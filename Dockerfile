@@ -20,7 +20,7 @@ COPY packages/learning-core/package.json packages/learning-core/package.json
 COPY packages/question-bank/package.json packages/question-bank/package.json
 RUN pnpm install --frozen-lockfile
 
-FROM postgres:17.6-bookworm AS postgres-tools
+FROM postgres:18.4-bookworm AS postgres-tools
 
 FROM dependencies AS builder
 COPY . .
