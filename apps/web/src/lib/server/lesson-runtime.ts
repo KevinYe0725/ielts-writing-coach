@@ -87,6 +87,13 @@ export type ExerciseItemRow = typeof exerciseItem.$inferSelect;
 export type ExerciseAttemptRow = typeof exerciseAttempt.$inferSelect;
 export type EvaluationRow = typeof evaluation.$inferSelect;
 
+/**
+ * One exercise keeps the independent first answer and one learner revision.
+ * Further practice must use a fresh item so repetition cannot masquerade as
+ * transfer and a learner can never be trapped retrying one prompt forever.
+ */
+export const MAX_EXERCISE_RESPONSE_VERSIONS = 2;
+
 export interface AttemptWithEvaluations extends ExerciseAttemptRow {
   readonly evaluations: readonly EvaluationRow[];
 }
@@ -579,6 +586,10 @@ function latestEvaluation(
   attempt: AttemptWithEvaluations | undefined,
 ): EvaluationRow | undefined {
   return attempt?.evaluations
+    .filter(
+      (candidate) =>
+        candidate.responseAttemptId === attempt.finalAttemptEventId,
+    )
     .slice()
     .sort(
       (a, b) =>
@@ -661,30 +672,44 @@ export function deriveLessonProgress(input: {
   const neutralItemIds = evaluations
     .filter((result) => result.supplementRequired && !result.demoOnly)
     .map((result) => result.itemId);
-  const neutralSupplement =
-    neutralItemIds.length > 0 &&
+  const exhaustedItemIds = input.attempts
+    .filter((attempt) => {
+      const latest = latestEvaluation(attempt);
+      return Boolean(
+        (attempt.contractAttempts?.length ?? 0) >=
+          MAX_EXERCISE_RESPONSE_VERSIONS &&
+          latest &&
+          !latest.passed &&
+          !isDemo(latest) &&
+          latest.feedback.outcome !== "NEUTRAL",
+      );
+    })
+    .map((attempt) => attempt.exerciseItemId);
+  const supportTriggerIds = [...neutralItemIds, ...exhaustedItemIds];
+  const supplementalItems =
+    supportTriggerIds.length > 0 &&
     decision.adaptive.activatedFlexItemIds.length === 0
       ? items
           .filter((item) => item.path === "FLEX")
-          .slice(-1)
+          .slice(0, 2)
           .map((item) => item.id)
       : [];
   const adaptive =
-    neutralSupplement.length > 0
+    supplementalItems.length > 0
       ? {
           ...decision.adaptive,
           remediationDepth: 1,
-          activatedFlexItemIds: neutralSupplement,
-          ...(neutralItemIds.at(-1)
-            ? { triggerAfterItemId: neutralItemIds.at(-1)! }
+          activatedFlexItemIds: supplementalItems,
+          ...(supportTriggerIds.at(-1)
+            ? { triggerAfterItemId: supportTriggerIds.at(-1)! }
             : {}),
         }
       : decision.adaptive;
   const activeItemIds =
-    neutralSupplement.length === 0
+    supplementalItems.length === 0
       ? decision.activeItemIds
       : (() => {
-          const triggerId = neutralItemIds.at(-1);
+          const triggerId = supportTriggerIds.at(-1);
           const index = decision.activeItemIds.findIndex(
             (id) => id === triggerId,
           );
@@ -692,7 +717,7 @@ export function deriveLessonProgress(input: {
             index < 0 ? decision.activeItemIds.length : index + 1;
           return [
             ...decision.activeItemIds.slice(0, insertion),
-            ...neutralSupplement,
+            ...supplementalItems,
             ...decision.activeItemIds.slice(insertion),
           ];
         })();
@@ -703,7 +728,12 @@ export function deriveLessonProgress(input: {
     const latest = latestEvaluation(attempt);
     if (latest !== undefined)
       return (
-        latest.passed || isDemo(latest) || latest.feedback.outcome === "NEUTRAL"
+        latest.passed ||
+        isDemo(latest) ||
+        latest.feedback.outcome === "NEUTRAL" ||
+        ((attempt.contractAttempts?.length ?? 0) >=
+          MAX_EXERCISE_RESPONSE_VERSIONS &&
+          latest.feedback.outcome !== "NEUTRAL")
       );
     if (unassessedAttemptIds.has(attempt.id)) return true;
     const item = items.find((candidate) => candidate.id === itemId);
@@ -734,7 +764,7 @@ export function deriveLessonProgress(input: {
     completedItemIds,
     nextItemId,
     remediationActive:
-      decision.remediationActive || neutralSupplement.length > 0,
+      decision.remediationActive || supplementalItems.length > 0,
     coreAnswered: coreIds.every((id) => attemptsByItem.has(id)),
     allActiveAnswered: activeItemIds.every((id) => attemptsByItem.has(id)),
   };

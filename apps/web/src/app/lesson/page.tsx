@@ -144,6 +144,8 @@ export default function LessonPage({
     runtimeOverride && data && runtimeOverride.revision >= data.runtime.revision
       ? runtimeOverride
       : (data?.runtime ?? null);
+  const movedToFollowUp =
+    data?.remediationActive === true || result?.remediationActive === true;
   const accepted =
     result?.outcome === "PASS" ||
     result?.outcome === "NEUTRAL" ||
@@ -151,7 +153,7 @@ export default function LessonPage({
     result?.outcome === "UNASSESSED" ||
     result?.outcome === "BATCH_PENDING" ||
     result?.outcome === "BATCH_COMPLETE" ||
-    result?.remediationActive === true;
+    movedToFollowUp;
   const currentStageIndex = item
     ? stages.findIndex((stage) => stage.id === item.stage)
     : 0;
@@ -1121,10 +1123,12 @@ export default function LessonPage({
               aria-live="polite"
               className={cn(
                 "answer-feedback",
-                accepted ? "feedback-correct" : "feedback-retry",
+                accepted && !movedToFollowUp
+                  ? "feedback-correct"
+                  : "feedback-retry",
               )}
             >
-              {accepted ? (
+              {accepted && !movedToFollowUp ? (
                 <CheckCircle2 aria-hidden="true" size={19} />
               ) : (
                 <RotateCcw aria-hidden="true" size={19} />
@@ -1156,15 +1160,20 @@ export default function LessonPage({
                                 "仅演示，不计能力证据",
                                 "Demo only — no mastery evidence",
                               )
-                            : accepted
+                            : movedToFollowUp
                               ? text(
-                                  "准确，而且意思保持完整",
-                                  "Accurate, with the intended meaning preserved",
+                                  "本题已记录为待加强，继续针对性练习",
+                                  "Recorded for follow-up — continue with targeted practice",
                                 )
-                              : text(
-                                  "还差一步，先自己再改一次",
-                                  "Almost there — revise it once yourself",
-                                )}
+                              : accepted
+                                ? text(
+                                    "准确，而且意思保持完整",
+                                    "Accurate, with the intended meaning preserved",
+                                  )
+                                : text(
+                                    "还差一步，先自己再改一次",
+                                    "Almost there — revise it once yourself",
+                                  )}
                 </strong>
                 <p>{text(result.feedbackZh, result.feedbackEn)}</p>
                 {result.criterionResults.length > 0 ? (
@@ -1218,19 +1227,25 @@ export default function LessonPage({
                     ))}
                   </ul>
                 ) : null}
-                {result.suggestionZh && !accepted ? (
+                {result.suggestionZh && (!accepted || movedToFollowUp) ? (
                   <small>{result.suggestionZh}</small>
                 ) : null}
               </div>
             </div>
           ) : null}
 
-          {errorMessage ? (
+          {errorMessage || (attempts >= 2 && !result) ? (
             <div className="answer-feedback feedback-retry" role="alert">
               <X aria-hidden="true" size={19} />
               <div>
                 <strong>{text("评价未完成", "Evaluation incomplete")}</strong>
-                <p>{errorMessage}</p>
+                <p>
+                  {errorMessage ||
+                    text(
+                      "答案已经保存，但本次评价尚未完成。请只重试评价，不要重复提交答案。",
+                      "Your answer is saved, but its evaluation did not finish. Retry only the evaluation instead of submitting another answer.",
+                    )}
+                </p>
                 <Button
                   disabled={saving}
                   onClick={() => void retryFailedEvaluation()}
@@ -1277,12 +1292,17 @@ export default function LessonPage({
                   <>
                     {actualIndex === data.items.length - 1
                       ? text("完成本课", "Complete lesson")
-                      : text("继续", "Continue")}
+                      : movedToFollowUp
+                        ? text(
+                            "进入针对性练习",
+                            "Continue to targeted practice",
+                          )
+                        : text("继续", "Continue")}
                     <ArrowRight aria-hidden="true" size={17} />
                   </>
                 )}
               </Button>
-            ) : (
+            ) : attempts >= 2 && !result ? null : (
               <Button
                 disabled={
                   !answer.trim() ||

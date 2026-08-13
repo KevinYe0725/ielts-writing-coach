@@ -153,9 +153,11 @@ describe("lesson runtime server projection", () => {
     const neutralAttempt = {
       id: "attempt-neutral",
       exerciseItemId: "open-card",
+      finalAttemptEventId: "answer-neutral",
       evaluations: [
         {
           id: "evaluation-neutral",
+          responseAttemptId: "answer-neutral",
           passed: false,
           feedback: { outcome: "NEUTRAL", firstAttemptPassed: "false" },
           versionSnapshot: { providerKind: "openai" },
@@ -173,6 +175,54 @@ describe("lesson runtime server projection", () => {
     expect(progress.remediationActive).toBe(true);
   });
 
+  it("moves an exhausted failed response to bounded follow-up practice", () => {
+    const row = (id: string, ordinal: number, path: "CORE" | "FLEX") =>
+      ({
+        id,
+        ordinal,
+        evaluationContract: {
+          path,
+          canonicalItem: { evidenceOpportunity: "OTHER" },
+        },
+      }) as unknown as ExerciseItemRow;
+    const exhaustedAttempt = {
+      id: "attempt-exhausted",
+      exerciseItemId: "cause-chain",
+      finalAttemptEventId: "revision",
+      contractAttempts: [
+        { id: "first", answer: "First answer" },
+        { id: "revision", answer: "Revision" },
+      ],
+      evaluations: [
+        {
+          id: "evaluation-revision",
+          responseAttemptId: "revision",
+          passed: false,
+          feedback: { outcome: "FAIL", firstAttemptPassed: "false" },
+          versionSnapshot: { providerKind: "openai" },
+          createdAt: new Date("2026-08-13T10:00:00Z"),
+        },
+      ],
+    } as unknown as AttemptWithEvaluations;
+    const progress = deriveLessonProgress({
+      items: [
+        row("cause-chain", 1, "CORE"),
+        row("simpler-contrast", 2, "FLEX"),
+        row("fresh-context", 3, "FLEX"),
+      ],
+      attempts: [exhaustedAttempt],
+    });
+
+    expect(progress.completedItemIds).toContain("cause-chain");
+    expect(progress.activeItemIds).toEqual([
+      "cause-chain",
+      "simpler-contrast",
+      "fresh-context",
+    ]);
+    expect(progress.nextItemId).toBe("simpler-contrast");
+    expect(progress.remediationActive).toBe(true);
+  });
+
   it("does not activate supplemental evidence for an unscored meaning fork", () => {
     const item = {
       id: "meaning-fork",
@@ -185,9 +235,11 @@ describe("lesson runtime server projection", () => {
     const attempt = {
       id: "attempt-meaning",
       exerciseItemId: "meaning-fork",
+      finalAttemptEventId: "answer-meaning",
       evaluations: [
         {
           id: "evaluation-meaning",
+          responseAttemptId: "answer-meaning",
           passed: false,
           feedback: { outcome: "NEUTRAL", firstAttemptPassed: "false" },
           versionSnapshot: { providerKind: "deterministic" },

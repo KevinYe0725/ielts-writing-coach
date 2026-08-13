@@ -28,6 +28,7 @@ import { enqueueAIJob } from "@/lib/server/jobs";
 import {
   deriveLessonProgress,
   expireLessonRuntime,
+  MAX_EXERCISE_RESPONSE_VERSIONS,
   normalizeLessonRuntimeState,
 } from "@/lib/server/lesson-runtime";
 import { ApiProblem, apiRoute } from "@/lib/server/problem";
@@ -508,13 +509,16 @@ export const POST = apiRoute(
             detail: "A revision cannot replace the saved first answer.",
           });
         }
-        if (existing && existing.contractAttempts.length >= 10) {
+        if (
+          existing &&
+          existing.contractAttempts.length >= MAX_EXERCISE_RESPONSE_VERSIONS
+        ) {
           throw new ApiProblem({
-            title: "Exercise retry limit reached",
+            title: "Exercise revision complete",
             status: 409,
             code: "EXERCISE_RETRY_LIMIT_REACHED",
             detail:
-              "This exercise already has the maximum number of saved attempts.",
+              "The first answer and one revision are already saved. Continue with the targeted follow-up item instead of repeating this prompt.",
           });
         }
         const responseId = existing?.id ?? newDomainId();
