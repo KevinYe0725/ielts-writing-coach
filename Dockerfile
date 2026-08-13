@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-FROM node:24.14.0-bookworm-slim AS base
+FROM node:24.19.0-bookworm-slim AS base
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 RUN corepack enable && corepack prepare pnpm@11.16.0 --activate
@@ -36,7 +36,7 @@ RUN pnpm --filter @iwc/web build \
     && cp -a /workspace/apps/web/.next/standalone/node_modules/. /workspace/runtime-node-modules/ \
     && ln -s .pnpm/node_modules/pg /workspace/runtime-node-modules/pg
 
-FROM node:24.14.0-bookworm-slim AS runner
+FROM node:24.19.0-bookworm-slim AS runner
 ARG SOURCE_URL="https://github.com/KevinYe0725/ielts-writing-coach"
 ARG VCS_REF="unknown"
 ARG VERSION="1.0.0"
