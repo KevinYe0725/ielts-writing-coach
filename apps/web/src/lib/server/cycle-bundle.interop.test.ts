@@ -32,6 +32,11 @@ import {
 
 const databaseUrl =
   process.env.IWC_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
+const skillPython =
+  process.env.IWC_SKILL_PYTHON ??
+  (spawnSync("python3.11", ["--version"]).status === 0
+    ? "python3.11"
+    : "python3");
 const skillScript = fileURLToPath(
   new URL(
     "../../../../../.agents/skills/coach-ielts-writing/scripts/coach_state.py",
@@ -42,7 +47,7 @@ const skillScript = fileURLToPath(
 function skill(workspace: string, ...args: string[]): unknown {
   const envelope = JSON.parse(
     execFileSync(
-      "python3.11",
+      skillPython,
       [skillScript, ...args, "--workspace", workspace],
       { encoding: "utf8" },
     ),

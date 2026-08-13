@@ -346,8 +346,24 @@ integration("shared-instance AI job routing and repair", () => {
   const waitingJobId = newDomainId();
   const blockedJobId = newDomainId();
   const personalJobId = newDomainId();
+  const fallbackInstanceId = newDomainId();
+  let testInstanceId = "";
+  let createdTestInstance = false;
 
   beforeAll(async () => {
+    const existingInstance =
+      await database.db.query.instanceConfiguration.findFirst();
+    if (existingInstance) {
+      testInstanceId = existingInstance.id;
+    } else {
+      testInstanceId = fallbackInstanceId;
+      createdTestInstance = true;
+      await database.db.insert(instanceConfiguration).values({
+        id: testInstanceId,
+        deploymentMode: "personal",
+        defaultLocale: "zh-CN",
+      });
+    }
     await database.db.insert(user).values([
       {
         id: ownerId,
@@ -457,6 +473,11 @@ integration("shared-instance AI job routing and repair", () => {
     await database.db.delete(user).where(eq(user.id, ownerId));
     await database.db.delete(user).where(eq(user.id, adminId));
     await database.db.delete(user).where(eq(user.id, learnerId));
+    if (createdTestInstance) {
+      await database.db
+        .delete(instanceConfiguration)
+        .where(eq(instanceConfiguration.id, testInstanceId));
+    }
     await database.pool.end();
   });
 
@@ -470,8 +491,9 @@ integration("shared-instance AI job routing and repair", () => {
       expect(resolved.route?.id).toBe(routeId);
       expect(resolved.provider?.id).toBe(providerId);
 
-      const instance =
-        await transaction.query.instanceConfiguration.findFirst();
+      const instance = await transaction.query.instanceConfiguration.findFirst({
+        where: eq(instanceConfiguration.id, testInstanceId),
+      });
       expect(instance).toBeDefined();
       await transaction
         .update(instanceConfiguration)
