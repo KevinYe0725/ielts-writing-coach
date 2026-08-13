@@ -22,6 +22,48 @@ async function close(server: Server): Promise<void> {
 }
 
 describe("CompatibleAdapter pinned provider requests", () => {
+  it("uses a sufficient validation budget and the preset-owned thinking mode", async () => {
+    let requestBody: Record<string, unknown> | undefined;
+    const server = createServer((request, response) => {
+      const chunks: Buffer[] = [];
+      request.on("data", (chunk: Buffer) => chunks.push(chunk));
+      request.on("end", () => {
+        requestBody = JSON.parse(
+          Buffer.concat(chunks).toString("utf8"),
+        ) as Record<string, unknown>;
+        response.setHeader("content-type", "application/json");
+        response.end(
+          JSON.stringify({
+            model: "deepseek-v4-flash",
+            choices: [{ message: { content: "OK" } }],
+          }),
+        );
+      });
+    });
+    const port = await listen(server);
+    const baseUrl = `http://provider.test:${port}`;
+    const adapter = new CompatibleAdapter({
+      baseUrl,
+      validationModel: "deepseek-v4-flash",
+      thinkingMode: "disabled",
+      localBaseUrlAllowlist: [baseUrl],
+      addressResolver: async () => [{ address: "127.0.0.1", family: 4 }],
+    });
+
+    try {
+      await expect(adapter.validateConnection()).resolves.toMatchObject({
+        ok: true,
+      });
+      expect(requestBody).toMatchObject({
+        max_tokens: 64,
+        model: "deepseek-v4-flash",
+        thinking: { type: "disabled" },
+      });
+    } finally {
+      await close(server);
+    }
+  });
+
   it("uses the exact API root and supports a preset-owned api-key header", async () => {
     let requestedPath: string | undefined;
     let apiKeyHeader: string | undefined;

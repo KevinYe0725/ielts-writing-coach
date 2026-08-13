@@ -13,6 +13,7 @@ describe("provider preset resolution", () => {
     });
     expect(result.credentials.baseUrl).toBe("https://api.deepseek.com");
     expect(result.credentials.validationModel).toBe("deepseek-v4-flash");
+    expect(result.credentials.thinkingMode).toBe("disabled");
   });
 
   it("accepts an exact custom endpoint while retaining Bearer auth", () => {

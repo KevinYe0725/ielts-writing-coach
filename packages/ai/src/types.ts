@@ -8,6 +8,8 @@ export interface ProviderCredentials {
   authHeader?: "authorization" | "api-key";
   /** Uses a fixed harmless generation for providers without a models endpoint. */
   validationModel?: string;
+  /** Server-owned preset option for providers with a hybrid reasoning mode. */
+  thinkingMode?: "disabled" | "enabled";
 }
 
 export interface ModelDescriptor {

@@ -50,6 +50,7 @@ export class CompatibleAdapter implements AIProviderAdapter {
   readonly #resolveAddresses: ProviderAddressResolver | undefined;
   readonly #authHeader: "authorization" | "api-key";
   readonly #validationModel: string | undefined;
+  readonly #thinkingMode: "disabled" | "enabled" | undefined;
 
   constructor(options: {
     apiKey?: string;
@@ -58,6 +59,7 @@ export class CompatibleAdapter implements AIProviderAdapter {
     addressResolver?: ProviderAddressResolver;
     authHeader?: "authorization" | "api-key";
     validationModel?: string;
+    thinkingMode?: "disabled" | "enabled";
   }) {
     this.#apiKey = options.apiKey;
     this.#baseUrl = options.baseUrl;
@@ -65,6 +67,7 @@ export class CompatibleAdapter implements AIProviderAdapter {
     this.#resolveAddresses = options.addressResolver;
     this.#authHeader = options.authHeader ?? "authorization";
     this.#validationModel = options.validationModel;
+    this.#thinkingMode = options.thinkingMode;
   }
 
   #endpoint(path: "models" | "chat/completions"): string {
@@ -119,7 +122,7 @@ export class CompatibleAdapter implements AIProviderAdapter {
         await this.generateText({
           model: this.#validationModel,
           input: "Reply with OK.",
-          maxOutputTokens: 8,
+          maxOutputTokens: 64,
           ...(signal === undefined ? {} : { signal }),
         });
       } else await this.listModels(signal);
@@ -233,6 +236,9 @@ export class CompatibleAdapter implements AIProviderAdapter {
         ...(request.temperature === undefined
           ? {}
           : { temperature: request.temperature }),
+        ...(this.#thinkingMode === undefined
+          ? {}
+          : { thinking: { type: this.#thinkingMode } }),
       }),
     });
     const rawBody = await response.text();

@@ -7,6 +7,21 @@ import {
 } from "./errors";
 
 describe("provider error redaction", () => {
+  it("explains model or request rejection without exposing provider text", () => {
+    expect(
+      normalizeProviderError({
+        status: 400,
+        message: "provider-controlled diagnostic",
+      }),
+    ).toEqual({
+      code: "UNKNOWN",
+      retryable: false,
+      safeMessage:
+        "The provider rejected the model or request. Check the model ID and account access.",
+      status: 400,
+    });
+  });
+
   it("redacts known credential shapes", () => {
     const text = redactSensitiveText(
       "Bearer abc.def.ghi api_key=secret-value sk-example123456",

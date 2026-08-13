@@ -42,6 +42,19 @@ describe("provider catalog", () => {
     ).toBe("api-key");
   });
 
+  it("disables DeepSeek hybrid reasoning for deterministic coaching calls", () => {
+    expect(
+      providerCredentialsForPreset({
+        vendor: "deepseek",
+        validationModel: "deepseek-v4-flash",
+      }).credentials,
+    ).toMatchObject({
+      baseUrl: "https://api.deepseek.com",
+      thinkingMode: "disabled",
+      validationModel: "deepseek-v4-flash",
+    });
+  });
+
   it("exposes non-empty defaults and bilingual guidance", () => {
     for (const preset of providerCatalog) {
       expect(getProviderPreset(preset.id).defaultModel.length).toBeGreaterThan(

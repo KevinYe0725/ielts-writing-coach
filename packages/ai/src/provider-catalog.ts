@@ -41,6 +41,7 @@ export interface ProviderPreset {
   apiKeyPlaceholder: string;
   configurableBaseUrl: boolean;
   authHeader: "authorization" | "api-key";
+  thinkingMode?: "disabled" | "enabled";
   docsUrl: string | null;
   compatibilityNoteZh: string;
   compatibilityNoteEn: string;
@@ -111,6 +112,7 @@ export const providerCatalog: readonly ProviderPreset[] = [
     region: "china",
     baseUrl: "https://api.deepseek.com",
     defaultModel: "deepseek-v4-flash",
+    thinkingMode: "disabled",
     apiKeyPlaceholder: "sk-…",
     docsUrl: "https://api-docs.deepseek.com/",
     compatibilityNoteZh: "使用 DeepSeek 官方 OpenAI 兼容入口。",
@@ -413,6 +415,7 @@ export function resolveProviderPreset(input: {
   vendor: ProviderVendor;
   baseUrl?: string;
   authHeader: "authorization" | "api-key";
+  thinkingMode?: "disabled" | "enabled";
 } {
   const preset = getProviderPreset(input.vendor);
   const requested = input.baseUrl?.trim() || undefined;
@@ -424,6 +427,9 @@ export function resolveProviderPreset(input: {
     vendor: preset.id,
     ...(baseUrl ? { baseUrl } : {}),
     authHeader: preset.authHeader,
+    ...(preset.thinkingMode === undefined
+      ? {}
+      : { thinkingMode: preset.thinkingMode }),
   };
 }
 
@@ -444,6 +450,9 @@ export function providerCredentialsForPreset(input: {
         ? {}
         : { localBaseUrlAllowlist: input.localBaseUrlAllowlist }),
       authHeader: resolved.authHeader,
+      ...(resolved.thinkingMode === undefined
+        ? {}
+        : { thinkingMode: resolved.thinkingMode }),
       ...(input.validationModel === undefined
         ? {}
         : { validationModel: input.validationModel }),

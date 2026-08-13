@@ -121,6 +121,15 @@ export function normalizeProviderError(
       ...optionalStatus,
     };
   }
+  if (status === 400 || status === 404 || status === 422) {
+    return {
+      code: "UNKNOWN",
+      safeMessage:
+        "The provider rejected the model or request. Check the model ID and account access.",
+      retryable: false,
+      status,
+    };
+  }
   if (status !== undefined && status >= 500) {
     return {
       code: "CONNECTION",

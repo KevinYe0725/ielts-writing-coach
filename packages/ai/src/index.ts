@@ -31,6 +31,9 @@ export function createProviderAdapter(
         ...(credentials.validationModel === undefined
           ? {}
           : { validationModel: credentials.validationModel }),
+        ...(credentials.thinkingMode === undefined
+          ? {}
+          : { thinkingMode: credentials.thinkingMode }),
       });
     case "mock":
       return new MockAdapter();
