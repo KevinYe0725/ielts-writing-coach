@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { DATABASE_SCHEMA_VERSION } from "../../packages/db/src/schema-version";
 
 const owner = {
   email: "compose-e2e-owner@example.invalid",
@@ -203,7 +204,7 @@ test("the production Compose image opens setup in a real browser", async ({
   expect(version.ok()).toBe(true);
   expect(await version.json()).toMatchObject({
     application: "1.0.0",
-    database_schema: expect.stringMatching(/^0008_/u),
+    database_schema: DATABASE_SCHEMA_VERSION,
     exchange_schema: "1.0.0",
   });
 
