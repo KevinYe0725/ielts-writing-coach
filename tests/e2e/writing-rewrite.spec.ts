@@ -57,6 +57,7 @@ test.describe("timed writing rooms", () => {
       ),
     ).toHaveCount(0);
 
+    await expect(page.getByRole("timer")).toContainText("40:00");
     await page.clock.runFor("35:00");
 
     await expect(page.getByRole("timer")).toContainText("05:00");

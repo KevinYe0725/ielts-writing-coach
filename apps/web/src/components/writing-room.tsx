@@ -102,6 +102,7 @@ export function WritingRoom({
     "waiting" | "saving" | "saved" | "error"
   >("waiting");
   const hydrated = useRef(false);
+  const deadlineAt = useRef<number | null>(null);
   const blindSnapshotSaved = useRef(false);
   const blindSnapshotPromise = useRef<Promise<void> | null>(null);
   const submitButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -131,6 +132,7 @@ export function WritingRoom({
     const timeout = window.setTimeout(() => {
       setDraft(data.draft);
       latestDraft.current = data.draft;
+      deadlineAt.current = Date.now() + data.durationSeconds * 1000;
       setRemaining(data.durationSeconds);
       setActive(true);
       if (mode === "rewrite") {
@@ -150,13 +152,17 @@ export function WritingRoom({
   }, [data, mode]);
 
   useEffect(() => {
-    if (!active || remaining <= 0) return;
-    const timer = window.setInterval(
-      () => setRemaining((value) => Math.max(0, value - 1)),
-      1000,
-    );
+    if (!active || deadlineAt.current === null) return;
+    const updateRemaining = () => {
+      if (deadlineAt.current === null) return;
+      setRemaining(
+        Math.max(0, Math.ceil((deadlineAt.current - Date.now()) / 1000)),
+      );
+    };
+    updateRemaining();
+    const timer = window.setInterval(updateRemaining, 1000);
     return () => window.clearInterval(timer);
-  }, [active, remaining]);
+  }, [active]);
 
   const persistDraft = useCallback(
     async (value: string, generation: number) => {
