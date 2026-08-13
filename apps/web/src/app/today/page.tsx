@@ -32,6 +32,7 @@ import { cn } from "@/components/utils";
 import { learningClient } from "@/lib/client";
 import type { QuestionOption, QuestionTopic, QuestionType } from "@/lib/client";
 import { learningRouteHref } from "@/lib/client/learning-route";
+import { saveLearningDestinations } from "@/lib/client/learning-navigation";
 
 const questionTypes: Array<{ id: QuestionType; zh: string; en: string }> = [
   { id: "opinion", zh: "同意 / 不同意", en: "Opinion" },
@@ -81,6 +82,9 @@ export default function TodayPage() {
   const [customTrack, setCustomTrack] = useState<
     "academic" | "general_training"
   >("academic");
+  useEffect(() => {
+    if (data) saveLearningDestinations(data.navigation);
+  }, [data]);
 
   const needsQuestion =
     data?.nextTask.id === "question-bank" ||

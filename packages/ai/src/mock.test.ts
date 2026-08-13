@@ -106,4 +106,83 @@ describe("deterministic Mock Provider", () => {
     expect(result.value).toMatchObject({ naturalOpportunity: true });
     expect(result.value.feedbackEn).toContain("did not score language");
   });
+
+  it("generates a clear, non-repeating complete practice paper", async () => {
+    const adapter = new MockAdapter();
+    const result = await adapter.generateStructured({
+      model: "mock-deterministic-v1",
+      input: "Create the paper.",
+      schemaName: "iwc_practice_paper_v2",
+      schema: { type: "object" },
+      validate: (
+        value: unknown,
+      ): value is {
+        items: Array<{
+          section: string;
+          promptEn: string;
+          sourceText: string;
+          suggestedMinutes: number;
+          publicCriteria: Array<{ weight: number }>;
+        }>;
+      } =>
+        typeof value === "object" &&
+        value !== null &&
+        Array.isArray((value as { items?: unknown }).items),
+    });
+
+    expect(result.value.items).toHaveLength(8);
+    expect(new Set(result.value.items.map((item) => item.promptEn)).size).toBe(
+      8,
+    );
+    expect(
+      result.value.items.reduce((sum, item) => sum + item.suggestedMinutes, 0),
+    ).toBe(60);
+    expect(
+      result.value.items
+        .filter((item) => item.section === "REPAIR")
+        .every((item) => item.sourceText.length > 0),
+    ).toBe(true);
+    expect(
+      result.value.items.every(
+        (item) =>
+          item.publicCriteria.reduce(
+            (sum, criterion) => sum + criterion.weight,
+            0,
+          ) === 100,
+      ),
+    ).toBe(true);
+  });
+
+  it("generates teaching and a paper with the same named target", async () => {
+    const adapter = new MockAdapter();
+    const result = await adapter.generateStructured({
+      model: "mock-deterministic-v1",
+      input: "Create the focused learning package.",
+      schemaName: "iwc_focused_learning_package_v3",
+      schema: { type: "object" },
+      validate: (
+        value: unknown,
+      ): value is {
+        teachingModule: {
+          targetTitleZh: string;
+          knowledgeCards: unknown[];
+          expressionBank: unknown[];
+        };
+        paper: { objectiveZh: string; items: unknown[] };
+      } =>
+        typeof value === "object" &&
+        value !== null &&
+        "teachingModule" in value &&
+        "paper" in value,
+    });
+
+    expect(result.value.teachingModule.knowledgeCards).toHaveLength(3);
+    expect(
+      result.value.teachingModule.expressionBank.length,
+    ).toBeGreaterThanOrEqual(2);
+    expect(result.value.paper.objectiveZh).toContain(
+      result.value.teachingModule.targetTitleZh,
+    );
+    expect(result.value.paper.items).toHaveLength(8);
+  });
 });

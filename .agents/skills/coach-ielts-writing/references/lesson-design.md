@@ -1,76 +1,66 @@
-# Lesson design
+# Complete practice paper design
 
 ## Contents
 
 1. Goal policy
-2. Core timing
-3. Active-output requirements
-4. Adaptive branches
-5. Passing rules
-6. Problem-type variants
+2. Focused teaching before the paper
+3. Paper timing
+4. Active-output requirements
+5. Submission and marking
+6. Passing rules
+7. Problem-type variants
 
 ## 1. Goal policy
 
-Teach one required new core objective. A related secondary objective is allowed only when it shares the same decision rule, the same output can prove both, and the core objective is progressing well. Do not add a new secondary objective to a TR or CC core lesson. An old objective may appear once as an unprompted retrieval check but does not affect core passing.
+Build the paper around one required new core objective. A related secondary objective is allowed only when it shares the same decision rule and the same output can demonstrate both. Do not add a new secondary objective to a TR or CC paper.
 
-## 2. Core timing
+## 2. Focused teaching before the paper
 
-Plan a 35–45 minute core path and at most 15 minutes of conditional support. The full lesson must not exceed 3,600 planned user seconds.
+The learner should enter the paper knowing what decision to make, why it works, and how to check it. Generate a teaching module before the timed paper with:
 
-| Time | Block | Required behavior |
-|---:|---|---|
-| 0–5 | Closed-book baseline | Repair an original sentence or outline and confirm intended meaning |
-| 5–10 | Minimal explanation | Predict first; then show one rule and a minimal contrast |
-| 10–18 | Diagnosis and repair | Use no more recognition tasks than necessary; explain the decision |
-| 18–27 | Fading support | Move from frame to keywords to unprompted generation |
-| 27–30 | Break | Off-screen; show no learning content |
-| 30–41 | Immediate near transfer | Change context and require an integrated output |
-| 41–44 | Self-check and exit item | Save pre-check and revised versions; use an unseen surface form |
-| 44–45 | Core checkpoint | End if all hard gates pass; otherwise select one support branch |
-| 45–57 | Conditional support | Address the missing evidence, not general weakness |
-| 57–60 | Conditional retest | Retest only after support; then schedule later work |
+- one plain-language ability target and decision rule;
+- 3–5 knowledge cards based on the diagnosed evidence;
+- 2–8 reusable expressions or one thinking framework suited to the target;
+- one worked before/after example with the reasoning made visible;
+- exactly two quick checks with explanations hidden until the learner answers;
+- a short readiness checklist.
 
-Do not start another remedial branch after minute 50. Preserve time for closure.
+Use the learner's original error as evidence, but teach a transferable rule. Do not reuse a forthcoming paper answer as the worked example. Do not start the timer while the learner reads or practises the teaching module.
 
-## 3. Active-output requirements
+## 3. Paper timing
 
-- Use the smallest number of substantial items that fills the 35–45 minute core path and creates every required evidence opportunity; do not inflate question count.
-- Limit recognition, judgment, and selection to 3–4 items and at most 25% of item count.
-- Set `expectedActiveSeconds` so active output is at least 65% of non-break required CORE item time.
+Plan one 60-minute, eight-question paper. All questions are visible from the start, and the learner submits them together.
+
+| Questions | Minutes | Required behavior |
+|---:|---:|---|
+| 1–2 | 10 | One unambiguous recognition task and one short explanation |
+| 3–4 | 14 | Repair two flawed excerpts while preserving meaning |
+| 5–6 | 16 | Generate original language in two genuinely different contexts |
+| 7–8 | 20 | Integrate the target into larger IELTS-style writing, including a paragraph |
+
+The question minutes must total exactly 60. The timer locks editing at 60 minutes, but the learner can still submit an incomplete sheet for honest marking.
+
+## 4. Active-output requirements
+
+- Use exactly eight substantial questions. Recognition or selection occupies at most two questions.
+- Reserve most time for repair, generation, and integrated output.
 - Include at least two first-attempt unprompted generations in different contexts and one integrated output.
 - Introduce at most 3–5 new chunks.
 - Keep a single explanation card under 90 seconds.
-- Batch independent items before feedback; otherwise the first answer becomes a cue for later items.
+- Give no item feedback before whole-paper submission, so one answer cannot reveal another.
 
-## 4. Adaptive branches
+## 5. Submission and marking
 
-### Stable baseline
+- Save the complete answer sheet once. Never make a failed item block navigation or submission.
+- Mark every answer against only the requirements stated in that question's visible instruction. Do not display protected marking criteria as a separate learner-facing block.
+- Give the whole-paper score and a short summary first.
+- Keep passed questions collapsed. For a below-standard question, show the missed criterion, exact learner evidence, a plain-language explanation, one improved answer, and one next action.
+- If evaluation fails, retry only the evaluation of the immutable answer sheet; never consume another learner attempt.
+- If the timebox expires, lock editing, retain all entered answers, and allow immediate submission. Blank answers are `not_scorable`, not system errors.
 
-If the baseline is independently correct and history does not show recurrence, skip elementary explanation and move to a harder generation or integrated use.
+## 6. Passing rules
 
-### Two controlled errors
-
-Insert one simpler minimal contrast, one explanation card, and one isomorphic repair. Add no more than two remedial items per target.
-
-### Recognition succeeds, generation fails
-
-Stop adding selection tasks. Use: complete frame → partial frame → keywords → no prompt.
-
-### Sentence succeeds, paragraph fails
-
-Use a short timed paragraph, a target-specific self-check, and one revision. Mark the ability `not_automatic` rather than retesting sentence recognition.
-
-### Two independent successes
-
-Stop same-level repetition. Move to near transfer or end early.
-
-### Timebox expires
-
-Save the current response, remove optional work, finish the lesson, and schedule an 8–20 minute recovery task targeted to the failure point.
-
-## 5. Passing rules
-
-Recognition accuracy is routing evidence, not the final gate. Mark the core objective `applied` only when all are true:
+The paper diagnoses readiness but does not by itself prove delayed retention. Mark the core objective `applied` only when all are true:
 
 - at least two different-context generations are first-attempt, unprompted, and correct;
 - an integrated output uses the ability naturally and preserves meaning;
@@ -80,7 +70,7 @@ Recognition accuracy is routing evidence, not the final gate. Mark the core obje
 
 If the integrated task has no natural opportunity to use the target, record `no_opportunity`; do not pass or fail it.
 
-## 6. Problem-type variants
+## 7. Problem-type variants
 
 ### Grammar and collocation
 

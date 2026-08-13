@@ -22,7 +22,7 @@ Guide one IELTS Writing Task 2 essay through an active, spaced learning cycle. K
 | ----------------------------- | ------------------------------------------------------------------------------------------- |
 | Start practice / 给我一道题   | Start or resume a cycle; present one Task 2 prompt and the 40-minute conditions             |
 | Submit or critique an essay   | Save the verbatim attempt first, then assess it                                             |
-| Generate exercises / 专项训练 | Build or continue the lesson for the selected core objective                                |
+| Generate exercises / 专项训练 | Teach the selected ability first, then build one complete timed paper for independent use   |
 | Continue / 今天做什么         | Use the deterministic `next_action` from local state                                        |
 | Rewrite / 重写                | Use only the rewrite packet and record assistance honestly                                  |
 | Compare versions              | Reassess with the same rubric version when possible, then run deterministic comparison      |
@@ -36,7 +36,7 @@ Guide one IELTS Writing Task 2 essay through an active, spaced learning cycle. K
 - Distinguish hard grammar errors, collocation or naturalness problems, L1-influenced information structure, logic gaps, and optional style improvements.
 - Select one required new core objective per lesson. Add a related secondary objective only when it shares the same decision rule and the same output can prove both. TR or CC core lessons do not add a new secondary objective.
 - Keep recognition, judgment, and selection tasks to at most 3–4 items and no more than 25% of the lesson. Require at least 65% active-output time.
-- Preserve the user's first answer, hint level, revision, and final answer separately. Seeing a full example cannot count as independent success.
+- Preserve the submitted answer sheet verbatim. Do not reveal answers, hints, or item-level judgments before the complete paper is submitted.
 - Do not reveal a complete Band 7/7.5 essay or line-by-line answer set before Version 2 is submitted.
 - Treat protected-file access as answer exposure even if the text is not copied into the final reply. Do not inspect Version 1, detailed feedback, lesson answers, or model language merely to decide that a request must be refused.
 - A lesson can advance a skill only to `applied`. Only delayed, unprompted evidence can support `retained`; cross-topic evidence supports `transferred`.
@@ -65,30 +65,32 @@ Read `references/assessment-rubric.md`. Produce:
 
 Show a one-minute summary first. Save detailed feedback locally and keep the full model essay locked.
 
-### 3. Teach the active lesson
+### 3. Teach the focused ability
 
-Read `references/lesson-design.md` and `references/exercise-contracts.md`. Generate a 35–45 minute core path plus at most 15 minutes of conditional support. Validate it with:
+Read `references/lesson-design.md`. Before testing, give the learner a compact but substantial learning module tied to the exact weakness found in Version 1:
 
-```bash
-python3.11 <skill-dir>/scripts/validate_lesson.py <lesson-plan.json>
-```
+- state the ability target and the decision rule in plain Chinese;
+- explain 3–5 transferable knowledge points with before/after examples from the learner's context;
+- provide a small expression bank or thinking framework relevant to the topic or rhetorical function;
+- walk through one worked example without revealing answers to the coming paper;
+- use two quick self-checks and a readiness checklist.
 
-Present one item at a time. Use this progression:
+The teaching module must explain how to make the writing decision, not merely list model sentences. Opening it does not start the paper timer. It must not display backend IDs, prompt fields, rubrics, confidence machinery, or hidden marking criteria.
 
-1. closed-book baseline and meaning confirmation;
-2. minimal explanation and contrast;
-3. controlled diagnosis and repair;
-4. fading support;
-5. two different-context, first-attempt, unprompted generations;
-6. a three-minute off-screen break;
-7. immediate near transfer and one integrated output;
-8. targeted self-check and an unseen-surface exit item;
-9. conditional support only if a core evidence gate is missing.
+### 4. Run the timed practice paper
 
-Give immediate feedback in controlled practice. Batch two or three independent generations before feedback so one answer cannot reveal the next. Save each first answer before responding.
-After each submitted item, persist the next safe resume point with `coach_state.py lesson-cursor`; never infer a cursor from chat history when state already contains one.
+Read `references/lesson-design.md` and `references/exercise-contracts.md`. Generate one coherent 60-minute paper with exactly eight self-contained questions, shown together before the timer starts:
 
-### 4. Schedule delayed work
+1. two foundation questions for recognition and short explanation;
+2. two repair questions using flawed but understandable excerpts;
+3. two independent-generation questions in genuinely different contexts;
+4. two integrated questions, including an IELTS-style paragraph.
+
+The suggested minutes must total 60. Every question must state in one plain-Chinese instruction what to produce, its sentence or word range, all required ideas, and all restrictions. Do not show a separate marking-criteria block. Protected marking criteria may mirror the visible instruction for reliable evaluation, but must never add a hidden requirement.
+
+Do not mark, hint, unlock answers, or adapt the next question while the user is working. Collect and save the complete answer sheet once. Then mark all eight answers together. Show a short whole-paper summary and expand detailed analysis, exact answer evidence, and an improved version only for questions below the published standard. A missed question does not trap the user on the page: record it as needing work and schedule it for later recovery.
+
+### 5. Schedule delayed work
 
 After the last teaching exposure, schedule:
 
@@ -98,7 +100,7 @@ After the last teaching exposure, schedule:
 
 If a recovery lesson adds another teaching exposure, move the rewrite so at least 24 hours still separates teaching and testing. Local due tasks work without background notifications; create an external reminder only when the user explicitly asks and the relevant automation tool is available.
 
-### 5. Protect Version 2
+### 6. Protect Version 2
 
 Generate the packet with:
 
@@ -108,7 +110,7 @@ python3.11 <skill-dir>/scripts/build_rewrite_packet.py --workspace <path> --cycl
 
 Recommend a fresh Codex task. During collection of Version 2, read only the packet and minimal cycle status; do not read Version 1, feedback, lesson responses, or reference answers. If the user asks for help, provide it only after confirming that the rewrite will be marked `assisted`; assisted work cannot prove retention.
 
-### 6. Compare and test transfer
+### 7. Compare and test transfer
 
 - Use the same assessment prompt and rubric versions for both attempts whenever possible. If versions differ, state that score movement is not directly comparable.
 - Run `compare_attempts.py` for word count, issue frequency per 100 words, recurrence, time, and version-comparability metadata.
@@ -132,7 +134,7 @@ Read `references/state-schema.md` before state repair, import, export, or migrat
 ## Resource map
 
 - `references/assessment-rubric.md`: four IELTS dimensions, evidence, issue labels, and comparison rules.
-- `references/lesson-design.md`: course timing, adaptive branches, cognitive-load limits, and exit gates.
+- `references/lesson-design.md`: complete-paper timing, question progression, clarity rules, and marking behavior.
 - `references/workflow-and-mastery.md`: cycle states, scheduling, assistance, retention, and transfer evidence.
 - `references/state-schema.md`: local files, JSON fields, atomicity, privacy, and CycleBundle.
 - `references/exercise-contracts.md`: supported `skill_id` values, exercise types, plan and response contracts.

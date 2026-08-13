@@ -1,36 +1,26 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 import { deterministicDemo, resetDemoState } from "./support";
 
 const lessonUrl =
   "/lesson?cycle=cycle-demo&lesson=lesson-collocation-perspective";
+const paperUrl =
+  "/lesson/paper?cycle=cycle-demo&lesson=lesson-collocation-perspective";
 
-async function submitChoice(page: Page, label: string): Promise<void> {
-  const choice = page.getByRole("radio", { name: label, exact: true });
-  await page.getByText(label, { exact: true }).last().click();
-  await expect(choice).toBeChecked();
-  await page.getByRole("button", { name: "提交", exact: true }).click();
-  await expect(page.getByText("仅演示，不计能力证据")).toBeVisible();
-  await page.getByRole("button", { name: "继续", exact: true }).click();
+async function navigationLink(
+  page: import("@playwright/test").Page,
+  name: string,
+) {
+  const link = page.getByRole("link", { name });
+  if ((page.viewportSize()?.width ?? 1_000) < 700) {
+    if (!(await link.isVisible())) {
+      await page.locator(".mobile-menu > summary").click();
+    }
+  }
+  return link;
 }
 
-async function submitSentence(
-  page: Page,
-  answer: string,
-  final = false,
-): Promise<void> {
-  await page.getByLabel("你的英文答案").fill(answer);
-  await page.getByRole("button", { name: "提交", exact: true }).click();
-  await expect(page.getByText("仅演示，不计能力证据")).toBeVisible();
-  await page
-    .getByRole("button", {
-      name: final ? "完成本课" : "继续",
-      exact: true,
-    })
-    .click();
-}
-
-test.describe("five-stage focused lesson", () => {
+test.describe("feedback, focused teaching and complete practice paper", () => {
   test.skip(
     !deterministicDemo,
     "Run with NEXT_PUBLIC_DEMO_MODE=true and a demo-mode web server.",
@@ -38,288 +28,160 @@ test.describe("five-stage focused lesson", () => {
 
   test.beforeEach(async ({ page }) => resetDemoState(page));
 
-  test("renders and accepts the demo's meaning, contrast, generation, and paragraph controls", async ({
-    page,
-  }) => {
-    await page.goto(
-      "/lesson?cycle=cycle-demo&lesson=lesson-collocation-perspective",
-    );
-
-    await expect(
-      page.getByText("含义岔路 · 不计分", { exact: true }),
-    ).toBeVisible();
-    const meaningChoice = page.getByRole("radio", {
-      name: "小学生需要完成的课业较少",
-      exact: true,
-    });
-    await page
-      .getByText("小学生需要完成的课业较少", { exact: true })
-      .last()
-      .click();
-    await expect(meaningChoice).toBeChecked();
-    await page.getByRole("button", { name: "提交", exact: true }).click();
-    await expect(page.getByText("仅演示，不计能力证据")).toBeVisible({
-      timeout: 15_000,
-    });
-    await page.getByRole("button", { name: "继续", exact: true }).click();
-
-    await expect(page.getByText("最小对比", { exact: true })).toBeVisible();
-    const contrastChoice = page.getByRole("radio", {
-      name: "Primary-school courses are less demanding.",
-      exact: true,
-    });
-    await page
-      .getByText("Primary-school courses are less demanding.", { exact: true })
-      .last()
-      .click();
-    await expect(contrastChoice).toBeChecked();
-    await page.getByRole("button", { name: "提交", exact: true }).click();
-    await expect(page.getByText("仅演示，不计能力证据")).toBeVisible();
-    await page.getByRole("button", { name: "继续", exact: true }).click();
-
-    await expect(page.getByText("无提示生成", { exact: true })).toBeVisible();
-    const answer = page.getByLabel("你的英文答案");
-    await answer.fill(
-      "Primary-school pupils face less academic pressure than secondary-school students.",
-    );
-    await expect(answer).toHaveValue(/pupils face less academic pressure/);
-    await page.getByRole("button", { name: "提交", exact: true }).click();
-    await expect(page.getByText("仅演示，不计能力证据")).toBeVisible();
-    await page.getByRole("button", { name: "继续", exact: true }).click();
-
-    await expect(page.getByText("陌生语境迁移", { exact: true })).toBeVisible();
-    await expect(
-      page.getByText("Use the academic-pressure perspective naturally."),
-    ).toBeVisible();
-    await expect(
-      page.getByText("Connect the workload cause to its consequence."),
-    ).toBeVisible();
-    const paragraph = page.getByLabel("你的英文答案");
-    const submit = page.getByRole("button", { name: "提交", exact: true });
-    await paragraph.fill(Array.from({ length: 79 }, () => "word").join(" "));
-    await expect(submit).toBeDisabled();
-    await paragraph.fill(Array.from({ length: 80 }, () => "word").join(" "));
-    await expect(submit).toBeEnabled();
-    await expect(page.getByText("80 词", { exact: false })).toBeVisible();
-  });
-
-  test("preserves a resumable, active-output path across all five stages", async ({
-    page,
-  }) => {
-    await page.goto(
-      "/lesson?cycle=cycle-demo&lesson=lesson-collocation-perspective",
-    );
-    await expect(page.locator('[aria-current="step"]')).toContainText("诊断");
-    await expect(
-      page.getByRole("radio", { name: "小学生承受的学业压力较小" }),
-    ).toBeVisible();
-
-    await page.getByRole("button", { name: "暂停", exact: true }).click();
-    const pauseDialog = page.getByRole("dialog", { name: "需要离开一下？" });
-    await expect(pauseDialog).toContainText("1/5 个核心任务");
-    await pauseDialog.getByRole("button", { name: "继续当前练习" }).click();
-
-    await submitChoice(page, "小学生承受的学业压力较小");
-    await expect(page.locator('[aria-current="step"]')).toContainText("理解");
-    await submitChoice(page, "Primary-school courses are less demanding.");
-    await expect(page.locator('[aria-current="step"]')).toContainText(
-      "独立输出",
-    );
-
-    await submitSentence(
-      page,
-      "Primary-school pupils face less academic pressure than secondary-school students.",
-    );
-    await expect(page.locator('[aria-current="step"]')).toContainText("应用");
-    await expect(page.getByText("80–120", { exact: false })).toBeVisible();
-    await expect(
-      page.getByText("Use the academic-pressure perspective naturally."),
-    ).toBeVisible();
-    await submitSentence(
-      page,
-      Array.from(
-        { length: 8 },
-        () =>
-          "University students face greater academic pressure because independent research requires sustained planning and careful analysis",
-      ).join(" "),
-    );
-    await expect(page.locator('[aria-current="step"]')).toContainText("收尾");
-    await submitSentence(
-      page,
-      "A heavy workload can take up time that children could otherwise spend exercising outdoors.",
-      true,
-    );
-
-    await expect(
-      page.getByRole("heading", { name: "你已完成核心路径" }),
-    ).toBeVisible();
-    await expect(page.getByText("仅完成练习", { exact: true })).toBeVisible();
-    await expect(page.getByText(/不会把能力标记为 applied/)).toBeVisible();
-    await expect(page.getByText("发展中", { exact: true })).toBeVisible();
-    await expect(page.getByText("尚未安排", { exact: true })).toBeVisible();
-    await expect(
-      page.getByText("未安排证据重写", { exact: true }),
-    ).toBeVisible();
-
-    await page.getByRole("link", { name: "完成并返回今日计划" }).click();
-    await expect(
-      page.getByRole("heading", { name: "开始新一轮 40 分钟首写" }),
-    ).toBeVisible();
-    await expect(
-      page.getByText(/没有创建 applied、retained、重写或迁移任务/),
-    ).toBeVisible();
-    await expect(page.getByRole("link", { name: "开始重写" })).toHaveCount(0);
-  });
-
-  test("restores an unsubmitted answer and hint state after pausing and reloading", async ({
-    page,
-  }) => {
-    await page.goto(
-      "/lesson?cycle=cycle-demo&lesson=lesson-collocation-perspective",
-    );
-    const choice = page.getByRole("radio", {
-      name: "小学生承受的学业压力较小",
-      exact: true,
-    });
-    await page
-      .getByText("小学生承受的学业压力较小", { exact: true })
-      .last()
-      .click();
-    await expect(choice).toBeChecked();
-    await page.getByRole("button", { name: "暂停", exact: true }).click();
-    await expect(
-      page.getByRole("dialog", { name: "需要离开一下？" }),
-    ).toBeVisible();
-    await page.waitForTimeout(300);
-    await page.reload();
-
-    await expect(choice).toBeChecked();
-  });
-
-  test("distinguishes ordinary pause, explicit abnormal interruption, and prerequisite-skipped rewrite", async ({
+  test("teaches the diagnosed ability before opening timed practice", async ({
     page,
   }) => {
     await page.goto(lessonUrl);
-    await page.getByRole("button", { name: "暂停", exact: true }).click();
-    const pauseDialog = page.getByRole("dialog", { name: "需要离开一下？" });
+
     await expect(
-      pauseDialog.getByRole("button", { name: "保存并返回今日计划" }),
-    ).toBeVisible();
-    await expect(
-      pauseDialog.getByRole("button", { name: "异常中断并稍后继续" }),
-    ).toBeVisible();
-    await expect(
-      pauseDialog.getByRole("button", {
-        name: "跳过专项课并开始不计保持的重写",
+      page.getByRole("heading", {
+        name: "用原因—机制—结果完整表达观点",
       }),
     ).toBeVisible();
+    await expect(
+      page.getByText("观点不等于论证", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("可以直接迁移的表达库", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("跟着思路改一遍", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "开始60分钟训练卷" }),
+    ).toBeVisible();
+    await expect(page.getByText("60:00", { exact: true })).toHaveCount(0);
+  });
 
-    await pauseDialog
-      .getByRole("button", {
-        name: "跳过专项课并开始不计保持的重写",
-      })
-      .click();
+  test("shows all eight questions with concise, complete instructions", async ({
+    page,
+  }) => {
+    await page.goto(paperUrl);
+
+    await expect(page.getByText("本题评分点")).toHaveCount(0);
+    await expect(page.getByText("基础判断", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("修改重写", { exact: true })).toHaveCount(0);
+    await expect(page.locator(".practice-paper-question")).toHaveCount(8);
+    await expect(
+      page.getByText(
+        "用20至35个英文词解释为什么早期接触能降低以后的学习难度；必须写出作用过程和结果。",
+        { exact: true },
+      ),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "交卷" })).toBeVisible();
+  });
+
+  test("keeps the source report available and preserves the paper draft", async ({
+    page,
+  }) => {
+    await page.goto(paperUrl);
+    const answer = page.getByRole("textbox", { name: "第 2 题 answer" });
+    await answer.fill(
+      "Regular exposure helps children recognise common language patterns early, so they face fewer difficulties when formal study becomes more demanding later.",
+    );
+
+    await page.getByRole("link", { name: "查看详细批改" }).click();
     await expect(page).toHaveURL(
-      /\/rewrite\?cycle=cycle-demo&task=rewrite-skipped-prerequisite$/,
+      /\/feedback\?cycle=cycle-demo&lesson=lesson-collocation-perspective$/,
+    );
+    await expect(
+      page.getByRole("heading", { name: "先把这篇作文真正改明白" }),
+    ).toBeVisible();
+    await page.getByRole("link", { name: "进入专项教学" }).click();
+    await page.getByRole("link", { name: "开始60分钟训练卷" }).click();
+
+    await expect(page).toHaveURL(
+      /\/lesson\/paper\?cycle=cycle-demo&lesson=lesson-collocation-perspective$/,
+    );
+    await expect(answer).toHaveValue(
+      "Regular exposure helps children recognise common language patterns early, so they face fewer difficulties when formal study becomes more demanding later.",
     );
   });
 
-  test("retries only the failed exercise evaluation and preserves the lesson URL identity", async ({
+  test("opens report and paper from their real sidebar destinations", async ({
     page,
   }) => {
-    await page.goto("/api/v1/health/live");
-    await page.evaluate(() =>
-      window.localStorage.setItem("iwc.demo.lesson-evaluation-failure", "true"),
-    );
-    await page.goto(lessonUrl);
-    await page
-      .getByText("小学生承受的学业压力较小", { exact: true })
-      .last()
-      .click();
-    await page.getByRole("button", { name: "提交", exact: true }).click();
-    await expect(page.getByText("评价未完成", { exact: true })).toBeVisible();
-    await page
-      .getByRole("button", { name: "只重试本题评价", exact: true })
-      .click();
-    await expect(page.getByText("仅演示，不计能力证据")).toBeVisible();
+    await page.goto("/today");
+    await (await navigationLink(page, "批改报告")).click();
+    await expect(page).toHaveURL(/\/feedback\?cycle=cycle-demo$/);
+
+    await (await navigationLink(page, "专项提升")).click();
     await expect(page).toHaveURL(
       /\/lesson\?cycle=cycle-demo&lesson=lesson-collocation-perspective$/,
     );
+    await page.getByRole("link", { name: "开始60分钟训练卷" }).click();
+    await expect(page).toHaveURL(
+      /\/lesson\/paper\?cycle=cycle-demo&lesson=lesson-collocation-perspective$/,
+    );
   });
 
-  test("retries only a failed lesson-generation module from its identity-bound feedback report", async ({
+  test("restores sidebar destinations when the paper is opened directly", async ({
     page,
   }) => {
-    await page.goto("/api/v1/health/live");
-    await page.evaluate(() =>
-      window.localStorage.setItem("iwc.demo.lesson-generation-failure", "true"),
+    await page.goto(paperUrl);
+
+    await (await navigationLink(page, "批改报告")).click();
+    await expect(page).toHaveURL(/\/feedback\?cycle=cycle-demo$/);
+  });
+
+  test("restores focused-learning navigation when the report is opened directly", async ({
+    page,
+  }) => {
+    const hydrationErrors: string[] = [];
+    page.on("console", (message) => {
+      if (
+        message.type() === "error" &&
+        message.text().includes("Hydration failed")
+      ) {
+        hydrationErrors.push(message.text());
+      }
+    });
+    await page.goto(
+      "/feedback?cycle=cycle-demo&lesson=lesson-collocation-perspective",
     );
-    await page.goto("/feedback?cycle=cycle-demo");
-    await expect(
-      page.getByText("只有这一课程生成模块失败", { exact: false }),
-    ).toBeVisible();
-    await page
-      .getByRole("button", { name: "只重试课程生成模块", exact: true })
-      .click();
+
+    await (await navigationLink(page, "专项提升")).click();
     await expect(page).toHaveURL(
       /\/lesson\?cycle=cycle-demo&lesson=lesson-collocation-perspective$/,
     );
-    await expect(page.getByText("本课只练这一件事")).toBeVisible();
+    expect(hydrationErrors).toEqual([]);
   });
 
-  test("preserves the current input when the 60-minute timebox expires", async ({
+  test("submits once and expands teaching analysis only for missed answers", async ({
     page,
   }) => {
-    await page.evaluate(() => {
-      window.localStorage.setItem("iwc.demo.lesson-elapsed", "3600");
-    });
-    await page.goto(
-      "/lesson?cycle=cycle-demo&lesson=lesson-collocation-perspective",
-    );
-    const dialog = page.getByRole("dialog", {
-      name: "本段 60 分钟已到",
-    });
-    await expect(dialog).toBeVisible();
-    await expect(dialog).toContainText("当前输入已经保留");
-    await expect(
-      dialog.getByRole("button", { name: "拆分剩余课程并返回今日计划" }),
-    ).toBeVisible();
-    await expect(
-      dialog.getByRole("button", { name: "裁掉 FLEX 并结束练习" }),
-    ).toBeVisible();
-    await dialog
-      .getByRole("button", { name: "拆分剩余课程并返回今日计划" })
-      .click();
-    await expect(page).toHaveURL(/\/today$/);
-    await expect(
-      page.getByRole("heading", { name: "先完成短回炉，再继续专项课" }),
-    ).toBeVisible();
-
-    await page.goto(
-      "/lesson?cycle=cycle-demo&lesson=lesson-collocation-perspective",
-    );
-    await expect(
-      page.getByRole("heading", { name: "先用对比讲解找回规则" }),
-    ).toBeVisible();
-  });
-
-  test("requires a persisted short refresher before a split lesson resumes", async ({
-    page,
-  }) => {
-    await page.evaluate(() => {
-      window.localStorage.setItem("iwc.demo.lesson-split", "ACTIVE");
-      window.localStorage.setItem("iwc.demo.lesson-refresher", "REQUIRED");
-    });
-    await page.goto(
-      "/lesson?cycle=cycle-demo&lesson=lesson-collocation-perspective",
-    );
-    await expect(
-      page.getByRole("heading", { name: "先用对比讲解找回规则" }),
-    ).toBeVisible();
+    await page.goto(paperUrl);
+    await page.getByText("A", { exact: true }).last().click();
     await page
-      .getByLabel("我的回忆")
-      .fill("Check who experiences the academic pressure.");
-    await page.getByRole("button", { name: "保存并继续剩余课程" }).click();
-    await expect(page.getByText("本课只练这一件事")).toBeVisible();
+      .getByRole("textbox", { name: "第 2 题 answer" })
+      .fill(
+        "Regular exposure helps children recognise common language patterns early, so they face fewer difficulties when formal study becomes more demanding later.",
+      );
+    await page.getByRole("button", { name: "交卷" }).click();
+
+    await expect(page.getByText("整卷结果", { exact: true })).toBeVisible();
+    await expect(page.getByText("已达标", { exact: true })).toHaveCount(2);
+    await expect(
+      page.getByRole("heading", { name: "这题为什么没有达标" }),
+    ).toHaveCount(6);
+    await expect(page.getByText("参考改法", { exact: true })).toHaveCount(6);
+  });
+
+  test("locks editing at the time limit but retains an incomplete sheet for submission", async ({
+    page,
+  }) => {
+    await page.goto("/api/v1/health/live");
+    await page.evaluate(() => {
+      window.localStorage.setItem(
+        "iwc:practice-paper-started",
+        new Date(Date.now() - 3_601_000).toISOString(),
+      );
+    });
+    await page.goto(paperUrl);
+
+    await expect(page.getByRole("textbox").first()).toBeDisabled();
+    await expect(
+      page.getByRole("button", { name: "时间到，交卷" }),
+    ).toBeEnabled();
   });
 });

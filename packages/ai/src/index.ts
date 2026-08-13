@@ -45,6 +45,7 @@ export * from "./crypto";
 export * from "./errors";
 export * from "./mock";
 export * from "./openai";
+export * from "./pedagogy-knowledge";
 export * from "./provider-catalog";
 export * from "./prompts";
 export * from "./session-secrets";

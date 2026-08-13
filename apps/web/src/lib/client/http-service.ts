@@ -18,6 +18,7 @@ import type {
   CycleBundleImportResult,
   FeedbackData,
   FeedbackIssue,
+  FocusedTeachingData,
   GrowthData,
   LearningClient,
   LessonData,
@@ -27,6 +28,9 @@ import type {
   LessonResponseInput,
   LessonRuntimeData,
   LessonRuntimeUpdate,
+  PracticePaperData,
+  PracticePaperQuestion,
+  PracticePaperResult,
   LessonStage,
   ModelRouteSetting,
   NextTask,
@@ -159,6 +163,18 @@ interface WireIssue extends JsonRecord {
   skillId?: string;
 }
 
+const issueTypes = [
+  "GRAMMAR",
+  "SPELLING",
+  "WORD_FORM",
+  "COLLOCATION",
+  "NATURALNESS",
+  "LOGIC",
+  "COHESION",
+  "TASK_RESPONSE",
+  "OPTIONAL_POLISH",
+] as const;
+
 interface WireLessonPlan extends JsonRecord {
   coreMinutes?: number;
   coreSkillId?: string;
@@ -282,6 +298,14 @@ interface TodayWire {
     id: string;
     question?: WireQuestion;
     status: string;
+    resources?: {
+      comparison_available?: boolean;
+      feedback_available?: boolean;
+      lesson_id?: string | null;
+      rewrite_task_id?: string | null;
+      transfer_task_id?: string | null;
+      writing_available?: boolean;
+    };
   };
   next_action: {
     dueAt?: string | null;
@@ -571,25 +595,25 @@ function actionPresentation(kind: string): {
       taskKind: "lesson",
       href: waiting ? "/today" : "/lesson",
       durationMinutes: waiting ? 0 : 60,
-      eyebrowZh: waiting ? "课程生成中" : "专项训练已就绪",
-      eyebrowEn: waiting ? "Lesson is being prepared" : "Focused lesson ready",
-      titleZh: waiting ? "等待专项课生成" : "完成五阶段专项训练",
+      eyebrowZh: waiting ? "试卷生成中" : "专项训练卷已就绪",
+      eyebrowEn: waiting ? "Paper is being prepared" : "Practice paper ready",
+      titleZh: waiting ? "等待专项训练卷生成" : "完成60分钟专项训练卷",
       titleEn: waiting
-        ? "Wait for the focused lesson"
-        : "Complete the five-stage lesson",
-      descriptionZh: "课程围绕本篇最值得迁移的一个能力组织。",
+        ? "Wait for the focused practice paper"
+        : "Complete the 60-minute practice paper",
+      descriptionZh: "整张试卷围绕本篇最高优先问题组织，完成后统一交卷和批改。",
       descriptionEn:
-        "The lesson targets the most transferable skill from this essay.",
+        "The complete paper targets one priority issue and is marked after submission.",
       actionZh: waiting
         ? "刷新状态"
         : kind === "CONTINUE_LESSON"
-          ? "继续训练"
-          : "开始训练",
+          ? "继续答卷"
+          : "开始答卷",
       actionEn: waiting
         ? "Refresh status"
         : kind === "CONTINUE_LESSON"
-          ? "Continue lesson"
-          : "Start lesson",
+          ? "Continue paper"
+          : "Start paper",
     };
   }
   if (
@@ -877,6 +901,32 @@ function mapIssue(issue: WireIssue, index: number): FeedbackIssue {
     explanationEn: explanation.en,
     transferRuleZh: transfer.zh,
     transferRuleEn: transfer.en,
+    issueType: issueTypes.includes(
+      String(diagnosis.issueType) as (typeof issueTypes)[number],
+    )
+      ? (String(diagnosis.issueType) as FeedbackIssue["issueType"])
+      : issue.skillId === "word_form_precision"
+        ? "WORD_FORM"
+        : issue.skillId === "mechanism_chain"
+          ? "LOGIC"
+          : "COLLOCATION",
+    correctedVersion: textValue(
+      diagnosis,
+      ["correctedVersion", "corrected_version"],
+      issue.excerpt ?? "",
+    ),
+    knowledgePointZh: textValue(
+      diagnosis,
+      ["knowledgePointZh", "knowledge_point_zh"],
+      transfer.zh,
+    ),
+    severity:
+      String(diagnosis.issueType) === "OPTIONAL_POLISH"
+        ? "polish"
+        : ["COLLOCATION", "NATURALNESS"].includes(String(diagnosis.issueType))
+          ? "naturalness"
+          : "must_fix",
+    confidence: issue.confidence ?? 0.7,
   };
 }
 
@@ -1674,6 +1724,16 @@ export class HttpLearningClient implements LearningClient {
       dueLabelZh: formatDue(wire.next_action.dueAt, "zh"),
       dueLabelEn: formatDue(wire.next_action.dueAt, "en"),
     };
+    const { buildLearningDestinations } = await import("./learning-navigation");
+    const navigation = buildLearningDestinations({
+      cycleId: wire.cycle?.id ?? null,
+      writingAvailable: wire.cycle?.resources?.writing_available === true,
+      feedbackAvailable: wire.cycle?.resources?.feedback_available === true,
+      lessonId: wire.cycle?.resources?.lesson_id ?? null,
+      rewriteTaskId: wire.cycle?.resources?.rewrite_task_id ?? null,
+      comparisonAvailable: wire.cycle?.resources?.comparison_available === true,
+      transferTaskId: wire.cycle?.resources?.transfer_task_id ?? null,
+    });
     return {
       learnerName: "Learner",
       greetingZh: "今天只做这一件事。",
@@ -1682,6 +1742,7 @@ export class HttpLearningClient implements LearningClient {
         ? ("connected" as const)
         : ("missing" as const),
       nextTask: task,
+      navigation,
       cycleTitle: wire.cycle?.question?.prompt ?? "IELTS Writing Task 2",
       timeline: mapTimeline(wire.cycle?.status ?? "QUESTION_READY"),
       week: {
@@ -1914,8 +1975,16 @@ export class HttpLearningClient implements LearningClient {
         retryable: true,
       });
     const summary = record(assessment.summary);
-    const issues = (assessment.issues ?? []).slice(0, 3).map(mapIssue);
+    const issues = (assessment.issues ?? []).map(mapIssue);
     const overall = assessment.overallBand ?? 0;
+    const { mergeLearningDestinations } = await import("./learning-navigation");
+    mergeLearningDestinations({
+      feedback: `/feedback?cycle=${encodeURIComponent(cycleId)}`,
+      lesson: cycle.lessonPlans?.[0]?.id
+        ? `/lesson?cycle=${encodeURIComponent(cycleId)}&lesson=${encodeURIComponent(cycle.lessonPlans[0].id)}`
+        : null,
+      write: `/write?cycle=${encodeURIComponent(cycleId)}`,
+    });
     return {
       cycleId,
       attemptId: attempt.id,
@@ -1940,14 +2009,40 @@ export class HttpLearningClient implements LearningClient {
       ),
       scores: criterionScores(assessment),
       issues,
+      prompt: cycle.question?.prompt ?? "",
+      originalEssay: attempt.content ?? "",
+      overallSummaryZh: textValue(
+        summary,
+        ["overallSummaryZh", "summaryZh", "zh"],
+        "报告已按四项标准生成。",
+      ),
+      overallSummaryEn: textValue(
+        summary,
+        ["overallSummaryEn", "summaryEn", "en"],
+        "The report was generated against the four criteria.",
+      ),
+      paragraphFeedback: (() => {
+        const serialized = textValue(summary, ["paragraphFeedback"], "[]");
+        try {
+          const values: unknown = JSON.parse(serialized);
+          return Array.isArray(values)
+            ? values.filter(
+                (value): value is FeedbackData["paragraphFeedback"][number] =>
+                  typeof value === "object" && value !== null,
+              )
+            : [];
+        } catch {
+          return [];
+        }
+      })(),
       lessonScheduledLabelZh:
         cycle.status === "LESSON_READY"
-          ? "专项训练已经生成。"
-          : "专项训练会在诊断完成后自动安排。",
+          ? "专项教学与60分钟训练卷已经生成。"
+          : "专项教学与完整训练卷会在诊断完成后自动生成。",
       lessonScheduledLabelEn:
         cycle.status === "LESSON_READY"
-          ? "Your focused lesson is ready."
-          : "Focused practice is scheduled automatically after diagnosis.",
+          ? "Your focused teaching and 60-minute paper are ready."
+          : "Focused teaching and the complete paper are generated after diagnosis.",
       lessonGenerationRetry: cycle.lessonGenerationRetry?.jobId
         ? {
             jobId: cycle.lessonGenerationRetry.jobId,
@@ -1959,6 +2054,34 @@ export class HttpLearningClient implements LearningClient {
           }
         : null,
     };
+  }
+
+  async getFocusedTeaching(
+    cycleId: string,
+    lessonId: string,
+  ): Promise<FocusedTeachingData> {
+    const cycle = await this.getCycle(cycleId);
+    if (!cycle.lessonPlans?.some((candidate) => candidate.id === lessonId)) {
+      throw new LearningClientError(
+        "The focused teaching module is not ready.",
+        {
+          status: 425,
+          code: "FOCUSED_TEACHING_NOT_READY",
+          retryable: true,
+        },
+      );
+    }
+    const { data } = await this.request<{
+      teaching: FocusedTeachingData;
+    }>(`/lessons/${encodeURIComponent(lessonId)}/teaching`);
+    const teaching = data.teaching;
+    const { mergeLearningDestinations } = await import("./learning-navigation");
+    mergeLearningDestinations({
+      feedback: `/feedback?cycle=${encodeURIComponent(cycleId)}`,
+      lesson: `/lesson?cycle=${encodeURIComponent(cycleId)}&lesson=${encodeURIComponent(lessonId)}`,
+      write: `/write?cycle=${encodeURIComponent(cycleId)}`,
+    });
+    return { ...teaching, id: lessonId, cycleId };
   }
 
   async getLesson(cycleId: string, lessonId: string): Promise<LessonData> {
@@ -2066,6 +2189,177 @@ export class HttpLearningClient implements LearningClient {
       rewriteUnlockEn:
         "Closed-book rewriting unlocks 24–48 hours after the core lesson",
     };
+  }
+
+  async getPracticePaper(
+    cycleId: string,
+    lessonId: string,
+  ): Promise<PracticePaperData> {
+    const cycle = await this.getCycle(cycleId);
+    if (!cycle.lessonPlans?.some((candidate) => candidate.id === lessonId)) {
+      throw new LearningClientError("The practice paper is not ready.", {
+        status: 425,
+        code: "PRACTICE_PAPER_NOT_READY",
+        retryable: true,
+      });
+    }
+    if (cycle.status === "LESSON_READY") {
+      await this.request(`/lessons/${encodeURIComponent(lessonId)}/start`, {
+        body: {},
+        idempotent: true,
+        method: "POST",
+      });
+    }
+    const { data } = await this.request<{
+      paper: Record<string, unknown>;
+      answers?: Record<string, string>;
+      result?: PracticePaperResult | null;
+      submitted_at?: string | null;
+      evaluation_pending?: boolean;
+      runtime?: { started_at?: string | null };
+    }>(`/lessons/${encodeURIComponent(lessonId)}/paper`);
+    const paper = record(data.paper);
+    const rawItems = Array.isArray(paper.items) ? paper.items : [];
+    const questions = rawItems.map((raw, index) => {
+      const item = record(raw);
+      const mode = String(item.responseMode);
+      const responseMode = [
+        "choice",
+        "short_text",
+        "sentence",
+        "paragraph",
+      ].includes(mode)
+        ? (mode as PracticePaperQuestion["responseMode"])
+        : "sentence";
+      return {
+        id: textValue(item, ["id"], `question-${index + 1}`),
+        number: Number(item.number ?? index + 1),
+        section: ["FOUNDATION", "REPAIR", "GENERATION", "INTEGRATION"].includes(
+          String(item.section),
+        )
+          ? (item.section as PracticePaperQuestion["section"])
+          : "GENERATION",
+        titleZh: textValue(item, ["titleZh"], `第 ${index + 1} 题`),
+        titleEn: textValue(item, ["titleEn"], `Question ${index + 1}`),
+        instructionZh: textValue(item, ["instructionZh"], "按题面要求作答。"),
+        promptEn: textValue(item, ["promptEn"], "Write your answer."),
+        sourceText: textValue(item, ["sourceText"], ""),
+        responseMode,
+        options: (Array.isArray(item.options) ? item.options : []).map(
+          (option) => {
+            const value = record(option);
+            return {
+              key: textValue(value, ["key"], ""),
+              labelEn: textValue(value, ["labelEn"], ""),
+            };
+          },
+        ),
+        suggestedMinutes: Number(item.suggestedMinutes ?? 5),
+        minimumWords: Number(item.minimumWords ?? 1),
+        maximumWords: Number(item.maximumWords ?? 150),
+        publicCriteria: (Array.isArray(item.publicCriteria)
+          ? item.publicCriteria
+          : []
+        ).map((criterion) => {
+          const value = record(criterion);
+          return {
+            labelZh: textValue(value, ["labelZh"], "完成要求"),
+            labelEn: textValue(value, ["labelEn"], "Task completion"),
+            descriptionZh: textValue(
+              value,
+              ["descriptionZh"],
+              "覆盖题面要求。",
+            ),
+            descriptionEn: textValue(
+              value,
+              ["descriptionEn"],
+              "Cover the stated requirements.",
+            ),
+            weight: Number(value.weight ?? 1),
+          };
+        }),
+      } satisfies PracticePaperQuestion;
+    });
+    if (questions.length !== 8) {
+      throw new LearningClientError("The complete practice paper is invalid.", {
+        code: "PRACTICE_PAPER_INVALID",
+      });
+    }
+    const { mergeLearningDestinations } = await import("./learning-navigation");
+    mergeLearningDestinations({
+      feedback: `/feedback?cycle=${encodeURIComponent(cycleId)}`,
+      lesson: `/lesson?cycle=${encodeURIComponent(cycleId)}&lesson=${encodeURIComponent(lessonId)}`,
+      write: `/write?cycle=${encodeURIComponent(cycleId)}`,
+    });
+    return {
+      id: lessonId,
+      cycleId,
+      titleZh: textValue(paper, ["titleZh"], "专项训练卷"),
+      titleEn: textValue(paper, ["titleEn"], "Focused practice paper"),
+      objectiveZh: textValue(paper, ["objectiveZh"], "完成本轮专项训练。"),
+      objectiveEn: textValue(
+        paper,
+        ["objectiveEn"],
+        "Complete this focused practice paper.",
+      ),
+      durationMinutes: 60,
+      instructionsZh: stringList(paper.instructionsZh),
+      instructionsEn: stringList(paper.instructionsEn),
+      questions,
+      answers: data.answers ?? {},
+      startedAt: data.runtime?.started_at ?? null,
+      submittedAt: data.submitted_at ?? null,
+      result: data.result ?? null,
+      evaluationPending: data.evaluation_pending === true,
+    };
+  }
+
+  async submitPracticePaper(
+    lessonId: string,
+    answers: Record<string, string>,
+  ): Promise<void> {
+    const { data } = await this.request<{
+      job_id?: string;
+      job_status?: string;
+    }>(`/lessons/${encodeURIComponent(lessonId)}/paper`, {
+      body: { answers },
+      idempotent: true,
+      method: "POST",
+    });
+    if (
+      data.job_id &&
+      data.job_status !== "WAITING_FOR_CONSENT" &&
+      data.job_status !== "SUCCEEDED"
+    )
+      await this.waitForJob(data.job_id);
+  }
+
+  async replaceLegacyLesson(lessonId: string): Promise<void> {
+    const { data } = await this.request<{
+      job_id?: string | null;
+      job_status?: string;
+    }>(`/lessons/${encodeURIComponent(lessonId)}/replace`, {
+      body: {},
+      idempotent: true,
+      method: "POST",
+    });
+    if (
+      data.job_id &&
+      data.job_status !== "WAITING_FOR_CONSENT" &&
+      data.job_status !== "SUCCEEDED"
+    )
+      await this.waitForJob(data.job_id);
+  }
+
+  async completePracticePaper(lessonId: string): Promise<void> {
+    await this.request(
+      `/lessons/${encodeURIComponent(lessonId)}/paper/complete`,
+      {
+        body: {},
+        idempotent: true,
+        method: "POST",
+      },
+    );
   }
 
   async saveLessonProgress(

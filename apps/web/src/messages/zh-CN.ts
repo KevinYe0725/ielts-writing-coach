@@ -32,7 +32,7 @@ export const zhCN = {
     today: "今天",
     write: "写作室",
     feedback: "批改报告",
-    lesson: "专项训练",
+    lesson: "专项提升",
     rewrite: "延迟重写",
     compare: "版本对比",
     growth: "成长记录",

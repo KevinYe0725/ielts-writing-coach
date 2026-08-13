@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   forwardRef,
+  type MouseEventHandler,
   type ButtonHTMLAttributes,
   type HTMLAttributes,
   type ReactNode,
@@ -55,6 +56,7 @@ export function ActionLink({
   className,
   children,
   trailing = true,
+  onClick,
 }: {
   href: string;
   children: ReactNode;
@@ -62,11 +64,13 @@ export function ActionLink({
   size?: "sm" | "md" | "lg";
   className?: string;
   trailing?: boolean;
+  onClick?: MouseEventHandler<HTMLAnchorElement>;
 }) {
   return (
     <Link
       className={cn("button", `button-${variant}`, `button-${size}`, className)}
       href={href}
+      {...(onClick ? { onClick } : {})}
     >
       {children}
       {trailing ? <ArrowRight aria-hidden="true" size={17} /> : null}

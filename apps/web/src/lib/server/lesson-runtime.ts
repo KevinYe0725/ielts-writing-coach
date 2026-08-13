@@ -82,7 +82,27 @@ export interface LessonRefresherPlan {
 const INTERRUPTION_WINDOW_MS = 7 * 24 * 60 * 60 * 1_000;
 export const AUTO_SPLIT_MAX_SECONDS = 25 * 60;
 
-export type LessonPlanRow = typeof lessonPlan.$inferSelect;
+/** Runtime helpers intentionally depend only on legacy clock fields. */
+export type LessonPlanRow = Omit<
+  typeof lessonPlan.$inferSelect,
+  | "practiceFormat"
+  | "paperContent"
+  | "paperAnswers"
+  | "paperResult"
+  | "paperSubmittedAt"
+  | "paperEvaluationJobId"
+> &
+  Partial<
+    Pick<
+      typeof lessonPlan.$inferSelect,
+      | "practiceFormat"
+      | "paperContent"
+      | "paperAnswers"
+      | "paperResult"
+      | "paperSubmittedAt"
+      | "paperEvaluationJobId"
+    >
+  >;
 export type ExerciseItemRow = typeof exerciseItem.$inferSelect;
 export type ExerciseAttemptRow = typeof exerciseAttempt.$inferSelect;
 export type EvaluationRow = typeof evaluation.$inferSelect;

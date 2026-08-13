@@ -287,6 +287,11 @@ describe("issue persistence categories", () => {
       endOffset: excerpt.length,
       excerpt,
       diagnosis,
+      issueType: "LOGIC",
+      correctedVersion: excerpt,
+      explanationZh: "解释这一问题。",
+      knowledgePointZh: "总结这个知识点。",
+      transferRuleZh: "下次写作时检查。",
       severity: "MEDIUM",
       confidence: 0.9,
     };

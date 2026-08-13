@@ -23,6 +23,53 @@ function requestHeaders(call: unknown[]): Headers {
 }
 
 describe("HttpLearningClient protocol", () => {
+  it("loads focused teaching without starting the timed paper", async () => {
+    const fetcher = vi.fn<typeof fetch>(async (input) => {
+      const url = String(input);
+      if (url.endsWith("/training-cycles/cycle-teaching"))
+        return jsonResponse({
+          cycle: {
+            id: "cycle-teaching",
+            lessonPlans: [{ id: "lesson-teaching" }],
+          },
+        });
+      if (url.endsWith("/lessons/lesson-teaching/teaching"))
+        return jsonResponse({
+          teaching: {
+            targetTitleZh: "用原因—机制—结果完整表达观点",
+            targetTitleEn: "Build a complete causal chain",
+            whyItMattersZh: "原文缺少中间机制。",
+            whyItMattersEn: "The mechanism is missing.",
+            currentPattern: "It is useful.",
+            decisionRuleZh: "写出原因、机制和具体结果。",
+            decisionRuleEn: "State a cause, mechanism and result.",
+            knowledgeCards: [],
+            expressionBank: [],
+            workedExample: {},
+            quickChecks: [],
+            readyChecklistZh: [],
+          },
+        });
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+    const client = new HttpLearningClient({
+      baseUrl: "https://coach.test/api/v1",
+      fetch: fetcher,
+      origin: "https://coach.test",
+    });
+
+    await expect(
+      client.getFocusedTeaching("cycle-teaching", "lesson-teaching"),
+    ).resolves.toMatchObject({
+      id: "lesson-teaching",
+      cycleId: "cycle-teaching",
+      targetTitleZh: "用原因—机制—结果完整表达观点",
+    });
+    expect(
+      fetcher.mock.calls.some(([input]) => String(input).endsWith("/start")),
+    ).toBe(false);
+  });
+
   it("uses HTTP by default and selects the local demo only when explicit", () => {
     expect(createLearningClient()).toBeInstanceOf(HttpLearningClient);
     expect(createLearningClient({ demoMode: true })).toBeInstanceOf(

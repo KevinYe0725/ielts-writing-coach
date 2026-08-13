@@ -56,6 +56,7 @@ export interface TodayData {
   greetingEn: string;
   aiState: AiConnectionState;
   nextTask: NextTask;
+  navigation: import("./learning-navigation").LearningDestinations;
   cycleTitle: string;
   timeline: TimelineStep[];
   week: {
@@ -149,6 +150,31 @@ export interface FeedbackIssue {
   explanationEn: string;
   transferRuleZh: string;
   transferRuleEn: string;
+  issueType:
+    | "GRAMMAR"
+    | "SPELLING"
+    | "WORD_FORM"
+    | "COLLOCATION"
+    | "NATURALNESS"
+    | "LOGIC"
+    | "COHESION"
+    | "TASK_RESPONSE"
+    | "OPTIONAL_POLISH";
+  correctedVersion: string;
+  knowledgePointZh: string;
+  severity: "must_fix" | "naturalness" | "polish";
+  confidence: number;
+}
+
+export interface ParagraphFeedback {
+  paragraphIndex: number;
+  excerpt: string;
+  roleZh: string;
+  roleEn: string;
+  diagnosisZh: string;
+  diagnosisEn: string;
+  actionZh: string;
+  actionEn: string;
 }
 
 export interface FeedbackData {
@@ -164,6 +190,11 @@ export interface FeedbackData {
   strengthZh: string;
   strengthEn: string;
   issues: FeedbackIssue[];
+  prompt: string;
+  originalEssay: string;
+  overallSummaryZh: string;
+  overallSummaryEn: string;
+  paragraphFeedback: ParagraphFeedback[];
   lessonScheduledLabelZh: string;
   lessonScheduledLabelEn: string;
   lessonGenerationRetry: {
@@ -171,6 +202,43 @@ export interface FeedbackData {
     code: string;
     safeMessage: string;
   } | null;
+}
+
+export interface FocusedTeachingData {
+  id: string;
+  cycleId: string;
+  targetTitleZh: string;
+  targetTitleEn: string;
+  whyItMattersZh: string;
+  whyItMattersEn: string;
+  currentPattern: string;
+  decisionRuleZh: string;
+  decisionRuleEn: string;
+  knowledgeCards: Array<{
+    titleZh: string;
+    explanationZh: string;
+    exampleEn: string;
+  }>;
+  expressionBank: Array<{
+    expressionEn: string;
+    functionZh: string;
+    usageZh: string;
+    exampleEn: string;
+  }>;
+  workedExample: {
+    taskZh: string;
+    weakAnswerEn: string;
+    thinkingStepsZh: string[];
+    improvedAnswerEn: string;
+    explanationZh: string;
+  };
+  quickChecks: Array<{
+    promptZh: string;
+    optionsZh: string[];
+    answerZh: string;
+    explanationZh: string;
+  }>;
+  readyChecklistZh: string[];
 }
 
 export type LessonStage =
@@ -384,6 +452,72 @@ export interface LessonCompletionResult {
   masteryEvidenceCreated: boolean;
   rewriteScheduled: boolean;
   segmentScheduled: boolean;
+}
+
+export type PracticePaperSection =
+  | "FOUNDATION"
+  | "REPAIR"
+  | "GENERATION"
+  | "INTEGRATION";
+
+export interface PracticePaperQuestion {
+  id: string;
+  number: number;
+  section: PracticePaperSection;
+  titleZh: string;
+  titleEn: string;
+  instructionZh: string;
+  promptEn: string;
+  sourceText: string;
+  responseMode: "choice" | "short_text" | "sentence" | "paragraph";
+  options: Array<{ key: string; labelEn: string }>;
+  suggestedMinutes: number;
+  minimumWords: number;
+  maximumWords: number;
+  publicCriteria: Array<{
+    labelZh: string;
+    labelEn: string;
+    descriptionZh: string;
+    descriptionEn: string;
+    weight: number;
+  }>;
+}
+
+export interface PracticePaperResult {
+  totalScore: number;
+  summaryZh: string;
+  itemResults: Array<{
+    itemId: string;
+    status: "MEETS_STANDARD" | "NEEDS_WORK" | "NOT_SCORABLE";
+    score: number;
+    feedbackZh: string;
+    strengthsZh: string[];
+    problems: Array<{
+      criterionLabelZh: string;
+      explanationZh: string;
+      evidence: string;
+    }>;
+    improvedAnswerEn: string;
+    nextStepZh: string;
+  }>;
+}
+
+export interface PracticePaperData {
+  id: string;
+  cycleId: string;
+  titleZh: string;
+  titleEn: string;
+  objectiveZh: string;
+  objectiveEn: string;
+  durationMinutes: 60;
+  instructionsZh: string[];
+  instructionsEn: string[];
+  questions: PracticePaperQuestion[];
+  answers: Record<string, string>;
+  startedAt: string | null;
+  submittedAt: string | null;
+  result: PracticePaperResult | null;
+  evaluationPending: boolean;
 }
 
 export interface RewriteData extends AttemptData {
@@ -679,7 +813,21 @@ export interface LearningClient {
   ): Promise<void>;
   submitAttempt(attemptId: string, draft: string): Promise<AttemptSubmission>;
   getFeedback(cycleId: string): Promise<FeedbackData>;
+  getFocusedTeaching(
+    cycleId: string,
+    lessonId: string,
+  ): Promise<FocusedTeachingData>;
   getLesson(cycleId: string, lessonId: string): Promise<LessonData>;
+  getPracticePaper(
+    cycleId: string,
+    lessonId: string,
+  ): Promise<PracticePaperData>;
+  submitPracticePaper(
+    lessonId: string,
+    answers: Record<string, string>,
+  ): Promise<void>;
+  replaceLegacyLesson(lessonId: string): Promise<void>;
+  completePracticePaper(lessonId: string): Promise<void>;
   saveLessonProgress(
     lessonId: string,
     itemIndex: number,

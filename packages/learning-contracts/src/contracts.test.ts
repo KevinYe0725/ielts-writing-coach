@@ -115,6 +115,26 @@ describe("AI-owned judgment boundaries", () => {
   it("accepts semantic assessment judgment and rejects server-owned metadata", () => {
     const judgment = {
       overallBand: 6,
+      overallSummaryZh: "文章回应了题目，但语言准确度限制了表达。",
+      overallSummaryEn:
+        "The essay addresses the task, but language accuracy limits expression.",
+      strengthZh: "立场明确，而且主体结构可辨认。",
+      strengthEn:
+        "The position is clear and the body structure is recognisable.",
+      paragraphFeedback: [
+        {
+          paragraphIndex: 1,
+          excerpt: "Children learn quickly.",
+          roleZh: "主体段观点句",
+          roleEn: "Body-paragraph claim",
+          diagnosisZh: "观点清楚，但没有说明为什么或如何产生后续好处。",
+          diagnosisEn:
+            "The claim is clear, but the cause and mechanism are missing.",
+          actionZh: "补充一个原因、一个中间机制和一个具体结果。",
+          actionEn:
+            "Add a cause, an intermediate mechanism and a specific result.",
+        },
+      ],
       criteria: {
         TR: criterion("The position is clear but development is uneven."),
         CC: criterion("Paragraph organization is generally clear."),
@@ -143,6 +163,14 @@ describe("AI-owned judgment boundaries", () => {
       excerpt: "much slighter pressure",
       diagnosis:
         "The comparative is grammatical; the phrase is unnatural in collocation and perspective.",
+      issueType: "COLLOCATION",
+      correctedVersion:
+        "Academic pressure is generally lower in primary school than in secondary school.",
+      explanationZh:
+        "much slighter并非语法错误，但slight与pressure搭配生硬，而且原句没有写明比较对象。",
+      knowledgePointZh:
+        "比较结构要写清A和B；描述压力时通常用higher/lower或lighter/heavier workload。",
+      transferRuleZh: "先确认谁承受压力，再写清与谁比较。",
       severity: "MEDIUM",
       confidence: 0.94,
     };

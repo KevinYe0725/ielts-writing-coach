@@ -4,9 +4,90 @@
   "title": "AI assessment judgment (server metadata excluded)",
   "type": "object",
   "additionalProperties": false,
-  "required": ["overallBand", "criteria"],
+  "required": [
+    "overallBand",
+    "overallSummaryZh",
+    "overallSummaryEn",
+    "strengthZh",
+    "strengthEn",
+    "paragraphFeedback",
+    "criteria"
+  ],
   "properties": {
     "overallBand": { "$ref": "common.schema.json#/$defs/Band", "default": 6.0 },
+    "overallSummaryZh": {
+      "type": "string",
+      "minLength": 1,
+      "default": "文章完成了基本回应，但仍有可改进之处。"
+    },
+    "overallSummaryEn": {
+      "type": "string",
+      "minLength": 1,
+      "default": "The essay addresses the task but still has limiting features."
+    },
+    "strengthZh": {
+      "type": "string",
+      "minLength": 1,
+      "default": "文章表达了明确立场。"
+    },
+    "strengthEn": {
+      "type": "string",
+      "minLength": 1,
+      "default": "The essay presents a clear position."
+    },
+    "paragraphFeedback": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "paragraphIndex",
+          "excerpt",
+          "roleZh",
+          "roleEn",
+          "diagnosisZh",
+          "diagnosisEn",
+          "actionZh",
+          "actionEn"
+        ],
+        "properties": {
+          "paragraphIndex": { "type": "integer", "minimum": 1, "default": 1 },
+          "excerpt": {
+            "type": "string",
+            "minLength": 1,
+            "default": "Essay paragraph excerpt."
+          },
+          "roleZh": { "type": "string", "minLength": 1, "default": "段落功能" },
+          "roleEn": {
+            "type": "string",
+            "minLength": 1,
+            "default": "Paragraph function"
+          },
+          "diagnosisZh": {
+            "type": "string",
+            "minLength": 1,
+            "default": "说明本段做得如何以及缺少什么。"
+          },
+          "diagnosisEn": {
+            "type": "string",
+            "minLength": 1,
+            "default": "Explain what works and what is missing."
+          },
+          "actionZh": {
+            "type": "string",
+            "minLength": 1,
+            "default": "给出一个可执行的修改动作。"
+          },
+          "actionEn": {
+            "type": "string",
+            "minLength": 1,
+            "default": "Give one observable revision action."
+          }
+        }
+      }
+    },
     "criteria": {
       "type": "object",
       "additionalProperties": false,
@@ -41,6 +122,22 @@
   "examples": [
     {
       "overallBand": 6.0,
+      "overallSummaryZh": "文章回应了题目，但展开和语言准确度仍有限制。",
+      "overallSummaryEn": "The essay addresses the task, but development and accuracy remain limiting.",
+      "strengthZh": "立场明确。",
+      "strengthEn": "The position is clear.",
+      "paragraphFeedback": [
+        {
+          "paragraphIndex": 1,
+          "excerpt": "The introduction states a clear position.",
+          "roleZh": "引言",
+          "roleEn": "Introduction",
+          "diagnosisZh": "立场清楚。",
+          "diagnosisEn": "The position is clear.",
+          "actionZh": "保持直接回应题目。",
+          "actionEn": "Continue answering the task directly."
+        }
+      ],
       "criteria": {
         "TR": {
           "band": 6.0,

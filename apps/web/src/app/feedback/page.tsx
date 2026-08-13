@@ -4,6 +4,7 @@ import { use, useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowRight,
+  BookOpen,
   BookLock,
   BrainCircuit,
   CalendarClock,
@@ -11,6 +12,8 @@ import {
   ChevronDown,
   Clock3,
   Info,
+  Languages,
+  PenLine,
   Quote,
   ShieldCheck,
   Sparkles,
@@ -41,7 +44,9 @@ export default function FeedbackPage({
 }: {
   searchParams: Promise<LearningSearchParams>;
 }) {
-  const cycleId = singleRouteParam(use(searchParams), "cycle");
+  const query = use(searchParams);
+  const cycleId = singleRouteParam(query, "cycle");
+  const lessonId = singleRouteParam(query, "lesson");
   const { text, messages } = useLocale();
   const router = useRouter();
   const loader = useCallback(
@@ -82,39 +87,72 @@ export default function FeedbackPage({
     return <Skeleton label={messages.common.loading} />;
   }
 
-  const confidenceLabel = (confidence: "high" | "medium" | "low") => {
-    if (confidence === "high") return text("高置信", "High confidence");
-    if (confidence === "medium") return text("中等置信", "Medium confidence");
-    return text("低置信", "Low confidence");
-  };
-
   return (
     <>
       <PageHeader
         actions={
-          <Badge tone="neutral">
-            <ShieldCheck aria-hidden="true" size={13} />
-            {data.languageScored
-              ? text(
-                  "AI 估分 · 非官方成绩",
-                  "AI estimate · not an official score",
-                )
-              : text(
-                  "Mock 演示 · 未评价语言",
-                  "Mock demo · language not scored",
-                )}
-          </Badge>
+          <div className="feedback-header-actions">
+            {cycleId && (lessonId ?? data.lessonId) ? (
+              <ActionLink
+                href={learningRouteHref("/lesson", {
+                  cycleId,
+                  lessonId: lessonId ?? data.lessonId,
+                })}
+                trailing={false}
+                variant="secondary"
+              >
+                <ArrowRight
+                  aria-hidden="true"
+                  size={17}
+                  style={{ transform: "rotate(180deg)" }}
+                />
+                {text("进入专项教学", "Open focused teaching")}
+              </ActionLink>
+            ) : null}
+            <Badge tone="neutral">
+              <ShieldCheck aria-hidden="true" size={13} />
+              {data.languageScored
+                ? text(
+                    "学习用估分 · 非官方成绩",
+                    "Learning estimate · not an official score",
+                  )
+                : text(
+                    "示例报告 · 未评价语言",
+                    "Example report · language not scored",
+                  )}
+            </Badge>
+          </div>
         }
-        eyebrow={text("Version 1 批改完成", "Version 1 feedback ready")}
+        eyebrow={text("第1步 · 详细批改与改正", "Step 1 · Detailed correction")}
         title={text(
-          "先看最影响分数的三件事",
-          "Start with the three things that matter most",
+          "先把这篇作文真正改明白",
+          "Understand and correct this essay first",
         )}
         description={text(
-          "详细报告已经保留，但你现在不需要读完所有修改。系统会把最高优先问题转成主动练习。",
-          "The full report is available, but you do not need to read every correction now. High-priority issues become active practice.",
+          "从原文逐段、逐句对照问题和改法；语法、拼写、搭配与论证分别讲清，再把最高优先问题带入专项教学。",
+          "Compare the original essay with paragraph and sentence-level corrections before moving the priority target into focused teaching.",
         )}
       />
+
+      <Card className="feedback-source-card">
+        <div className="feedback-source-section">
+          <p className="eyebrow">{text("原题", "Original task")}</p>
+          <h2 lang="en">{data.prompt}</h2>
+        </div>
+        <div className="feedback-source-section">
+          <p className="eyebrow">
+            {text(
+              "你的原文 · 原样保留",
+              "Your original Version 1 · preserved verbatim",
+            )}
+          </p>
+          <div className="feedback-original-essay" lang="en">
+            {data.originalEssay.split(/\n\s*\n/).map((paragraph, index) => (
+              <p key={`${index}-${paragraph.slice(0, 20)}`}>{paragraph}</p>
+            ))}
+          </div>
+        </div>
+      </Card>
 
       <div className="feedback-hero-grid">
         <Card className="overall-score-card">
@@ -123,7 +161,10 @@ export default function FeedbackPage({
             aria-label={
               data.languageScored
                 ? `${text("总分估计", "Estimated overall band")} ${data.overallScore}`
-                : text("Mock 未评价语言", "Mock did not score language")
+                : text(
+                    "当前仅演示流程，未评价语言",
+                    "This is a workflow preview; language was not scored",
+                  )
             }
           >
             <strong>
@@ -139,20 +180,13 @@ export default function FeedbackPage({
             <p className="eyebrow">
               {text("Overall estimate", "Overall estimate")}
             </p>
-            <h2>
-              {text(
-                "结构意识清楚，准确度仍是主要瓶颈",
-                "Clear structure; accuracy remains the main constraint",
-              )}
-            </h2>
-            <p>
-              {text(
-                "这次最值得投入的不是寻找更高级观点，而是把已有观点用自然、完整的英语表达出来。",
-                "The highest-return move is not finding more sophisticated ideas, but expressing your existing ideas naturally and completely.",
-              )}
-            </p>
+            <h2>{text("本篇总体诊断", "Overall diagnosis")}</h2>
+            <p>{text(data.overallSummaryZh, data.overallSummaryEn)}</p>
             <small>
-              {data.modelLabel} · {data.rubricVersion}
+              {text(
+                "估分只用于定位下一步学习重点",
+                "The estimate is used only to identify the next learning priority",
+              )}
             </small>
           </div>
         </Card>
@@ -161,14 +195,53 @@ export default function FeedbackPage({
             <CheckCircle2 aria-hidden="true" size={22} />
           </span>
           <p className="eyebrow">{text("本篇优势", "What worked")}</p>
-          <h2>
-            {text(
-              "你已经在写一篇真正的议论文",
-              "You are already writing a real argument",
-            )}
-          </h2>
+          <h2>{text("先保留做对的部分", "Preserve what already works")}</h2>
           <p>{text(data.strengthZh, data.strengthEn)}</p>
         </Card>
+      </div>
+
+      <SectionHeader
+        title={text(
+          "逐段看：每一段完成了什么，还缺什么",
+          "Paragraph-by-paragraph review",
+        )}
+        description={text(
+          "先理解段落功能和论证缺口，再处理句子里的语言问题。",
+          "Understand paragraph purpose and development before local language corrections.",
+        )}
+      />
+      <div className="paragraph-feedback-list">
+        {data.paragraphFeedback.length > 0 ? (
+          data.paragraphFeedback.map((paragraph) => (
+            <Card
+              className="paragraph-feedback-card"
+              key={paragraph.paragraphIndex}
+            >
+              <header>
+                <span>{paragraph.paragraphIndex}</span>
+                <h3>{text(paragraph.roleZh, paragraph.roleEn)}</h3>
+              </header>
+              <blockquote lang="en">{paragraph.excerpt}</blockquote>
+              <p>{text(paragraph.diagnosisZh, paragraph.diagnosisEn)}</p>
+              <div>
+                <PenLine aria-hidden="true" size={16} />
+                <span>
+                  <strong>{text("具体怎么改：", "Revision action: ")}</strong>
+                  {text(paragraph.actionZh, paragraph.actionEn)}
+                </span>
+              </div>
+            </Card>
+          ))
+        ) : (
+          <Card>
+            <p>
+              {text(
+                "段落级分析未生成；下方逐句改正仍然可用。",
+                "Paragraph analysis is unavailable; sentence-level corrections remain available below.",
+              )}
+            </p>
+          </Card>
+        )}
       </div>
 
       <div
@@ -185,18 +258,18 @@ export default function FeedbackPage({
             </div>
             <h3>{text(score.labelZh, score.labelEn)}</h3>
             <p>{text(score.summaryZh, score.summaryEn)}</p>
-            <Badge tone={score.confidence === "high" ? "green" : "amber"}>
-              {confidenceLabel(score.confidence)}
-            </Badge>
           </Card>
         ))}
       </div>
 
       <SectionHeader
-        title={text("本篇优先训练目标", "Priority learning targets")}
+        title={text(
+          "逐句对照：原句 → 改法 → 知识点",
+          "Sentence correction: original → revision → knowledge",
+        )}
         description={text(
-          "只突出会进入专项课的高收益问题。",
-          "Only high-return issues that feed the focused lesson are shown.",
+          "先修必须改的错误，再处理自然度；可选润色不会冒充语法错误。",
+          "Fix real errors first, then naturalness. Optional polish is never presented as grammar failure.",
         )}
       />
       <div className="issue-list">
@@ -208,16 +281,52 @@ export default function FeedbackPage({
             </div>
             <div className="issue-main">
               <div className="issue-title-row">
-                <Badge tone={issue.priority === 1 ? "blue" : "neutral"}>
-                  {text(issue.categoryZh, issue.categoryEn)}
+                <Badge
+                  tone={
+                    issue.severity === "must_fix"
+                      ? "amber"
+                      : issue.severity === "naturalness"
+                        ? "blue"
+                        : "neutral"
+                  }
+                >
+                  {issue.severity === "must_fix"
+                    ? text("需要改正", "Must fix")
+                    : issue.severity === "naturalness"
+                      ? text("更自然", "More natural")
+                      : text("可选优化", "Optional polish")}
                 </Badge>
                 <h3>{text(issue.titleZh, issue.titleEn)}</h3>
               </div>
-              <blockquote lang="en">
-                <Quote aria-hidden="true" size={15} />
-                {issue.evidence}
-              </blockquote>
-              <p>{text(issue.explanationZh, issue.explanationEn)}</p>
+              <div className="sentence-correction-grid">
+                <div>
+                  <small>{text("原文", "Original")}</small>
+                  <blockquote lang="en">
+                    <Quote aria-hidden="true" size={15} />
+                    {issue.evidence}
+                  </blockquote>
+                </div>
+                <div>
+                  <small>{text("参考改法", "Improved version")}</small>
+                  <p lang="en">{issue.correctedVersion}</p>
+                </div>
+              </div>
+              <div className="correction-explanation">
+                <Languages aria-hidden="true" size={17} />
+                <div>
+                  <strong>{text("为什么要改", "Why this changes")}</strong>
+                  <p>{text(issue.explanationZh, issue.explanationEn)}</p>
+                </div>
+              </div>
+              <div className="knowledge-point">
+                <BookOpen aria-hidden="true" size={17} />
+                <div>
+                  <strong>
+                    {text("举一反三知识点", "Transferable knowledge")}
+                  </strong>
+                  <p>{issue.knowledgePointZh}</p>
+                </div>
+              </div>
               <div className="transfer-rule">
                 <Target aria-hidden="true" size={16} />
                 <span>
@@ -229,16 +338,55 @@ export default function FeedbackPage({
           </Card>
         ))}
       </div>
-      {!showAll ? (
+      {!showAll && data.issues.length > 2 ? (
         <Button
           className="show-more-button"
           onClick={() => setShowAll(true)}
           variant="ghost"
         >
-          {text("再看 1 个论证问题", "Show one argument issue")}
+          {text(
+            `继续看另外 ${data.issues.length - 2} 个问题`,
+            `Show ${data.issues.length - 2} more issues`,
+          )}
           <ChevronDown aria-hidden="true" size={16} />
         </Button>
       ) : null}
+
+      <SectionHeader
+        title={text("容易漏掉的小问题", "Small but recurring leaks")}
+        description={text(
+          "这些问题不一定决定整篇立意，却会持续拉低准确度。",
+          "These may not define the argument, but repeated local errors reduce accuracy.",
+        )}
+      />
+      <Card className="small-leaks-card">
+        {data.issues.filter((issue) =>
+          ["GRAMMAR", "SPELLING", "WORD_FORM"].includes(issue.issueType),
+        ).length > 0 ? (
+          <ul>
+            {data.issues
+              .filter((issue) =>
+                ["GRAMMAR", "SPELLING", "WORD_FORM"].includes(issue.issueType),
+              )
+              .map((issue) => (
+                <li key={`leak-${issue.id}`}>
+                  <CheckCircle2 aria-hidden="true" size={16} />
+                  <div>
+                    <strong lang="en">{issue.evidence}</strong>
+                    <span>{issue.knowledgePointZh}</span>
+                  </div>
+                </li>
+              ))}
+          </ul>
+        ) : (
+          <p>
+            {text(
+              "本轮没有发现高置信的拼写或基础语法漏洞；系统不会为了显得详细而制造错误。",
+              "No high-confidence spelling or foundational grammar leak was found; the report will not invent errors for appearance.",
+            )}
+          </p>
+        )}
+      </Card>
 
       <Card className="lesson-schedule-card">
         <span className="lesson-schedule-icon">
@@ -250,8 +398,8 @@ export default function FeedbackPage({
           </p>
           <h2>
             {text(
-              "专项训练：让英语按英语的方式组织信息",
-              "Focused lesson: organise ideas through a natural English perspective",
+              "先完成专项教学，再进入60分钟训练卷",
+              "Complete focused teaching before the 60-minute paper",
             )}
           </h2>
           <p>
@@ -262,8 +410,8 @@ export default function FeedbackPage({
               <Info aria-hidden="true" size={16} />
               <span>
                 {text(
-                  "只有这一课程生成模块失败；已完成的批改与目标不会重做。",
-                  "Only this lesson-generation module failed; completed assessment and objectives will not be rerun.",
+                  "试卷暂时没有生成；已完成的作文批改不会重做。",
+                  "The paper was not generated; completed essay feedback will not be rerun.",
                 )}
               </span>
             </div>
@@ -274,7 +422,7 @@ export default function FeedbackPage({
           <div className="task-meta">
             <span>
               <Clock3 aria-hidden="true" size={15} />
-              45–60 {messages.common.minutes}
+              15–25 {messages.common.minutes}
             </span>
             <span>
               <CalendarClock aria-hidden="true" size={15} />
@@ -298,7 +446,7 @@ export default function FeedbackPage({
                   .then((refreshed) => {
                     if (!refreshed.lessonId) {
                       throw new LearningClientError(
-                        "The lesson-generation retry finished without a canonical lesson ID.",
+                        "新版专项训练卷尚未生成成功，请稍后再试。",
                         {
                           status: 500,
                           code: "LESSON_GENERATION_RESULT_MISSING",
@@ -317,8 +465,8 @@ export default function FeedbackPage({
                       error instanceof Error
                         ? error.message
                         : text(
-                            "课程模块仍未生成，请稍后再试。",
-                            "The lesson module is still unavailable. Try again later.",
+                            "专项训练卷仍未生成，请稍后再试。",
+                            "The practice paper is still unavailable. Try again later.",
                           ),
                     ),
                   )
@@ -326,7 +474,10 @@ export default function FeedbackPage({
               }}
               size="lg"
             >
-              {text("只重试课程生成模块", "Retry lesson module only")}
+              {text(
+                "重新生成专项教学与试卷",
+                "Generate teaching and paper again",
+              )}
             </Button>
           ) : (
             <ActionLink
@@ -336,7 +487,7 @@ export default function FeedbackPage({
               })}
               size="lg"
             >
-              {text("先做 3 分钟热身", "Do a 3-minute warm-up")}
+              {text("开始专项教学", "Start focused teaching")}
             </ActionLink>
           )}
         </div>

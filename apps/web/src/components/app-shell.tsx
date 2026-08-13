@@ -2,9 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
-  Activity,
   BarChart3,
   BookOpenCheck,
   BrainCircuit,
@@ -18,13 +17,18 @@ import {
   PenLine,
   RefreshCw,
   Settings,
-  ShieldCheck,
   Sparkles,
+  UserRound,
 } from "lucide-react";
 
 import { useLocale } from "@/components/locale-provider";
 import { NotificationCenter } from "@/components/notification-center";
 import { cn } from "@/components/utils";
+import {
+  buildLearningDestinations,
+  readLearningDestinations,
+  type LearningDestinations,
+} from "@/lib/client/learning-navigation";
 
 const navItems = [
   { href: "/today", key: "today", icon: Home },
@@ -38,7 +42,6 @@ const navItems = [
 
 const utilityItems = [
   { href: "/settings", key: "settings", icon: Settings },
-  { href: "/admin", key: "admin", icon: Activity },
 ] as const;
 
 function LocaleSwitch() {
@@ -79,6 +82,27 @@ function Brand() {
 function Navigation({ compact = false }: { compact?: boolean }) {
   const pathname = usePathname();
   const { messages, text } = useLocale();
+  const [destinations, setDestinations] = useState<LearningDestinations>(() =>
+    buildLearningDestinations({
+      cycleId: null,
+      writingAvailable: false,
+      feedbackAvailable: false,
+      lessonId: null,
+      rewriteTaskId: null,
+      comparisonAvailable: false,
+      transferTaskId: null,
+    }),
+  );
+  useEffect(() => {
+    const update = () => setDestinations(readLearningDestinations());
+    window.addEventListener("storage", update);
+    window.addEventListener("iwc:learning-navigation", update);
+    update();
+    return () => {
+      window.removeEventListener("storage", update);
+      window.removeEventListener("iwc:learning-navigation", update);
+    };
+  }, [pathname]);
   return (
     <nav
       aria-label={text("主导航", "Primary navigation")}
@@ -90,11 +114,26 @@ function Navigation({ compact = false }: { compact?: boolean }) {
         ) : null}
         {navItems.map((item) => {
           const Icon = item.icon;
-          const active = pathname === item.href;
-          const destination =
-            item.key === "today" || item.key === "growth"
-              ? item.href
-              : "/today";
+          const active =
+            pathname === item.href ||
+            (item.href === "/lesson" && pathname.startsWith("/lesson/"));
+          const destination = destinations[item.key];
+          if (!destination) {
+            return (
+              <span
+                aria-disabled="true"
+                className="nav-link nav-link-disabled"
+                key={item.href}
+                title={text(
+                  "完成前面的学习步骤后即可查看",
+                  "Available after the earlier learning step",
+                )}
+              >
+                <Icon aria-hidden="true" size={18} />
+                <span>{messages.nav[item.key]}</span>
+              </span>
+            );
+          }
           return (
             <Link
               aria-current={active ? "page" : undefined}
@@ -113,7 +152,7 @@ function Navigation({ compact = false }: { compact?: boolean }) {
       </div>
       {!compact ? (
         <div className="nav-group nav-utility-group">
-          <p className="nav-label">{text("系统", "System")}</p>
+          <p className="nav-label">{text("更多", "More")}</p>
           {utilityItems.map((item) => {
             const Icon = item.icon;
             const active = pathname === item.href;
@@ -144,12 +183,12 @@ function Sidebar() {
       <div className="sidebar-foot">
         <div className="system-mini-card">
           <span className="system-mini-icon" aria-hidden="true">
-            <ShieldCheck size={17} />
+            <UserRound size={17} />
           </span>
           <div>
-            <strong>{text("个人自托管", "Personal self-hosted")}</strong>
+            <strong>{text("专注学习", "Focused study")}</strong>
             <span>
-              {text("实时状态请查看管理页", "See Admin for live status")}
+              {text("今天只完成眼前一步", "One clear step at a time")}
             </span>
           </div>
         </div>
@@ -186,10 +225,6 @@ function MobileHeader() {
               <Link href="/settings">
                 <Settings aria-hidden="true" size={17} />
                 {messages.nav.settings}
-              </Link>
-              <Link href="/admin">
-                <Activity aria-hidden="true" size={17} />
-                {messages.nav.admin}
               </Link>
             </div>
           </div>

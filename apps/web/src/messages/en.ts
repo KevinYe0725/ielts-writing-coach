@@ -7,7 +7,7 @@ export const en = {
     today: "Today",
     write: "Writing room",
     feedback: "Feedback",
-    lesson: "Focused lesson",
+    lesson: "Focused learning",
     rewrite: "Delayed rewrite",
     compare: "Version comparison",
     growth: "Growth",

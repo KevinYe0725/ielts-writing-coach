@@ -534,8 +534,8 @@ export default function SetupPage() {
                       <strong>{text("加密保存", "Encrypted storage")}</strong>
                       <small>
                         {text(
-                          "支持无人值守的后台批改与提醒",
-                          "Supports unattended feedback and reminders",
+                          "离开页面后仍可继续完成批改与提醒",
+                          "Feedback and reminders can continue after you leave the page",
                         )}
                       </small>
                     </span>
@@ -568,8 +568,8 @@ export default function SetupPage() {
                 <summary>{text("高级设置", "Advanced settings")}</summary>
                 <p>
                   {text(
-                    "默认使用单模型处理评分、生成和开放题判分。完成初始化后可在设置中配置八类任务路由。",
-                    "By default, one model handles assessment, generation, and open responses. After setup, all eight task routes can be configured in Settings.",
+                    "默认由一个模型完成作文批改、试卷生成与复盘；之后也可以在设置中按学习步骤选择不同模型。",
+                    "By default, one model handles essay feedback, paper generation, and review. You can choose different models for learning steps later in Settings.",
                   )}
                 </p>
               </details>

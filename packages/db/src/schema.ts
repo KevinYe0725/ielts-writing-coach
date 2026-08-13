@@ -636,6 +636,23 @@ export const lessonPlan = pgTable(
       }>()
       .notNull()
       .default(sql`'{"split":"NONE","refresher":"NOT_REQUIRED"}'::jsonb`),
+    /**
+     * Product-facing practice-paper state. Legacy lesson columns stay readable
+     * for exchange compatibility, but the learner experience is one complete
+     * timed paper followed by one whole-paper result.
+     */
+    practiceFormat: text("practice_format").notNull().default("TIMED_PAPER_V2"),
+    paperContent: jsonb("paper_content").$type<Record<string, unknown>>(),
+    paperAnswers: jsonb("paper_answers")
+      .$type<Record<string, string>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    paperResult: jsonb("paper_result").$type<Record<string, unknown>>(),
+    paperSubmittedAt: timestamp("paper_submitted_at", { withTimezone: true }),
+    paperEvaluationJobId: uuid("paper_evaluation_job_id").references(
+      () => aiJob.id,
+      { onDelete: "set null" },
+    ),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

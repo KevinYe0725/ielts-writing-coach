@@ -10,6 +10,11 @@
     "endOffset",
     "excerpt",
     "diagnosis",
+    "issueType",
+    "correctedVersion",
+    "explanationZh",
+    "knowledgePointZh",
+    "transferRuleZh",
     "severity",
     "confidence"
   ],
@@ -30,6 +35,40 @@
       "minLength": 1,
       "default": "The comparative is grammatical, but the collocation and perspective are unnatural."
     },
+    "issueType": {
+      "enum": [
+        "GRAMMAR",
+        "SPELLING",
+        "WORD_FORM",
+        "COLLOCATION",
+        "NATURALNESS",
+        "LOGIC",
+        "COHESION",
+        "TASK_RESPONSE",
+        "OPTIONAL_POLISH"
+      ],
+      "default": "COLLOCATION"
+    },
+    "correctedVersion": {
+      "type": "string",
+      "minLength": 1,
+      "default": "A clearer corrected version."
+    },
+    "explanationZh": {
+      "type": "string",
+      "minLength": 1,
+      "default": "解释原句的问题以及修改理由。"
+    },
+    "knowledgePointZh": {
+      "type": "string",
+      "minLength": 1,
+      "default": "总结可迁移的知识点。"
+    },
+    "transferRuleZh": {
+      "type": "string",
+      "minLength": 1,
+      "default": "说明下次写作时如何检查。"
+    },
     "severity": { "enum": ["LOW", "MEDIUM", "HIGH"], "default": "MEDIUM" },
     "confidence": {
       "$ref": "common.schema.json#/$defs/Confidence",
@@ -43,6 +82,11 @@
       "endOffset": 22,
       "excerpt": "much slighter pressure",
       "diagnosis": "Much correctly modifies a comparative; the issue is natural collocation and English information perspective, not a 'much + comparative' grammar rule.",
+      "issueType": "COLLOCATION",
+      "correctedVersion": "Academic pressure is generally lower in primary school than in secondary school.",
+      "explanationZh": "比较级本身合法，但原搭配不自然且比较对象不完整。",
+      "knowledgePointZh": "描述压力高低时优先使用higher/lower，并写清比较对象。",
+      "transferRuleZh": "先确认谁承受压力，再检查A和B是否都写完整。",
       "severity": "MEDIUM",
       "confidence": 0.93
     }

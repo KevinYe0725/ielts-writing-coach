@@ -519,6 +519,20 @@ export interface AssessmentCriterionResult {
 /** AI-owned semantic output. Server IDs, versions, and timestamps are intentionally absent. */
 export interface AiAssessmentJudgment {
   readonly overallBand: number;
+  readonly overallSummaryZh: string;
+  readonly overallSummaryEn: string;
+  readonly strengthZh: string;
+  readonly strengthEn: string;
+  readonly paragraphFeedback: readonly {
+    readonly paragraphIndex: number;
+    readonly excerpt: string;
+    readonly roleZh: string;
+    readonly roleEn: string;
+    readonly diagnosisZh: string;
+    readonly diagnosisEn: string;
+    readonly actionZh: string;
+    readonly actionEn: string;
+  }[];
   readonly criteria: Readonly<
     Record<
       IeltsDimension,
@@ -538,6 +552,20 @@ export interface AiIssueJudgment {
   readonly endOffset: number;
   readonly excerpt: string;
   readonly diagnosis: string;
+  readonly issueType:
+    | "GRAMMAR"
+    | "SPELLING"
+    | "WORD_FORM"
+    | "COLLOCATION"
+    | "NATURALNESS"
+    | "LOGIC"
+    | "COHESION"
+    | "TASK_RESPONSE"
+    | "OPTIONAL_POLISH";
+  readonly correctedVersion: string;
+  readonly explanationZh: string;
+  readonly knowledgePointZh: string;
+  readonly transferRuleZh: string;
   readonly severity: "LOW" | "MEDIUM" | "HIGH";
   readonly confidence: number;
 }

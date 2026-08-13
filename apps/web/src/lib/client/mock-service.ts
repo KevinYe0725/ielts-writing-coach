@@ -11,9 +11,11 @@ import type {
   CycleExportOption,
   CycleBundleImportResult,
   FeedbackData,
+  FocusedTeachingData,
   GrowthData,
   LearningClient,
   LessonData,
+  PracticePaperData,
   ModelRouteSetting,
   QuestionOption,
   SettingsData,
@@ -25,6 +27,10 @@ import type {
   TransferTaskData,
   UserPreferences,
 } from "./types";
+import {
+  buildLearningDestinations,
+  mergeLearningDestinations,
+} from "./learning-navigation";
 import { LearningClientError } from "./errors";
 
 const STORAGE_KEYS = {
@@ -60,6 +66,9 @@ const readStorage = (key: string): string | null =>
 const writeStorage = (key: string, value: string): void => {
   if (canUseStorage()) window.localStorage.setItem(key, value);
 };
+
+const countWords = (value: string): number =>
+  value.trim().split(/\s+/).filter(Boolean).length;
 
 const removeStorage = (key: string): void => {
   if (canUseStorage()) window.localStorage.removeItem(key);
@@ -176,6 +185,60 @@ const feedback: FeedbackData = {
     "立场清晰，而且优缺点都有回应；你已经在写一篇真正的议论文，而不是堆砌观点。",
   strengthEn:
     "Your position is clear and both sides are addressed with a recognisable argument structure.",
+  prompt:
+    "Some experts believe that it is better for children to begin learning a foreign language at primary school rather than secondary school. Do the advantages outweigh the disadvantages?",
+  originalEssay:
+    "First of all, children always have a better ability to absorb new knowledges than the elder one especially in learning a new foreign language. They can understand new vocabulary and improve their listening skills easily, which makes children can develop a foreign language mindset more naturally.\n\nOn the other hand, the pressure from the courses in primary school is much slighter. Children have more time to explore new cultures and take part in other activities.\n\nIn conclusion, the advantages of learning a foreign language at primary school outweigh the disadvantages.",
+  overallSummaryZh:
+    "文章立场明确并完成了优缺点比较，但语言准确度、自然搭配和因果展开仍限制说服力。",
+  overallSummaryEn:
+    "The essay has a clear position and addresses both sides, but accuracy, collocation and causal development limit its persuasiveness.",
+  paragraphFeedback: [
+    {
+      paragraphIndex: 1,
+      excerpt:
+        "First of all, children always have a better ability to absorb new knowledges than the elder one...",
+      roleZh: "优势段：提出儿童学习能力更强",
+      roleEn: "Advantages paragraph: stronger learning ability",
+      diagnosisZh:
+        "核心观点清楚，但比较对象、knowledge的可数性和结果句动词结构都有问题；从学习能力跳到长期好处时也缺少中间机制。",
+      diagnosisEn:
+        "The main claim is clear, but the comparison, countability and result-clause grammar need correction, and the mechanism is underdeveloped.",
+      actionZh:
+        "先写清儿童与成年人之间的同类比较，再补充“反复接触使语言模式变熟悉”这一中间过程。",
+      actionEn:
+        "Make the child–adult comparison parallel, then add the process by which exposure makes patterns familiar.",
+    },
+    {
+      paragraphIndex: 2,
+      excerpt:
+        "On the other hand, the pressure from the courses in primary school is much slighter.",
+      roleZh: "让步段：讨论课程压力",
+      roleEn: "Concession paragraph: course pressure",
+      diagnosisZh:
+        "段落方向可以支持总体立场，但原句没有写清与什么阶段相比，也从课程视角直译了“压力更小”。",
+      diagnosisEn:
+        "The paragraph can support the position, but the comparison point is missing and the pressure expression follows an unnatural perspective.",
+      actionZh:
+        "明确比较对象，并根据意思选择pupils face less pressure或the workload is lighter。",
+      actionEn:
+        "Name the comparison and choose either pupils face less pressure or the workload is lighter according to the intended meaning.",
+    },
+    {
+      paragraphIndex: 3,
+      excerpt:
+        "In conclusion, the advantages of learning a foreign language at primary school outweigh the disadvantages.",
+      roleZh: "结论：重申权衡结果",
+      roleEn: "Conclusion: restate the weighing judgment",
+      diagnosisZh: "立场明确，但只重复结论，没有用一句话概括为什么优势更重要。",
+      diagnosisEn:
+        "The position is clear, but the conclusion repeats it without summarising why the advantages carry more weight.",
+      actionZh:
+        "补充一条权衡标准，例如长期收益持续更久，而压力风险可通过课程设计控制。",
+      actionEn:
+        "Add a weighing criterion, such as lasting benefits versus manageable course-design risks.",
+    },
+  ],
   lessonGenerationRetry: null,
   scores: [
     {
@@ -237,6 +300,13 @@ const feedback: FeedbackData = {
         "先判断你描述的是人承受压力、课业量，还是课程要求，再选择对应词块。",
       transferRuleEn:
         "First identify whether you mean pressure, workload, or course demands; then choose the matching chunk.",
+      issueType: "COLLOCATION",
+      correctedVersion:
+        "Academic pressure is generally lower in primary school than in secondary school.",
+      knowledgePointZh:
+        "much可以修饰比较级；真正的问题是slighter pressure搭配生硬、比较对象缺失，以及表达视角不自然。",
+      severity: "naturalness",
+      confidence: 0.93,
     },
     {
       id: "issue-comparison",
@@ -254,6 +324,13 @@ const feedback: FeedbackData = {
       transferRuleZh: "写 than 后立即检查：A 与 B 是否同类，B 是否写完整。",
       transferRuleEn:
         "After than, check that A and B are parallel and that B is complete.",
+      issueType: "GRAMMAR",
+      correctedVersion:
+        "Children generally absorb new knowledge more readily than adults.",
+      knowledgePointZh:
+        "knowledge在这里通常不可数；than前后应比较同类且名词成分完整。",
+      severity: "must_fix",
+      confidence: 0.97,
     },
     {
       id: "issue-argument",
@@ -271,11 +348,18 @@ const feedback: FeedbackData = {
         "The direction is sound, but the mechanism from exposure to a useful foundation is missing.",
       transferRuleZh: "每个主体观点至少回答 Why、How 和 So what。",
       transferRuleEn: "For each body idea, answer Why, How, and So what.",
+      issueType: "LOGIC",
+      correctedVersion:
+        "Regular exposure makes basic language patterns familiar, so children need less effort to process them during later study.",
+      knowledgePointZh:
+        "完整主体观点通常需要观点、原因、中间机制和具体结果，而不只是claim + beneficial。",
+      severity: "must_fix",
+      confidence: 0.9,
     },
   ],
-  lessonScheduledLabelZh: "专项训练已安排在今天 20:00，预计 45–60 分钟。",
+  lessonScheduledLabelZh: "专项教学已经准备好；学完后再进入60分钟训练卷。",
   lessonScheduledLabelEn:
-    "Your focused lesson is scheduled for 20:00 today and will take about 45–60 minutes.",
+    "Your focused teaching is ready; the 60-minute paper follows after it.",
 };
 
 const lesson: LessonData = {
@@ -688,6 +772,15 @@ export class MockLearningClient implements LearningClient {
           dueLabelZh: "从短回炉开始",
           dueLabelEn: "Starts with a short refresher",
         },
+        navigation: buildLearningDestinations({
+          cycleId: "cycle-demo",
+          writingAvailable: true,
+          feedbackAvailable: true,
+          lessonId: "lesson-collocation-perspective",
+          rewriteTaskId: "rewrite-primary-language",
+          comparisonAvailable: false,
+          transferTaskId: "transfer-task",
+        }),
         cycleTitle: "儿童是否应在小学开始学习外语",
         timeline: [
           {
@@ -789,6 +882,15 @@ export class MockLearningClient implements LearningClient {
             ? "Complete by 20:00 today"
             : "Start whenever you are ready",
       },
+      navigation: buildLearningDestinations({
+        cycleId: "cycle-demo",
+        writingAvailable: true,
+        feedbackAvailable: true,
+        lessonId: "lesson-collocation-perspective",
+        rewriteTaskId: practiceCompleted ? null : "rewrite-primary-language",
+        comparisonAvailable: false,
+        transferTaskId: practiceCompleted ? null : "transfer-task",
+      }),
       cycleTitle: practiceCompleted
         ? "小学外语启蒙 · Demo 练习记录已结束"
         : "儿童是否应在小学开始学习外语",
@@ -924,19 +1026,153 @@ export class MockLearningClient implements LearningClient {
     };
   }
 
-  async getFeedback(_cycleId: string): Promise<FeedbackData> {
+  async getFeedback(cycleId: string): Promise<FeedbackData> {
     await delay();
-    return readStorage(STORAGE_KEYS.lessonGenerationFailure) === "true"
-      ? {
-          ...feedback,
-          lessonId: null,
-          lessonGenerationRetry: {
-            jobId: "demo-failed-generation-job",
-            code: "DEMO_GENERATION_FAILURE",
-            safeMessage: "The demo lesson module failed to generate.",
-          },
-        }
-      : feedback;
+    const result =
+      readStorage(STORAGE_KEYS.lessonGenerationFailure) === "true"
+        ? {
+            ...feedback,
+            lessonId: null,
+            lessonGenerationRetry: {
+              jobId: "demo-failed-generation-job",
+              code: "DEMO_GENERATION_FAILURE",
+              safeMessage: "The demo lesson module failed to generate.",
+            },
+          }
+        : feedback;
+    mergeLearningDestinations({
+      feedback: `/feedback?cycle=${encodeURIComponent(cycleId)}`,
+      lesson: result.lessonId
+        ? `/lesson?cycle=${encodeURIComponent(cycleId)}&lesson=${encodeURIComponent(result.lessonId)}`
+        : null,
+      write: `/write?cycle=${encodeURIComponent(cycleId)}`,
+    });
+    return result;
+  }
+
+  async getFocusedTeaching(
+    cycleId: string,
+    lessonId: string,
+  ): Promise<FocusedTeachingData> {
+    await delay();
+    mergeLearningDestinations({
+      feedback: `/feedback?cycle=${encodeURIComponent(cycleId)}`,
+      lesson: `/lesson?cycle=${encodeURIComponent(cycleId)}&lesson=${encodeURIComponent(lessonId)}`,
+      write: `/write?cycle=${encodeURIComponent(cycleId)}`,
+    });
+    return {
+      id: lessonId,
+      cycleId,
+      targetTitleZh: "用原因—机制—结果完整表达观点",
+      targetTitleEn: "Build a complete cause–mechanism–result chain",
+      whyItMattersZh:
+        "你的原文能够提出观点，但有时从原因直接跳到beneficial，读者看不到影响是怎样发生的。IELTS高分论证不只需要观点正确，还要让推理过程可追踪。",
+      whyItMattersEn:
+        "Your essay can state claims, but sometimes jumps directly to beneficial without showing how the effect occurs.",
+      currentPattern:
+        "Children can learn languages easily, so it is beneficial for their future.",
+      decisionRuleZh:
+        "写完一个观点后依次追问：为什么？它通过什么过程产生影响？最后出现什么具体结果？",
+      decisionRuleEn:
+        "After a claim, ask why, explain the process, and state the specific result.",
+      knowledgeCards: [
+        {
+          titleZh: "观点不等于论证",
+          explanationZh:
+            "“早学语言有好处”只是立场。读者还需要看到重复接触如何形成熟悉度，以及熟悉度怎样降低后续学习成本。",
+          exampleEn:
+            "Regular exposure makes basic patterns familiar, so later study requires less processing effort.",
+        },
+        {
+          titleZh: "机制不是重复原因",
+          explanationZh:
+            "原因写发生了什么，机制写它怎样起作用。把“儿童学得快”换成“重复模仿使语音和句型逐渐自动化”，推理才真正向前。",
+          exampleEn:
+            "Repeated imitation gradually makes unfamiliar sounds easier to recognise and reproduce.",
+        },
+        {
+          titleZh: "结果必须落地",
+          explanationZh:
+            "少用空泛的useful、good和beneficial，改写成学习者以后能做什么，或者会减少什么成本。",
+          exampleEn:
+            "As a result, pupils can understand later lessons with less effort and greater confidence.",
+        },
+        {
+          titleZh: "一条链只服务一个观点",
+          explanationZh:
+            "不要在一句话中同时加入文化、就业和认知三个方向。一个主体观点配一条完整链，比堆多个未展开好处更有说服力。",
+          exampleEn:
+            "Early pronunciation practice builds accurate sound patterns, which makes later speaking practice less frustrating.",
+        },
+      ],
+      expressionBank: [
+        {
+          expressionEn: "This allows + 人/事物 + to do",
+          functionZh: "把中间机制连接到可观察结果",
+          usageZh: "allow后必须有宾语，再接to do；不要写allow somebody do。",
+          exampleEn:
+            "This allows pupils to process new vocabulary more efficiently.",
+        },
+        {
+          expressionEn: "which in turn + 动词",
+          functionZh: "说明前一影响继续引发下一步结果",
+          usageZh: "只有前后确实存在递进因果时使用，不能只为增加连接词。",
+          exampleEn:
+            "Familiar patterns reduce processing effort, which in turn makes later study less demanding.",
+        },
+        {
+          expressionEn: "Over time, + 累积变化",
+          functionZh: "表达重复或长期积累的结果",
+          usageZh: "适合习惯、熟悉度、信心等逐渐形成的变化，不适合瞬间结果。",
+          exampleEn: "Over time, regular exposure builds automatic recall.",
+        },
+        {
+          expressionEn: "As a result, + 具体结果",
+          functionZh: "收束因果链",
+          usageZh: "后面不要再次写同一个原因，而要落到表现、行为或成本。",
+          exampleEn:
+            "As a result, learners can participate more confidently in later lessons.",
+        },
+      ],
+      workedExample: {
+        taskZh: "说明早期语言接触为什么能降低后续学习难度。",
+        weakAnswerEn:
+          "Children learn quickly, so language lessons are beneficial.",
+        thinkingStepsZh: [
+          "先把原因具体化：儿童反复听到并模仿声音和基本句型。",
+          "再找中间过程：重复让陌生模式逐渐变得熟悉。",
+          "最后落到结果：正式学习时识别和处理新内容所需的努力更少。",
+        ],
+        improvedAnswerEn:
+          "Regular exposure makes basic sounds and patterns familiar, so children need less effort to process new material when formal study becomes more demanding.",
+        explanationZh:
+          "改写保留了原来的好处，但用“接触—熟悉—降低处理难度”让读者看见了完整推理。",
+      },
+      quickChecks: [
+        {
+          promptZh: "哪一句真正包含机制，而不是只重复观点？",
+          optionsZh: [
+            "A. Early lessons are beneficial for children.",
+            "B. Repeated exposure makes common patterns familiar, so later processing becomes easier.",
+          ],
+          answerZh: "B",
+          explanationZh: "B写出了“重复接触→变熟悉→处理更容易”的中间过程。",
+        },
+        {
+          promptZh: "把it is beneficial改成一个具体的学习结果。",
+          optionsZh: [],
+          answerZh:
+            "例如：learners can process new material with less effort。",
+          explanationZh:
+            "这个结果可以观察，也直接说明早期接触怎样影响后续学习。",
+        },
+      ],
+      readyChecklistZh: [
+        "我能区分观点、原因、机制和结果。",
+        "我能不用照抄示例，也解释一个影响怎样发生。",
+        "我会把good或beneficial换成具体、可观察的结果。",
+      ],
+    };
   }
 
   async getLesson(_cycleId: string, _lessonId: string): Promise<LessonData> {
@@ -980,6 +1216,190 @@ export class MockLearningClient implements LearningClient {
         observedAtMs: Date.now(),
       },
     };
+  }
+
+  async getPracticePaper(
+    cycleId: string,
+    lessonId: string,
+  ): Promise<PracticePaperData> {
+    await delay();
+    mergeLearningDestinations({
+      feedback: `/feedback?cycle=${encodeURIComponent(cycleId)}`,
+      lesson: `/lesson?cycle=${encodeURIComponent(cycleId)}&lesson=${encodeURIComponent(lessonId)}`,
+      write: `/write?cycle=${encodeURIComponent(cycleId)}`,
+    });
+    const instructions = [
+      "选择唯一一项同时包含原因、作用过程和结果的英文句子。",
+      "用20至35个英文词解释为什么早期接触能降低以后的学习难度；必须写出作用过程和结果。",
+      "将原句改写成一个语法正确、比较对象完整的英文句子；保持原意，不增加新观点。",
+      "将原句改写成一个自然的英文句子；明确谁承受压力以及比较对象，不使用much slighter。",
+      "用25至45个英文词解释校内体育活动如何改善课堂学习；必须包含直接作用和学习结果。",
+      "用25至45个英文词解释公共交通如何减少城市拥堵；必须包含中间机制，不得使用because。",
+      "写一个80至120词的英文段落，说明早期语言学习的一个长期好处；必须包含观点、原因、机制和结果。",
+      "写一个80至120词的英文段落，承认早期语言课程的一个风险，并说明学校如何通过课程设计降低该风险。",
+    ];
+    const prompts = [
+      "Which option presents a complete cause–mechanism–result chain?",
+      "Explain why early language exposure can make later study easier.",
+      "Children always have a better ability to absorb new knowledges than the elder one.",
+      "The pressure from the courses in primary school is much slighter.",
+      "Explain how regular physical activity at school can improve classroom learning.",
+      "Explain how reliable public transport can reduce congestion in large cities.",
+      "Explain one long-term benefit of beginning foreign-language lessons in primary school.",
+      "Explain how schools can preserve the benefits of early language learning without creating excessive pressure.",
+    ];
+    const questions = [
+      "FOUNDATION",
+      "FOUNDATION",
+      "REPAIR",
+      "REPAIR",
+      "GENERATION",
+      "GENERATION",
+      "INTEGRATION",
+      "INTEGRATION",
+    ].map((section, index) => ({
+      id: `demo-paper-question-${index + 1}`,
+      number: index + 1,
+      section: section as PracticePaperData["questions"][number]["section"],
+      titleZh: `第 ${index + 1} 题`,
+      titleEn: `Question ${index + 1}`,
+      instructionZh: instructions[index] ?? "按题面要求作答。",
+      promptEn: prompts[index] ?? "Write a complete English answer.",
+      sourceText:
+        index === 0
+          ? "Children learn languages at primary school."
+          : section === "REPAIR"
+            ? (prompts[index] ?? "")
+            : "",
+      responseMode: (index === 0
+        ? "choice"
+        : index >= 6
+          ? "paragraph"
+          : "sentence") as PracticePaperData["questions"][number]["responseMode"],
+      options:
+        index === 0
+          ? [
+              {
+                key: "A",
+                labelEn:
+                  "Early exposure builds a foundation, so later study becomes easier.",
+              },
+              { key: "B", labelEn: "Early exposure is useful." },
+              { key: "C", labelEn: "Many schools teach languages." },
+            ]
+          : [],
+      suggestedMinutes: [5, 5, 7, 7, 8, 8, 10, 10][index] ?? 5,
+      minimumWords: [1, 20, 8, 8, 25, 25, 80, 80][index] ?? 1,
+      maximumWords: [1, 35, 40, 40, 45, 45, 120, 120][index] ?? 60,
+      publicCriteria: [
+        {
+          labelZh: "按题面作答",
+          labelEn: "Follow the instruction",
+          descriptionZh: instructions[index] ?? "按题面要求作答。",
+          descriptionEn: "Follow every requirement in the visible instruction.",
+          weight: 100,
+        },
+      ],
+    }));
+    const stored = readStorage("iwc:practice-paper-answers");
+    const answers = stored
+      ? (JSON.parse(stored) as Record<string, string>)
+      : {};
+    const submittedAt = readStorage("iwc:practice-paper-submitted");
+    let startedAt = readStorage("iwc:practice-paper-started");
+    if (!startedAt) {
+      startedAt = new Date().toISOString();
+      writeStorage("iwc:practice-paper-started", startedAt);
+    }
+    const itemResults = submittedAt
+      ? questions.map((question) => {
+          const answer = answers[question.id]?.trim() ?? "";
+          const meetsStandard =
+            question.responseMode === "choice"
+              ? answer === "A"
+              : countWords(answer) >= Math.min(question.minimumWords, 20);
+          return {
+            itemId: question.id,
+            status: meetsStandard
+              ? ("MEETS_STANDARD" as const)
+              : ("NEEDS_WORK" as const),
+            score: meetsStandard ? 100 : 45,
+            feedbackZh: meetsStandard
+              ? "答案达到本题交卷前公开的评分点。"
+              : "答案尚未完整覆盖题面明确要求，请对照下方评分点修改。",
+            strengthsZh: meetsStandard ? ["回答切合题意。"] : [],
+            problems: meetsStandard
+              ? []
+              : [
+                  {
+                    criterionLabelZh: "题意完成",
+                    explanationZh:
+                      "当前回答没有完整呈现题面要求的因果关系或必要信息。",
+                    evidence: answer.slice(0, 120),
+                  },
+                ],
+            improvedAnswerEn: meetsStandard
+              ? ""
+              : "Early exposure helps children become familiar with basic language patterns, so they face fewer difficulties when language study becomes more demanding.",
+            nextStepZh: meetsStandard
+              ? "保持这种清晰度。"
+              : "先圈出题面中的动作和信息要求，再重写一个完整答案。",
+          };
+        })
+      : [];
+    const result = submittedAt
+      ? {
+          totalScore:
+            itemResults.reduce((sum, item) => sum + item.score, 0) /
+            itemResults.length,
+          summaryZh: "整卷已完成。下方只展开未达到公开评分点的题目。",
+          itemResults,
+        }
+      : null;
+    return {
+      id: lessonId,
+      cycleId,
+      titleZh: "核心问题专项训练卷",
+      titleEn: "Focused writing practice paper",
+      objectiveZh: "在60分钟内完成整卷，交卷后统一查看不达标题解析。",
+      objectiveEn:
+        "Complete the full paper in 60 minutes and review missed questions after submission.",
+      durationMinutes: 60,
+      instructionsZh: [
+        "所有题目一次性完成后再交卷。",
+        "交卷前不显示答案、提示或单题评价。",
+        "题目已经写明全部作答要求，不会在批改时增加条件。",
+      ],
+      instructionsEn: [
+        "Submit all answers together.",
+        "No answer or item feedback is shown before submission.",
+        "Every requirement is stated in the question before you answer.",
+      ],
+      questions,
+      answers,
+      startedAt,
+      submittedAt,
+      result,
+      evaluationPending: false,
+    };
+  }
+
+  async submitPracticePaper(
+    _lessonId: string,
+    answers: Record<string, string>,
+  ): Promise<void> {
+    writeStorage("iwc:practice-paper-answers", JSON.stringify(answers));
+    writeStorage("iwc:practice-paper-submitted", new Date().toISOString());
+    await delay(160);
+  }
+
+  async replaceLegacyLesson(_lessonId: string): Promise<void> {
+    await delay(120);
+  }
+
+  async completePracticePaper(_lessonId: string): Promise<void> {
+    await delay(80);
+    writeStorage(STORAGE_KEYS.lessonPracticeComplete, "true");
   }
 
   async saveLessonProgress(

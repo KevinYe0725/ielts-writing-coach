@@ -23,7 +23,6 @@ import {
   evaluateAppliedGate,
   evaluateRetainedGate,
   evaluateTransferredGate,
-  validateLessonPlan,
   transitionRewrite,
   transitionTransfer,
   transitionTrainingCycle,
@@ -61,13 +60,12 @@ import {
   assessmentJudgmentSchema,
   comparisonSchema,
   evaluationSchema,
+  focusedLearningPackageSchema,
   issueBatchSchema,
-  lessonContentSchema,
+  practicePaperEvaluationSchema,
   transferEvaluationSchema,
 } from "../schemas";
 import {
-  buildCanonicalLessonPlan,
-  buildExercisePresentation,
   buildProviderAwareDelayedRewriteEvidence,
   buildProviderAwareExerciseEvidence,
   buildTransferEvidence,
@@ -76,15 +74,16 @@ import {
   classifyIssueForPersistence,
   countComparisonWords,
   followUpSchedule,
-  itemTypesForPrompt,
-  lessonItemsWithPath,
   verifyComparisonIssueSpans,
   verifyTransferJudgmentEvidence,
   type ComparisonJudgment,
   type ExerciseEvaluationJudgment,
-  type GeneratedLessonContent,
+  type FocusedLearningPackage,
+  type PracticePaperJudgment,
   type TransferEvaluationJudgment,
   type VersionScoreSet,
+  sanitizePracticePaperJudgment,
+  validateFocusedLearningPackage,
 } from "../learning";
 import { buildMixedReviewObservation } from "../mixed-review";
 
@@ -411,6 +410,11 @@ async function ensureVersion2Assessment(input: {
         CC: result.value.criteria.CC.rationale,
         LR: result.value.criteria.LR.rationale,
         GRA: result.value.criteria.GRA.rationale,
+        overallSummaryZh: result.value.overallSummaryZh,
+        overallSummaryEn: result.value.overallSummaryEn,
+        strengthZh: result.value.strengthZh,
+        strengthEn: result.value.strengthEn,
+        paragraphFeedback: JSON.stringify(result.value.paragraphFeedback),
       },
       confidence: overallConfidence,
       isAiEstimate: !providerIsMock,
@@ -601,6 +605,11 @@ async function assessEssay(
         CC: result.value.criteria.CC.rationale,
         LR: result.value.criteria.LR.rationale,
         GRA: result.value.criteria.GRA.rationale,
+        overallSummaryZh: result.value.overallSummaryZh,
+        overallSummaryEn: result.value.overallSummaryEn,
+        strengthZh: result.value.strengthZh,
+        strengthEn: result.value.strengthEn,
+        paragraphFeedback: JSON.stringify(result.value.paragraphFeedback),
       },
       confidence: overallConfidence,
       isAiEstimate: !providerIsMock,
@@ -703,6 +712,13 @@ async function classifyIssues(
         excerpt: attempt.content.slice(0, endOffset),
         diagnosis:
           "Use this exact span as the starting point for evidence-based development practice.",
+        issueType: "LOGIC",
+        correctedVersion: attempt.content.slice(0, endOffset),
+        explanationZh:
+          "当前证据不足以形成更具体的自动诊断，请在报告中人工确认这一处的论证展开。",
+        knowledgePointZh: "观点需要用原因、机制或例证充分展开。",
+        transferRuleZh:
+          "下一篇写完主体观点后，检查是否回答了为什么、如何发生和产生什么结果。",
         severity: "MEDIUM",
         confidence: 0.6,
       },
@@ -731,6 +747,15 @@ async function classifyIssues(
           excerpt: issue.excerpt,
           diagnosis: {
             en: classification.diagnosis,
+            titleZh: issue.knowledgePointZh,
+            titleEn: issue.skillId,
+            explanationZh: issue.explanationZh,
+            explanationEn: issue.diagnosis,
+            correctedVersion: issue.correctedVersion,
+            knowledgePointZh: issue.knowledgePointZh,
+            transferRuleZh: issue.transferRuleZh,
+            transferRuleEn: issue.transferRuleZh,
+            issueType: issue.issueType,
             source: usedSyntheticFallback
               ? "SYNTHETIC_FALLBACK"
               : "AI_CLASSIFICATION",
@@ -795,169 +820,85 @@ async function generateLesson(
       "Lesson generation requires at least one source issue for the selected skill.",
     );
   }
-  const secondaryIssue = issueRows
-    .filter(
-      (issue) =>
-        issue.skillId !== canonicalSkillId &&
-        SKILL_IDS.includes(issue.skillId as (typeof SKILL_IDS)[number]),
-    )
-    .sort(
-      (left, right) =>
-        right.severity - left.severity ||
-        right.confidence - left.confidence ||
-        left.id.localeCompare(right.id),
-    )[0];
-  const secondaryObjective = secondaryIssue
-    ? {
-        skillId: secondaryIssue.skillId as SkillId,
-        sourceEvidenceIds: [secondaryIssue.id],
-      }
-    : undefined;
   const version1 = cycle.writingAttempts.find(
     (attempt) => attempt.kind === "version_1",
   );
   const adapter = await adapterForJob(job);
-  const result = await adapter.generateStructured<GeneratedLessonContent>({
+  const result = await adapter.generateStructured<FocusedLearningPackage>({
     model: model(job),
     idempotencyKey: job.id,
     system: PROMPT_REGISTRY.exercise_generation.system,
-    input: `Supply content for five active-output slots inside a deterministic canonical lesson. Target skill: ${canonicalSkillId}. The deterministic planner will assign these forms: slot 1 ${itemTypesForPrompt(canonicalSkillId).pretest}; slot 2 ${itemTypesForPrompt(canonicalSkillId).controlled}; slots 3 and 4 ${itemTypesForPrompt(canonicalSkillId).production} as semantically distinct first-attempt no-hint generations whose feedback is delayed until both are submitted; slot 5 is an 80–120 word integrated paragraph lab. For every slot, provide usable sourceText, 2–4 distinct options, explicit acceptedAnswers that use option IDs for choice tasks, correct mappingPairs, semantic slotLabels, every validOrders variant, three branch-specific prompts, and fixed rubricCriteria. A meaning fork is unscored and its options represent plausible intended meanings; later branch prompts must genuinely differ by that meaning. Closed answers must be internally consistent with the prompt and repeatable. Explain in Chinese; all learner prompts and output are English. Do not choose timings, IDs, lifecycle state, evidence gates, or mastery. Use fresh contexts and do not reveal a complete model essay. Task prompt: ${cycle.question.prompt}\nLearner evidence: ${(version1?.content ?? "").slice(0, 4_000)}`,
-    schemaName: "iwc_lesson_content_v1",
-    schema: lessonContentSchema as unknown as Record<string, unknown>,
-    validate: (value): value is GeneratedLessonContent =>
+    input: `Create one complete focused-learning package for the learner. First teach the diagnosed priority, then create the 60-minute practice paper. The diagnosed priority is ${canonicalSkillId}.
+
+The teaching module must use the exact learner evidence, explain why the current pattern limits IELTS writing, teach one clear decision rule through 3–5 knowledge cards, give 2–8 reusable expressions with usage notes, walk through one improved example in at least 3 thinking steps, provide 2 untimed quick checks with revealed answers, and end with a readiness checklist. It must not reveal a complete essay. The paper objectiveZh must contain teachingModule.targetTitleZh verbatim.
+
+The paper has exactly 8 questions in this exact order:
+1–2 FOUNDATION: one clear recognition/diagnosis question and one short explanation question;
+3–4 REPAIR: repair or rewrite two flawed excerpts without changing their intended meaning;
+5–6 GENERATION: write original sentences in two genuinely different contexts;
+7–8 INTEGRATION: write and improve an IELTS-style paragraph using the target naturally.
+
+The suggested minutes across all 8 questions must total exactly 60. Every question must be answerable without seeing feedback from another question. Before the learner answers, state in Chinese exactly what to produce, how many sentences or words, all required ideas, and all restrictions. publicCriteria are protected evaluator data and are not displayed as a separate learner-facing rubric. Each criterion descriptionZh must repeat the visible instruction verbatim and must not add or paraphrase another requirement. Prefer one criterion with weight 100. A criterion label must be a short human-facing phrase, never an ID. Choice questions need 3–4 unambiguous options and acceptedAnswers containing only option keys. Open questions must have empty options and acceptedAnswers. Use plain Chinese instructions and English writing material. Avoid vague wording such as 'demonstrate the target', 'complete the chain', 'meaning branch', or 'according to the slots'. Do not mention internal software concepts.
+
+All eight English prompts must be substantively different. REPAIR questions must include the exact flawed source sentence. The public criterion weights for each question must total 100. Reject trivia, meta-questions about grammar labels, and instructions that require the learner to guess the intended content.
+
+Original IELTS question: ${cycle.question.prompt}
+Relevant diagnosed excerpts and explanations: ${JSON.stringify(
+      issueRows.slice(0, 4).map((issue) => ({
+        excerpt: issue.excerpt,
+        diagnosis: issue.diagnosis,
+      })),
+    )}
+Learner Version 1 for context only: ${(version1?.content ?? "").slice(0, 4_000)}`,
+    schemaName: "iwc_focused_learning_package_v3",
+    schema: focusedLearningPackageSchema as unknown as Record<string, unknown>,
+    validate: (value): value is FocusedLearningPackage =>
       typeof value === "object" &&
       value !== null &&
-      Array.isArray((value as { stages?: unknown }).stages) &&
-      (value as { stages: unknown[] }).stages.length === 5,
-    maxOutputTokens: 5_000,
+      validateFocusedLearningPackage(value as FocusedLearningPackage),
+    maxOutputTokens: 12_000,
   });
-  const ids = {
-    planId: newDomainId(),
-    objectiveId: newDomainId(),
-    secondaryObjectiveId: newDomainId(),
-    foundationBlockId: newDomainId(),
-    breakBlockId: newDomainId(),
-    applicationBlockId: newDomainId(),
-    flexBlockId: newDomainId(),
-    independentGroupId: newDomainId(),
-    pretestItemId: newDomainId(),
-    controlledItemId: newDomainId(),
-    generationOneItemId: newDomainId(),
-    generationTwoItemId: newDomainId(),
-    integratedItemId: newDomainId(),
-    selfCheckItemId: newDomainId(),
-    exitItemId: newDomainId(),
-    flexRepairItemId: newDomainId(),
-    flexGenerationItemId: newDomainId(),
-  };
-  const canonicalPlan = buildCanonicalLessonPlan({
-    cycleId,
-    skillId: canonicalSkillId,
-    sourceEvidenceIds,
-    content: result.value,
-    ids,
-    plannerVersion: "worker-canonical-planner@1.0.0",
-    generatorVersion:
-      job.versionSnapshot.promptVersion ??
-      PROMPT_REGISTRY.exercise_generation.version,
-    ...(secondaryObjective ? { secondaryObjective } : {}),
-  });
-  const canonicalItems = lessonItemsWithPath(canonicalPlan);
-  const coreItems = canonicalPlan.blocks
-    .filter((block) => block.path === "CORE")
-    .flatMap((block) => block.items);
-  const coreTotalSeconds = coreItems.reduce(
-    (sum, item) => sum + item.expectedTotalSeconds,
-    0,
-  );
-  const coreActiveSeconds = coreItems.reduce(
-    (sum, item) => sum + item.expectedActiveSeconds,
-    0,
-  );
-  const lessonMetrics = validateLessonPlan(canonicalPlan).metrics;
-  await databaseContext.db.transaction(async (transaction) => {
-    await transaction.insert(learningObjective).values(
-      canonicalPlan.objectives.map((objective) => ({
-        id: objective.id,
-        cycleId,
-        skillId: objective.skillId,
-        role: objective.role,
-        sourceEvidenceIds: [...objective.sourceEvidenceIds],
-        priority: objective.priority,
-        successCriterion: objective.successCriterion,
+  const planId = newDomainId();
+  const objectiveId = newDomainId();
+  const paperContent = {
+    teachingModule: result.value.teachingModule,
+    paper: {
+      ...result.value.paper,
+      format: "TIMED_PAPER_V3",
+      durationMinutes: 60,
+      items: result.value.paper.items.map((item, index) => ({
+        ...item,
+        id: newDomainId(),
+        number: index + 1,
       })),
-    );
+    },
+    format: "TIMED_PAPER_V2",
+  };
+  await databaseContext.db.transaction(async (transaction) => {
+    await transaction.insert(learningObjective).values({
+      id: objectiveId,
+      cycleId,
+      skillId: canonicalSkillId,
+      role: "CORE",
+      sourceEvidenceIds: [...sourceEvidenceIds],
+      priority: 1,
+      successCriterion:
+        "Meet the public criteria on the complete timed practice paper.",
+    });
     await transaction.insert(lessonPlan).values({
-      id: ids.planId,
+      id: planId,
       cycleId,
       coreSkillId: canonicalSkillId,
       schemaVersion: LEARNING_CONTRACT_VERSION,
       plannedMinutes: 60,
-      coreMinutes: 45,
-      activeOutputRatio:
-        coreTotalSeconds === 0 ? 0 : coreActiveSeconds / coreTotalSeconds,
-      selectionRatio: lessonMetrics.recognitionItemRatio,
-      remediationMinutes: 15,
-      // Stable export shape: exactly one complete canonical plan in the legacy unknown[] column.
-      stages: [canonicalPlan],
+      coreMinutes: 60,
+      activeOutputRatio: 0.75,
+      selectionRatio: 0.125,
+      remediationMinutes: 0,
+      stages: [],
+      practiceFormat: "TIMED_PAPER_V2",
+      paperContent,
     });
-    await transaction.insert(exerciseItem).values(
-      canonicalItems.map(({ item, path }, index) => {
-        const generated =
-          result.value.stages[index % result.value.stages.length];
-        const stage = generated ?? result.value.stages[0]!;
-        const presentation = buildExercisePresentation({
-          item,
-          stage,
-          ...(canonicalPlan.blocks
-            .flatMap((block) => block.items)
-            .find((candidate) => candidate.itemType === "MEANING_FORK")
-            ? { meaningStage: result.value.stages[0] }
-            : {}),
-          ...(item.id === ids.selfCheckItemId
-            ? { revisionSourceItemId: ids.integratedItemId }
-            : {}),
-        });
-        const minimumConfidence =
-          item.grading.mode === "RUBRIC" ? item.grading.minimumConfidence : 1;
-        return {
-          id: item.id,
-          lessonPlanId: ids.planId,
-          learningObjectiveId: ids.objectiveId,
-          ordinal: index + 1,
-          itemType: item.itemType,
-          prompt: {
-            titleZh: generated?.titleZh ?? result.value.titleZh,
-            instructionZh:
-              item.itemType === "SELF_CHECK"
-                ? "对上一张段落实验卡逐项目标检查，至少做一处针对性修改，再提交第二版。"
-                : (generated?.instructionZh ?? result.value.objectiveZh),
-            promptEn: item.prompt,
-            canonicalPrompt: item.prompt,
-            responseMode: presentation.responseMode,
-            presentation,
-            ...(presentation.sourceText
-              ? { source: presentation.sourceText }
-              : {}),
-            ...(presentation.options ? { choices: presentation.options } : {}),
-            ...(presentation.selfCheckPrompts
-              ? { selfCheckPrompts: presentation.selfCheckPrompts }
-              : {}),
-            criteria: item.criteria ?? [],
-          },
-          // Stable row-level export/evaluation shape; IDs and prompt are intentionally duplicated for integrity checks.
-          evaluationContract: {
-            canonicalItem: item,
-            path,
-            skillId: canonicalSkillId,
-            requiresIndependentFirstAnswer: item.firstAttemptRequired,
-            minimumConfidence,
-            presentation,
-          },
-          expectedMinutes: item.expectedTotalSeconds / 60,
-        };
-      }),
-    );
     const current = cycle.status;
     const feedbackReady =
       current === "ANALYZING"
@@ -1297,6 +1238,106 @@ async function evaluateExercise(
         );
     }
   });
+  return usageRecord(result.usage);
+}
+
+function publicPaper(value: unknown): {
+  readonly titleZh: string;
+  readonly objectiveZh: string;
+  readonly items: readonly {
+    readonly id: string;
+    readonly number: number;
+    readonly titleZh: string;
+    readonly instructionZh: string;
+    readonly promptEn: string;
+    readonly sourceText: string;
+    readonly responseMode: string;
+    readonly options: readonly {
+      readonly key: string;
+      readonly labelEn: string;
+    }[];
+    readonly acceptedAnswers: readonly string[];
+    readonly answerExplanationZh: string;
+    readonly publicCriteria: readonly {
+      readonly labelZh: string;
+      readonly descriptionZh: string;
+      readonly weight: number;
+    }[];
+  }[];
+} | null {
+  if (typeof value !== "object" || value === null) return null;
+  const container = value as {
+    paper?: unknown;
+  };
+  const paperValue =
+    typeof container.paper === "object" && container.paper !== null
+      ? container.paper
+      : value;
+  const candidate = paperValue as {
+    titleZh?: unknown;
+    objectiveZh?: unknown;
+    items?: unknown;
+  };
+  if (
+    typeof candidate.titleZh !== "string" ||
+    typeof candidate.objectiveZh !== "string" ||
+    !Array.isArray(candidate.items)
+  )
+    return null;
+  return paperValue as ReturnType<typeof publicPaper>;
+}
+
+async function evaluatePracticePaper(
+  job: ClaimedJob,
+): Promise<Record<string, number>> {
+  const lessonId = job.protectedReference.lessonId;
+  if (!lessonId)
+    throw new Error(
+      "Practice paper evaluation is missing its paper reference.",
+    );
+  const plan = await databaseContext.db.query.lessonPlan.findFirst({
+    where: eq(lessonPlan.id, lessonId),
+    with: { cycle: true },
+  });
+  if (!plan || plan.cycle.userId !== job.ownerId)
+    throw new Error("The submitted practice paper no longer exists.");
+  if (plan.paperResult) return {};
+  if (!plan.paperSubmittedAt)
+    throw new Error("The practice paper has not been submitted.");
+  const paper = publicPaper(plan.paperContent);
+  if (!paper || paper.items.length !== 8)
+    throw new Error("The practice paper content is invalid.");
+  const answers = plan.paperAnswers;
+  const adapter = await adapterForJob(job);
+  const result = await adapter.generateStructured<PracticePaperJudgment>({
+    model: model(job),
+    idempotencyKey: job.id,
+    system: PROMPT_REGISTRY.paragraph_evaluation.system,
+    input: `Mark this complete focused-practice paper. Judge only the publicCriteria attached to each question. Do not infer an unstated requirement. Preserve every question's itemId exactly. For a choice question, compare the answer with acceptedAnswers deterministically. For open English, quote only exact learner wording in evidence. A blank or impossible-to-judge answer is NOT_SCORABLE. Detailed problems and the improved answer are required only for NEEDS_WORK; keep them empty for MEETS_STANDARD. Use supportive, concrete Chinese and never mention software internals.
+
+Paper: ${JSON.stringify(paper)}
+Learner answers submitted together: ${JSON.stringify(answers)}`,
+    schemaName: "iwc_practice_paper_evaluation_v2",
+    schema: practicePaperEvaluationSchema as unknown as Record<string, unknown>,
+    validate: (value): value is PracticePaperJudgment =>
+      typeof value === "object" &&
+      value !== null &&
+      typeof (value as { totalScore?: unknown }).totalScore === "number" &&
+      Array.isArray((value as { itemResults?: unknown }).itemResults),
+    maxOutputTokens: 8_000,
+  });
+  const sanitized = sanitizePracticePaperJudgment({
+    paper,
+    answers,
+    judgment: result.value,
+  });
+  await databaseContext.db
+    .update(lessonPlan)
+    .set({
+      paperResult: { ...sanitized },
+      paperEvaluationJobId: job.id,
+    })
+    .where(eq(lessonPlan.id, plan.id));
   return usageRecord(result.usage);
 }
 
@@ -1888,8 +1929,11 @@ async function execute(
     case "exercise_generation":
       return generateLesson(job);
     case "open_sentence_evaluation":
-    case "paragraph_evaluation":
       return evaluateExercise(job);
+    case "paragraph_evaluation":
+      return job.protectedReference.practicePaper === "true"
+        ? evaluatePracticePaper(job)
+        : evaluateExercise(job);
     case "version_comparison":
       return compareVersions(job);
     case "transfer_evaluation":

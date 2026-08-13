@@ -59,6 +59,7 @@ export const GET = apiRoute(async (request) => {
       rewriteTasks: true,
       transferTasks: true,
       mixedReviewTasks: true,
+      writingAttempts: { with: { assessment: true } },
     },
     orderBy: [desc(trainingCycle.updatedAt)],
     limit: 10,
@@ -135,6 +136,19 @@ export const GET = apiRoute(async (request) => {
           status: selected.cycle.status,
           question: selected.cycle.question,
           core_skill_id: selected.cycle.coreSkillId,
+          resources: {
+            writing_available: selected.cycle.writingAttempts.length > 0,
+            feedback_available: selected.cycle.writingAttempts.some(
+              (attempt) => attempt.assessment !== null,
+            ),
+            lesson_id: selected.cycle.lessonPlans[0]?.id ?? null,
+            rewrite_task_id: selected.cycle.rewriteTasks[0]?.id ?? null,
+            comparison_available: selected.cycle.writingAttempts.some(
+              (attempt) =>
+                attempt.kind === "version_2" && attempt.assessment !== null,
+            ),
+            transfer_task_id: selected.cycle.transferTasks[0]?.id ?? null,
+          },
         }
       : null,
     queue: queue.map(({ action, cycle }) => ({

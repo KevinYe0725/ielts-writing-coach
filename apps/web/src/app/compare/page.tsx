@@ -182,7 +182,9 @@ export default function ComparePage({
             </p>
             <h2>{text("四项估分变化", "Four-criterion score changes")}</h2>
           </div>
-          <Badge tone="blue">{data.scoringVersion.rubricVersion}</Badge>
+          <Badge tone="blue">
+            {text("同一评分标准", "Same marking standard")}
+          </Badge>
         </div>
         <div className="criterion-delta-grid">
           {data.criterionDeltas.map((criterion) => (

@@ -3,10 +3,10 @@
 ## Contents
 
 1. Supported skills
-2. Exercise families
-3. Lesson plan contract
+2. Paper sections
+3. Paper contract
 4. Response contract
-5. Hint and feedback rules
+5. Feedback rules
 
 ## 1. Supported skills
 
@@ -30,91 +30,46 @@ Use only these course-generating IDs:
 
 Unsupported issues remain in feedback. Do not invent an ID.
 
-## 2. Exercise families
+## 2. Paper sections
 
-1. `source_spotlight`: select the relevant span; distinguish error from optional improvement.
-2. `meaning_fork`: confirm intended meaning; branches but is not scored.
-3. `expression_map`: map meaning, English perspective, and complete chunk.
-4. `minimal_contrast`: choose and explain the best form among plausible alternatives.
-5. `sentence_rebuild`: reconstruct semantic slots and complete relationships.
-6. `constrained_rewrite`: write a full sentence under a meaning or structure constraint; includes one-meaning-many-ways tasks.
-7. `reasoning_bridge`: classify, order, remove, or write claim/reason/mechanism/result units.
-8. `paragraph_lab`: write 80–120 words, self-check, and resubmit; score only lesson targets.
+1. `FOUNDATION`: one unambiguous recognition question and one short explanation.
+2. `REPAIR`: two meaning-preserving corrections or rewrites.
+3. `GENERATION`: two original responses in different contexts without hints.
+4. `INTEGRATION`: two larger IELTS-style outputs, including an 80–120 word paragraph.
 
-## 3. Lesson plan contract
+## 3. Paper contract
 
-Use the canonical `LessonPlan` shape shared with the Web application:
+The learner-facing paper contains exactly eight questions and 60 suggested minutes:
 
 ```json
 {
-  "schemaVersion": "1.0.0",
-  "id": "01989a00-0000-7001-8000-000000000002",
-  "trainingCycleId": "01989a00-0000-7001-8000-000000000001",
-  "status": "READY",
-  "plannedUserSeconds": 2700,
-  "corePathSeconds": 2700,
-  "flexiblePathSeconds": 0,
-  "objectives": [],
-  "blocks": [],
-  "plannerVersion": "planner-version",
-  "generatorVersion": "generator-version"
+  "format": "TIMED_PAPER_V2",
+  "durationMinutes": 60,
+  "titleZh": "本篇作文专项训练卷",
+  "objectiveZh": "检验一个明确的核心能力",
+  "items": []
 }
 ```
 
-Each block declares `kind`, `path`, `timeBudgetSeconds`, and `items`. `path=CORE` always runs; `FLEX` is remedial when core evidence is incomplete; `OPTIONAL` is voluntary enrichment after a core pass. FLEX and OPTIONAL are mutually exclusive tail paths. Use exactly one `BREAK` block on the CORE path with 180 seconds and no items.
-
-Each exercise item uses canonical camelCase fields:
-
-- IDs and traceability: `id`, `blockId`, `learningObjectiveId`, `primarySkillId`, and optional `sourceIssueId`;
-- `stage`: `notice`, `understand`, `control`, `produce`, `near_transfer`, or `self_check`;
-- a canonical `itemType` allowed by the selected skill definition;
-- `expectedActiveSeconds`, `expectedTotalSeconds`, `isReserve`, `contextId`, and evidence opportunity;
-- `firstAttemptRequired`, `hintPolicy`, and `feedbackPolicy`;
-- validated quality state and one scoring criterion per explicit integrated objective.
-
-Integrated items may score several dimensions, but each scoring dimension must map to one explicit `skill_id`.
+Each item declares its section, bilingual title, one complete plain-Chinese instruction, English prompt/source, response mode, options where relevant, minute budget, word range, and protected evaluator criteria. Choice answer keys must refer only to visible options. Open questions must not carry hidden accepted strings. The instruction explicitly states required ideas, output size, and restrictions; evaluator criteria mirror this instruction and are not shown as a separate learner-facing rubric.
 
 ## 4. Response contract
 
-Store append-only attempts and evaluations:
+Store one immutable answer sheet and one whole-paper evaluation:
 
 ```json
 {
   "schemaVersion": "1.0.0",
   "id": "01989a00-0000-7001-8000-000000000020",
-  "exerciseItemId": "01989a00-0000-7001-8000-000000000010",
-  "firstAttemptId": "01989a00-0000-7001-8000-000000000021",
-  "finalAttemptId": "01989a00-0000-7001-8000-000000000021",
-  "attempts": [
-    {
-      "id": "01989a00-0000-7001-8000-000000000021",
-      "answer": "verbatim",
-      "submittedAt": "2026-08-13T12:00:00Z",
-      "elapsedSeconds": 90,
-      "hintLevel": "NONE",
-      "referenceAnswerSeen": false
-    }
-  ],
-  "evaluations": []
+  "paperId": "01989a00-0000-7001-8000-000000000010",
+  "submittedAt": "2026-08-13T12:00:00Z",
+  "answers": {},
+  "result": null
 }
 ```
 
-Never overwrite an earlier attempt or evaluation. `firstAttemptId` stays immutable; `finalAttemptId` points to the latest submitted attempt. Evaluations store dimension scores, quoted user-answer evidence, one most important suggestion, evaluator/prompt/rubric versions, confidence, and adjudication. A correct later attempt after `ANSWER_SHOWN` remains a prompted completion.
+Never overwrite the submitted answer sheet. A failed evaluation can be repeated against the same sheet, but it cannot create another answer attempt. Internal model and provenance data stay in protected records and are not displayed in learner feedback.
 
-## 5. Hint and feedback rules
+## 5. Feedback rules
 
-Hint ladder:
-
-1. conceptual prompt without target wording;
-2. partial structure or semantic slots;
-3. complete example followed immediately by a different-context repair.
-
-For open responses:
-
-1. save the first answer;
-2. give one minimal, target-specific cue;
-3. collect the user's revision;
-4. show full feedback and one reference expression;
-5. add a new-context item only when needed.
-
-Do not require exact wording. Judge meaning preservation, target use, overall acceptability, and confidence.
+Do not show hints, answer keys, item judgments, protected criteria, or an adaptive branch before submission. After submission, keep successful questions concise and expand only below-standard questions. Do not require exact wording. Judge meaning preservation, target use, overall acceptability, and only requirements stated in the visible instruction.

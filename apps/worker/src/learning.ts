@@ -49,6 +49,345 @@ export interface GeneratedLessonContent {
   readonly stages: readonly GeneratedLessonStage[];
 }
 
+export type PracticePaperSection =
+  | "FOUNDATION"
+  | "REPAIR"
+  | "GENERATION"
+  | "INTEGRATION";
+
+export interface PracticePaperCriterion {
+  readonly labelZh: string;
+  readonly labelEn: string;
+  readonly descriptionZh: string;
+  readonly descriptionEn: string;
+  readonly weight: number;
+}
+
+export interface PracticePaperItemContent {
+  readonly section: PracticePaperSection;
+  readonly titleZh: string;
+  readonly titleEn: string;
+  readonly instructionZh: string;
+  readonly promptEn: string;
+  readonly sourceText: string;
+  readonly responseMode: "choice" | "short_text" | "sentence" | "paragraph";
+  readonly options: readonly {
+    readonly key: string;
+    readonly labelEn: string;
+  }[];
+  readonly acceptedAnswers: readonly string[];
+  readonly answerExplanationZh: string;
+  readonly suggestedMinutes: number;
+  readonly minimumWords: number;
+  readonly maximumWords: number;
+  readonly publicCriteria: readonly PracticePaperCriterion[];
+}
+
+export interface PracticePaperContent {
+  readonly titleZh: string;
+  readonly titleEn: string;
+  readonly objectiveZh: string;
+  readonly objectiveEn: string;
+  readonly instructionsZh: readonly string[];
+  readonly instructionsEn: readonly string[];
+  readonly items: readonly PracticePaperItemContent[];
+}
+
+export interface FocusedTeachingModule {
+  readonly targetTitleZh: string;
+  readonly targetTitleEn: string;
+  readonly whyItMattersZh: string;
+  readonly whyItMattersEn: string;
+  readonly currentPattern: string;
+  readonly decisionRuleZh: string;
+  readonly decisionRuleEn: string;
+  readonly knowledgeCards: readonly {
+    readonly titleZh: string;
+    readonly explanationZh: string;
+    readonly exampleEn: string;
+  }[];
+  readonly expressionBank: readonly {
+    readonly expressionEn: string;
+    readonly functionZh: string;
+    readonly usageZh: string;
+    readonly exampleEn: string;
+  }[];
+  readonly workedExample: {
+    readonly taskZh: string;
+    readonly weakAnswerEn: string;
+    readonly thinkingStepsZh: readonly string[];
+    readonly improvedAnswerEn: string;
+    readonly explanationZh: string;
+  };
+  readonly quickChecks: readonly {
+    readonly promptZh: string;
+    readonly optionsZh: readonly string[];
+    readonly answerZh: string;
+    readonly explanationZh: string;
+  }[];
+  readonly readyChecklistZh: readonly string[];
+}
+
+export interface FocusedLearningPackage {
+  readonly teachingModule: FocusedTeachingModule;
+  readonly paper: PracticePaperContent;
+}
+
+export interface PracticePaperItemJudgment {
+  readonly itemId: string;
+  readonly status: "MEETS_STANDARD" | "NEEDS_WORK" | "NOT_SCORABLE";
+  readonly score: number;
+  readonly feedbackZh: string;
+  readonly strengthsZh: readonly string[];
+  readonly problems: readonly {
+    readonly criterionLabelZh: string;
+    readonly explanationZh: string;
+    readonly evidence: string;
+  }[];
+  readonly improvedAnswerEn: string;
+  readonly nextStepZh: string;
+}
+
+export interface PracticePaperJudgment {
+  readonly totalScore: number;
+  readonly summaryZh: string;
+  readonly itemResults: readonly PracticePaperItemJudgment[];
+}
+
+const practicePaperSections: readonly PracticePaperSection[] = [
+  "FOUNDATION",
+  "FOUNDATION",
+  "REPAIR",
+  "REPAIR",
+  "GENERATION",
+  "GENERATION",
+  "INTEGRATION",
+  "INTEGRATION",
+];
+
+function normalizedInstructionText(value: string): string {
+  return value
+    .normalize("NFKC")
+    .toLocaleLowerCase()
+    .replace(/[\s，。；：、,.!?！？“”‘’'"()（）—–-]+/g, "");
+}
+
+function hasClearOutputAction(instruction: string): boolean {
+  const vaguePhrases = [
+    "本轮目标",
+    "目标能力",
+    "按要求作答",
+    "根据题目作答",
+    "完成下面的表达",
+    "完善表达",
+  ];
+  if (vaguePhrases.some((phrase) => instruction.includes(phrase))) return false;
+  return /选择|判断|匹配|排序|解释|改写|重写|写(?:出|一个|两|三|\d)|列出|圈出/.test(
+    instruction,
+  );
+}
+
+function criteriaAreVisibleInInstruction(
+  item: PracticePaperItemContent,
+): boolean {
+  const instruction = normalizedInstructionText(item.instructionZh);
+  return item.publicCriteria.every((criterion) => {
+    const requirement = normalizedInstructionText(criterion.descriptionZh);
+    return requirement.length > 0 && instruction.includes(requirement);
+  });
+}
+
+/** Product-level guardrails that reject confusing or internally inconsistent AI papers. */
+export function validatePracticePaperContent(
+  value: PracticePaperContent,
+): boolean {
+  if (value.items.length !== 8) return false;
+  if (
+    value.items.some(
+      (item, index) =>
+        item.section !== practicePaperSections[index] ||
+        item.titleZh.trim().length === 0 ||
+        item.instructionZh.trim().length < 8 ||
+        !hasClearOutputAction(item.instructionZh) ||
+        !criteriaAreVisibleInInstruction(item) ||
+        item.promptEn.trim().length === 0 ||
+        item.publicCriteria.length < 1 ||
+        item.publicCriteria.length > 4 ||
+        item.publicCriteria.reduce(
+          (sum, criterion) => sum + criterion.weight,
+          0,
+        ) !== 100 ||
+        item.suggestedMinutes < 4 ||
+        item.suggestedMinutes > 15 ||
+        item.publicCriteria.some(
+          (criterion) =>
+            criterion.labelZh.trim().length === 0 ||
+            criterion.descriptionZh.trim().length === 0 ||
+            criterion.weight <= 0,
+        ),
+    )
+  )
+    return false;
+  const totalMinutes = value.items.reduce(
+    (sum, item) => sum + item.suggestedMinutes,
+    0,
+  );
+  if (totalMinutes !== 60) return false;
+  const normalizedPrompts = value.items.map((item) =>
+    item.promptEn.trim().toLocaleLowerCase(),
+  );
+  if (new Set(normalizedPrompts).size !== normalizedPrompts.length)
+    return false;
+  return value.items.every((item) => {
+    if (item.responseMode === "choice") {
+      const optionKeys = new Set(item.options.map((option) => option.key));
+      return (
+        item.options.length >= 3 &&
+        item.options.length <= 4 &&
+        item.acceptedAnswers.length >= 1 &&
+        item.acceptedAnswers.every((answer) => optionKeys.has(answer))
+      );
+    }
+    if (item.options.length > 0 || item.acceptedAnswers.length > 0)
+      return false;
+    if (item.section === "REPAIR" && item.sourceText.trim().length === 0)
+      return false;
+    if (item.responseMode === "paragraph")
+      return item.minimumWords >= 60 && item.maximumWords <= 150;
+    return item.minimumWords >= 1 && item.maximumWords >= item.minimumWords;
+  });
+}
+
+function substantive(value: string, minimum = 4): boolean {
+  return value.trim().length >= minimum;
+}
+
+/** Keeps the teaching and testing halves of one lesson aligned and useful. */
+export function validateFocusedLearningPackage(
+  value: FocusedLearningPackage,
+): boolean {
+  const teaching = value.teachingModule;
+  const normalizedTarget = normalizedInstructionText(teaching.targetTitleZh);
+  const normalizedObjective = normalizedInstructionText(
+    value.paper.objectiveZh,
+  );
+  return (
+    validatePracticePaperContent(value.paper) &&
+    substantive(teaching.targetTitleZh, 6) &&
+    substantive(teaching.targetTitleEn, 8) &&
+    normalizedObjective.includes(normalizedTarget) &&
+    substantive(teaching.whyItMattersZh, 12) &&
+    substantive(teaching.currentPattern, 4) &&
+    substantive(teaching.decisionRuleZh, 12) &&
+    teaching.knowledgeCards.length >= 3 &&
+    teaching.knowledgeCards.length <= 5 &&
+    teaching.knowledgeCards.every(
+      (card) =>
+        substantive(card.titleZh) &&
+        substantive(card.explanationZh, 10) &&
+        substantive(card.exampleEn, 8),
+    ) &&
+    teaching.expressionBank.length >= 2 &&
+    teaching.expressionBank.length <= 8 &&
+    teaching.expressionBank.every(
+      (entry) =>
+        substantive(entry.expressionEn) &&
+        substantive(entry.functionZh) &&
+        substantive(entry.usageZh, 6) &&
+        substantive(entry.exampleEn, 8),
+    ) &&
+    teaching.workedExample.thinkingStepsZh.length >= 3 &&
+    substantive(teaching.workedExample.taskZh, 6) &&
+    substantive(teaching.workedExample.weakAnswerEn, 8) &&
+    substantive(teaching.workedExample.improvedAnswerEn, 16) &&
+    substantive(teaching.workedExample.explanationZh, 10) &&
+    teaching.quickChecks.length === 2 &&
+    teaching.quickChecks.every(
+      (check) =>
+        substantive(check.promptZh, 6) &&
+        substantive(check.answerZh, 1) &&
+        substantive(check.explanationZh, 6),
+    ) &&
+    teaching.readyChecklistZh.length >= 3 &&
+    teaching.readyChecklistZh.every((item) => substantive(item, 6))
+  );
+}
+
+export function sanitizePracticePaperJudgment(input: {
+  readonly paper: {
+    readonly items: readonly {
+      readonly id: string;
+      readonly responseMode?: string;
+      readonly acceptedAnswers?: readonly string[];
+    }[];
+  };
+  readonly answers: Readonly<Record<string, string>>;
+  readonly judgment: PracticePaperJudgment;
+}): PracticePaperJudgment {
+  const expectedIds = new Set(input.paper.items.map((item) => item.id));
+  const uniqueIds = new Set(
+    input.judgment.itemResults.map((item) => item.itemId),
+  );
+  if (
+    input.judgment.itemResults.length !== input.paper.items.length ||
+    uniqueIds.size !== expectedIds.size ||
+    [...uniqueIds].some((id) => !expectedIds.has(id))
+  ) {
+    throw new Error("The practice paper result does not match its questions.");
+  }
+  const paperById = new Map(input.paper.items.map((item) => [item.id, item]));
+  const itemResults = input.judgment.itemResults.map((item) => {
+    const answer = input.answers[item.itemId]?.trim() ?? "";
+    const question = paperById.get(item.itemId);
+    const status =
+      answer.length === 0
+        ? "NOT_SCORABLE"
+        : question?.responseMode === "choice"
+          ? question.acceptedAnswers?.includes(answer)
+            ? "MEETS_STANDARD"
+            : "NEEDS_WORK"
+          : item.status;
+    const score =
+      status === "NOT_SCORABLE"
+        ? 0
+        : status === "MEETS_STANDARD" && question?.responseMode === "choice"
+          ? 100
+          : Math.max(0, Math.min(100, item.score));
+    return {
+      ...item,
+      status,
+      score,
+      feedbackZh:
+        status === "NOT_SCORABLE"
+          ? "本题未作答，因此无法评分。"
+          : item.feedbackZh,
+      problems:
+        status === "MEETS_STANDARD" || status === "NOT_SCORABLE"
+          ? []
+          : item.problems.filter(
+              (problem) =>
+                problem.evidence.length === 0 ||
+                answer.includes(problem.evidence),
+            ),
+      improvedAnswerEn:
+        status === "MEETS_STANDARD" || status === "NOT_SCORABLE"
+          ? ""
+          : item.improvedAnswerEn,
+      nextStepZh:
+        status === "NOT_SCORABLE"
+          ? "复盘时先按题面要求独立完成本题。"
+          : item.nextStepZh,
+    } satisfies PracticePaperItemJudgment;
+  });
+  return {
+    totalScore:
+      itemResults.reduce((sum, item) => sum + item.score, 0) /
+      itemResults.length,
+    summaryZh: input.judgment.summaryZh,
+    itemResults,
+  };
+}
+
 export interface CanonicalLessonIds {
   readonly planId: string;
   readonly objectiveId: string;

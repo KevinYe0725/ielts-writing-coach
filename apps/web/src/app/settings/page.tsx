@@ -223,9 +223,9 @@ export default function SettingsPage() {
         connection: true,
         structuredOutput: data.ai.structuredOutput,
         contextWindow: true,
-        messageZh: "新密钥已验证并替换，受阻任务会沿用原 Job 恢复。",
+        messageZh: "新密钥已验证并替换，未完成的批改会自动继续。",
         messageEn:
-          "The new key was verified and replaced; blocked jobs resume with their original Job IDs.",
+          "The new key was verified and replaced; unfinished feedback will continue automatically.",
       });
       retry();
     } catch (error) {
@@ -862,7 +862,7 @@ export default function SettingsPage() {
                       ) : (
                         cycleOptions.map((cycle) => (
                           <option key={cycle.id} value={cycle.id}>
-                            {`${cycle.prompt.slice(0, 72)} · ${cycle.status}`}
+                            {cycle.prompt.slice(0, 72)}
                           </option>
                         ))
                       )}
@@ -1174,8 +1174,8 @@ function AiSettings({
   const deleteCurrentConnection = async () => {
     const confirmed = window.confirm(
       text(
-        `只删除当前连接“${data.ai.displayName}”（${data.ai.id}）？等待中的 AI 任务将暂停；此操作不会在供应商侧撤销密钥。`,
-        `Delete only the current connection “${data.ai.displayName}” (${data.ai.id})? Queued AI work will pause. This does not revoke the key at the provider.`,
+        `删除当前 AI 连接“${data.ai.displayName}”？尚未完成的批改会暂停；此操作不会在供应商侧撤销密钥。`,
+        `Delete the current AI connection “${data.ai.displayName}”? Unfinished feedback will pause. This does not revoke the key at the provider.`,
       ),
     );
     if (!confirmed) return;
@@ -1218,7 +1218,7 @@ function AiSettings({
       setRouteMessage(
         error instanceof Error
           ? error.message
-          : text("无法读取模型路由。", "Could not load model routes."),
+          : text("无法读取模型分工。", "Could not load model assignments."),
       );
     } finally {
       setRoutesLoading(false);
@@ -1246,15 +1246,15 @@ function AiSettings({
       }));
       setRouteMessage(
         text(
-          "路由已保存；等待配置的同类任务会使用原 Job ID 恢复。",
-          "Route saved. Waiting jobs of this kind resume with their original Job IDs.",
+          "模型选择已保存，未完成的批改会自动继续。",
+          "Model choice saved; unfinished feedback will continue automatically.",
         ),
       );
     } catch (error) {
       setRouteMessage(
         error instanceof Error
           ? error.message
-          : text("路由保存失败。", "Could not save the route."),
+          : text("模型选择保存失败。", "Could not save the model choice."),
       );
     } finally {
       setRouteSaving(null);
@@ -1563,7 +1563,7 @@ function AiSettings({
             <Settings2 aria-hidden="true" size={20} />
           </span>
           <div>
-            <h2>{text("模型路由", "Model routing")}</h2>
+            <h2>{text("模型分工", "Model assignments")}</h2>
             <p>
               {text(
                 "简单模式使用一个模型完成所有开放 AI 任务。",
@@ -1580,19 +1580,19 @@ function AiSettings({
           }}
         >
           <summary>
-            {text("展开高级路由", "Open advanced routing")}
+            {text("按学习步骤选择模型", "Choose models by learning step")}
             <ChevronDown aria-hidden="true" size={16} />
           </summary>
           <div>
             <p>
               {text(
-                "每类任务可指定当前连接上的模型。保存路由时跨供应商备用保持关闭；完整备用配置仍可通过版本化 API 管理。",
-                "Each task can use a model on the current connection. Cross-provider fallback stays off when this editor saves; complete fallback settings remain available through the versioned API.",
+                "如果你有多个可用模型，可以为作文批改、出题和复盘分别选择；不设置时统一使用默认模型。",
+                "If you have several models, you can choose one for essay feedback, paper generation, or review. Otherwise the default model is used throughout.",
               )}
             </p>
             {routesLoading ? (
               <p className="field-hint">
-                {text("正在读取路由…", "Loading routes…")}
+                {text("正在读取模型选择…", "Loading model choices…")}
               </p>
             ) : (
               <div className="route-editor-list">
@@ -1605,8 +1605,11 @@ function AiSettings({
                         <strong>{text(task.zh, task.en)}</strong>
                         <small>
                           {provider
-                            ? `${text("当前", "Current")}: ${provider}`
-                            : text("尚未设置显式路由", "No explicit route")}
+                            ? text(
+                                "使用当前 AI 连接",
+                                "Uses the current AI connection",
+                              )
+                            : text("使用默认模型", "Uses the default model")}
                         </small>
                       </span>
                       <input
