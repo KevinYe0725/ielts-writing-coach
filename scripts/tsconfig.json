@@ -1,0 +1,13 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "types": ["node"]
+  },
+  "include": [
+    "compose-archive.ts",
+    "compose-operations.test.ts",
+    "verify-compose-backup-restore.test.ts",
+    "vitest.config.ts"
+  ]
+}

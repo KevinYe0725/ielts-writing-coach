@@ -1,0 +1,31 @@
+{
+  "name": "@iwc/db",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./schema": "./src/schema.ts"
+  },
+  "scripts": {
+    "generate": "drizzle-kit generate",
+    "lint": "eslint src drizzle.config.ts",
+    "migrate": "tsx src/migrate.ts",
+    "seed": "tsx src/seed.ts",
+    "test": "vitest run --root ../.. packages/db/src",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@iwc/config": "workspace:*",
+    "@iwc/question-bank": "workspace:*",
+    "drizzle-orm": "catalog:",
+    "graphile-worker": "0.17.3",
+    "pg": "8.23.0",
+    "uuid": "14.0.1"
+  },
+  "devDependencies": {
+    "@types/pg": "8.21.0",
+    "drizzle-kit": "0.31.10",
+    "typescript": "catalog:"
+  }
+}

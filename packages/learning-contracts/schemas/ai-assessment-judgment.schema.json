@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ielts-writing-coach.dev/schemas/ai-assessment-judgment.schema.json",
+  "title": "AI assessment judgment (server metadata excluded)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["overallBand", "criteria"],
+  "properties": {
+    "overallBand": { "$ref": "common.schema.json#/$defs/Band", "default": 6.0 },
+    "criteria": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["TR", "CC", "LR", "GRA"],
+      "properties": {
+        "TR": { "$ref": "#/$defs/Criterion" },
+        "CC": { "$ref": "#/$defs/Criterion" },
+        "LR": { "$ref": "#/$defs/Criterion" },
+        "GRA": { "$ref": "#/$defs/Criterion" }
+      }
+    }
+  },
+  "$defs": {
+    "Criterion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["band", "confidence", "rationale"],
+      "properties": {
+        "band": { "$ref": "common.schema.json#/$defs/Band", "default": 6.0 },
+        "confidence": {
+          "$ref": "common.schema.json#/$defs/Confidence",
+          "default": 0.85
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1,
+          "default": "Evidence-based criterion rationale."
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "overallBand": 6.0,
+      "criteria": {
+        "TR": {
+          "band": 6.0,
+          "confidence": 0.86,
+          "rationale": "The position is clear but one mechanism needs fuller development."
+        },
+        "CC": {
+          "band": 6.0,
+          "confidence": 0.88,
+          "rationale": "Paragraph functions are visible, with occasional abrupt links."
+        },
+        "LR": {
+          "band": 6.0,
+          "confidence": 0.9,
+          "rationale": "Meaning is clear despite several unnatural collocations."
+        },
+        "GRA": {
+          "band": 6.0,
+          "confidence": 0.9,
+          "rationale": "A useful range is attempted, with recurring local errors."
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ielts-writing-coach.dev/schemas/training-cycle.schema.json",
+  "title": "TrainingCycle aggregate state",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "userId",
+    "questionId",
+    "state",
+    "lessonStatus",
+    "rewriteStatus",
+    "transferStatuses",
+    "createdAt",
+    "updatedAt"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "id": { "$ref": "common.schema.json#/$defs/NonEmptyId" },
+    "userId": { "$ref": "common.schema.json#/$defs/NonEmptyId" },
+    "questionId": { "$ref": "common.schema.json#/$defs/NonEmptyId" },
+    "state": { "$ref": "common.schema.json#/$defs/TrainingCycleState" },
+    "lessonStatus": { "$ref": "common.schema.json#/$defs/LessonStatus" },
+    "rewriteStatus": { "$ref": "common.schema.json#/$defs/RewriteTaskStatus" },
+    "transferStatuses": {
+      "type": "array",
+      "items": { "$ref": "common.schema.json#/$defs/TransferTaskStatus" }
+    },
+    "createdAt": { "$ref": "common.schema.json#/$defs/IsoDateTime" },
+    "updatedAt": { "$ref": "common.schema.json#/$defs/IsoDateTime" },
+    "coreCompletedAt": { "$ref": "common.schema.json#/$defs/IsoDateTime" }
+  }
+}

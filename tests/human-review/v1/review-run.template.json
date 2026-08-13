@@ -1,0 +1,22 @@
+{
+  "protocolVersion": "1.0.0",
+  "runId": "REPLACE_WITH_IMMUTABLE_RUN_ID",
+  "status": "NOT_RUN",
+  "startedAt": null,
+  "completedAt": null,
+  "provider": null,
+  "modelId": null,
+  "promptVersion": null,
+  "rubricVersion": null,
+  "corpusVersion": "1.0.0",
+  "reviewers": [],
+  "openResponsePassThresholdsDeclaredAt": null,
+  "generatedItems": [],
+  "openResponses": [],
+  "essayAdjudications": [],
+  "summary": null,
+  "limitations": [
+    "AI-generated IELTS bands are estimates, not official IELTS results.",
+    "No result may be reported while status is NOT_RUN."
+  ]
+}

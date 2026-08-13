@@ -1,0 +1,8 @@
+IELTS Writing Coach
+Copyright 2026 Kevin Ye
+
+IELTS is a registered trademark of its respective owners. This project is independent and is not endorsed by IELTS, Cambridge University Press & Assessment, the British Council, or IDP.
+
+Portions of scripts/vendor/skill_quick_validate.py are derived from the OpenAI Codex skill-creator and are licensed under the Apache License, Version 2.0.
+
+Third-party dependency notices are listed in THIRD_PARTY_NOTICES.md and in each release SBOM.

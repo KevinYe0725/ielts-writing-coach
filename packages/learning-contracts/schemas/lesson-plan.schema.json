@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ielts-writing-coach.dev/schemas/lesson-plan.schema.json",
+  "title": "LessonPlan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "trainingCycleId",
+    "status",
+    "plannedUserSeconds",
+    "corePathSeconds",
+    "flexiblePathSeconds",
+    "objectives",
+    "blocks",
+    "plannerVersion",
+    "generatorVersion"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "id": { "$ref": "common.schema.json#/$defs/NonEmptyId" },
+    "trainingCycleId": { "$ref": "common.schema.json#/$defs/NonEmptyId" },
+    "status": { "$ref": "common.schema.json#/$defs/LessonStatus" },
+    "plannedUserSeconds": {
+      "type": "integer",
+      "minimum": 2700,
+      "maximum": 3600
+    },
+    "corePathSeconds": { "type": "integer", "minimum": 2100, "maximum": 2700 },
+    "flexiblePathSeconds": { "type": "integer", "minimum": 0, "maximum": 900 },
+    "objectives": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 3,
+      "contains": {
+        "type": "object",
+        "required": ["role"],
+        "properties": { "role": { "const": "CORE" } }
+      },
+      "minContains": 1,
+      "maxContains": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "trainingCycleId",
+          "skillId",
+          "role",
+          "sourceEvidenceIds",
+          "priority",
+          "successCriterion"
+        ],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/$defs/NonEmptyId" },
+          "trainingCycleId": { "$ref": "common.schema.json#/$defs/NonEmptyId" },
+          "skillId": { "$ref": "common.schema.json#/$defs/SkillId" },
+          "role": { "enum": ["CORE", "SECONDARY", "REVIEW"] },
+          "sourceEvidenceIds": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "$ref": "common.schema.json#/$defs/NonEmptyId" }
+          },
+          "priority": { "type": "integer", "minimum": 1 },
+          "successCriterion": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "blocks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "kind",
+          "path",
+          "order",
+          "timeBudgetSeconds",
+          "items"
+        ],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/$defs/NonEmptyId" },
+          "objectiveId": { "$ref": "common.schema.json#/$defs/NonEmptyId" },
+          "kind": {
+            "enum": ["CORE", "SECONDARY", "REVIEW", "INTEGRATED", "BREAK"]
+          },
+          "path": {
+            "enum": ["CORE", "FLEX", "OPTIONAL"],
+            "description": "CORE always runs; FLEX runs only when core evidence is incomplete; OPTIONAL is voluntary after a core pass."
+          },
+          "order": { "type": "integer", "minimum": 0 },
+          "timeBudgetSeconds": { "type": "integer", "minimum": 1 },
+          "items": {
+            "type": "array",
+            "items": { "$ref": "exercise-item.schema.json" }
+          }
+        }
+      }
+    },
+    "plannerVersion": { "$ref": "common.schema.json#/$defs/NonEmptyId" },
+    "generatorVersion": { "$ref": "common.schema.json#/$defs/NonEmptyId" }
+  }
+}

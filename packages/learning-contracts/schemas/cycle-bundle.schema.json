@@ -1,0 +1,302 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ielts-writing-coach.dev/schemas/cycle-bundle.schema.json",
+  "title": "Canonical portable training cycle bundle",
+  "description": "Complete Web/Skill exchange without secrets, chat history, provider configuration, or internal database fields.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "manifest",
+    "checksum",
+    "cycle",
+    "attempts",
+    "assessment",
+    "issueEvidence",
+    "objectives",
+    "lesson",
+    "evidence",
+    "dueTasks",
+    "conflicts"
+  ],
+  "properties": {
+    "contractVersion": { "const": "1.0.0" },
+    "manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bundleId",
+        "cycleId",
+        "source",
+        "exportedAt",
+        "revision",
+        "parentRevision",
+        "appendOnlyEntityIds"
+      ],
+      "properties": {
+        "bundleId": { "$ref": "common.schema.json#/$defs/NonEmptyId" },
+        "cycleId": { "$ref": "common.schema.json#/$defs/NonEmptyId" },
+        "source": { "enum": ["WEB", "SKILL"] },
+        "exportedAt": { "$ref": "common.schema.json#/$defs/IsoDateTime" },
+        "revision": {
+          "description": "Persisted portable snapshot revision. It advances only when canonical exchange content changes, not on every local file or database mutation.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "parentRevision": {
+          "description": "The last portable revision observed by the exporter. A direct append-only re-import requires this value to equal the receiver's current revision.",
+          "oneOf": [{ "type": "integer", "minimum": 1 }, { "type": "null" }]
+        },
+        "appendOnlyEntityIds": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "common.schema.json#/$defs/NonEmptyId" }
+        }
+      }
+    },
+    "checksum": {
+      "type": "object",
+      "description": "SHA-256 over RFC 8785 JCS of the complete bundle after omitting the top-level checksum property.",
+      "additionalProperties": false,
+      "required": ["algorithm", "canonicalization", "value"],
+      "properties": {
+        "algorithm": { "const": "SHA-256" },
+        "canonicalization": { "const": "JCS" },
+        "value": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
+    "cycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "state", "question", "createdAt", "updatedAt"],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/NonEmptyId" },
+        "state": { "$ref": "common.schema.json#/$defs/TrainingCycleState" },
+        "question": {
+          "description": "Immutable question snapshot. id is the stable internal UUIDv7 for both public and private questions; UI slugs are never exported.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "prompt", "instructions"],
+          "properties": {
+            "id": { "$ref": "common.schema.json#/$defs/NonEmptyId" },
+            "prompt": { "type": "string", "minLength": 1 },
+            "instructions": { "type": "string", "minLength": 1 }
+          }
+        },
+        "createdAt": { "$ref": "common.schema.json#/$defs/IsoDateTime" },
+        "updatedAt": { "$ref": "common.schema.json#/$defs/IsoDateTime" },
+        "coreCompletedAt": { "$ref": "common.schema.json#/$defs/IsoDateTime" }
+      }
+    },
+    "attempts": {
+      "type": "array",
+      "maxItems": 2,
+      "items": { "$ref": "#/$defs/Attempt" }
+    },
+    "assessment": {
+      "oneOf": [{ "$ref": "assessment.schema.json" }, { "type": "null" }]
+    },
+    "issueEvidence": {
+      "type": "array",
+      "items": { "$ref": "issue-evidence.schema.json" }
+    },
+    "objectives": {
+      "type": "array",
+      "maxItems": 3,
+      "items": { "$ref": "#/$defs/Objective" }
+    },
+    "lesson": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["plan", "responses"],
+      "properties": {
+        "plan": {
+          "oneOf": [{ "$ref": "lesson-plan.schema.json" }, { "type": "null" }]
+        },
+        "responses": {
+          "type": "array",
+          "items": { "$ref": "exercise-response.schema.json" }
+        }
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": { "$ref": "skill-evidence-event.schema.json" }
+    },
+    "dueTasks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rewrite", "transfers", "mixedReview"],
+      "properties": {
+        "rewrite": { "$ref": "#/$defs/RewriteTask" },
+        "transfers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/TransferTask" }
+        },
+        "mixedReview": { "$ref": "#/$defs/MixedReview" }
+      }
+    },
+    "conflicts": { "type": "array", "items": { "$ref": "#/$defs/Conflict" } }
+  },
+  "$defs": {
+    "Attempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "version",
+        "content",
+        "startedAt",
+        "submittedAt",
+        "wordCount",
+        "assisted",
+        "interrupted"
+      ],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/NonEmptyId" },
+        "version": { "enum": ["V1", "V2"] },
+        "content": { "type": "string", "minLength": 1 },
+        "startedAt": { "$ref": "common.schema.json#/$defs/IsoDateTime" },
+        "submittedAt": { "$ref": "common.schema.json#/$defs/IsoDateTime" },
+        "wordCount": { "type": "integer", "minimum": 0 },
+        "assisted": { "type": "boolean" },
+        "interrupted": { "type": "boolean" },
+        "draftBeforeSelfCheck": { "type": "string" },
+        "draftAfterSelfCheck": { "type": "string" }
+      }
+    },
+    "Objective": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "trainingCycleId",
+        "skillId",
+        "role",
+        "sourceEvidenceIds",
+        "priority",
+        "successCriterion"
+      ],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/NonEmptyId" },
+        "trainingCycleId": { "$ref": "common.schema.json#/$defs/NonEmptyId" },
+        "skillId": { "$ref": "common.schema.json#/$defs/SkillId" },
+        "role": { "enum": ["CORE", "SECONDARY", "REVIEW"] },
+        "sourceEvidenceIds": {
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/NonEmptyId" }
+        },
+        "priority": { "type": "integer", "minimum": 1 },
+        "successCriterion": { "type": "string", "minLength": 1 }
+      }
+    },
+    "RewriteTask": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "status",
+        "targetRewriteAt",
+        "dueAt",
+        "lastInstructionExposureAt",
+        "assisted",
+        "prerequisiteSkipped"
+      ],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/NonEmptyId" },
+        "status": { "$ref": "common.schema.json#/$defs/RewriteTaskStatus" },
+        "targetRewriteAt": { "$ref": "common.schema.json#/$defs/IsoDateTime" },
+        "dueAt": {
+          "oneOf": [
+            { "$ref": "common.schema.json#/$defs/IsoDateTime" },
+            { "type": "null" }
+          ]
+        },
+        "lastInstructionExposureAt": {
+          "oneOf": [
+            { "$ref": "common.schema.json#/$defs/IsoDateTime" },
+            { "type": "null" }
+          ]
+        },
+        "assisted": { "type": "boolean" },
+        "prerequisiteSkipped": { "type": "boolean" }
+      }
+    },
+    "TransferTask": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "objectiveId",
+        "status",
+        "windowStartsAt",
+        "windowEndsAt",
+        "dueAt",
+        "naturalOpportunityDefinition",
+        "noHintRequired"
+      ],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/NonEmptyId" },
+        "objectiveId": { "$ref": "common.schema.json#/$defs/NonEmptyId" },
+        "status": { "$ref": "common.schema.json#/$defs/TransferTaskStatus" },
+        "windowStartsAt": { "$ref": "common.schema.json#/$defs/IsoDateTime" },
+        "windowEndsAt": { "$ref": "common.schema.json#/$defs/IsoDateTime" },
+        "dueAt": { "$ref": "common.schema.json#/$defs/IsoDateTime" },
+        "naturalOpportunityDefinition": { "type": "string", "minLength": 1 },
+        "noHintRequired": { "const": true }
+      }
+    },
+    "MixedReview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "dueAt", "status"],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/NonEmptyId" },
+        "dueAt": { "$ref": "common.schema.json#/$defs/IsoDateTime" },
+        "status": { "enum": ["PLANNED", "READY", "COMPLETED", "RESCHEDULED"] }
+      }
+    },
+    "Conflict": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "entityType",
+        "entityId",
+        "fieldPaths",
+        "localValueHash",
+        "incomingValueHash",
+        "status",
+        "detectedAt"
+      ],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/NonEmptyId" },
+        "entityType": {
+          "enum": [
+            "ATTEMPT",
+            "ASSESSMENT",
+            "OBJECTIVE",
+            "LESSON_RESPONSE",
+            "EVIDENCE",
+            "DUE_TASK"
+          ]
+        },
+        "entityId": { "$ref": "common.schema.json#/$defs/NonEmptyId" },
+        "fieldPaths": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^/" }
+        },
+        "localValueHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "incomingValueHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "status": {
+          "enum": ["UNRESOLVED", "KEEP_LOCAL", "KEEP_INCOMING", "MERGED"]
+        },
+        "detectedAt": { "$ref": "common.schema.json#/$defs/IsoDateTime" },
+        "resolutionNote": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

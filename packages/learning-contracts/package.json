@@ -1,0 +1,21 @@
+{
+  "name": "@iwc/learning-contracts",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./schemas/*": "./schemas/*"
+  },
+  "scripts": {
+    "lint": "eslint src",
+    "test": "vitest run --root ../.. packages/learning-contracts/src",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "ajv": "catalog:"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}

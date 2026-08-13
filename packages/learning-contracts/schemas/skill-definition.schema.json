@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ielts-writing-coach.dev/schemas/skill-definition.schema.json",
+  "title": "SkillDefinition",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "dimension",
+    "nameZh",
+    "description",
+    "allowedItemTypes",
+    "successThreshold",
+    "acceptedAnswerPolicy",
+    "minimumGradingConfidence",
+    "fallbackStrategy",
+    "version"
+  ],
+  "properties": {
+    "id": { "$ref": "common.schema.json#/$defs/SkillId" },
+    "dimension": { "$ref": "common.schema.json#/$defs/IeltsDimension" },
+    "nameZh": { "type": "string", "minLength": 1 },
+    "description": { "type": "string", "minLength": 1 },
+    "allowedItemTypes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/$defs/ExerciseItemType" }
+    },
+    "successThreshold": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "independentNoHintCorrect",
+        "distinctContexts",
+        "integratedApplicationRequired",
+        "unseenExitTestRequired"
+      ],
+      "properties": {
+        "independentNoHintCorrect": { "const": 2 },
+        "distinctContexts": { "const": 2 },
+        "integratedApplicationRequired": { "const": true },
+        "unseenExitTestRequired": { "const": true }
+      }
+    },
+    "acceptedAnswerPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "preservesIntendedMeaning",
+        "acceptsEquivalentNaturalAnswers",
+        "rejectsRecommendationMismatchAlone"
+      ],
+      "properties": {
+        "mode": { "enum": ["DETERMINISTIC_SET", "CONSTRAINED_RUBRIC"] },
+        "preservesIntendedMeaning": { "const": true },
+        "acceptsEquivalentNaturalAnswers": { "type": "boolean" },
+        "rejectsRecommendationMismatchAlone": { "const": true },
+        "deterministicNormalization": {
+          "enum": ["TRIM_CASE_FOLD", "ORDER_INSENSITIVE"]
+        },
+        "rubricCriteria": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "minimumGradingConfidence": {
+      "$ref": "common.schema.json#/$defs/Confidence"
+    },
+    "fallbackStrategy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "maxRemedialItems",
+        "lowConfidenceAction",
+        "description"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "SCAFFOLD_LADDER",
+            "GENERAL_REWRITE",
+            "GENERAL_ARGUMENT",
+            "GENERAL_COHESION"
+          ]
+        },
+        "maxRemedialItems": { "const": 2 },
+        "lowConfidenceAction": { "const": "SUPPLEMENT_WITHOUT_STATE_CHANGE" },
+        "description": { "type": "string", "minLength": 1 }
+      }
+    },
+    "version": { "const": "1.0.0" }
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "@iwc/email",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint src",
+    "test": "vitest run --root ../.. packages/email/src",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "nodemailer": "9.0.5",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/nodemailer": "8.0.1",
+    "typescript": "catalog:"
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "name": "@iwc/worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./embedded": "./src/embedded.ts"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts src/migrate.ts --format esm --sourcemap --out-dir dist",
+    "dev": "tsx watch src/index.ts",
+    "lint": "eslint src",
+    "start": "node dist/index.js",
+    "test": "vitest run --root ../.. apps/worker/src",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@iwc/ai": "workspace:*",
+    "@iwc/config": "workspace:*",
+    "@iwc/db": "workspace:*",
+    "@iwc/email": "workspace:*",
+    "@iwc/learning-contracts": "workspace:*",
+    "@iwc/learning-core": "workspace:*",
+    "drizzle-orm": "catalog:",
+    "graphile-worker": "0.17.3",
+    "nodemailer": "9.0.5"
+  },
+  "devDependencies": {
+    "tsup": "8.5.0",
+    "typescript": "catalog:"
+  }
+}

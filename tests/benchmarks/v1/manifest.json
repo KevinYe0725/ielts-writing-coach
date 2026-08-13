@@ -1,0 +1,21 @@
+{
+  "corpusVersion": "1.0.0",
+  "license": "Apache-2.0",
+  "provenance": "Original synthetic material created for deterministic repository QA; no exam-provider or learner text is included.",
+  "expectedCounts": {
+    "boundarySamples": 52,
+    "essaySamples": 12,
+    "cycleSamples": 6
+  },
+  "scope": {
+    "boundarySamples": "Exact UTF-16 span, fixed skill ID, category, and hard-grammar flag regression only.",
+    "essaySamples": "Full-length structured-input and pipeline fixtures only; no gold IELTS band or certified language-quality label.",
+    "cycleSamples": "Canonical schema, archive, and deterministic evidence-gate scenarios; no live model output."
+  },
+  "limitations": [
+    "AI-generated IELTS bands are estimates, not official IELTS results.",
+    "This corpus has not been adjudicated by certified IELTS examiners and cannot establish scoring accuracy.",
+    "Open-response model quality and the 95 percent generation-quality target require a separately versioned human-labelled evaluation run.",
+    "Passing deterministic fixtures does not certify accessibility conformance or production deployment reliability."
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ielts-writing-coach.dev/schemas/learning-profile-exchange.schema.json",
+  "title": "Web and Codex Skill learning profile exchange",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "exportedAt",
+    "source",
+    "profileId",
+    "skills",
+    "evidence",
+    "checksumSha256"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "exportedAt": { "$ref": "common.schema.json#/$defs/IsoDateTime" },
+    "source": { "enum": ["WEB", "SKILL"] },
+    "profileId": { "$ref": "common.schema.json#/$defs/NonEmptyId" },
+    "skills": {
+      "type": "array",
+      "items": { "$ref": "common.schema.json#/$defs/UserSkillState" }
+    },
+    "evidence": {
+      "type": "array",
+      "items": { "$ref": "skill-evidence-event.schema.json" }
+    },
+    "checksumSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  }
+}

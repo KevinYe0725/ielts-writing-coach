@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ielts-writing-coach.dev/schemas/exercise-response.schema.json",
+  "title": "ExerciseResponse with append-only attempts and evaluations",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "exerciseItemId",
+    "firstAttemptId",
+    "finalAttemptId",
+    "attempts",
+    "evaluations"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "id": { "$ref": "common.schema.json#/$defs/NonEmptyId" },
+    "exerciseItemId": { "$ref": "common.schema.json#/$defs/NonEmptyId" },
+    "firstAttemptId": { "$ref": "common.schema.json#/$defs/NonEmptyId" },
+    "finalAttemptId": { "$ref": "common.schema.json#/$defs/NonEmptyId" },
+    "currentEvaluationId": { "$ref": "common.schema.json#/$defs/NonEmptyId" },
+    "attempts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "answer",
+          "submittedAt",
+          "elapsedSeconds",
+          "hintLevel",
+          "referenceAnswerSeen"
+        ],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/$defs/NonEmptyId" },
+          "answer": { "type": "string" },
+          "submittedAt": { "$ref": "common.schema.json#/$defs/IsoDateTime" },
+          "elapsedSeconds": { "type": "integer", "minimum": 0 },
+          "hintLevel": {
+            "enum": [
+              "NONE",
+              "KEYWORD",
+              "PARTIAL_FRAME",
+              "FULL_FRAME",
+              "ANSWER_SHOWN"
+            ]
+          },
+          "referenceAnswerSeen": { "type": "boolean" }
+        }
+      }
+    },
+    "evaluations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "attemptId",
+          "outcome",
+          "confidence",
+          "dimensionScores",
+          "userAnswerEvidence",
+          "mostImportantSuggestion",
+          "evaluatorVersion",
+          "promptVersion",
+          "rubricVersion",
+          "adjudicationStatus"
+        ],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/$defs/NonEmptyId" },
+          "attemptId": { "$ref": "common.schema.json#/$defs/NonEmptyId" },
+          "outcome": { "enum": ["PASS", "FAIL", "NO_OPPORTUNITY"] },
+          "confidence": { "$ref": "common.schema.json#/$defs/Confidence" },
+          "dimensionScores": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "userAnswerEvidence": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "mostImportantSuggestion": { "type": "string" },
+          "evaluatorVersion": {
+            "$ref": "common.schema.json#/$defs/NonEmptyId"
+          },
+          "promptVersion": { "$ref": "common.schema.json#/$defs/NonEmptyId" },
+          "rubricVersion": { "$ref": "common.schema.json#/$defs/NonEmptyId" },
+          "adjudicationStatus": {
+            "enum": ["ACCEPTED", "DISPUTED", "SUPERSEDED", "PENDING"]
+          },
+          "supersedesEvaluationId": {
+            "$ref": "common.schema.json#/$defs/NonEmptyId"
+          }
+        }
+      }
+    }
+  }
+}

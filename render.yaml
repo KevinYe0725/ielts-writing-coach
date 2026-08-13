@@ -1,0 +1,66 @@
+# Community-supported example. Docker Compose and Railway are the Tier 1 deployment targets.
+services:
+  - type: web
+    name: ielts-writing-coach-web
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    preDeployCommand: node /app/docker/migrate-with-lock.mjs
+    healthCheckPath: /api/v1/health/ready
+    maxShutdownDelaySeconds: 30
+    envVars:
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: APP_ENCRYPTION_KEY
+        # Render documents generateValue as a base64-encoded 256-bit value,
+        # which is exactly the key shape required by this application.
+        generateValue: true
+      - key: APP_ENCRYPTION_KEY_VERSION
+        value: "1"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ielts-writing-coach-db
+          property: connectionString
+      - key: DEPLOYMENT_MODE
+        value: personal
+      - key: WORKER_MODE
+        value: standalone
+      - key: APP_URL
+        fromService:
+          type: web
+          name: ielts-writing-coach-web
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: TRUST_PROXY_HOPS
+        value: "1"
+      - key: SETUP_TOKEN
+        generateValue: true
+  - type: worker
+    name: ielts-writing-coach-worker
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerCommand: node /app/worker-runtime/dist/index.js
+    preDeployCommand: node /app/docker/migrate-with-lock.mjs
+    maxShutdownDelaySeconds: 60
+    envVars:
+      - key: APP_ENCRYPTION_KEY
+        fromService:
+          type: web
+          name: ielts-writing-coach-web
+          envVarKey: APP_ENCRYPTION_KEY
+      - key: APP_ENCRYPTION_KEY_VERSION
+        value: "1"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ielts-writing-coach-db
+          property: connectionString
+      - key: WORKER_MODE
+        value: standalone
+
+databases:
+  - name: ielts-writing-coach-db
+    databaseName: iwc
+    user: iwc
+    plan: basic-256mb
+    postgresMajorVersion: "17"
+    # Empty means private-network access only; never expose PostgreSQL publicly
+    # by default in the community Blueprint.
+    ipAllowList: []

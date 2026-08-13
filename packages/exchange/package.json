@@ -1,0 +1,21 @@
+{
+  "name": "@iwc/exchange",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint src",
+    "test": "vitest run --root ../.. packages/exchange/src",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@iwc/learning-contracts": "workspace:*",
+    "fflate": "0.8.3"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "@iwc/question-bank",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint src",
+    "test": "vitest run --root ../.. packages/question-bank/src/questions.test.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  }
+}

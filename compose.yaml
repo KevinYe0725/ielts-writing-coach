@@ -1,0 +1,111 @@
+name: ielts-writing-coach
+
+x-app-environment: &app-environment
+  DATABASE_URL: postgresql://iwc:${POSTGRES_PASSWORD:-iwc-local-only}@postgres:5432/iwc
+  APP_URL: ${APP_URL:-http://127.0.0.1:3000}
+  DEPLOYMENT_MODE: ${DEPLOYMENT_MODE:-personal}
+  AUTH_SECRET_FILE: /run/iwc-secrets/auth_secret
+  APP_ENCRYPTION_KEY_FILE: /run/iwc-secrets/encryption_key
+  APP_ENCRYPTION_KEY_VERSION: ${APP_ENCRYPTION_KEY_VERSION:-1}
+  SETUP_TOKEN_FILE: /run/iwc-secrets/setup_token
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  SMTP_HOST: ${SMTP_HOST:-}
+  SMTP_PORT: ${SMTP_PORT:-587}
+  SMTP_SECURE: ${SMTP_SECURE:-false}
+  SMTP_USER: ${SMTP_USER:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+  SMTP_FROM: ${SMTP_FROM:-}
+  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  OPENAI_MODEL: ${OPENAI_MODEL:-}
+  LOCAL_MODEL_BASE_URL_ALLOWLIST: ${LOCAL_MODEL_BASE_URL_ALLOWLIST:-}
+  TELEMETRY_ENABLED: ${TELEMETRY_ENABLED:-false}
+  TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-0}
+
+services:
+  bootstrap:
+    build: .
+    image: ${IWC_IMAGE:-ghcr.io/kevinye0725/ielts-writing-coach:local}
+    command: ["node", "/app/docker/bootstrap.mjs"]
+    environment:
+      IWC_SECRET_DIRECTORY: /run/iwc-secrets
+    volumes:
+      - iwc_secrets:/run/iwc-secrets
+    restart: "no"
+
+  postgres:
+    image: postgres:17.6-bookworm
+    environment:
+      POSTGRES_DB: iwc
+      POSTGRES_USER: iwc
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-iwc-local-only}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U iwc -d iwc"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    ports:
+      - "127.0.0.1:${IWC_POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - iwc_postgres:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  migrate:
+    image: ${IWC_IMAGE:-ghcr.io/kevinye0725/ielts-writing-coach:local}
+    build: .
+    command: ["node", "/app/docker/migrate-with-lock.mjs"]
+    environment: *app-environment
+    volumes:
+      - iwc_secrets:/run/iwc-secrets:ro
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  web:
+    image: ${IWC_IMAGE:-ghcr.io/kevinye0725/ielts-writing-coach:local}
+    build: .
+    environment:
+      <<: *app-environment
+      WORKER_MODE: standalone
+      WEB_REPLICAS: 1
+    ports:
+      - "${IWC_BIND_ADDRESS:-127.0.0.1}:${IWC_PORT:-3000}:3000"
+    volumes:
+      - iwc_secrets:/run/iwc-secrets:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/v1/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+    init: true
+
+  worker:
+    image: ${IWC_IMAGE:-ghcr.io/kevinye0725/ielts-writing-coach:local}
+    build: .
+    command: ["node", "/app/worker-runtime/dist/index.js"]
+    environment:
+      <<: *app-environment
+      WORKER_MODE: standalone
+    volumes:
+      - iwc_secrets:/run/iwc-secrets:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    init: true
+
+volumes:
+  iwc_postgres:
+  iwc_secrets:

@@ -1,0 +1,23 @@
+{
+  "name": "@iwc/auth",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./authorization": "./src/authorization.ts"
+  },
+  "scripts": {
+    "lint": "eslint src",
+    "test": "vitest run --root ../.. packages/auth/src",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@iwc/db": "workspace:*",
+    "better-auth": "1.6.27",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}

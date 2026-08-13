@@ -1,0 +1,4 @@
+interface:
+  display_name: "IELTS Writing Coach"
+  short_description: "Build lasting Task 2 skill through guided practice"
+  default_prompt: "Use $coach-ielts-writing to continue my evidence-based IELTS Writing Task 2 training cycle."

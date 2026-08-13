@@ -1,0 +1,10 @@
+.next
+dist
+coverage
+node_modules
+pnpm-lock.yaml
+playwright-report
+test-results
+IELTS_Writing_Web_PRD.md
+DCO.md
+.agents/skills/coach-ielts-writing/**

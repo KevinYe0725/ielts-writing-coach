@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ielts-writing-coach.dev/schemas/ai-issue-judgment.schema.json",
+  "title": "AI issue judgment (server metadata excluded)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "skillId",
+    "startOffset",
+    "endOffset",
+    "excerpt",
+    "diagnosis",
+    "severity",
+    "confidence"
+  ],
+  "properties": {
+    "skillId": {
+      "$ref": "common.schema.json#/$defs/SkillId",
+      "default": "collocation_perspective"
+    },
+    "startOffset": { "type": "integer", "minimum": 0, "default": 0 },
+    "endOffset": { "type": "integer", "minimum": 1, "default": 22 },
+    "excerpt": {
+      "type": "string",
+      "minLength": 1,
+      "default": "much slighter pressure"
+    },
+    "diagnosis": {
+      "type": "string",
+      "minLength": 1,
+      "default": "The comparative is grammatical, but the collocation and perspective are unnatural."
+    },
+    "severity": { "enum": ["LOW", "MEDIUM", "HIGH"], "default": "MEDIUM" },
+    "confidence": {
+      "$ref": "common.schema.json#/$defs/Confidence",
+      "default": 0.93
+    }
+  },
+  "examples": [
+    {
+      "skillId": "collocation_perspective",
+      "startOffset": 0,
+      "endOffset": 22,
+      "excerpt": "much slighter pressure",
+      "diagnosis": "Much correctly modifies a comparative; the issue is natural collocation and English information perspective, not a 'much + comparative' grammar rule.",
+      "severity": "MEDIUM",
+      "confidence": 0.93
+    }
+  ]
+}

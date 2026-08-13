@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ielts-writing-coach.dev/schemas/assessment.schema.json",
+  "title": "IELTS four-criterion assessment",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "attemptId",
+    "rubricVersion",
+    "modelId",
+    "overallBand",
+    "criteria",
+    "issueEvidenceIds"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "id": { "$ref": "common.schema.json#/$defs/NonEmptyId" },
+    "attemptId": { "$ref": "common.schema.json#/$defs/NonEmptyId" },
+    "rubricVersion": { "$ref": "common.schema.json#/$defs/NonEmptyId" },
+    "modelId": { "$ref": "common.schema.json#/$defs/NonEmptyId" },
+    "overallBand": { "$ref": "common.schema.json#/$defs/Band" },
+    "criteria": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["TR", "CC", "LR", "GRA"],
+      "properties": {
+        "TR": { "$ref": "#/$defs/Criterion" },
+        "CC": { "$ref": "#/$defs/Criterion" },
+        "LR": { "$ref": "#/$defs/Criterion" },
+        "GRA": { "$ref": "#/$defs/Criterion" }
+      }
+    },
+    "issueEvidenceIds": {
+      "type": "array",
+      "items": { "$ref": "common.schema.json#/$defs/NonEmptyId" }
+    }
+  },
+  "$defs": {
+    "Criterion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["band", "confidence", "rationale", "evidenceIds"],
+      "properties": {
+        "band": { "$ref": "common.schema.json#/$defs/Band" },
+        "confidence": { "$ref": "common.schema.json#/$defs/Confidence" },
+        "rationale": { "type": "string", "minLength": 1 },
+        "evidenceIds": {
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/NonEmptyId" }
+        }
+      }
+    }
+  }
+}

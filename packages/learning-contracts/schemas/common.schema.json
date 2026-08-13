@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ielts-writing-coach.dev/schemas/common.schema.json",
+  "title": "IELTS Writing Coach common learning contract definitions",
+  "$defs": {
+    "NonEmptyId": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "IsoDateTime": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{3})?Z$"
+    },
+    "Confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "Band": { "type": "number", "minimum": 0, "maximum": 9, "multipleOf": 0.5 },
+    "IeltsDimension": { "enum": ["TR", "CC", "LR", "GRA"] },
+    "SkillId": {
+      "enum": [
+        "complete_comparison",
+        "verb_form_trigger",
+        "sentence_boundary",
+        "subject_verb_agreement",
+        "article_control",
+        "collocation_perspective",
+        "word_form_precision",
+        "task_instruction_coverage",
+        "mechanism_chain",
+        "development_relevance",
+        "weighing_qualification",
+        "paragraph_function_order",
+        "reference_linking"
+      ]
+    },
+    "ExerciseItemType": {
+      "enum": [
+        "MINIMAL_PAIR",
+        "SKELETON_COMPLETION",
+        "CONSTRAINED_REWRITE",
+        "ERROR_LOCATION",
+        "GAP_FILL",
+        "SENTENCE_GENERATION",
+        "SENTENCE_REPAIR",
+        "PARAGRAPH_SELF_CHECK",
+        "MEANING_FORK",
+        "EXPRESSION_MAP",
+        "MULTIPLE_REALIZATION",
+        "MATCHING",
+        "TASK_TYPE_IDENTIFICATION",
+        "THESIS_COMPARISON",
+        "OUTLINE",
+        "ROLE_CARD",
+        "CAUSAL_CHAIN",
+        "BRIDGE_SENTENCE",
+        "RELEVANCE_FILTER",
+        "DELETION",
+        "MICRO_PARAGRAPH",
+        "WEIGHING_CHOICE",
+        "QUALIFICATION",
+        "PARAGRAPH_WRITING",
+        "FUNCTION_LABELING",
+        "ORDERING",
+        "REVERSE_OUTLINE",
+        "REFERENCE_REPAIR",
+        "LINK_RELATION",
+        "RECONSTRUCTION",
+        "INTEGRATED_APPLICATION",
+        "EXIT_TEST",
+        "SELF_CHECK"
+      ]
+    },
+    "LessonStatus": {
+      "enum": [
+        "PLANNING",
+        "READY",
+        "ACTIVE",
+        "CORE_COMPLETED",
+        "TIMEBOX_EXPIRED",
+        "USER_SKIPPED",
+        "ABANDONED"
+      ]
+    },
+    "RewriteTaskStatus": {
+      "enum": [
+        "PLANNED",
+        "LOCKED",
+        "READY",
+        "ACTIVE",
+        "COMPLETED",
+        "SKIPPED_PREREQUISITE",
+        "RESCHEDULED"
+      ]
+    },
+    "TransferTaskStatus": {
+      "enum": ["PLANNED", "READY", "COMPLETED", "NO_OPPORTUNITY", "RESCHEDULED"]
+    },
+    "TrainingCycleState": {
+      "enum": [
+        "QUESTION_READY",
+        "ATTEMPT_1_ACTIVE",
+        "SUBMITTED",
+        "ANALYZING",
+        "FEEDBACK_READY",
+        "LESSON_GENERATING",
+        "LESSON_READY",
+        "LESSON_ACTIVE",
+        "LESSON_RESOLVED",
+        "REWRITE_LOCKED",
+        "REWRITE_READY",
+        "ATTEMPT_2_ACTIVE",
+        "COMPARING",
+        "CORE_CYCLE_COMPLETED"
+      ]
+    },
+    "MasteryLevel": {
+      "enum": ["diagnosed", "practicing", "applied", "retained", "transferred"]
+    },
+    "UserSkillState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "skillId",
+        "highestAttainedLevel",
+        "currentStability",
+        "latestLessonOutcome",
+        "recurrenceCount",
+        "consecutiveIndependentSuccesses"
+      ],
+      "properties": {
+        "skillId": { "$ref": "#/$defs/SkillId" },
+        "highestAttainedLevel": { "$ref": "#/$defs/MasteryLevel" },
+        "currentStability": { "enum": ["stable", "unstable", "needs_review"] },
+        "latestLessonOutcome": {
+          "enum": ["applied", "developing", "not_stable"]
+        },
+        "recurrenceCount": { "type": "integer", "minimum": 0 },
+        "consecutiveIndependentSuccesses": { "type": "integer", "minimum": 0 },
+        "lastEvidenceAt": { "$ref": "#/$defs/IsoDateTime" },
+        "nextReviewAt": { "$ref": "#/$defs/IsoDateTime" }
+      }
+    }
+  }
+}

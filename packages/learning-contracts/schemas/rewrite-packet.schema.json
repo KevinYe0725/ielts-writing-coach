@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ielts-writing-coach.dev/schemas/rewrite-packet.schema.json",
+  "title": "Closed-book Version 2 RewritePacket",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "rewriteTaskId",
+    "question",
+    "durationMinutes",
+    "blindDraft",
+    "selfCheck"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "rewriteTaskId": { "$ref": "common.schema.json#/$defs/NonEmptyId" },
+    "question": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["prompt", "instructions"],
+      "properties": {
+        "prompt": { "type": "string", "minLength": 1 },
+        "instructions": { "type": "string", "minLength": 1 }
+      }
+    },
+    "durationMinutes": { "const": 40 },
+    "blindDraft": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["minutes", "showPersonalTargets"],
+      "properties": {
+        "minutes": { "const": 35 },
+        "showPersonalTargets": { "const": false }
+      }
+    },
+    "selfCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["minutes", "abstractTargets"],
+      "properties": {
+        "minutes": { "const": 5 },
+        "abstractTargets": {
+          "type": "array",
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 120 }
+        }
+      }
+    }
+  }
+}

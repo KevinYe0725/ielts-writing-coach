@@ -1,0 +1,421 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "01989a00-0000-7001-8000-000000000002",
+  "trainingCycleId": "01989a00-0000-7001-8000-000000000001",
+  "status": "READY",
+  "plannedUserSeconds": 2700,
+  "corePathSeconds": 2700,
+  "flexiblePathSeconds": 0,
+  "objectives": [
+    {
+      "id": "01989a00-0000-7001-8000-000000000003",
+      "trainingCycleId": "01989a00-0000-7001-8000-000000000001",
+      "skillId": "collocation_perspective",
+      "role": "CORE",
+      "sourceEvidenceIds": ["01989a00-0000-7001-8000-000000000004"],
+      "priority": 1,
+      "successCriterion": "Use natural English perspectives in independent sentences, an integrated paragraph and an unseen exit item."
+    }
+  ],
+  "blocks": [
+    {
+      "id": "01989a00-0000-7001-8000-000000000005",
+      "objectiveId": "01989a00-0000-7001-8000-000000000003",
+      "kind": "CORE",
+      "path": "CORE",
+      "order": 0,
+      "timeBudgetSeconds": 1200,
+      "items": [
+        {
+          "id": "01989a00-0000-7001-8000-000000000010",
+          "blockId": "01989a00-0000-7001-8000-000000000005",
+          "learningObjectiveId": "01989a00-0000-7001-8000-000000000003",
+          "primarySkillId": "collocation_perspective",
+          "sourceIssueId": "01989a00-0000-7001-8000-000000000004",
+          "stage": "notice",
+          "itemType": "CONSTRAINED_REWRITE",
+          "prompt": "Rewrite the source sentence naturally without help and state the meaning you intended.",
+          "grading": {
+            "mode": "RUBRIC",
+            "minimumConfidence": 0.85,
+            "criteria": [
+              {
+                "id": "01989a00-0000-7001-8000-000000000030",
+                "description": "The rewrite preserves the intended meaning and uses a natural English perspective.",
+                "passingScore": 0.75
+              }
+            ]
+          },
+          "expectedActiveSeconds": 150,
+          "expectedTotalSeconds": 180,
+          "isReserve": false,
+          "generationMode": "TEMPLATE",
+          "qualityStatus": "VALIDATED",
+          "evidenceOpportunity": "PRETEST",
+          "contextId": "original-education",
+          "firstAttemptRequired": true,
+          "hintPolicy": "NONE",
+          "feedbackPolicy": "AFTER_SUBMISSION"
+        },
+        {
+          "id": "01989a00-0000-7001-8000-000000000011",
+          "blockId": "01989a00-0000-7001-8000-000000000005",
+          "learningObjectiveId": "01989a00-0000-7001-8000-000000000003",
+          "primarySkillId": "collocation_perspective",
+          "sourceIssueId": "01989a00-0000-7001-8000-000000000004",
+          "stage": "understand",
+          "itemType": "MEANING_FORK",
+          "prompt": "Choose whether the intended focus is academic pressure, workload or course demands.",
+          "grading": {
+            "mode": "UNSCORED_BRANCH",
+            "branchIds": ["academic-pressure", "workload"]
+          },
+          "expectedActiveSeconds": 40,
+          "expectedTotalSeconds": 120,
+          "isReserve": false,
+          "generationMode": "TEMPLATE",
+          "qualityStatus": "VALIDATED",
+          "evidenceOpportunity": "OTHER",
+          "contextId": "original-education",
+          "firstAttemptRequired": false,
+          "hintPolicy": "ON_REQUEST",
+          "feedbackPolicy": "IMMEDIATE"
+        },
+        {
+          "id": "01989a00-0000-7001-8000-000000000012",
+          "blockId": "01989a00-0000-7001-8000-000000000005",
+          "learningObjectiveId": "01989a00-0000-7001-8000-000000000003",
+          "primarySkillId": "collocation_perspective",
+          "sourceIssueId": "01989a00-0000-7001-8000-000000000004",
+          "stage": "control",
+          "itemType": "EXPRESSION_MAP",
+          "prompt": "Map each meaning to the appropriate English subject, verb and noun phrase.",
+          "grading": {
+            "mode": "RUBRIC",
+            "minimumConfidence": 0.85,
+            "criteria": [
+              {
+                "id": "01989a00-0000-7001-8000-000000000031",
+                "description": "The mapping expresses each meaning through a natural subject, verb and noun phrase.",
+                "passingScore": 0.75
+              }
+            ]
+          },
+          "expectedActiveSeconds": 120,
+          "expectedTotalSeconds": 180,
+          "isReserve": false,
+          "generationMode": "TEMPLATE",
+          "qualityStatus": "VALIDATED",
+          "evidenceOpportunity": "CONTROLLED_REPAIR",
+          "contextId": "original-education",
+          "firstAttemptRequired": true,
+          "hintPolicy": "ON_REQUEST",
+          "feedbackPolicy": "IMMEDIATE"
+        },
+        {
+          "id": "01989a00-0000-7001-8000-000000000013",
+          "blockId": "01989a00-0000-7001-8000-000000000005",
+          "learningObjectiveId": "01989a00-0000-7001-8000-000000000003",
+          "primarySkillId": "collocation_perspective",
+          "sourceIssueId": "01989a00-0000-7001-8000-000000000004",
+          "stage": "control",
+          "itemType": "CONSTRAINED_REWRITE",
+          "prompt": "Repair the sentence with a partial semantic frame, then remove the frame.",
+          "grading": {
+            "mode": "RUBRIC",
+            "minimumConfidence": 0.85,
+            "criteria": [
+              {
+                "id": "01989a00-0000-7001-8000-000000000032",
+                "description": "The repaired sentence is complete, natural and meaning-preserving.",
+                "passingScore": 0.75
+              }
+            ]
+          },
+          "expectedActiveSeconds": 150,
+          "expectedTotalSeconds": 180,
+          "isReserve": false,
+          "generationMode": "TEMPLATE",
+          "qualityStatus": "VALIDATED",
+          "evidenceOpportunity": "CONTROLLED_REPAIR",
+          "contextId": "original-education",
+          "firstAttemptRequired": true,
+          "hintPolicy": "SCAFFOLD_LADDER",
+          "feedbackPolicy": "IMMEDIATE"
+        },
+        {
+          "id": "01989a00-0000-7001-8000-000000000014",
+          "blockId": "01989a00-0000-7001-8000-000000000005",
+          "learningObjectiveId": "01989a00-0000-7001-8000-000000000003",
+          "primarySkillId": "collocation_perspective",
+          "stage": "produce",
+          "itemType": "SENTENCE_GENERATION",
+          "prompt": "Express a new education claim naturally without supplied wording.",
+          "grading": {
+            "mode": "RUBRIC",
+            "minimumConfidence": 0.85,
+            "criteria": [
+              {
+                "id": "01989a00-0000-7001-8000-000000000033",
+                "description": "The sentence independently uses a natural collocation and perspective.",
+                "passingScore": 0.75
+              }
+            ]
+          },
+          "expectedActiveSeconds": 170,
+          "expectedTotalSeconds": 180,
+          "isReserve": false,
+          "generationMode": "AI",
+          "qualityStatus": "VALIDATED",
+          "evidenceOpportunity": "INDEPENDENT_GENERATION",
+          "contextId": "education-new",
+          "firstAttemptRequired": true,
+          "hintPolicy": "NONE",
+          "feedbackPolicy": "BATCH_AFTER_GROUP",
+          "independentGroupId": "generation-batch-1"
+        },
+        {
+          "id": "01989a00-0000-7001-8000-000000000015",
+          "blockId": "01989a00-0000-7001-8000-000000000005",
+          "learningObjectiveId": "01989a00-0000-7001-8000-000000000003",
+          "primarySkillId": "collocation_perspective",
+          "stage": "produce",
+          "itemType": "SENTENCE_GENERATION",
+          "prompt": "Express a workplace claim naturally without supplied wording.",
+          "grading": {
+            "mode": "RUBRIC",
+            "minimumConfidence": 0.85,
+            "criteria": [
+              {
+                "id": "01989a00-0000-7001-8000-000000000034",
+                "description": "The sentence independently uses a natural collocation and perspective.",
+                "passingScore": 0.75
+              }
+            ]
+          },
+          "expectedActiveSeconds": 170,
+          "expectedTotalSeconds": 180,
+          "isReserve": false,
+          "generationMode": "AI",
+          "qualityStatus": "VALIDATED",
+          "evidenceOpportunity": "INDEPENDENT_GENERATION",
+          "contextId": "work-new",
+          "firstAttemptRequired": true,
+          "hintPolicy": "NONE",
+          "feedbackPolicy": "BATCH_AFTER_GROUP",
+          "independentGroupId": "generation-batch-1"
+        },
+        {
+          "id": "01989a00-0000-7001-8000-000000000016",
+          "blockId": "01989a00-0000-7001-8000-000000000005",
+          "learningObjectiveId": "01989a00-0000-7001-8000-000000000003",
+          "primarySkillId": "collocation_perspective",
+          "stage": "produce",
+          "itemType": "SENTENCE_GENERATION",
+          "prompt": "Express a health claim naturally without supplied wording.",
+          "grading": {
+            "mode": "RUBRIC",
+            "minimumConfidence": 0.85,
+            "criteria": [
+              {
+                "id": "01989a00-0000-7001-8000-000000000035",
+                "description": "The sentence independently uses a natural collocation and perspective.",
+                "passingScore": 0.75
+              }
+            ]
+          },
+          "expectedActiveSeconds": 170,
+          "expectedTotalSeconds": 180,
+          "isReserve": false,
+          "generationMode": "AI",
+          "qualityStatus": "VALIDATED",
+          "evidenceOpportunity": "INDEPENDENT_GENERATION",
+          "contextId": "health-new",
+          "firstAttemptRequired": true,
+          "hintPolicy": "NONE",
+          "feedbackPolicy": "BATCH_AFTER_GROUP",
+          "independentGroupId": "generation-batch-2"
+        }
+      ]
+    },
+    {
+      "id": "01989a00-0000-7001-8000-000000000006",
+      "kind": "BREAK",
+      "path": "CORE",
+      "order": 1,
+      "timeBudgetSeconds": 180,
+      "items": []
+    },
+    {
+      "id": "01989a00-0000-7001-8000-000000000007",
+      "objectiveId": "01989a00-0000-7001-8000-000000000003",
+      "kind": "INTEGRATED",
+      "path": "CORE",
+      "order": 2,
+      "timeBudgetSeconds": 1320,
+      "items": [
+        {
+          "id": "01989a00-0000-7001-8000-000000000017",
+          "blockId": "01989a00-0000-7001-8000-000000000007",
+          "learningObjectiveId": "01989a00-0000-7001-8000-000000000003",
+          "primarySkillId": "collocation_perspective",
+          "stage": "produce",
+          "itemType": "MULTIPLE_REALIZATION",
+          "prompt": "Express one workload idea through three distinct, meaning-accurate English perspectives.",
+          "grading": {
+            "mode": "RUBRIC",
+            "minimumConfidence": 0.85,
+            "criteria": [
+              {
+                "id": "01989a00-0000-7001-8000-000000000036",
+                "description": "All realizations are natural, distinct and preserve the intended meaning.",
+                "passingScore": 0.75
+              }
+            ]
+          },
+          "expectedActiveSeconds": 200,
+          "expectedTotalSeconds": 240,
+          "isReserve": false,
+          "generationMode": "TEMPLATE",
+          "qualityStatus": "VALIDATED",
+          "evidenceOpportunity": "OTHER",
+          "contextId": "education-perspectives",
+          "firstAttemptRequired": true,
+          "hintPolicy": "NONE",
+          "feedbackPolicy": "AFTER_SUBMISSION"
+        },
+        {
+          "id": "01989a00-0000-7001-8000-000000000018",
+          "blockId": "01989a00-0000-7001-8000-000000000007",
+          "learningObjectiveId": "01989a00-0000-7001-8000-000000000003",
+          "primarySkillId": "collocation_perspective",
+          "stage": "near_transfer",
+          "itemType": "INTEGRATED_APPLICATION",
+          "prompt": "Write an 80–120 word paragraph in a new technology context and preserve the required meaning.",
+          "grading": {
+            "mode": "RUBRIC",
+            "minimumConfidence": 0.85,
+            "criteria": [
+              {
+                "id": "01989a00-0000-7001-8000-000000000037",
+                "description": "The paragraph creates a natural opportunity and applies the target perspective without distorting meaning.",
+                "passingScore": 0.75
+              }
+            ]
+          },
+          "expectedActiveSeconds": 380,
+          "expectedTotalSeconds": 420,
+          "isReserve": false,
+          "generationMode": "AI",
+          "qualityStatus": "VALIDATED",
+          "evidenceOpportunity": "INTEGRATED_APPLICATION",
+          "contextId": "technology-paragraph",
+          "firstAttemptRequired": true,
+          "hintPolicy": "NONE",
+          "feedbackPolicy": "AFTER_SUBMISSION",
+          "criteria": [
+            {
+              "objectiveId": "01989a00-0000-7001-8000-000000000003",
+              "skillId": "collocation_perspective",
+              "rubric": "The chosen perspective and collocation are natural and preserve the intended meaning.",
+              "passingScore": 0.75
+            }
+          ]
+        },
+        {
+          "id": "01989a00-0000-7001-8000-000000000019",
+          "blockId": "01989a00-0000-7001-8000-000000000007",
+          "learningObjectiveId": "01989a00-0000-7001-8000-000000000003",
+          "primarySkillId": "collocation_perspective",
+          "stage": "near_transfer",
+          "itemType": "CONSTRAINED_REWRITE",
+          "prompt": "Rebuild a sentence in an environmental context without reusing the lesson wording.",
+          "grading": {
+            "mode": "RUBRIC",
+            "minimumConfidence": 0.85,
+            "criteria": [
+              {
+                "id": "01989a00-0000-7001-8000-000000000038",
+                "description": "The new sentence is natural, independent and meaning-preserving.",
+                "passingScore": 0.75
+              }
+            ]
+          },
+          "expectedActiveSeconds": 210,
+          "expectedTotalSeconds": 240,
+          "isReserve": false,
+          "generationMode": "AI",
+          "qualityStatus": "VALIDATED",
+          "evidenceOpportunity": "OTHER",
+          "contextId": "environment-new",
+          "firstAttemptRequired": true,
+          "hintPolicy": "NONE",
+          "feedbackPolicy": "AFTER_SUBMISSION"
+        },
+        {
+          "id": "01989a00-0000-7001-8000-000000000020",
+          "blockId": "01989a00-0000-7001-8000-000000000007",
+          "learningObjectiveId": "01989a00-0000-7001-8000-000000000003",
+          "primarySkillId": "collocation_perspective",
+          "stage": "self_check",
+          "itemType": "SELF_CHECK",
+          "prompt": "Check the paragraph's subject–verb perspective and revise only where the meaning or collocation requires it.",
+          "grading": {
+            "mode": "RUBRIC",
+            "minimumConfidence": 0.85,
+            "criteria": [
+              {
+                "id": "01989a00-0000-7001-8000-000000000039",
+                "description": "The revision correctly identifies and improves only target-relevant wording.",
+                "passingScore": 0.75
+              }
+            ]
+          },
+          "expectedActiveSeconds": 210,
+          "expectedTotalSeconds": 240,
+          "isReserve": false,
+          "generationMode": "TEMPLATE",
+          "qualityStatus": "VALIDATED",
+          "evidenceOpportunity": "SELF_CHECK",
+          "contextId": "technology-paragraph",
+          "firstAttemptRequired": false,
+          "hintPolicy": "ON_REQUEST",
+          "feedbackPolicy": "AFTER_SUBMISSION"
+        },
+        {
+          "id": "01989a00-0000-7001-8000-000000000021",
+          "blockId": "01989a00-0000-7001-8000-000000000007",
+          "learningObjectiveId": "01989a00-0000-7001-8000-000000000003",
+          "primarySkillId": "collocation_perspective",
+          "stage": "produce",
+          "itemType": "EXIT_TEST",
+          "prompt": "Respond to an unseen meaning prompt with a natural sentence and no target wording.",
+          "grading": {
+            "mode": "RUBRIC",
+            "minimumConfidence": 0.85,
+            "criteria": [
+              {
+                "id": "01989a00-0000-7001-8000-000000000040",
+                "description": "The first response independently preserves meaning through a natural unseen realization.",
+                "passingScore": 0.75
+              }
+            ]
+          },
+          "expectedActiveSeconds": 170,
+          "expectedTotalSeconds": 180,
+          "isReserve": false,
+          "generationMode": "AI",
+          "qualityStatus": "VALIDATED",
+          "evidenceOpportunity": "EXIT_TEST",
+          "contextId": "unseen-surface",
+          "firstAttemptRequired": true,
+          "hintPolicy": "NONE",
+          "feedbackPolicy": "AFTER_SUBMISSION",
+          "unseenSurfaceForm": true
+        }
+      ]
+    }
+  ],
+  "plannerVersion": "planner-1.0.0",
+  "generatorVersion": "fixture-1.0.0"
+}

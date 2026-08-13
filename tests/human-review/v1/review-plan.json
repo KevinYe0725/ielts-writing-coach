@@ -1,0 +1,71 @@
+{
+  "protocolVersion": "1.0.0",
+  "status": "NOT_RUN",
+  "license": "Apache-2.0",
+  "generatedItemReview": {
+    "minimumItems": 52,
+    "minimumPerSkill": 4,
+    "requiredSkillIds": [
+      "complete_comparison",
+      "verb_form_trigger",
+      "sentence_boundary",
+      "subject_verb_agreement",
+      "article_control",
+      "collocation_perspective",
+      "word_form_precision",
+      "task_instruction_coverage",
+      "mechanism_chain",
+      "development_relevance",
+      "weighing_qualification",
+      "paragraph_function_order",
+      "reference_linking"
+    ],
+    "requiredCriteria": [
+      "goalClarity",
+      "answerDeterminacy",
+      "meaningPreservation",
+      "languageNaturalness"
+    ],
+    "acceptanceRule": "ALL_REQUIRED_CRITERIA_PASS",
+    "minimumAcceptanceRate": 0.95,
+    "reviewersPerItem": 2,
+    "disagreementPolicy": "INDEPENDENT_REVIEW_THEN_ADJUDICATION",
+    "providerPolicy": "REAL_PROVIDER_ONLY_NO_MOCK"
+  },
+  "openResponseReview": {
+    "minimumResponses": 26,
+    "minimumPerSkill": 2,
+    "requiredSkillIds": [
+      "complete_comparison",
+      "verb_form_trigger",
+      "sentence_boundary",
+      "subject_verb_agreement",
+      "article_control",
+      "collocation_perspective",
+      "word_form_precision",
+      "task_instruction_coverage",
+      "mechanism_chain",
+      "development_relevance",
+      "weighing_qualification",
+      "paragraph_function_order",
+      "reference_linking"
+    ],
+    "responseLevels": ["sentence", "paragraph"],
+    "reviewersPerResponse": 2,
+    "disagreementPolicy": "INDEPENDENT_REVIEW_THEN_ADJUDICATION",
+    "providerPolicy": "REAL_PROVIDER_ONLY_NO_MOCK",
+    "passThresholdPolicy": "DECLARE_IN_RUN_BEFORE_MODEL_EXECUTION"
+  },
+  "essayAdjudication": {
+    "source": "tests/benchmarks/v1/essay-samples.json",
+    "requiredEssays": 12,
+    "reviewersPerEssay": 2,
+    "status": "NOT_ADJUDICATED",
+    "purpose": "Future calibration evidence only; no gold bands are asserted by this repository fixture."
+  },
+  "limitations": [
+    "AI-generated IELTS bands are estimates, not official IELTS results.",
+    "A completed run demonstrates performance only for its recorded provider, model, prompt, rubric, and sample version.",
+    "The plan and templates are not evidence that a human review has occurred."
+  ]
+}

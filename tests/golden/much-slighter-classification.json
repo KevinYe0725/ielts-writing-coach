@@ -1,0 +1,18 @@
+{
+  "fixture_id": "01989a00-0000-7001-8000-000000000050",
+  "source": "The pressure from the courses in primary school is much slighter.",
+  "intended_meaning": "Primary-school pupils face less academic pressure than secondary-school students.",
+  "expected": {
+    "primary_skill_id": "collocation_perspective",
+    "issue_type": "collocation_naturalness",
+    "acceptable_explanation_points": [
+      "much can correctly modify a comparative adjective",
+      "slighter pressure is understandable but not the conventional collocation",
+      "the sentence should clarify whether it means pressure, workload, or course demands"
+    ],
+    "must_not_claim": [
+      "much plus a comparative is ungrammatical",
+      "slighter is not a comparative form"
+    ]
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ielts-writing-coach.dev/schemas/skill-evidence-event.schema.json",
+  "title": "SkillEvidenceEvent",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "userId",
+    "skillId",
+    "kind",
+    "outcome",
+    "independent",
+    "firstAttempt",
+    "hintLevel",
+    "confidence",
+    "validForStateTransition",
+    "adjudicationStatus",
+    "contextId",
+    "topicId",
+    "sourceEntityType",
+    "sourceEntityId",
+    "occurredAt"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "id": { "$ref": "common.schema.json#/$defs/NonEmptyId" },
+    "userId": { "$ref": "common.schema.json#/$defs/NonEmptyId" },
+    "skillId": { "$ref": "common.schema.json#/$defs/SkillId" },
+    "objectiveId": { "$ref": "common.schema.json#/$defs/NonEmptyId" },
+    "kind": {
+      "enum": [
+        "DIAGNOSED_ISSUE",
+        "RECOGNITION",
+        "CONTROLLED_REPAIR",
+        "INDEPENDENT_GENERATION",
+        "NEAR_TRANSFER",
+        "INTEGRATED_APPLICATION",
+        "EXIT_TEST",
+        "DELAYED_REWRITE",
+        "CROSS_TOPIC_TRANSFER",
+        "RECURRENCE",
+        "REVIEW"
+      ]
+    },
+    "outcome": { "enum": ["PASS", "FAIL", "NO_OPPORTUNITY"] },
+    "independent": { "type": "boolean" },
+    "firstAttempt": { "type": "boolean" },
+    "hintLevel": {
+      "enum": ["NONE", "KEYWORD", "PARTIAL_FRAME", "FULL_FRAME", "ANSWER_SHOWN"]
+    },
+    "confidence": { "$ref": "common.schema.json#/$defs/Confidence" },
+    "validForStateTransition": { "type": "boolean" },
+    "adjudicationStatus": {
+      "enum": ["ACCEPTED", "DISPUTED", "SUPERSEDED", "PENDING"]
+    },
+    "contextId": { "$ref": "common.schema.json#/$defs/NonEmptyId" },
+    "topicId": { "$ref": "common.schema.json#/$defs/NonEmptyId" },
+    "sourceEntityType": {
+      "enum": ["ESSAY", "EXERCISE", "REWRITE", "TRANSFER"]
+    },
+    "sourceEntityId": { "$ref": "common.schema.json#/$defs/NonEmptyId" },
+    "occurredAt": { "$ref": "common.schema.json#/$defs/IsoDateTime" },
+    "naturalOpportunity": { "type": "boolean" },
+    "targetPrompted": { "type": "boolean" },
+    "unseenSurfaceForm": { "type": "boolean" },
+    "coreErrorRecurred": { "type": "boolean" },
+    "instructionExposureAt": {
+      "$ref": "common.schema.json#/$defs/IsoDateTime"
+    },
+    "prerequisiteSkipped": { "type": "boolean" },
+    "assisted": { "type": "boolean" }
+  }
+}

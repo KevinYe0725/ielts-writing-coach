@@ -1,0 +1,181 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+      - name: Secret scan
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 11.16.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.14.0
+          cache: pnpm
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.13"
+      - run: pnpm install --frozen-lockfile
+      - name: Dependency vulnerability audit
+        run: pnpm security:audit
+      - name: Dependency license policy
+        run: pnpm licenses:check
+      - run: python -m pip install --disable-pip-version-check PyYAML==6.0.3
+      - run: pnpm format:check
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - name: Deterministic v1 benchmark corpus
+        run: pnpm exec vitest run --config tests/quality/vitest.config.ts
+      - run: pnpm skill:validate
+      - name: Validate checked-in fresh-agent Skill evidence
+        run: pnpm skill:forward:validate
+
+  postgres-integration:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17.6-bookworm
+        env:
+          POSTGRES_DB: iwc_test
+          POSTGRES_USER: iwc
+          POSTGRES_PASSWORD: iwc_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U iwc -d iwc_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://iwc:iwc_test@127.0.0.1:5432/iwc_test
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 11.16.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.14.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:migrate
+      - run: pnpm --filter @iwc/db test
+      - name: Worker PostgreSQL crash, lease, and idempotency tests
+        run: pnpm --filter @iwc/worker test
+      - name: Web PostgreSQL integration tests
+        run: pnpm --filter @iwc/web test
+
+  e2e:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      NEXT_PUBLIC_DEMO_MODE: "true"
+      PLAYWRIGHT_BASE_URL: http://127.0.0.1:3201
+      IWC_E2E_PROVIDER: mock
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 11.16.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.14.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium firefox webkit
+      - run: pnpm test:e2e
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report
+          retention-days: 7
+
+  docker:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      COMPOSE_PROJECT_NAME: iwc-ci
+      IWC_IMAGE: ielts-writing-coach:ci
+      IWC_PORT: 3100
+      IWC_POSTGRES_PORT: 55434
+      APP_URL: http://127.0.0.1:3100
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 11.16.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.14.0
+          cache: pnpm
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: docker compose config --quiet
+      - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        with:
+          context: .
+          push: false
+          load: true
+          tags: ielts-writing-coach:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - run: docker inspect ielts-writing-coach:ci --format '{{.Config.User}}' | grep -qx iwc
+      - name: Compose smoke test
+        run: |
+          docker compose up -d --no-build --wait --wait-timeout 180
+          curl --fail --show-error --silent http://127.0.0.1:3100/api/v1/health/ready
+          test "$(docker inspect iwc-ci-web-1 --format '{{.Config.User}}')" = iwc
+          test "$(docker inspect iwc-ci-worker-1 --format '{{.Config.User}}')" = iwc
+          secrets_volume="$(docker volume ls \
+            --filter 'label=com.docker.compose.project=iwc-ci' \
+            --filter 'label=com.docker.compose.volume=iwc_secrets' \
+            --format '{{.Name}}' | head -n 1)"
+          test -n "${secrets_volume}"
+          setup_token="$(docker run --rm \
+            -v "${secrets_volume}:/run/iwc-secrets:ro" \
+            ielts-writing-coach:ci \
+            node -e "process.stdout.write(require('node:fs').readFileSync('/run/iwc-secrets/setup_token','utf8').trim())")"
+          test -n "${setup_token}"
+          echo "::add-mask::${setup_token}"
+          IWC_COMPOSE_FULL_E2E=true \
+            IWC_E2E_SETUP_TOKEN="${setup_token}" \
+            PLAYWRIGHT_BASE_URL=http://127.0.0.1:3100 \
+            pnpm exec playwright test --config tests/deployment/playwright.compose.config.ts
+          unset setup_token
+      - name: Compose smoke logs on failure
+        if: failure()
+        # bootstrap logs contain the still-valid one-time setup token before
+        # the browser journey consumes it, so never copy them into public CI.
+        run: docker compose logs --no-color web worker migrate postgres
+      - name: Compose smoke cleanup
+        if: always()
+        run: docker compose down --volumes --remove-orphans
+      - name: Isolated backup and clean-instance restore gate
+        if: success()
+        env:
+          IWC_RECOVERY_IMAGE: ielts-writing-coach:ci
+        run: scripts/verify-compose-backup-restore.sh

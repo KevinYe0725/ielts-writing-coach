@@ -1,0 +1,24 @@
+{
+  "name": "@iwc/ai",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./crypto": "./src/crypto.ts",
+    "./ssrf": "./src/ssrf.ts"
+  },
+  "scripts": {
+    "lint": "eslint src",
+    "test": "vitest run --root ../.. packages/ai/src",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "ajv": "catalog:",
+    "openai": "7.4.0",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}
