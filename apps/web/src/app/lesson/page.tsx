@@ -145,7 +145,8 @@ export default function LessonPage({
       ? runtimeOverride
       : (data?.runtime ?? null);
   const movedToFollowUp =
-    data?.remediationActive === true || result?.remediationActive === true;
+    attempts >= 2 &&
+    (data?.remediationActive === true || result?.remediationActive === true);
   const accepted =
     result?.outcome === "PASS" ||
     result?.outcome === "NEUTRAL" ||
