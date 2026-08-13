@@ -40,6 +40,7 @@ openssl rand -base64 24  # SETUP_TOKEN
 | `SETUP_TOKEN`                | required for first setup | no           | one-time owner-creation credential                           |
 | `DEPLOYMENT_MODE`            | required                 | recommended  | `personal` or `shared`                                       |
 | `WORKER_MODE`                | `standalone`             | `standalone` | cloud deployments use the separate Worker                    |
+| `PORT`                       | `3000`                   | no           | pins Web to the Railway HTTP proxy port                      |
 | `WEB_REPLICAS`               | required                 | no           | start with `1`                                               |
 | `TRUST_PROXY_HOPS`           | public deployments       | no           | sanitized ingress hops; `0` ignores all forwarding headers   |
 | `OPENAI_API_KEY`             | optional                 | optional     | required on both services only for environment-key routing   |
@@ -85,6 +86,10 @@ Do not use `latest` for data-bearing deployments. Do not run `docker compose dow
 
 Railway uses one managed PostgreSQL service and two services connected to this repository. The project is a shared monorepo, so keep the repository root as the build context.
 
+The shortest supported path is the tested [IELTS Writing Coach Railway template](https://railway.com/deploy/n6tTY8). It creates PostgreSQL 17 and separate Web and Worker services with cross-service references, generated secrets, `PORT=3000`, and a public Web proxy already configured. Review the generated variables before deploying; Railway usage and billing remain the operator's responsibility.
+
+For a manual deployment:
+
 1. Create a Railway project and add PostgreSQL.
 2. Add a `Web` service from this repository. Set its custom config-as-code path to `/railway.web.toml`.
 3. Add a `Worker` service from the same repository. Set its custom config-as-code path to `/railway.worker.toml`.
@@ -121,10 +126,12 @@ curl --fail https://YOUR_DOMAIN/api/v1/health/ready
 
 Check that Web has one healthy instance, Worker remains running without restart loops, and both resolve the same database. Then complete `/setup?token=YOUR_SETUP_TOKEN` and run the provider connection test in the UI.
 
-Railway's Web health check targets `/api/v1/health/ready`, so a deployment does
-not become healthy from HTTP liveness alone: its migration lineage and the
-separately deployed same-version Worker heartbeat must both be current within
-the configured health-check timeout.
+Railway's platform health check targets `/api/v1/health/live`. This avoids a
+first-deployment deadlock on workspaces that serialize Web and Worker builds:
+the platform can finish Web before starting Worker. This liveness probe is only
+the platform startup gate. The deployment is not accepted until the public
+`/api/v1/health/ready` check also reports current migrations, database access,
+valid configuration, and a fresh same-version Worker heartbeat.
 
 ## Render — community example
 

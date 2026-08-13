@@ -106,6 +106,11 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for test scope, privacy rules, contract
 | Railway        | Tier 1                         | [`railway.web.toml`](./railway.web.toml) and [`railway.worker.toml`](./railway.worker.toml) |
 | Render         | Community example, best effort | [`render.yaml`](./render.yaml)                                                              |
 
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/n6tTY8)
+
+The Railway template creates PostgreSQL 17 plus separate Web and Worker services. It was
+validated against the public `/api/v1/health/ready` endpoint before this link was added.
+
 Tier 1 means that the project treats documentation and configuration regressions for that target as release-blocking. It does not imply a hosting SLA. The Render Blueprint is a community-maintained starting point: plans, platform behavior, migration sequencing, backups, and costs must be reviewed by the operator.
 
 Read the [deployment guide](./docs/deployment.md) before deploying to Railway or Render. It documents the required service topology, shared secrets, migration ordering, and platform-specific verification.

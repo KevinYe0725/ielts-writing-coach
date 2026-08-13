@@ -97,6 +97,11 @@ pnpm skill:forward:validate
 | Railway        | Tier 1             | [`railway.web.toml`](./railway.web.toml) 与 [`railway.worker.toml`](./railway.worker.toml) |
 | Render         | 社区示例，尽力维护 | [`render.yaml`](./render.yaml)                                                             |
 
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/n6tTY8)
+
+Railway 模板会创建 PostgreSQL 17、独立 Web 和独立 Worker。加入此链接前，已用公网
+`/api/v1/health/ready` 完成真实部署验收。
+
 Tier 1 表示该目标的文档或配置回归会阻塞项目发布，但不代表项目提供托管 SLA。Render Blueprint 只是社区维护的起点；套餐、平台行为、数据库迁移顺序、备份方式和费用均需部署者自行复核。
 
 部署到 Railway 或 Render 前，请阅读[部署指南](./docs/deployment.md)，其中列出了服务拓扑、共享密钥、迁移顺序和平台专项验证方法。
