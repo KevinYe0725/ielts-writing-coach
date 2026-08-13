@@ -327,7 +327,7 @@ describe.skipIf(!databaseUrl)(
       const conflictPath = join(root, "skill-conflict.json");
       writeFileSync(conflictPath, JSON.stringify(conflicting));
       const failed = spawnSync(
-        "python3.11",
+        skillPython,
         [
           skillScript,
           "import-bundle",
