@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./provider-catalog": "./src/provider-catalog.ts",
     "./crypto": "./src/crypto.ts",
     "./ssrf": "./src/ssrf.ts"
   },

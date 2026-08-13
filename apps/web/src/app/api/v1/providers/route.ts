@@ -5,6 +5,7 @@ import {
   createProviderAdapter,
   encryptProviderSecret,
   parseMasterKey,
+  providerVendorIds,
   validateProviderBaseUrl,
 } from "@iwc/ai";
 import { localModelAllowlist, sessionOnlyProviderAllowed } from "@iwc/config";
@@ -12,6 +13,10 @@ import { auditEvent, newDomainId, providerConnection, user } from "@iwc/db";
 
 import { getServerContext } from "@/lib/server/context";
 import { ApiProblem, apiRoute } from "@/lib/server/problem";
+import {
+  providerNeedsApiKey,
+  resolveProviderConfig,
+} from "@/lib/server/provider-config";
 import { parseJsonBody } from "@/lib/server/request";
 import { requireRole, requireSession } from "@/lib/server/session";
 import { setSessionProviderSecret } from "@/lib/server/session-secrets";
@@ -26,7 +31,8 @@ import {
 const providerSchema = z
   .object({
     name: z.string().trim().min(1).max(80),
-    kind: z.enum(["openai", "compatible", "mock"]),
+    kind: z.enum(["openai", "compatible", "mock"]).optional(),
+    vendor: z.enum(providerVendorIds).optional(),
     base_url: z.url().optional(),
     api_key: z.string().max(2_000).optional(),
     secret_mode: z.enum(["encrypted", "session_only"]).default("encrypted"),
@@ -56,6 +62,7 @@ export const GET = apiRoute(async (request) => {
       id: providerConnection.id,
       name: providerConnection.name,
       kind: providerConnection.kind,
+      vendor: providerConnection.vendor,
       baseUrl: providerConnection.baseUrl,
       secretMode: providerConnection.secretMode,
       enabled: providerConnection.enabled,
@@ -77,6 +84,7 @@ export const GET = apiRoute(async (request) => {
           id: "environment-openai",
           name: "OpenAI (environment)",
           kind: "openai",
+          vendor: "openai",
           baseUrl: null,
           secretMode: "environment",
           enabled: true,
@@ -114,15 +122,15 @@ export const POST = apiRoute(async (request) => {
   );
   if (reservation.replay) return reservation.replay;
   try {
-    if (payload.kind === "compatible" && !payload.base_url) {
-      throw new ApiProblem({
-        title: "Base URL required",
-        status: 422,
-        code: "BASE_URL_REQUIRED",
-        detail: "OpenAI-compatible providers require a base URL.",
-      });
-    }
-    if (payload.kind !== "mock" && !payload.api_key) {
+    const resolved = resolveProviderConfig({
+      vendor: payload.vendor,
+      kind: payload.kind,
+      baseUrl: payload.base_url,
+      apiKey: payload.api_key,
+      model: payload.test_model,
+      localBaseUrlAllowlist: localModelAllowlist(environment),
+    });
+    if (providerNeedsApiKey(resolved.vendor) && !payload.api_key) {
       throw new ApiProblem({
         title: "API key required",
         status: 422,
@@ -147,16 +155,12 @@ export const POST = apiRoute(async (request) => {
           "Session-only keys require personal mode, one Web replica, and the embedded executor.",
       });
     }
-    if (payload.base_url)
+    if (resolved.credentials.baseUrl)
       await validateProviderBaseUrl(
-        payload.base_url,
+        resolved.credentials.baseUrl,
         localModelAllowlist(environment),
       );
-    const adapter = createProviderAdapter(payload.kind, {
-      ...(payload.api_key === undefined ? {} : { apiKey: payload.api_key }),
-      ...(payload.base_url === undefined ? {} : { baseUrl: payload.base_url }),
-      localBaseUrlAllowlist: localModelAllowlist(environment),
-    });
+    const adapter = createProviderAdapter(resolved.kind, resolved.credentials);
     const validation = await adapter.validateConnection();
     if (!validation.ok) {
       throw new ApiProblem({
@@ -192,9 +196,12 @@ export const POST = apiRoute(async (request) => {
     const connectionValues: typeof providerConnection.$inferInsert = {
       id,
       ownerId: actor.id,
-      name: payload.name,
-      kind: payload.kind,
-      ...(payload.base_url === undefined ? {} : { baseUrl: payload.base_url }),
+      name: resolved.preset.label,
+      kind: resolved.kind,
+      vendor: resolved.vendor,
+      ...(resolved.credentials.baseUrl === undefined
+        ? {}
+        : { baseUrl: resolved.credentials.baseUrl }),
       secretMode: payload.secret_mode,
       ...(encrypted === undefined
         ? {}
@@ -211,9 +218,10 @@ export const POST = apiRoute(async (request) => {
     const responseBody = {
       provider: {
         id,
-        name: payload.name,
-        kind: payload.kind,
-        base_url: payload.base_url ?? null,
+        name: resolved.preset.label,
+        kind: resolved.kind,
+        vendor: resolved.vendor,
+        base_url: resolved.credentials.baseUrl ?? null,
         secret_mode: payload.secret_mode,
         tested: true,
         capabilities: capabilities ?? null,
@@ -227,7 +235,11 @@ export const POST = apiRoute(async (request) => {
         targetType: "provider_connection",
         targetId: id,
         result: "success",
-        metadata: { kind: payload.kind, secretMode: payload.secret_mode },
+        metadata: {
+          kind: resolved.kind,
+          vendor: resolved.vendor,
+          secretMode: payload.secret_mode,
+        },
       });
       await completeIdempotentResponse(
         transaction,

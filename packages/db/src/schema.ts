@@ -221,6 +221,8 @@ export const providerConnection = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     kind: providerKind("kind").notNull(),
+    /** Product-facing preset ID; transport protocol remains in `kind`. */
+    vendor: text("vendor").notNull().default("custom"),
     baseUrl: text("base_url"),
     secretMode: providerSecretMode("secret_mode").notNull(),
     secretCiphertext: text("secret_ciphertext"),

@@ -25,6 +25,12 @@ export function createProviderAdapter(
         ...(credentials.localBaseUrlAllowlist === undefined
           ? {}
           : { localBaseUrlAllowlist: credentials.localBaseUrlAllowlist }),
+        ...(credentials.authHeader === undefined
+          ? {}
+          : { authHeader: credentials.authHeader }),
+        ...(credentials.validationModel === undefined
+          ? {}
+          : { validationModel: credentials.validationModel }),
       });
     case "mock":
       return new MockAdapter();
@@ -36,6 +42,7 @@ export * from "./crypto";
 export * from "./errors";
 export * from "./mock";
 export * from "./openai";
+export * from "./provider-catalog";
 export * from "./prompts";
 export * from "./session-secrets";
 export * from "./ssrf";

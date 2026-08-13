@@ -267,7 +267,7 @@ describe("supported Compose operator commands", () => {
       JSON.stringify({
         createdAt: "2026-08-13T12:00:00.000Z",
         applicationVersion: "1.0.0",
-        databaseSchemaVersion: "0008_flowery_red_ghost",
+        databaseSchemaVersion: "0009_sharp_maddog",
         database: {
           name: "iwc",
           sizeBytes: 1,

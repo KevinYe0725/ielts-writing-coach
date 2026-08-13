@@ -6,6 +6,7 @@ import {
 } from "./errors";
 import type {
   AiConnection,
+  AiConnectionInput,
   AttemptSubmission,
   AttemptData,
   BandScore,
@@ -307,6 +308,7 @@ interface ProviderWire extends JsonRecord {
   enabled?: boolean;
   id?: string;
   kind?: AiConnection["provider"];
+  vendor?: AiConnection["vendor"];
   lastTestedAt?: string | null;
   name?: string;
   secretMode?: string;
@@ -746,6 +748,7 @@ function mapProvider(provider: ProviderWire | undefined): AiConnection {
     return {
       id: "missing",
       provider: "openai",
+      vendor: "openai",
       displayName: "尚未连接",
       baseUrl: "",
       model: "—",
@@ -763,6 +766,13 @@ function mapProvider(provider: ProviderWire | undefined): AiConnection {
   return {
     id: provider.id ?? "environment-openai",
     provider: provider.kind ?? "openai",
+    vendor:
+      provider.vendor ??
+      (provider.kind === "mock"
+        ? "mock"
+        : provider.kind === "compatible"
+          ? "custom"
+          : "openai"),
     displayName: provider.name ?? "OpenAI",
     baseUrl:
       provider.baseUrl ?? provider.base_url ?? "https://api.openai.com/v1",
@@ -3139,8 +3149,9 @@ export class HttpLearningClient implements LearningClient {
         body: {
           ...(status.data.setup_required ? { setup_token: setupToken } : {}),
           api_key: input.apiKey || undefined,
-          base_url: input.provider === "compatible" ? input.baseUrl : undefined,
+          base_url: input.baseUrl || undefined,
           kind: input.provider ?? "openai",
+          vendor: input.providerVendor,
           model: input.model,
         },
         idempotent: true,
@@ -3221,9 +3232,10 @@ export class HttpLearningClient implements LearningClient {
     }>("/providers", {
       body: {
         api_key: input.apiKey || undefined,
-        base_url: input.provider === "compatible" ? input.baseUrl : undefined,
+        base_url: input.baseUrl || undefined,
         kind: input.provider,
-        name: input.provider === "openai" ? "OpenAI" : "IELTS Writing AI",
+        vendor: input.providerVendor,
+        name: input.providerVendor,
         secret_mode:
           input.secretSource === "session" ? "session_only" : "encrypted",
         test_model: input.model,
@@ -3252,6 +3264,51 @@ export class HttpLearningClient implements LearningClient {
         method: "PUT",
       });
     }
+  }
+
+  async configureAiConnection(input: AiConnectionInput): Promise<void> {
+    const provider = await this.request<{ provider?: { id?: string } }>(
+      "/providers",
+      {
+        body: {
+          api_key: input.apiKey || undefined,
+          base_url: input.baseUrl || undefined,
+          kind: input.provider,
+          vendor: input.providerVendor,
+          name: input.providerVendor,
+          secret_mode:
+            input.secretSource === "session" ? "session_only" : "encrypted",
+          test_model: input.model,
+        },
+        idempotent: true,
+        method: "POST",
+      },
+    );
+    const providerId = provider.data.provider?.id;
+    if (!providerId)
+      throw new LearningClientError(
+        "The server did not return the saved provider connection.",
+        { status: 502, code: "PROVIDER_SAVE_UNCONFIRMED" },
+      );
+    await this.request("/model-routes", {
+      body: {
+        fallback_enabled: false,
+        model: input.model,
+        provider_connection_id: providerId,
+        tasks: [
+          "ielts_assessment",
+          "issue_classification",
+          "objective_prioritization",
+          "exercise_generation",
+          "open_sentence_evaluation",
+          "paragraph_evaluation",
+          "version_comparison",
+          "transfer_evaluation",
+        ],
+      },
+      idempotent: true,
+      method: "PUT",
+    });
   }
 
   async deleteAiConnection(connectionId: string): Promise<void> {

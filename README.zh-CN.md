@@ -47,7 +47,7 @@ docker compose logs bootstrap
 curl --fail http://127.0.0.1:3000/api/v1/health/ready
 ```
 
-首次创建密钥卷时，`bootstrap` 日志会输出一次性初始化令牌。打开 `http://127.0.0.1:3000/setup?token=YOUR_TOKEN`，创建所有者账号并配置 AI 服务。应用不会把已经保存的 AI provider 密钥发送到浏览器端代码。
+首次创建密钥卷时，`bootstrap` 日志会输出一次性初始化令牌。打开 `http://127.0.0.1:3000/setup?token=YOUR_TOKEN`，创建所有者账号并配置 AI 服务。内置预设覆盖 OpenAI、Claude、Gemini、DeepSeek、通义千问、Kimi、智谱 GLM、MiniMax、Mistral、xAI、Groq、OpenRouter、Together、Fireworks、Perplexity、硅基流动、NVIDIA NIM、Cerebras、Azure OpenAI、Ollama 与 LM Studio，并保留精确 API 根地址的自定义 OpenAI-compatible 选项。每个指定模型必须先通过能力探测，才能成为评分路由。应用不会把已经保存的 AI provider 密钥发送到浏览器端代码。
 
 自动生成的认证密钥、加密密钥和初始化令牌保存在 `iwc_secrets` Docker 卷中。必须将该卷与数据库一起备份；丢失加密密钥会导致已经持久化的 provider 凭据无法解密。存入真实学习数据前，请先阅读[备份与恢复手册](./docs/operations/backup-restore.md)。
 

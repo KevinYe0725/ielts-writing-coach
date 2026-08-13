@@ -4,7 +4,9 @@ import { z } from "zod";
 import {
   createProviderAdapter,
   encryptProviderSecret,
+  inferProviderVendor,
   parseMasterKey,
+  providerCredentialsForPreset,
 } from "@iwc/ai";
 import { localModelAllowlist, sessionOnlyProviderAllowed } from "@iwc/config";
 import { auditEvent, providerConnection, user } from "@iwc/db";
@@ -114,11 +116,19 @@ export const PATCH = apiRoute(
             "Session-only keys require personal mode, one Web replica, and the embedded executor.",
         });
       }
-      const adapter = createProviderAdapter(connection.kind, {
+      const resolved = providerCredentialsForPreset({
+        vendor: inferProviderVendor(connection.kind, connection.vendor),
         apiKey: payload.api_key,
         ...(connection.baseUrl === null ? {} : { baseUrl: connection.baseUrl }),
         localBaseUrlAllowlist: localModelAllowlist(environment),
+        ...(payload.test_model === undefined
+          ? {}
+          : { validationModel: payload.test_model }),
       });
+      const adapter = createProviderAdapter(
+        resolved.kind,
+        resolved.credentials,
+      );
       const validation = await adapter.validateConnection();
       if (!validation.ok) {
         throw new ApiProblem({
@@ -158,6 +168,7 @@ export const PATCH = apiRoute(
           id,
           name: connection.name,
           kind: connection.kind,
+          vendor: inferProviderVendor(connection.kind, connection.vendor),
           base_url: connection.baseUrl,
           secret_mode: payload.secret_mode,
           tested: true,

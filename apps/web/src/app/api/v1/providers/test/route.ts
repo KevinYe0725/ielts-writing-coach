@@ -1,17 +1,26 @@
 import { z } from "zod";
 
-import { createProviderAdapter, validateProviderBaseUrl } from "@iwc/ai";
+import {
+  createProviderAdapter,
+  providerVendorIds,
+  validateProviderBaseUrl,
+} from "@iwc/ai";
 import { localModelAllowlist } from "@iwc/config";
 
 import { getServerContext } from "@/lib/server/context";
 import { ApiProblem, apiRoute } from "@/lib/server/problem";
+import {
+  providerNeedsApiKey,
+  resolveProviderConfig,
+} from "@/lib/server/provider-config";
 import { parseJsonBody } from "@/lib/server/request";
 import { requireRole, requireSession } from "@/lib/server/session";
 import { enforceRateLimit, protectMutation } from "@/lib/server/security";
 
 const testSchema = z
   .object({
-    kind: z.enum(["openai", "compatible", "mock"]),
+    kind: z.enum(["openai", "compatible", "mock"]).optional(),
+    vendor: z.enum(providerVendorIds).optional(),
     api_key: z.string().max(2_000).optional(),
     base_url: z.url().optional(),
     model: z.string().trim().min(1).max(200).optional(),
@@ -32,15 +41,15 @@ export const POST = apiRoute(async (request) => {
     maximumBytes: 8 * 1_024,
   });
   const { environment } = getServerContext();
-  if (payload.kind === "compatible" && !payload.base_url) {
-    throw new ApiProblem({
-      title: "Base URL required",
-      status: 422,
-      code: "BASE_URL_REQUIRED",
-      detail: "A compatible provider requires a base URL.",
-    });
-  }
-  if (payload.kind !== "mock" && !payload.api_key) {
+  const resolved = resolveProviderConfig({
+    vendor: payload.vendor,
+    kind: payload.kind,
+    baseUrl: payload.base_url,
+    apiKey: payload.api_key,
+    model: payload.model,
+    localBaseUrlAllowlist: localModelAllowlist(environment),
+  });
+  if (providerNeedsApiKey(resolved.vendor) && !payload.api_key) {
     throw new ApiProblem({
       title: "API key required",
       status: 422,
@@ -48,16 +57,12 @@ export const POST = apiRoute(async (request) => {
       detail: "Testing a new provider requires the complete API key.",
     });
   }
-  if (payload.base_url)
+  if (resolved.credentials.baseUrl)
     await validateProviderBaseUrl(
-      payload.base_url,
+      resolved.credentials.baseUrl,
       localModelAllowlist(environment),
     );
-  const adapter = createProviderAdapter(payload.kind, {
-    ...(payload.api_key === undefined ? {} : { apiKey: payload.api_key }),
-    ...(payload.base_url === undefined ? {} : { baseUrl: payload.base_url }),
-    localBaseUrlAllowlist: localModelAllowlist(environment),
-  });
+  const adapter = createProviderAdapter(resolved.kind, resolved.credentials);
   const validation = await adapter.validateConnection();
   if (!validation.ok) {
     throw new ApiProblem({

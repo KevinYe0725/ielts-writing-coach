@@ -21,6 +21,12 @@ import {
   UserRound,
 } from "lucide-react";
 
+import {
+  getProviderPreset,
+  providerCatalog,
+  type ProviderVendor,
+} from "@iwc/ai/provider-catalog";
+
 import { useLocale } from "@/components/locale-provider";
 import {
   Badge,
@@ -167,6 +173,7 @@ export default function SettingsPage() {
       setProbe(
         await learningClient.testConnection({
           provider: data.ai.provider,
+          providerVendor: data.ai.vendor,
           baseUrl: data.ai.baseUrl,
           model: data.ai.model,
           apiKey: newKey,
@@ -1107,6 +1114,62 @@ function AiSettings({
   const [deleteConnectionMessage, setDeleteConnectionMessage] = useState<
     string | null
   >(null);
+  const [showAddConnection, setShowAddConnection] = useState(
+    data.ai.id === "missing",
+  );
+  const [newVendor, setNewVendor] = useState<ProviderVendor>("deepseek");
+  const initialNewPreset = getProviderPreset("deepseek");
+  const [newProviderModel, setNewProviderModel] = useState(
+    initialNewPreset.defaultModel,
+  );
+  const [newProviderBaseUrl, setNewProviderBaseUrl] = useState(
+    initialNewPreset.baseUrl ?? "",
+  );
+  const [newProviderKey, setNewProviderKey] = useState("");
+  const [savingProvider, setSavingProvider] = useState(false);
+  const [providerMessage, setProviderMessage] = useState<string | null>(null);
+  const newProviderPreset = getProviderPreset(newVendor);
+
+  const selectNewVendor = (vendor: ProviderVendor) => {
+    const preset = getProviderPreset(vendor);
+    setNewVendor(vendor);
+    setNewProviderModel(preset.defaultModel);
+    setNewProviderBaseUrl(preset.baseUrl ?? "");
+    if (vendor === "mock") setNewProviderKey("");
+    setProviderMessage(null);
+  };
+
+  const saveNewProvider = async () => {
+    setSavingProvider(true);
+    setProviderMessage(null);
+    try {
+      await learningClient.configureAiConnection({
+        provider: newProviderPreset.kind,
+        providerVendor: newVendor,
+        baseUrl: newProviderBaseUrl,
+        apiKey: newProviderKey,
+        model: newProviderModel,
+        secretSource: "encrypted",
+      });
+      setProviderMessage(
+        text(
+          "连接已通过能力测试并设为八类任务的默认服务。",
+          "The connection passed capability testing and is now the default for all eight task types.",
+        ),
+      );
+      setNewProviderKey("");
+      setShowAddConnection(false);
+      onRefresh();
+    } catch (error) {
+      setProviderMessage(
+        error instanceof Error
+          ? error.message
+          : text("连接无法保存。", "The connection could not be saved."),
+      );
+    } finally {
+      setSavingProvider(false);
+    }
+  };
 
   const deleteCurrentConnection = async () => {
     const confirmed = window.confirm(
@@ -1337,6 +1400,160 @@ function AiSettings({
                 ? `${probe.latencyMs} ms`
                 : text("请检查密钥与模型", "Check the key and model")}
             </span>
+          </div>
+        ) : null}
+        <div className="settings-divider" />
+        <div className="inline-actions">
+          <Button
+            onClick={() => setShowAddConnection((current) => !current)}
+            variant="secondary"
+          >
+            <Cloud aria-hidden="true" size={16} />
+            {showAddConnection
+              ? text("收起新增连接", "Close new connection")
+              : text("新增或切换 AI 服务", "Add or switch AI service")}
+          </Button>
+        </div>
+        {showAddConnection ? (
+          <div className="replace-key-form">
+            <div className="form-grid">
+              <div className="form-field form-field-wide">
+                <label htmlFor="new-provider-vendor">
+                  {text("服务商预设", "Provider preset")}
+                </label>
+                <select
+                  className="select-input"
+                  id="new-provider-vendor"
+                  onChange={(event) =>
+                    selectNewVendor(event.target.value as ProviderVendor)
+                  }
+                  value={newVendor}
+                >
+                  <optgroup label={text("全球主流服务", "Global providers")}>
+                    {providerCatalog
+                      .filter((preset) => preset.region === "global")
+                      .map((preset) => (
+                        <option key={preset.id} value={preset.id}>
+                          {text(preset.labelZh, preset.label)}
+                        </option>
+                      ))}
+                  </optgroup>
+                  <optgroup label={text("中国大陆服务", "China providers")}>
+                    {providerCatalog
+                      .filter((preset) => preset.region === "china")
+                      .map((preset) => (
+                        <option key={preset.id} value={preset.id}>
+                          {text(preset.labelZh, preset.label)}
+                        </option>
+                      ))}
+                  </optgroup>
+                  <optgroup
+                    label={text(
+                      "企业、自建与本地",
+                      "Enterprise, custom & local",
+                    )}
+                  >
+                    {providerCatalog
+                      .filter(
+                        (preset) =>
+                          ["custom", "local"].includes(preset.region) &&
+                          preset.id !== "mock",
+                      )
+                      .map((preset) => (
+                        <option key={preset.id} value={preset.id}>
+                          {text(preset.labelZh, preset.label)}
+                        </option>
+                      ))}
+                  </optgroup>
+                  <option value="mock">
+                    {text("Mock（仅演示）", "Mock (demo only)")}
+                  </option>
+                </select>
+                <p className="field-hint">
+                  {text(
+                    newProviderPreset.compatibilityNoteZh,
+                    newProviderPreset.compatibilityNoteEn,
+                  )}
+                </p>
+              </div>
+              <div className="form-field">
+                <label htmlFor="new-provider-model">
+                  {text("模型 ID", "Model ID")}
+                </label>
+                <input
+                  className="text-input"
+                  id="new-provider-model"
+                  onChange={(event) => setNewProviderModel(event.target.value)}
+                  spellCheck={false}
+                  value={newProviderModel}
+                />
+              </div>
+              {newProviderPreset.configurableBaseUrl ? (
+                <div className="form-field form-field-wide">
+                  <label htmlFor="new-provider-base-url">Base URL</label>
+                  <input
+                    className="text-input"
+                    id="new-provider-base-url"
+                    onChange={(event) =>
+                      setNewProviderBaseUrl(event.target.value)
+                    }
+                    type="url"
+                    value={newProviderBaseUrl}
+                  />
+                  <p className="field-hint">
+                    {text(
+                      "必须是精确 API 根地址。本地/私网地址只有进入管理员 allowlist 后才可访问。",
+                      "Use the exact API root. Local or private URLs work only after the operator adds them to the allowlist.",
+                    )}
+                  </p>
+                </div>
+              ) : null}
+              {newVendor !== "mock" ? (
+                <div className="form-field form-field-wide">
+                  <label htmlFor="new-provider-api-key">API Key</label>
+                  <div className="input-with-icon">
+                    <KeyRound aria-hidden="true" size={16} />
+                    <input
+                      autoComplete="off"
+                      className="text-input"
+                      id="new-provider-api-key"
+                      onChange={(event) =>
+                        setNewProviderKey(event.target.value)
+                      }
+                      placeholder={newProviderPreset.apiKeyPlaceholder}
+                      spellCheck={false}
+                      type="password"
+                      value={newProviderKey}
+                    />
+                  </div>
+                </div>
+              ) : null}
+            </div>
+            <div className="inline-actions">
+              <Button
+                disabled={
+                  savingProvider ||
+                  !newProviderModel.trim() ||
+                  (newVendor !== "mock" &&
+                    !["ollama", "lm_studio", "custom"].includes(newVendor) &&
+                    !newProviderKey)
+                }
+                onClick={() => void saveNewProvider()}
+              >
+                {savingProvider ? (
+                  <LoadingButtonContent
+                    label={text("正在测试并保存…", "Testing and saving…")}
+                  />
+                ) : (
+                  text("测试并设为默认", "Test and set as default")
+                )}
+              </Button>
+            </div>
+            {providerMessage ? (
+              <p aria-live="polite" className="field-hint">
+                {providerMessage}
+              </p>
+            ) : null}
           </div>
         ) : null}
       </Card>

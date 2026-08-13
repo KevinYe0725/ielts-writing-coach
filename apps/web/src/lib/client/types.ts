@@ -1,3 +1,5 @@
+import type { ProviderVendor } from "@iwc/ai/provider-catalog";
+
 export type Locale = "zh-CN" | "en";
 
 export type DeploymentMode = "personal" | "shared";
@@ -570,6 +572,7 @@ export interface UserPreferences {
 export interface AiConnection {
   id: string;
   provider: "openai" | "compatible" | "mock";
+  vendor: ProviderVendor;
   displayName: string;
   baseUrl: string;
   model: string;
@@ -627,6 +630,7 @@ export interface BootstrapInput {
   email: string;
   password: string;
   provider: AiConnection["provider"];
+  providerVendor: ProviderVendor;
   baseUrl: string;
   apiKey: string;
   model: string;
@@ -640,6 +644,15 @@ export interface BootstrapInput {
   configureAi?: boolean;
   /** Populated by setup status; session storage is never assumed from mode alone. */
   sessionOnlyAvailable?: boolean;
+}
+
+export interface AiConnectionInput {
+  provider: AiConnection["provider"];
+  providerVendor: ProviderVendor;
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  secretSource: "encrypted" | "session";
 }
 
 export interface ConnectionProbe {
@@ -715,6 +728,7 @@ export interface LearningClient {
   deleteLearningData(): Promise<void>;
   testConnection(input: Partial<BootstrapInput>): Promise<ConnectionProbe>;
   completeBootstrap(input: BootstrapInput): Promise<void>;
+  configureAiConnection(input: AiConnectionInput): Promise<void>;
   deleteAiConnection(connectionId: string): Promise<void>;
   getSystemStatus(): Promise<SystemStatus>;
 }

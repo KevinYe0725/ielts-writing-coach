@@ -1,5 +1,6 @@
 import type {
   AiConnection,
+  AiConnectionInput,
   AiTaskKind,
   AttemptData,
   AttemptSubmission,
@@ -107,6 +108,7 @@ const mockTransferResult = (): TransferResult => ({
 const connectedAi: AiConnection = {
   id: "connection-primary",
   provider: "openai",
+  vendor: "openai",
   displayName: "OpenAI",
   baseUrl: "https://api.openai.com/v1",
   model: "gpt-5.4-mini",
@@ -1332,6 +1334,14 @@ export class MockLearningClient implements LearningClient {
   async completeBootstrap(_input: BootstrapInput): Promise<void> {
     await delay(280);
     writeStorage(STORAGE_KEYS.ai, "true");
+  }
+
+  async configureAiConnection(input: AiConnectionInput): Promise<void> {
+    connectedAi.provider = input.provider;
+    connectedAi.vendor = input.providerVendor;
+    connectedAi.baseUrl = input.baseUrl;
+    connectedAi.model = input.model;
+    connectedAi.displayName = input.providerVendor;
   }
 
   async deleteAiConnection(connectionId: string): Promise<void> {

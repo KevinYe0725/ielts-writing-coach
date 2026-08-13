@@ -3,7 +3,10 @@ import { eq } from "drizzle-orm";
 import {
   createProviderAdapter,
   decryptProviderSecret,
+  inferProviderVendor,
   parseMasterKey,
+  providerCredentialsForPreset,
+  providerPresetNeedsApiKey,
   type AIProviderAdapter,
 } from "@iwc/ai";
 import { localModelAllowlist } from "@iwc/config";
@@ -89,12 +92,31 @@ export async function adapterForConnection(
   }
   if (connection.kind === "mock") return createProviderAdapter("mock", {});
   if (connection.secretMode === "encrypted") {
-    if (
-      !environment.APP_ENCRYPTION_KEY ||
-      !connection.secretCiphertext ||
-      !connection.secretNonce ||
-      !connection.keyVersion
-    ) {
+    const vendor = inferProviderVendor(connection.kind, connection.vendor);
+    const hasEncryptedSecret = Boolean(
+      connection.secretCiphertext &&
+        connection.secretNonce &&
+        connection.keyVersion,
+    );
+    if (hasEncryptedSecret) {
+      if (!environment.APP_ENCRYPTION_KEY)
+        throw new ApiProblem({
+          title: "Provider blocked",
+          status: 409,
+          code: "PROVIDER_SECRET_UNAVAILABLE",
+          detail:
+            "The encrypted provider secret cannot be opened by this instance.",
+        });
+      apiKey = decryptProviderSecret(
+        {
+          ciphertext: connection.secretCiphertext!,
+          nonce: connection.secretNonce!,
+          keyVersion: connection.keyVersion!,
+        },
+        parseMasterKey(environment.APP_ENCRYPTION_KEY),
+        `provider:${connection.ownerId}:${connection.id}`,
+      );
+    } else if (providerPresetNeedsApiKey(vendor))
       throw new ApiProblem({
         title: "Provider blocked",
         status: 409,
@@ -102,19 +124,10 @@ export async function adapterForConnection(
         detail:
           "The encrypted provider secret cannot be opened by this instance.",
       });
-    }
-    apiKey = decryptProviderSecret(
-      {
-        ciphertext: connection.secretCiphertext,
-        nonce: connection.secretNonce,
-        keyVersion: connection.keyVersion,
-      },
-      parseMasterKey(environment.APP_ENCRYPTION_KEY),
-      `provider:${connection.ownerId}:${connection.id}`,
-    );
   } else if (connection.secretMode === "session_only") {
     apiKey = getSessionProviderSecret(connection.id);
-    if (!apiKey) {
+    const vendor = inferProviderVendor(connection.kind, connection.vendor);
+    if (!apiKey && providerPresetNeedsApiKey(vendor)) {
       throw new ApiProblem({
         title: "Session key expired",
         status: 409,
@@ -126,9 +139,11 @@ export async function adapterForConnection(
   } else if (connection.secretMode === "environment") {
     apiKey = environment.OPENAI_API_KEY;
   }
-  return createProviderAdapter(connection.kind, {
+  const resolved = providerCredentialsForPreset({
+    vendor: inferProviderVendor(connection.kind, connection.vendor),
     ...(apiKey === undefined ? {} : { apiKey }),
     ...(connection.baseUrl === null ? {} : { baseUrl: connection.baseUrl }),
     localBaseUrlAllowlist: localModelAllowlist(environment),
   });
+  return createProviderAdapter(resolved.kind, resolved.credentials);
 }

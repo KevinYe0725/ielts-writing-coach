@@ -4,6 +4,10 @@ export interface ProviderCredentials {
   apiKey?: string;
   baseUrl?: string;
   localBaseUrlAllowlist?: readonly string[];
+  /** Selected only by a server-owned preset; custom callers cannot set headers. */
+  authHeader?: "authorization" | "api-key";
+  /** Uses a fixed harmless generation for providers without a models endpoint. */
+  validationModel?: string;
 }
 
 export interface ModelDescriptor {

@@ -48,22 +48,28 @@ export class CompatibleAdapter implements AIProviderAdapter {
   readonly #baseUrl: string;
   readonly #localAllowlist: readonly string[];
   readonly #resolveAddresses: ProviderAddressResolver | undefined;
+  readonly #authHeader: "authorization" | "api-key";
+  readonly #validationModel: string | undefined;
 
   constructor(options: {
     apiKey?: string;
     baseUrl: string;
     localBaseUrlAllowlist?: readonly string[];
     addressResolver?: ProviderAddressResolver;
+    authHeader?: "authorization" | "api-key";
+    validationModel?: string;
   }) {
     this.#apiKey = options.apiKey;
     this.#baseUrl = options.baseUrl;
     this.#localAllowlist = options.localBaseUrlAllowlist ?? [];
     this.#resolveAddresses = options.addressResolver;
+    this.#authHeader = options.authHeader ?? "authorization";
+    this.#validationModel = options.validationModel;
   }
 
   #endpoint(path: "models" | "chat/completions"): string {
     const root = this.#baseUrl.replace(/\/+$/, "");
-    return `${root.endsWith("/v1") ? root : `${root}/v1`}/${path}`;
+    return `${root}/${path}`;
   }
 
   async #request(
@@ -78,7 +84,10 @@ export class CompatibleAdapter implements AIProviderAdapter {
     const headers = new Headers(init.headers);
     headers.set("accept", "application/json");
     if (init.body) headers.set("content-type", "application/json");
-    if (this.#apiKey) headers.set("authorization", `Bearer ${this.#apiKey}`);
+    if (this.#apiKey) {
+      if (this.#authHeader === "api-key") headers.set("api-key", this.#apiKey);
+      else headers.set("authorization", `Bearer ${this.#apiKey}`);
+    }
     const response = await requestPinnedProvider(
       safeBaseUrl,
       new URL(this.#endpoint(path)),
@@ -106,7 +115,14 @@ export class CompatibleAdapter implements AIProviderAdapter {
   ): Promise<ConnectionValidation> {
     const started = performance.now();
     try {
-      await this.listModels(signal);
+      if (this.#validationModel) {
+        await this.generateText({
+          model: this.#validationModel,
+          input: "Reply with OK.",
+          maxOutputTokens: 8,
+          ...(signal === undefined ? {} : { signal }),
+        });
+      } else await this.listModels(signal);
       return {
         ok: true,
         latencyMs: Math.round(performance.now() - started),

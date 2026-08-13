@@ -22,6 +22,37 @@ async function close(server: Server): Promise<void> {
 }
 
 describe("CompatibleAdapter pinned provider requests", () => {
+  it("uses the exact API root and supports a preset-owned api-key header", async () => {
+    let requestedPath: string | undefined;
+    let apiKeyHeader: string | undefined;
+    let authorizationHeader: string | undefined;
+    const server = createServer((request, response) => {
+      requestedPath = request.url;
+      apiKeyHeader = request.headers["api-key"] as string | undefined;
+      authorizationHeader = request.headers.authorization;
+      response.setHeader("content-type", "application/json");
+      response.end(JSON.stringify({ data: [] }));
+    });
+    const port = await listen(server);
+    const baseUrl = `http://provider.test:${port}/openai/v1`;
+    const adapter = new CompatibleAdapter({
+      apiKey: "azure-test-key",
+      authHeader: "api-key",
+      baseUrl,
+      localBaseUrlAllowlist: [baseUrl],
+      addressResolver: async () => [{ address: "127.0.0.1", family: 4 }],
+    });
+
+    try {
+      await adapter.listModels();
+      expect(requestedPath).toBe("/openai/v1/models");
+      expect(apiKeyHeader).toBe("azure-test-key");
+      expect(authorizationHeader).toBeUndefined();
+    } finally {
+      await close(server);
+    }
+  });
+
   it("uses the one validated DNS result for the actual socket while preserving Host", async () => {
     let requestedHost: string | undefined;
     let requestedPath: string | undefined;

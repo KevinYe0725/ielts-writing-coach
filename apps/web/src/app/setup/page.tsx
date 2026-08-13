@@ -19,6 +19,12 @@ import {
   Users,
 } from "lucide-react";
 
+import {
+  getProviderPreset,
+  providerCatalog,
+  type ProviderVendor,
+} from "@iwc/ai/provider-catalog";
+
 import { useLocale } from "@/components/locale-provider";
 import { Badge, Button, Card, LoadingButtonContent } from "@/components/ui";
 import { cn } from "@/components/utils";
@@ -36,6 +42,7 @@ const initialForm: BootstrapInput = {
   email: "",
   password: "",
   provider: "openai",
+  providerVendor: "openai",
   baseUrl: "https://api.openai.com/v1",
   apiKey: "",
   model: "gpt-5.4-mini",
@@ -85,6 +92,10 @@ export default function SetupPage() {
     ],
     [text],
   );
+  const selectedProvider = useMemo(
+    () => getProviderPreset(form.providerVendor),
+    [form.providerVendor],
+  );
 
   const update = <K extends keyof BootstrapInput>(
     key: K,
@@ -93,6 +104,7 @@ export default function SetupPage() {
     setForm((current) => ({ ...current, [key]: value }));
     if (
       key === "provider" ||
+      key === "providerVendor" ||
       key === "model" ||
       key === "apiKey" ||
       key === "baseUrl"
@@ -392,25 +404,66 @@ export default function SetupPage() {
                     className="select-input"
                     id="provider"
                     onChange={(event) => {
-                      const provider = event.target
-                        .value as BootstrapInput["provider"];
-                      update("provider", provider);
-                      if (provider === "compatible")
-                        update(
-                          "baseUrl",
-                          "http://host.docker.internal:11434/v1",
-                        );
-                      if (provider === "mock")
-                        update("model", "mock-ielts-demo");
+                      const vendor = event.target.value as ProviderVendor;
+                      const preset = getProviderPreset(vendor);
+                      setForm((current) => ({
+                        ...current,
+                        providerVendor: vendor,
+                        provider: preset.kind,
+                        baseUrl: preset.baseUrl ?? "",
+                        model: preset.defaultModel,
+                        apiKey: vendor === "mock" ? "" : current.apiKey,
+                      }));
+                      setProbe(null);
                     }}
-                    value={form.provider}
+                    value={form.providerVendor}
                   >
-                    <option value="openai">OpenAI</option>
-                    <option value="compatible">OpenAI-compatible</option>
+                    <optgroup label={text("全球主流服务", "Global providers")}>
+                      {providerCatalog
+                        .filter((preset) => preset.region === "global")
+                        .map((preset) => (
+                          <option key={preset.id} value={preset.id}>
+                            {text(preset.labelZh, preset.label)}
+                          </option>
+                        ))}
+                    </optgroup>
+                    <optgroup label={text("中国大陆服务", "China providers")}>
+                      {providerCatalog
+                        .filter((preset) => preset.region === "china")
+                        .map((preset) => (
+                          <option key={preset.id} value={preset.id}>
+                            {text(preset.labelZh, preset.label)}
+                          </option>
+                        ))}
+                    </optgroup>
+                    <optgroup
+                      label={text(
+                        "企业、自建与本地",
+                        "Enterprise, custom & local",
+                      )}
+                    >
+                      {providerCatalog
+                        .filter(
+                          (preset) =>
+                            ["custom", "local"].includes(preset.region) &&
+                            preset.id !== "mock",
+                        )
+                        .map((preset) => (
+                          <option key={preset.id} value={preset.id}>
+                            {text(preset.labelZh, preset.label)}
+                          </option>
+                        ))}
+                    </optgroup>
                     <option value="mock">
                       Mock · {text("仅演示", "demo only")}
                     </option>
                   </select>
+                  <p className="field-hint">
+                    {text(
+                      selectedProvider.compatibilityNoteZh,
+                      selectedProvider.compatibilityNoteEn,
+                    )}
+                  </p>
                 </div>
                 <div className="form-field">
                   <label htmlFor="model">{text("模型 ID", "Model ID")}</label>
@@ -421,7 +474,7 @@ export default function SetupPage() {
                     value={form.model}
                   />
                 </div>
-                {form.provider === "compatible" ? (
+                {selectedProvider.configurableBaseUrl ? (
                   <div className="form-field form-field-wide">
                     <label htmlFor="base-url">Base URL</label>
                     <input
@@ -435,13 +488,13 @@ export default function SetupPage() {
                     />
                     <p className="field-hint">
                       {text(
-                        "容器中的 localhost 通常不是宿主机；本地模型可使用 host.docker.internal。",
-                        "Inside a container, localhost is usually not the host machine; local models may use host.docker.internal.",
+                        "填写精确 API 根地址（含版本路径，如 /v1）。本地地址还需实例管理员加入精确 allowlist。",
+                        "Enter the exact API root, including its version path such as /v1. Local URLs also require an exact operator allowlist.",
                       )}
                     </p>
                   </div>
                 ) : null}
-                {form.provider !== "mock" ? (
+                {form.providerVendor !== "mock" ? (
                   <div className="form-field form-field-wide">
                     <label htmlFor="api-key">API Key</label>
                     <div className="secret-input-wrap">
@@ -453,7 +506,7 @@ export default function SetupPage() {
                         onChange={(event) =>
                           update("apiKey", event.target.value)
                         }
-                        placeholder="sk-…"
+                        placeholder={selectedProvider.apiKeyPlaceholder}
                         spellCheck={false}
                         type="password"
                         value={form.apiKey}
@@ -694,11 +747,7 @@ export default function SetupPage() {
               </span>
               <div>
                 <strong>
-                  {form.provider === "openai"
-                    ? "OpenAI"
-                    : form.provider === "compatible"
-                      ? "Compatible endpoint"
-                      : "Mock provider"}
+                  {text(selectedProvider.labelZh, selectedProvider.label)}
                 </strong>
                 <small>
                   {form.model} ·{" "}

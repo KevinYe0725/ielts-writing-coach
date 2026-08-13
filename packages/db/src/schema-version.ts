@@ -3,9 +3,9 @@
  * compares both the number of applied migrations and Drizzle's latest journal
  * timestamp, so a database that is merely reachable cannot be reported current.
  */
-export const DATABASE_SCHEMA_VERSION = "0008_flowery_red_ghost" as const;
-export const EXPECTED_DATABASE_MIGRATION_COUNT = 9 as const;
+export const DATABASE_SCHEMA_VERSION = "0009_sharp_maddog" as const;
+export const EXPECTED_DATABASE_MIGRATION_COUNT = 10 as const;
 export const EXPECTED_DATABASE_MIGRATION_CREATED_AT =
-  1_786_569_298_186 as const;
+  1_786_600_068_109 as const;
 export const EXPECTED_DATABASE_MIGRATION_HASH =
-  "055e8a278c482a935539b58619798ea032e90112a6ba86c9ca5ecc43f690f2e4" as const;
+  "1107fd0da4926d3e2c240f629a251a2fd9ece6cbe601ec1be5cdae8c7c7f6a5a" as const;

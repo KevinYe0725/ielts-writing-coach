@@ -4,8 +4,11 @@ import {
   createProviderAdapter,
   decryptProviderSecret,
   getSessionProviderSecret,
+  inferProviderVendor,
   normalizeProviderError,
   parseMasterKey,
+  providerCredentialsForPreset,
+  providerPresetNeedsApiKey,
   promptSnapshot,
   type AIProviderAdapter,
   type AITaskKind,
@@ -245,7 +248,8 @@ export async function adapterForJob(
   if (connection.kind === "mock") return createProviderAdapter("mock", {});
   if (connection.secretMode === "session_only") {
     const sessionSecret = getSessionProviderSecret(connection.id);
-    if (!sessionSecret) {
+    const vendor = inferProviderVendor(connection.kind, connection.vendor);
+    if (!sessionSecret && providerPresetNeedsApiKey(vendor)) {
       throw Object.assign(
         new Error(
           "The session-only key was lost or cannot be used outside its embedded Web process.",
@@ -253,42 +257,52 @@ export async function adapterForJob(
         { code: "SESSION_KEY_EXPIRED" },
       );
     }
-    return createProviderAdapter(connection.kind, {
-      apiKey: sessionSecret,
+    const resolved = providerCredentialsForPreset({
+      vendor,
+      ...(sessionSecret === undefined ? {} : { apiKey: sessionSecret }),
       ...(connection.baseUrl === null ? {} : { baseUrl: connection.baseUrl }),
       localBaseUrlAllowlist: localModelAllowlist(environment),
     });
+    return createProviderAdapter(resolved.kind, resolved.credentials);
   }
   let apiKey: string | undefined;
   if (connection.secretMode === "environment")
     apiKey = environment.OPENAI_API_KEY;
   if (connection.secretMode === "encrypted") {
-    if (
-      !environment.APP_ENCRYPTION_KEY ||
-      !connection.secretCiphertext ||
-      !connection.secretNonce ||
-      !connection.keyVersion
-    ) {
+    const vendor = inferProviderVendor(connection.kind, connection.vendor);
+    const hasEncryptedSecret = Boolean(
+      connection.secretCiphertext &&
+        connection.secretNonce &&
+        connection.keyVersion,
+    );
+    if (hasEncryptedSecret) {
+      if (!environment.APP_ENCRYPTION_KEY)
+        throw Object.assign(
+          new Error("The encrypted provider key cannot be opened."),
+          { code: "PROVIDER_SECRET_UNAVAILABLE" },
+        );
+      apiKey = decryptProviderSecret(
+        {
+          ciphertext: connection.secretCiphertext!,
+          nonce: connection.secretNonce!,
+          keyVersion: connection.keyVersion!,
+        },
+        parseMasterKey(environment.APP_ENCRYPTION_KEY),
+        `provider:${connection.ownerId}:${connection.id}`,
+      );
+    } else if (providerPresetNeedsApiKey(vendor))
       throw Object.assign(
         new Error("The encrypted provider key cannot be opened."),
         { code: "PROVIDER_SECRET_UNAVAILABLE" },
       );
-    }
-    apiKey = decryptProviderSecret(
-      {
-        ciphertext: connection.secretCiphertext,
-        nonce: connection.secretNonce,
-        keyVersion: connection.keyVersion,
-      },
-      parseMasterKey(environment.APP_ENCRYPTION_KEY),
-      `provider:${connection.ownerId}:${connection.id}`,
-    );
   }
-  return createProviderAdapter(connection.kind, {
+  const resolved = providerCredentialsForPreset({
+    vendor: inferProviderVendor(connection.kind, connection.vendor),
     ...(apiKey === undefined ? {} : { apiKey }),
     ...(connection.baseUrl === null ? {} : { baseUrl: connection.baseUrl }),
     localBaseUrlAllowlist: localModelAllowlist(environment),
   });
+  return createProviderAdapter(resolved.kind, resolved.credentials);
 }
 
 export async function markJobSucceeded(

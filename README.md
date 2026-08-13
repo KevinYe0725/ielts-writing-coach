@@ -56,7 +56,7 @@ docker compose logs bootstrap
 curl --fail http://127.0.0.1:3000/api/v1/health/ready
 ```
 
-The `bootstrap` log prints the one-time setup token when the secret volume is created. Open `http://127.0.0.1:3000/setup?token=YOUR_TOKEN`, create the owner account, and configure an AI provider. The application never sends a stored provider key to browser-side code.
+The `bootstrap` log prints the one-time setup token when the secret volume is created. Open `http://127.0.0.1:3000/setup?token=YOUR_TOKEN`, create the owner account, and configure an AI provider. Built-in presets cover OpenAI, Claude, Gemini, DeepSeek, Qwen, Kimi, GLM, MiniMax, Mistral, xAI, Groq, OpenRouter, Together, Fireworks, Perplexity, SiliconFlow, NVIDIA NIM, Cerebras, Azure OpenAI, Ollama, and LM Studio; an exact-root custom OpenAI-compatible option is also available. Every selected model is probed before it becomes a scoring route. The application never sends a stored provider key to browser-side code.
 
 Generated authentication, encryption, and setup secrets live in the `iwc_secrets` Docker volume. Keep that volume with the database backup; losing the encryption key makes persisted provider credentials unreadable. Follow the [backup and restore runbook](./docs/operations/backup-restore.md) before using real learner data.
 
