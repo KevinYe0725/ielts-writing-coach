@@ -98,9 +98,25 @@ integration("AI job lease and result idempotency", () => {
   const sharedProviderId = newDomainId();
   const encryptedProviderId = newDomainId();
   const sharedRouteId = newDomainId();
+  const fallbackInstanceId = newDomainId();
   const testMasterKey = Buffer.alloc(32, 7).toString("base64");
+  let testInstanceId = "";
+  let createdTestInstance = false;
 
   beforeAll(async () => {
+    const existingInstance =
+      await databaseContext.db.query.instanceConfiguration.findFirst();
+    if (existingInstance) {
+      testInstanceId = existingInstance.id;
+    } else {
+      testInstanceId = fallbackInstanceId;
+      createdTestInstance = true;
+      await databaseContext.db.insert(instanceConfiguration).values({
+        id: testInstanceId,
+        deploymentMode: "personal",
+        defaultLocale: "zh-CN",
+      });
+    }
     await databaseContext.db.insert(user).values({
       id: userId,
       name: "Worker idempotency test",
@@ -235,6 +251,11 @@ integration("AI job lease and result idempotency", () => {
   afterAll(async () => {
     await databaseContext.db.delete(user).where(eq(user.id, sharedLearnerId));
     await databaseContext.db.delete(user).where(eq(user.id, userId));
+    if (createdTestInstance) {
+      await databaseContext.db
+        .delete(instanceConfiguration)
+        .where(eq(instanceConfiguration.id, testInstanceId));
+    }
     await databaseContext.pool.end();
   });
 
@@ -301,7 +322,9 @@ integration("AI job lease and result idempotency", () => {
 
   it("instantiates a frozen Owner provider for a Learner only in shared mode", async () => {
     const instance =
-      await databaseContext.db.query.instanceConfiguration.findFirst();
+      await databaseContext.db.query.instanceConfiguration.findFirst({
+        where: eq(instanceConfiguration.id, testInstanceId),
+      });
     expect(instance).toBeDefined();
     const frozenJob = {
       id: newDomainId(),

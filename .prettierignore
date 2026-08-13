@@ -5,6 +5,7 @@ node_modules
 pnpm-lock.yaml
 playwright-report
 test-results
+results.sarif
 IELTS_Writing_Web_PRD.md
 DCO.md
 .agents/skills/coach-ielts-writing/**
