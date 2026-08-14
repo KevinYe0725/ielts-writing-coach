@@ -19,7 +19,94 @@ async function signedInSession(page: import("@playwright/test").Page) {
   });
 }
 
+async function enterSignInCredentials(
+  page: import("@playwright/test").Page,
+  email: string,
+) {
+  const emailInput = page.locator("#signin-email");
+  const passwordInput = page.locator("#signin-password");
+  await emailInput.click();
+  await emailInput.pressSequentially(email);
+  await passwordInput.click();
+  await passwordInput.pressSequentially("secure-password");
+  await expect(
+    page.getByRole("button", { name: /继续|continue/i }),
+  ).toBeEnabled();
+}
+
 test.describe("account controls", () => {
+  test("opens sign-in first for an anonymous visit to the root page", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await expect(page).toHaveURL(/\/signin$/);
+  });
+
+  test("uses the visible form to create a personal account and keeps its local return path", async ({
+    page,
+  }) => {
+    await signedInSession(page);
+    await page.route("**/api/v1/account-entry", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          outcome: "REGISTERED",
+          redirect_to: "/write?cycle=cycle-demo",
+        }),
+      });
+    });
+
+    await page.goto("/signin?next=/write?cycle=cycle-demo");
+    await enterSignInCredentials(page, "new@example.test");
+    await page.getByRole("button", { name: /继续|continue/i }).click();
+
+    await expect(page).toHaveURL(/\/write\?cycle=cycle-demo$/);
+  });
+
+  test("keeps a shared-space unknown email on sign-in with an invitation message", async ({
+    page,
+  }) => {
+    await page.route("**/api/v1/account-entry", async (route) => {
+      await route.fulfill({
+        status: 403,
+        contentType: "application/problem+json",
+        body: JSON.stringify({
+          code: "INVITE_REQUIRED",
+          detail: "Invitation required",
+        }),
+      });
+    });
+
+    await page.goto("/signin");
+    await enterSignInCredentials(page, "new@example.test");
+    await page.getByRole("button", { name: /继续|continue/i }).click();
+
+    await expect(page).toHaveURL(/\/signin$/);
+    await expect(page.locator(".setup-form-card [role='alert']")).toContainText(
+      /邀请|invitation/i,
+    );
+    await expect(page.locator("#signin-email")).toHaveValue("new@example.test");
+  });
+
+  test("never follows an unsafe account-entry redirect", async ({ page }) => {
+    await signedInSession(page);
+    await page.route("**/api/v1/account-entry", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          outcome: "SIGNED_IN",
+          redirect_to: "https://evil.example/",
+        }),
+      });
+    });
+
+    await page.goto("/signin?next=https://evil.example/");
+    await enterSignInCredentials(page, "learner@example.test");
+    await page.getByRole("button", { name: /继续|continue/i }).click();
+
+    await expect(page).toHaveURL(/\/today$/);
+  });
+
   test("shows the signed-in account and updates a confirmed password", async ({
     page,
   }) => {

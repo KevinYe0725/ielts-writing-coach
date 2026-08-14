@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState, type FormEvent } from "react";
 import { KeyRound, LogIn } from "lucide-react";
 
 import { useLocale } from "@/components/locale-provider";
@@ -11,10 +11,25 @@ import { Badge, Button, Card, LoadingButtonContent } from "@/components/ui";
 interface ProblemPayload {
   detail?: string;
   message?: string;
+  code?: string;
 }
 
-export default function SignInPage() {
+interface AccountEntryPayload {
+  outcome?: "SIGNED_IN" | "REGISTERED";
+  redirect_to?: string;
+}
+
+function safeLocalRedirect(value: unknown): string {
+  return typeof value === "string" &&
+    value.startsWith("/") &&
+    !value.startsWith("//")
+    ? value
+    : "/today";
+}
+
+function SignInForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { text } = useLocale();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -26,23 +41,38 @@ export default function SignInPage() {
     setBusy(true);
     setError(null);
     try {
-      const response = await fetch("/api/v1/auth/sign-in/email", {
+      const response = await fetch("/api/v1/account-entry", {
         method: "POST",
         credentials: "include",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email, password, rememberMe: true }),
+        body: JSON.stringify({
+          email,
+          password,
+          ...(searchParams.get("next")
+            ? { next: searchParams.get("next") }
+            : {}),
+        }),
       });
       if (!response.ok) {
         const problem = (await response
           .json()
           .catch(() => ({}))) as ProblemPayload;
+        if (problem.code === "INVITE_REQUIRED") {
+          throw new Error(
+            text(
+              "这是共享学习空间；请使用管理员发给你的邀请链接创建账号。",
+              "This is a shared learning space. Use an invitation link from its administrator to create an account.",
+            ),
+          );
+        }
         throw new Error(
           problem.detail ??
             problem.message ??
             text("邮箱或密码不正确。", "The email or password is incorrect."),
         );
       }
-      router.replace("/today");
+      const result = (await response.json()) as AccountEntryPayload;
+      router.replace(safeLocalRedirect(result.redirect_to));
       router.refresh();
     } catch (caught) {
       setError(
@@ -71,8 +101,8 @@ export default function SignInPage() {
           </h1>
           <p>
             {text(
-              "继续你的写作、专项训练和延迟重写。",
-              "Continue your writing, focused practice, and delayed rewrite.",
+              "继续你的写作、专项训练和延迟重写。个人学习空间会为新邮箱创建账号；共享空间需要邀请链接。",
+              "Continue your writing, focused practice, and delayed rewrite. Personal spaces create a new account for a new email; shared spaces use invitations.",
             )}
           </p>
         </div>
@@ -117,12 +147,12 @@ export default function SignInPage() {
               >
                 {busy ? (
                   <LoadingButtonContent
-                    label={text("正在登录…", "Signing in…")}
+                    label={text("正在继续…", "Continuing…")}
                   />
                 ) : (
                   <>
                     <LogIn aria-hidden="true" size={17} />
-                    {text("登录", "Sign in")}
+                    {text("继续", "Continue")}
                   </>
                 )}
               </Button>
@@ -134,5 +164,13 @@ export default function SignInPage() {
         </p>
       </section>
     </div>
+  );
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense fallback={null}>
+      <SignInForm />
+    </Suspense>
   );
 }
