@@ -35,7 +35,12 @@ export type AccountEntryResult =
 
 export function parseAccountReturnPath(value: string | null): string;
 export async function enterAccount(
-  input: { email: string; password: string; returnPath: string; origin: string },
+  input: {
+    email: string;
+    password: string;
+    returnPath: string;
+    origin: string;
+  },
   dependencies?: AccountEntryDependencies,
 ): Promise<AccountEntryResult>;
 ```
