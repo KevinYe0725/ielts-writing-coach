@@ -91,6 +91,7 @@ export type LessonPlanRow = Omit<
   | "paperResult"
   | "paperSubmittedAt"
   | "paperEvaluationJobId"
+  | "legacyMigrationSnapshot"
 > &
   Partial<
     Pick<

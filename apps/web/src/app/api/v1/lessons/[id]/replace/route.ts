@@ -1,6 +1,7 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 
-import { aiJob, learningObjective, lessonPlan, trainingCycle } from "@iwc/db";
+import { aiJob, lessonPlan, trainingCycle } from "@iwc/db";
+import { SKILL_IDS, type SkillId } from "@iwc/learning-contracts";
 
 import { getServerContext } from "@/lib/server/context";
 import { enqueueAIJob } from "@/lib/server/jobs";
@@ -19,6 +20,13 @@ import {
 } from "@/lib/server/security";
 
 import { learnerFacingTeachingArticle } from "../adaptive-teaching";
+
+function isSkillId(value: unknown): value is SkillId {
+  return (
+    typeof value === "string" &&
+    (SKILL_IDS as readonly string[]).includes(value)
+  );
+}
 
 export const POST = apiRoute(
   async (request, context: { params: Promise<{ id: string }> }) => {
@@ -83,43 +91,47 @@ export const POST = apiRoute(
           (attempt) => attempt.kind === "version_1",
         );
         const assessmentId = version1?.assessment?.id;
-        const coreSkillId = cycle.coreSkillId;
-        if (!assessmentId || !coreSkillId) {
+        const coreSkillId = isSkillId(cycle.coreSkillId)
+          ? cycle.coreSkillId
+          : isSkillId(plan.coreSkillId)
+            ? plan.coreSkillId
+            : null;
+        if (!coreSkillId) {
           throw new ApiProblem({
-            title: "Diagnosis unavailable",
+            title: "Practice recovery unavailable",
             status: 409,
-            code: "PRACTICE_PAPER_DIAGNOSIS_REQUIRED",
+            code: "PRACTICE_PAPER_RECOVERY_UNAVAILABLE",
             detail:
-              "The original essay diagnosis is required to create a new paper.",
+              "This earlier practice does not contain enough information to create a safe updated paper.",
           });
         }
-        await transaction.delete(lessonPlan).where(eq(lessonPlan.id, plan.id));
-        await transaction
-          .delete(learningObjective)
-          .where(eq(learningObjective.cycleId, cycle.id));
-        await transaction
-          .delete(aiJob)
-          .where(
-            and(
-              eq(aiJob.ownerId, actor.id),
-              eq(aiJob.taskKind, "exercise_generation"),
-              sql`${aiJob.protectedReference}->>'cycleId' = ${cycle.id}`,
-            ),
-          );
-        await transaction
-          .update(trainingCycle)
-          .set({ status: "LESSON_GENERATING" })
-          .where(eq(trainingCycle.id, cycle.id));
+        const activeJob = await transaction.query.aiJob.findFirst({
+          where: and(
+            eq(aiJob.ownerId, actor.id),
+            eq(aiJob.taskKind, "exercise_generation"),
+            inArray(aiJob.status, ["QUEUED", "RUNNING", "WAITING_FOR_CONSENT"]),
+            sql`${aiJob.protectedReference}->>'lessonPlanId' = ${plan.id}`,
+          ),
+        });
+        if (activeJob) {
+          return {
+            lessonId: null,
+            jobId: activeJob.id,
+            jobStatus: activeJob.status,
+          };
+        }
         const job = await enqueueAIJob(transaction, {
           ownerId: actor.id,
           taskKind: "exercise_generation",
           protectedReference: {
-            attemptId: version1.id,
+            lessonPlanId: plan.id,
+            migrationMode: "LEGACY_RECOVERY",
             cycleId: cycle.id,
-            assessmentId,
             skillId: coreSkillId,
+            ...(version1 ? { attemptId: version1.id } : {}),
+            ...(assessmentId ? { assessmentId } : {}),
           },
-          idempotencyKey: `practice-paper:${cycle.id}:v2`,
+          idempotencyKey: `practice-paper:${plan.id}:legacy-recovery`,
         });
         return { lessonId: null, jobId: job.id, jobStatus: job.status };
       });

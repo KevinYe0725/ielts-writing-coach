@@ -11,6 +11,9 @@ const routeState = vi.hoisted(() => ({
   },
   lesson: null as Record<string, unknown> | null,
   cycle: null as Record<string, unknown> | null,
+  deletedTables: [] as unknown[],
+  queuedInput: null as Record<string, unknown> | null,
+  activeRecoveryJob: null as Record<string, unknown> | null,
 }));
 
 vi.mock("@/lib/server/session", () => ({
@@ -32,7 +35,13 @@ vi.mock("@/lib/server/security", () => ({
 }));
 
 vi.mock("@/lib/server/jobs", () => ({
-  enqueueAIJob: async () => ({ id: "replacement-job", status: "QUEUED" }),
+  enqueueAIJob: async (
+    _transaction: unknown,
+    input: Record<string, unknown>,
+  ) => {
+    routeState.queuedInput = input;
+    return { id: "replacement-job", status: "QUEUED" };
+  },
 }));
 
 function mutationChain() {
@@ -53,8 +62,14 @@ const transaction = {
     trainingCycle: {
       findFirst: async () => routeState.cycle,
     },
+    aiJob: {
+      findFirst: async () => routeState.activeRecoveryJob,
+    },
   },
-  delete: () => mutationChain(),
+  delete: (table: unknown) => {
+    routeState.deletedTables.push(table);
+    return mutationChain();
+  },
   update: () => ({
     set: () => mutationChain(),
   }),
@@ -134,6 +149,9 @@ describe("focused teaching adaptive article routes", () => {
   beforeEach(() => {
     routeState.lesson = null;
     routeState.cycle = null;
+    routeState.deletedTables = [];
+    routeState.queuedInput = null;
+    routeState.activeRecoveryJob = null;
   });
 
   it("returns replacement-required instead of serving a legacy teaching module", async () => {
@@ -393,5 +411,89 @@ describe("focused teaching adaptive article routes", () => {
       job_id: null,
       job_status: "SUCCEEDED",
     });
+  });
+
+  it("recovers a historical lesson from its preserved skill without deleting records", async () => {
+    routeState.lesson = {
+      id: lessonId,
+      cycleId: "cycle-1",
+      coreSkillId: "mechanism_chain",
+      practiceFormat: "LEGACY_EXERCISES",
+      paperContent: { teachingModule: legacyTeaching(), paper: {} },
+    };
+    routeState.cycle = {
+      id: "cycle-1",
+      coreSkillId: null,
+      writingAttempts: [],
+    };
+
+    const response = await replaceTeaching(
+      new Request(`https://coach.test/api/v1/lessons/${lessonId}/replace`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": "recover-historical-lesson",
+          origin: "https://coach.test",
+        },
+        body: "{}",
+      }),
+      { params: Promise.resolve({ id: lessonId }) },
+    );
+
+    expect(response.status).toBe(202);
+    await expect(response.json()).resolves.toMatchObject({
+      replacement_started: true,
+      job_id: "replacement-job",
+    });
+    expect(routeState.queuedInput).toMatchObject({
+      taskKind: "exercise_generation",
+      protectedReference: {
+        lessonPlanId: lessonId,
+        migrationMode: "LEGACY_RECOVERY",
+        cycleId: "cycle-1",
+        skillId: "mechanism_chain",
+      },
+    });
+    expect(routeState.deletedTables).toEqual([]);
+  });
+
+  it("reuses an active legacy recovery job instead of queuing a second one", async () => {
+    routeState.lesson = {
+      id: lessonId,
+      cycleId: "cycle-1",
+      coreSkillId: "mechanism_chain",
+      practiceFormat: "LEGACY_EXERCISES",
+      paperContent: { teachingModule: legacyTeaching(), paper: {} },
+    };
+    routeState.cycle = {
+      id: "cycle-1",
+      coreSkillId: null,
+      writingAttempts: [],
+    };
+    routeState.activeRecoveryJob = {
+      id: "existing-recovery-job",
+      status: "QUEUED",
+    };
+
+    const response = await replaceTeaching(
+      new Request(`https://coach.test/api/v1/lessons/${lessonId}/replace`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": "recover-historical-lesson-again",
+          origin: "https://coach.test",
+        },
+        body: "{}",
+      }),
+      { params: Promise.resolve({ id: lessonId }) },
+    );
+
+    expect(response.status).toBe(202);
+    await expect(response.json()).resolves.toMatchObject({
+      job_id: "existing-recovery-job",
+      job_status: "QUEUED",
+    });
+    expect(routeState.queuedInput).toBeNull();
+    expect(routeState.deletedTables).toEqual([]);
   });
 });
