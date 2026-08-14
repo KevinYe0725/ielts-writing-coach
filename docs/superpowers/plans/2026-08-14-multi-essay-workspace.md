@@ -34,10 +34,12 @@ Vitest, Playwright, existing `@iwc/learning-core` next-action reducer.
 ### Task 1: Extend the server’s active-cycle boundary
 
 **Files:**
+
 - Modify: `apps/web/src/app/api/v1/training-cycles/route.ts:23-101`
 - Modify: `apps/web/src/lib/client/http-route-contract.test.ts:210-285`
 
 **Interfaces:**
+
 - Consumes: the existing `POST /api/v1/training-cycles` request shape and
   transaction-level learner-row lock.
 - Produces: an eight-cycle limit and `ACTIVE_CYCLE_LIMIT` whose detail says
@@ -51,8 +53,7 @@ Vitest, Playwright, existing `@iwc/learning-core` next-action reducer.
 
   ```ts
   expect(responses.map((response) => response.status).sort()).toEqual([
-    201,
-    409,
+    201, 409,
   ]);
   await expect(
     database.db.query.trainingCycle.findMany({
@@ -99,12 +100,14 @@ Vitest, Playwright, existing `@iwc/learning-core` next-action reducer.
 ### Task 2: Create the authenticated workspace read model
 
 **Files:**
+
 - Create: `apps/web/src/app/api/v1/essays/route.ts`
 - Create: `apps/web/src/app/api/v1/essays/route.test.ts`
 - Create: `apps/web/src/lib/server/essay-workspace.ts`
 - Create: `apps/web/src/lib/server/essay-workspace.test.ts`
 
 **Interfaces:**
+
 - Consumes: `trainingCycle`, `lessonPlan`, `rewriteTask`, `transferTask`,
   `mixedReviewTask`, `writingAttempt`, `getUniqueNextAction`, and the
   `deriveLessonStatus` rules currently in `today/route.ts`.
@@ -201,6 +204,7 @@ Vitest, Playwright, existing `@iwc/learning-core` next-action reducer.
 ### Task 3: Add typed client and demo access
 
 **Files:**
+
 - Modify: `apps/web/src/lib/client/types.ts`
 - Modify: `apps/web/src/lib/client/http-service.ts`
 - Modify: `apps/web/src/lib/client/http-service.test.ts`
@@ -208,6 +212,7 @@ Vitest, Playwright, existing `@iwc/learning-core` next-action reducer.
 - Modify: `apps/web/src/lib/client/http-route-contract.test.ts`
 
 **Interfaces:**
+
 - Consumes: the `EssayWorkspaceData` JSON envelope from Task 2.
 - Produces: `LearningClient.getEssayWorkspace(): Promise<EssayWorkspaceData>`
   in the HTTP and Demo client implementations.
@@ -267,6 +272,7 @@ Vitest, Playwright, existing `@iwc/learning-core` next-action reducer.
 ### Task 4: Build the My essays workspace and Today switcher
 
 **Files:**
+
 - Create: `apps/web/src/app/essays/page.tsx`
 - Create: `apps/web/src/app/essays/page.module.css`
 - Create: `apps/web/src/components/essay-workspace.tsx`
@@ -277,6 +283,7 @@ Vitest, Playwright, existing `@iwc/learning-core` next-action reducer.
 - Modify: `apps/web/src/app/globals.css`
 
 **Interfaces:**
+
 - Consumes: `LearningClient.getEssayWorkspace`, `EssayWorkspaceData`,
   `learningRouteHref`, `useDemoResource`, and the existing question picker
   calls from Today.
@@ -351,12 +358,14 @@ Vitest, Playwright, existing `@iwc/learning-core` next-action reducer.
 ### Task 5: Prove isolation, recovery, and the full browser workflow
 
 **Files:**
+
 - Modify: `tests/e2e/writing.spec.ts` (or create
   `tests/e2e/essay-workspace.spec.ts` if no focused writing suite exists)
 - Modify: `tests/e2e/lesson.spec.ts`
 - Modify: `apps/web/src/lib/client/learning-navigation.test.ts`
 
 **Interfaces:**
+
 - Consumes: all previous tasks, explicit route identities, and existing
   focused-package recovery behavior.
 - Produces: browser evidence that multiple essays can be switched and
