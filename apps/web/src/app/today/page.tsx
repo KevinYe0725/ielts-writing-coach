@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
@@ -67,8 +73,23 @@ function optionLabel<T extends string>(
   return locale === "zh-CN" ? (value?.zh ?? id) : (value?.en ?? id);
 }
 
+function subscribeToLocation(onStoreChange: () => void) {
+  window.addEventListener("popstate", onStoreChange);
+  return () => window.removeEventListener("popstate", onStoreChange);
+}
+
+function newEssaySnapshot() {
+  if (typeof window === "undefined") return false;
+  return new URLSearchParams(window.location.search).get("new-essay") === "1";
+}
+
 export default function TodayPage() {
   const router = useRouter();
+  const startingNewEssay = useSyncExternalStore(
+    subscribeToLocation,
+    newEssaySnapshot,
+    () => false,
+  );
   const { locale, text, messages } = useLocale();
   const loader = useCallback(() => learningClient.getToday(), []);
   const { data, error, loading, retry } = useDemoResource(loader);
@@ -83,12 +104,6 @@ export default function TodayPage() {
   const [customTrack, setCustomTrack] = useState<
     "academic" | "general_training"
   >("academic");
-  const [startingNewEssay, setStartingNewEssay] = useState(false);
-  useEffect(() => {
-    setStartingNewEssay(
-      new URLSearchParams(window.location.search).get("new-essay") === "1",
-    );
-  }, []);
   useEffect(() => {
     if (data) saveLearningDestinations(data.navigation);
   }, [data]);
