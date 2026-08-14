@@ -1,67 +1,208 @@
+<div align="center">
+
+<img src="https://raw.githubusercontent.com/KevinYe0725/ielts-writing-coach/main/assets/logo.svg" alt="IELTS Writing Coach logo" width="96" height="96" />
+
 # IELTS Writing Coach
 
-[English](./README.md) | [简体中文](./README.zh-CN.md)
+**自托管的雅思写作 Task 2 学习闭环系统。**
 
-IELTS Writing Coach 是一个开源、可自托管的 IELTS Academic 与 General Training Writing Task 2 学习系统。它会把每篇作文推进为完整训练闭环：限时首写、基于证据的评估、针对性主动练习、延迟闭卷重写、版本比较，以及之后的陌生语境迁移检测。
+限时初稿 · 基于证据的评分反馈 · 专项训练最弱技能 · 延迟闭卷重写 · 真正记住并迁移到考场。
+
+[![CI](https://img.shields.io/github/actions/workflow/status/KevinYe0725/ielts-writing-coach/ci.yml?branch=main&style=for-the-badge&label=CI)](https://github.com/KevinYe0725/ielts-writing-coach/actions/workflows/ci.yml)
+[![CodeQL](https://img.shields.io/github/actions/workflow/status/KevinYe0725/ielts-writing-coach/codeql.yml?branch=main&style=for-the-badge&label=CodeQL)](https://github.com/KevinYe0725/ielts-writing-coach/actions/workflows/codeql.yml)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=for-the-badge)](./LICENSE)
+[![Node.js >= 24.14](https://img.shields.io/badge/Node.js-%3E%3D24.14-5FA04E?style=for-the-badge&logo=nodedotjs&logoColor=white)](./package.json)
+[![Docker Compose](https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)](./compose.yaml)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=for-the-badge)](./CONTRIBUTING.md)
+
+[English](./README.md) · **简体中文**
+
+</div>
+
+---
 
 > [!IMPORTANT]
-> 所有 Band 分数均为 AI 估分，并非 IELTS 官方成绩。本项目独立开发，与 IELTS、Cambridge University Press & Assessment、British Council 或 IDP 均无隶属、合作或背书关系。
+> 分数是 AI 估算结果，不是雅思官方成绩。本项目独立开发，与雅思官方（IELTS）、剑桥大学出版社与考评院（Cambridge University Press & Assessment）、英国文化协会（British Council）及 IDP 无任何隶属或背书关系。
 
-## 项目状态
+IELTS Writing Coach 把每一篇作文变成一次**完整的学习循环**：限时初稿 → 基于证据的评分 → 针对性主动练习 → 延迟闭卷重写 → 版本对比 → 迁移检验。不仅写得更好，而且真正记得住。
 
-当前源码以 v1.0.0 为目标；在版本化人工审查证据、真实 Provider 完整闭环、云模板验收和 Release 工作流全部通过前，项目不会宣称已有稳定版本。带标签的 GitHub Release 出现之前，`main` 仅是发布候选。正式发布后按语义化版本管理兼容性；只要部署中保存了重要学习数据，仍应固定使用明确的发布标签或镜像摘要，并在换版本前阅读[升级指南](./docs/operations/upgrading.md)。
+## ✨ 为什么选择 IELTS Writing Coach？
 
-## 系统做什么
+大多数 AI 批改工具只会把你的作文"改一遍"。IELTS Writing Coach 基于刻意练习与间隔提取的学习科学设计：
 
-系统负责自动化刻意练习中的流程管理，但把真正产生学习效果的工作留给学习者：
+|                          |                                                                                                                                |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| 🔍 **基于证据的评分**    | 每一项 TR / CC / LR / GRA 评分都附带从你作文中引用的原文证据、评分标准版本和诚实的置信度——让你知道*为什么*，而不只是*多少分*。 |
+| 🎯 **针对性主动练习**    | 每节课程都围绕你作文中最突出的一个弱点生成，并保证至少 65% 的时间在主动输出——拒绝被动刷视频式学习。                            |
+| ⏳ **延迟闭卷重写**      | 经过一段真实的时间间隔后，凭记忆闭卷重写第二版。看懂反馈很容易，回忆并应用它才是真正的考场能力。                               |
+| 🔒 **自托管 · 隐私优先** | 用 Docker Compose 跑在你自己的机器上。API 密钥仅存服务端并加密落盘，你的作文永远不会离开你的基础设施。                         |
 
-1. 选择或粘贴一道 Task 2 题目；
-2. 在 40 分钟内完成 Version 1；
-3. 获得带原文证据的 TR、CC、LR 与 GRA 评估；
-4. 围绕本篇最高优先级问题完成专项课；
-5. 经过真实时间间隔后，闭卷重写；
-6. 比较 Version 1 与 Version 2；
-7. 在陌生语境中再次检测同一能力。
+## 🔄 学习闭环
 
-Web 应用和仓库内的 Codex Skill 共用带版本的学习契约。一节专项课最多只能提供短期的 `applied` 证据；只有延迟、独立的输出才能把能力推进为 `retained` 或 `transferred`。
+每篇作文都经历相同的七个步骤：
 
-## 技术架构
+```mermaid
+flowchart LR
+    A["📝 <b>写作</b><br/>40 分钟限时初稿"] --> B["🔍 <b>评分</b><br/>基于证据的 TR · CC · LR · GRA"]
+    B --> C["🎯 <b>练习</b><br/>针对最弱技能的专项课程"]
+    C --> D["⏳ <b>重写</b><br/>真实间隔后的闭卷重写"]
+    D --> E["⚖️ <b>对比</b><br/>第一版 vs 第二版"]
+    E --> F["🚀 <b>迁移</b><br/>同一技能 · 全新题目"]
+    F -.->|"反复循环直至掌握"| A
+```
 
-- Next.js Web 应用：学习者与管理员界面
-- Graphile Worker：持久化 AI 后台任务
-- PostgreSQL：应用数据与任务队列
-- TypeScript 共享包：AI 适配器、学习契约、学习规则、认证与数据访问
-- 仓库内可发现的 `coach-ielts-writing` Codex Skill
+| 评分项  | 考察内容                                                                 |
+| ------- | ------------------------------------------------------------------------ |
+| **TR**  | 任务回应（Task Response）——是否完整回答了题目                            |
+| **CC**  | 连贯与衔接（Coherence & Cohesion）——论证是否组织有序、衔接自然           |
+| **LR**  | 词汇资源（Lexical Resource）——词汇的广度与精准度                         |
+| **GRA** | 语法范围与准确性（Grammatical Range & Accuracy）——句式多样性与语法控制力 |
 
-v1 架构不依赖 Redis、对象存储或任何闭源托管后端。设计依据见 [ADR 0001](./docs/adr/0001-modular-monolith.md)。
+技能进步由**证据门槛**判定，而不是由练习次数判定：
 
-## 使用 Docker Compose 快速启动
+```mermaid
+flowchart LR
+    X["🆕 未证明"] --> Y["📚 <b>已应用</b><br/>在引导练习中使用"]
+    Y --> Z["🧠 <b>已保持</b><br/>延迟后仍能回忆"]
+    Z --> W["🚀 <b>已迁移</b><br/>在陌生语境中使用"]
+```
 
-要求：Docker Engine、Docker Compose v2 与 OpenSSL。数据库与 Web 端口默认都只绑定到 `127.0.0.1`。如需通过受维护的反向代理发布 Web，请显式设置 `IWC_BIND_ADDRESS` 并配置 HTTPS；不要暴露 PostgreSQL。
+课程只能证明 `applied`（已应用）。`retained`（已保持）需要延迟后的独立表现，`transferred`（已迁移）需要在全新语境中使用该技能——杜绝虚假掌握。
+
+## 🚀 功能一览
+
+### ✍️ 写作与评分
+
+- 无干扰**写作间**：40 分钟倒计时、实时字数统计
+- **120 道内置 Task 2 题目**（8 大话题 × 5 种题型），也可粘贴自定义题目
+- 四项评分（TR、CC、LR、GRA），附原文证据引用与半档估分
+- 评分标准版本固定（rubric-version pinning），每项分数都可追溯到产生它的具体标准
+
+### 🎯 专项练习
+
+- 根据你作文中优先级最高的一个问题自动生成个性化课程
+- 识别与选择题型不超过 25%，至少 65% 主动输出
+- 每节课只设一个必学核心目标——深度练习，而非表面覆盖
+
+### ⏳ 保持与迁移
+
+- 延迟闭卷重写（第二版），如实记录是否借助了提示
+- 使用同一版评分标准的**版本对比**
+- **迁移检验**：在陌生话题和不同题型中检验同一技能
+- 成长档案按技能汇总证据——绝不用练习量冒充掌握度
+
+### 🛠️ 平台能力
+
+- **学员端**——今日计划、写作间、评分报告、专项课程、成长档案、设置
+- **管理端**——账号管理、SMTP 测试、恢复链接管理
+- 双语界面：**English / 简体中文**
+- 20+ 家 AI 提供商预设，支持任意 OpenAI 兼容接口；每个模型启用前都会先探测验证
+- 提供商密钥加密存储、SMTP 邮件支持、健康检查端点、加密备份
+
+## 🏗️ 技术架构
+
+模块化单体（modular monolith）：单一部署单元、持久化任务队列，无需 Redis、对象存储或任何专有后端。
+
+```mermaid
+flowchart TB
+    subgraph B["🖥️ 浏览器"]
+        L["🧑‍🎓 学员"]
+        M["🛠️ 管理员"]
+    end
+    subgraph S["自托管服务"]
+        W["@iwc/web<br/>Next.js"]
+        K["@iwc/worker<br/>Graphile Worker"]
+        P[("PostgreSQL 17<br/>业务数据 + 持久化任务队列")]
+        G["共享包<br/>ai · learning-core · contracts · auth · db · question-bank · exchange · email · config"]
+    end
+    I["🧠 20+ 家 AI 提供商"]
+    C["💻 Codex Skill<br/>coach-ielts-writing"]
+    O["本地学习状态<br/>.coach-ielts-writing"]
+
+    L --> W
+    M --> W
+    W --> P
+    W --> G
+    W --> K
+    K --> P
+    K --> G
+    K --> I
+    G --> I
+    C -.->|"独立运行 · Python 3.11 标准库 · 无需 AI API"| O
+```
+
+| 层级     | 技术                                                                                                      |
+| -------- | --------------------------------------------------------------------------------------------------------- |
+| Web 应用 | Next.js、React、TypeScript                                                                                |
+| 后台任务 | Graphile Worker（持久化 AI 评分与课程生成任务）                                                           |
+| 数据库   | PostgreSQL 17（业务数据 + 任务队列）                                                                      |
+| 共享包   | `ai`、`learning-core`、`learning-contracts`、`auth`、`db`、`question-bank`、`exchange`、`email`、`config` |
+| 工程化   | pnpm workspaces、Docker Compose、GHCR 镜像                                                                |
+| 质量保障 | ESLint、Prettier、Vitest、Playwright、CodeQL、DCO                                                         |
+
+## 🚀 快速开始
+
+环境要求：**Docker Engine + Docker Compose v2** 和 **OpenSSL**。仅此而已。
 
 ```bash
+git clone https://github.com/KevinYe0725/ielts-writing-coach.git
+cd ielts-writing-coach
+
 cp .env.example .env
 printf '\nPOSTGRES_PASSWORD=%s\n' "$(openssl rand -hex 24)" >> .env
+
 docker compose up -d --build
-docker compose logs bootstrap
-curl --fail http://127.0.0.1:3000/api/v1/health/ready
+docker compose logs bootstrap   # 打印一次性初始化令牌
 ```
 
-首次创建密钥卷时，`bootstrap` 日志会输出一次性初始化令牌。打开 `http://127.0.0.1:3000/setup?token=YOUR_TOKEN`，创建所有者账号并配置 AI 服务。内置预设覆盖 OpenAI、Claude、Gemini、DeepSeek、通义千问、Kimi、智谱 GLM、MiniMax、Mistral、xAI、Groq、OpenRouter、Together、Fireworks、Perplexity、硅基流动、NVIDIA NIM、Cerebras、Azure OpenAI、Ollama 与 LM Studio，并保留精确 API 根地址的自定义 OpenAI-compatible 选项。每个指定模型必须先通过能力探测，才能成为评分路由。应用不会把已经保存的 AI provider 密钥发送到浏览器端代码。
+1. 打开 `http://127.0.0.1:3000/setup?token=你的令牌`
+2. 创建管理员账号并配置 AI 提供商
+3. 验证就绪状态：`curl --fail http://127.0.0.1:3000/api/v1/health/ready`
 
-自动生成的认证密钥、加密密钥和初始化令牌保存在 `iwc_secrets` Docker 卷中。必须将该卷与数据库一起备份；丢失加密密钥会导致已经持久化的 provider 凭据无法解密。存入真实学习数据前，请先阅读[备份与恢复手册](./docs/operations/backup-restore.md)。
+> [!WARNING]
+> 自动生成的认证、加密与初始化密钥存放在 `iwc_secrets` Docker 卷中。请将该卷与数据库备份一起妥善保管——丢失加密密钥将导致已存储的提供商凭据无法解密。开始存放真实学习数据前，请先阅读[备份与恢复手册](./docs/operations/backup-restore.md)。
 
-停止应用但保留数据：
+Web 应用和 PostgreSQL 默认只绑定 `127.0.0.1`。如需通过反向代理对外发布，请显式设置 `IWC_BIND_ADDRESS`、配置 HTTPS，并且**切勿**暴露 PostgreSQL 端口。
 
-```bash
-docker compose down
+## 🧠 AI 提供商
+
+内置 21 家提供商预设，另支持任意 OpenAI 兼容接口的自定义配置。每个选中的模型在成为评分通道前都会**先通过探测验证**，已存储的 API 密钥永远不会发送到浏览器端。
+
+|              |                  |               |
+| ------------ | ---------------- | ------------- |
+| OpenAI       | Anthropic Claude | Google Gemini |
+| DeepSeek     | 通义千问 Qwen    | Kimi          |
+| GLM          | MiniMax          | Mistral       |
+| xAI Grok     | Groq             | OpenRouter    |
+| Together     | Fireworks        | Perplexity    |
+| SiliconFlow  | NVIDIA NIM       | Cerebras      |
+| Azure OpenAI | Ollama           | LM Studio     |
+
+## ☁️ 部署
+
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/n6tTY8)
+
+| 部署目标       | 支持级别           | 配置文件                                                                                  |
+| -------------- | ------------------ | ----------------------------------------------------------------------------------------- |
+| Docker Compose | Tier 1             | [`compose.yaml`](./compose.yaml)                                                          |
+| Railway        | Tier 1             | [`railway.web.toml`](./railway.web.toml) · [`railway.worker.toml`](./railway.worker.toml) |
+| Render         | 社区示例，尽力维护 | [`render.yaml`](./render.yaml)                                                            |
+
+Tier 1 表示该部署目标的文档与配置回归会被视为发布阻断项。部署前请阅读[部署指南](./docs/deployment.md)，其中涵盖服务拓扑、共享密钥、迁移顺序与平台验证。
+
+## 💻 Codex Skill
+
+更喜欢在终端里练习？仓库自带一个 **Codex Skill**，无需 Web 应用、无需调用 AI API 即可运行同样的学习闭环——仅用 Python 3.11 标准库，学习状态全部保存在本地。
+
+```text
+Use $skill-installer to install https://github.com/KevinYe0725/ielts-writing-coach/tree/v1.0.0/.agents/skills/coach-ielts-writing
 ```
 
-除非你明确要删除数据库和自动生成的密钥，否则不要添加 `--volumes`。
+Web 应用与 Skill 共享**带版本号的学习契约**，两端的进度与掌握度定义完全一致。请固定到发布标签（tag），不要安装随时变动的 `main`。
 
-## 本地开发
+## 🛠️ 本地开发
 
-要求：Node.js 24.14 或更高版本、pnpm 11.16、Docker Compose v2 与 OpenSSL。
+环境要求：Node.js 24.14+、pnpm 11.16、Docker Compose v2、OpenSSL。
 
 ```bash
 corepack enable
@@ -76,9 +217,7 @@ pnpm db:seed
 pnpm dev
 ```
 
-打开 `http://127.0.0.1:3000/setup?token=$SETUP_TOKEN`。开发命令会同时启动 Web 和独立 Worker。这里明确设置的 `DATABASE_URL` 使用 `5433`，因为它是 `compose.yaml` 暴露到宿主机的端口；容器内部仍然使用 `5432`。
-
-提交 Pull Request 前运行：
+打开 `http://127.0.0.1:3000/setup?token=$SETUP_TOKEN`。提交 Pull Request 前请运行：
 
 ```bash
 pnpm validate
@@ -87,66 +226,41 @@ pnpm skill:validate
 pnpm skill:forward:validate
 ```
 
-测试范围、隐私要求、契约变更规则和每个 commit 必须包含的 DCO 签署方式见 [CONTRIBUTING.md](./CONTRIBUTING.md)。
+## 🔐 安全与隐私
 
-## 部署支持范围
+- 提供商凭据使用运营者提供的 `APP_ENCRYPTION_KEY` 加密落盘
+- 出站模型请求经过 SSRF 防护；API 密钥永不进入浏览器
+- 全加密 `.iwc-backup` 备份归档，含版本化清单与校验和
+- 升级前强制完成并通过验证的备份，否则拒绝拉取新镜像
 
-| 目标           | 支持级别           | 配置文件                                                                                   |
-| -------------- | ------------------ | ------------------------------------------------------------------------------------------ |
-| Docker Compose | Tier 1             | [`compose.yaml`](./compose.yaml)                                                           |
-| Railway        | Tier 1             | [`railway.web.toml`](./railway.web.toml) 与 [`railway.worker.toml`](./railway.worker.toml) |
-| Render         | 社区示例，尽力维护 | [`render.yaml`](./render.yaml)                                                             |
+请**不要在 issue、fixture、截图或 Pull Request 中**放置真实作文、凭据、数据库导出或会话 Cookie。发现安全漏洞请遵循 [SECURITY.md](./SECURITY.md)，不要公开提交 issue。
 
-[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/n6tTY8)
+## 📚 文档
 
-Railway 模板会创建 PostgreSQL 17、独立 Web 和独立 Worker。加入此链接前，已用公网
-`/api/v1/health/ready` 完成真实部署验收。
+| 分类   | 链接                                                                                                                                                                                             |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 产品   | [PRD](./IELTS_Writing_Web_PRD.md) · [v1.0.0 发布说明](./docs/releases/v1.0.0.md) · [兼容性矩阵](./docs/compatibility.md)                                                                         |
+| 知识库 | [评分与诊断](./docs/knowledge-base/scoring-and-diagnosis.md) · [反馈与修改](./docs/knowledge-base/feedback-and-revision.md) · [针对性教学设计](./docs/knowledge-base/focused-teaching-design.md) |
+| 运维   | [备份与恢复](./docs/operations/backup-restore.md) · [升级与回滚](./docs/operations/upgrading.md) · [部署](./docs/deployment.md)                                                                  |
+| 质量   | [人工复核协议](./docs/quality/human-review-protocol.md) · [v1 质量证据](./docs/quality/v1-quality-evidence.md) · [无障碍审查](./docs/quality/accessibility-review-v1.md)                         |
+| 架构   | [ADR 0001 — 模块化单体](./docs/adr/0001-modular-monolith.md)                                                                                                                                     |
 
-Tier 1 表示该目标的文档或配置回归会阻塞项目发布，但不代表项目提供托管 SLA。Render Blueprint 只是社区维护的起点；套餐、平台行为、数据库迁移顺序、备份方式和费用均需部署者自行复核。
+健康检查端点：`/api/v1/health/live`（进程存活）与 `/api/v1/health/ready`（配置、迁移、数据库连接、Worker 心跳）。版本元数据：`/api/version`。
 
-部署到 Railway 或 Render 前，请阅读[部署指南](./docs/deployment.md)，其中列出了服务拓扑、共享密钥、迁移顺序和平台专项验证方法。
+## 🤝 参与贡献
 
-## 运维
+欢迎贡献！请先阅读 [CONTRIBUTING.md](./CONTRIBUTING.md) 与 [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md)。每次提交都需要 [Developer Certificate of Origin 1.1](./DCO.md) 签名，无需转让著作权。
 
-- 受支持的 Compose 命令（必须始终显式传入准确 project）：
+## 📄 许可证
 
-  ```bash
-  pnpm compose:doctor -- --project ielts-writing-coach
-  pnpm compose:backup -- --project ielts-writing-coach
-  pnpm compose:restore -- --project recovery --archive /secure/backup.iwc-backup --confirm "RESTORE recovery"
-  pnpm compose:upgrade -- --project ielts-writing-coach --image ghcr.io/kevinye0725/ielts-writing-coach:1.0.0 --confirm "UPGRADE ielts-writing-coach TO ghcr.io/kevinye0725/ielts-writing-coach:1.0.0"
-  ```
+源代码与文档使用 [Apache License 2.0](./LICENSE) 许可。署名信息见 [NOTICE](./NOTICE)。
 
-  在真实数据上操作前，先阅读各命令的 `--help`。备份是完整加密的
-  `.iwc-backup` 文件，包含 PostgreSQL custom dump、版本化 manifest、校验和，
-  以及二次加密的实例密钥信封。恢复会先认证并完整校验归档，随后才修改显式
-  命名的 project；升级会在通过可验证的升级前备份之前拒绝拉取新镜像。
+---
 
-- [备份与恢复](./docs/operations/backup-restore.md)
-- [升级与回滚](./docs/operations/upgrading.md)
-- 健康检查：`/api/v1/health/live` 检测 Web 进程存活；`/api/v1/health/ready` 同时检查配置、迁移版本、数据库连接和新鲜的 Worker 心跳
-- 兼容版本：`/api/version`（亦可用 `/api/v1/version`）公开应用、数据库、契约、规划器、Prompt、Rubric 与交换格式版本
+<div align="center">
 
-## Codex Skill
+**如果这个项目对你有帮助，请点个 ⭐ 并分享给一起备考的朋友。**
 
-仓库内 Skill 位于 `.agents/skills/coach-ielts-writing`，从本仓库启动 Codex 时会自动发现。若完全不使用 Web，可让 Codex 使用内置 `$skill-installer` 从固定标签路径安装：
+为全球学习者用心打造。与雅思官方、剑桥、英国文化协会及 IDP 无任何隶属或背书关系。
 
-```text
-Use $skill-installer to install https://github.com/KevinYe0725/ielts-writing-coach/tree/v1.0.0/.agents/skills/coach-ielts-writing
-```
-
-安装后的 Skill 会在下一次 Codex 对话中可用。它只依赖 Python 3.11 标准库，把学习状态写入所选 workspace 下的 `.coach-ielts-writing/`，不会另外调用 AI API。正式标签 Release 也会附带独立 Skill ZIP；建议固定标签，不要安装会变化的 `main`。
-
-维护者使用 `pnpm skill:validate` 检查结构，使用 `pnpm skill:forward:validate` 验证仓库内 10+ 个独立 ephemeral Codex 会话证据；`pnpm skill:forward` 会有意重新执行一次真实、会产生模型用量的 forward suite。版本对应关系见[兼容矩阵](./docs/compatibility.md)，验收机制见 [fresh-agent 协议](./tests/skill-forward/README.md)。
-
-## 安全与隐私
-
-请勿把真实作文、provider 凭据、数据库备份、会话 Cookie 或其他个人数据放入 issue、测试 fixture、截图或 Pull Request。API key 始终留在服务端；持久化的 provider 凭据由部署者提供的 `APP_ENCRYPTION_KEY` 加密。
-
-发现漏洞时请按 [SECURITY.md](./SECURITY.md) 私下报告，不要创建公开 issue。
-
-## 许可证与贡献
-
-源代码与文档依据 [Apache License 2.0](./LICENSE) 发布，署名信息见 [NOTICE](./NOTICE)。每个贡献 commit 都必须签署 [Developer Certificate of Origin 1.1](./DCO.md)；项目不要求转让版权。
-
-参与贡献前请阅读 [CONTRIBUTING.md](./CONTRIBUTING.md) 与 [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md)。
+</div>
