@@ -32,7 +32,6 @@ test.describe("cross-browser accessibility smoke checks", () => {
       page,
     }) => {
       await page.goto(route);
-      await page.waitForLoadState("networkidle");
       await expectBasicAccessibility(page);
       const scan = await new AxeBuilder({ page })
         .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
@@ -51,7 +50,6 @@ test.describe("cross-browser accessibility smoke checks", () => {
       "The touch project has no hardware-keyboard contract.",
     );
     await page.goto("/today");
-    await page.waitForLoadState("networkidle");
 
     const skipLink = page.locator('a[href="#main-content"]');
     if (testInfo.project.name === "webkit") {
@@ -75,7 +73,6 @@ test.describe("cross-browser accessibility smoke checks", () => {
       "The touch project has no hardware-keyboard contract.",
     );
     await page.goto("/setup");
-    await page.waitForLoadState("networkidle");
     const skipLink = page.locator('a[href="#main-content"]');
     if (testInfo.project.name === "webkit") {
       await skipLink.focus();
