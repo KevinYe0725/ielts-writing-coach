@@ -93,6 +93,7 @@ type HttpTeachingScenario = {
   submit?: ResponseSource;
   retry?: ResponseSource;
   restoreFailureStatus?: number;
+  teachingNeedsRecovery?: boolean;
 };
 
 const httpAnswer = "Employees can protect longer periods for demanding work.";
@@ -165,6 +166,7 @@ async function installHttpTeachingApi(
   scenario: HttpTeachingScenario,
 ): Promise<string[]> {
   const requests: string[] = [];
+  let recoveryStarted = false;
   await page.route("**/api/v1/**", async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -184,9 +186,38 @@ async function installHttpTeachingApi(
       return;
     }
     if (url.pathname === "/api/v1/lessons/lesson-http/teaching") {
+      if (scenario.teachingNeedsRecovery && !recoveryStarted) {
+        await route.fulfill({
+          contentType: "application/problem+json",
+          status: 409,
+          body: JSON.stringify({
+            title: "Focused teaching needs recovery",
+            status: 409,
+            detail: "An earlier focused package needs replacement.",
+            code: "FOCUSED_TEACHING_REPLACEMENT_REQUIRED",
+          }),
+        });
+        return;
+      }
       await route.fulfill({
         contentType: "application/json",
         body: JSON.stringify({ teaching: httpTeaching }),
+      });
+      return;
+    }
+    if (
+      url.pathname === "/api/v1/lessons/lesson-http/replace" &&
+      request.method() === "POST"
+    ) {
+      recoveryStarted = true;
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          replacement_started: true,
+          lesson_id: "lesson-http",
+          job_id: null,
+          job_status: "SUCCEEDED",
+        }),
       });
       return;
     }
@@ -1054,6 +1085,29 @@ test.describe("tutorial answer analysis over the public HTTP contract", () => {
     deterministicDemo,
     "Run with NEXT_PUBLIC_DEMO_MODE=false and an HTTP-mode web server.",
   );
+
+  test("automatically restores earlier focused teaching without a learner action", async ({
+    page,
+  }) => {
+    const requests = await installHttpTeachingApi(page, {
+      restore: null,
+      teachingNeedsRecovery: true,
+    });
+
+    await page.goto(httpLessonUrl);
+    await expect(page.locator("article[data-teaching-article]")).toBeVisible();
+    expect(
+      requests.filter(
+        (request) => request === "POST /api/v1/lessons/lesson-http/replace",
+      ),
+    ).toHaveLength(1);
+    await expect(
+      page.getByRole("button", {
+        name: /生成专项教学|检查是否已准备好|Generate teaching|Check whether it is ready/,
+      }),
+    ).toHaveCount(0);
+    await expectPaperLinkAvailable(page);
+  });
 
   test("keeps a prompt restoring until the canonical first answer is known", async ({
     page,

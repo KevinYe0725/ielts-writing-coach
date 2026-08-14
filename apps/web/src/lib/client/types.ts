@@ -639,7 +639,7 @@ export interface PracticePaperResult {
 }
 
 export interface LegacyLessonRecoveryResult {
-  readonly state: "READY" | "PREPARING" | "CONTINUING_SAFELY" | "UNAVAILABLE";
+  readonly state: "READY" | "PREPARING" | "CONTINUING_SAFELY";
   readonly jobId: string | null;
 }
 

@@ -1,11 +1,11 @@
 "use client";
 
-import { use, useCallback, useState } from "react";
-import { useRouter } from "next/navigation";
+import { use, useCallback } from "react";
 
 import { useLocale } from "@/components/locale-provider";
-import { ActionLink, Button, Card, Skeleton } from "@/components/ui";
+import { ActionLink, Card, Skeleton } from "@/components/ui";
 import { useDemoResource } from "@/components/use-demo-resource";
+import { useFocusedPackageRecovery } from "@/components/use-focused-package-recovery";
 import { LearningClientError, learningClient } from "@/lib/client";
 import {
   learningRouteHref,
@@ -21,7 +21,6 @@ export default function FocusedTeachingPage({
   searchParams: Promise<LearningSearchParams>;
 }) {
   const query = use(searchParams);
-  const router = useRouter();
   const cycleId = singleRouteParam(query, "cycle");
   const lessonId = singleRouteParam(query, "lesson");
   const { text } = useLocale();
@@ -38,96 +37,65 @@ export default function FocusedTeachingPage({
     [cycleId, lessonId],
   );
   const { data, error, loading, retry } = useDemoResource(loader);
-  const [replacing, setReplacing] = useState(false);
-  const [replacementState, setReplacementState] = useState<
-    "PREPARING" | "CONTINUING_SAFELY" | "UNAVAILABLE" | null
-  >(null);
+  const replace = useCallback(
+    (targetLessonId: string) =>
+      learningClient.replaceLegacyLesson(targetLessonId),
+    [],
+  );
+  const recoveryState = useFocusedPackageRecovery({
+    available: Boolean(data),
+    error,
+    lessonId,
+    refresh: retry,
+    replace,
+  });
   const feedbackHref = cycleId
     ? learningRouteHref("/feedback", { cycleId })
     : "/today";
+  const writingHref = cycleId
+    ? learningRouteHref("/write", { cycleId })
+    : "/write";
 
-  const startReplacement = () => {
-    if (!lessonId) return;
-    setReplacing(true);
-    void learningClient
-      .replaceLegacyLesson(lessonId)
-      .then((result) => {
-        if (result.state === "READY") {
-          setReplacementState(null);
-          retry();
-          router.refresh();
-          return;
-        }
-        setReplacementState(result.state);
-      })
-      .catch(() => {
-        setReplacementState("UNAVAILABLE");
-      })
-      .finally(() => setReplacing(false));
-  };
-
-  if (loading || !data) {
-    if (error) {
-      const needsReplacement =
-        error instanceof LearningClientError &&
-        error.code === "FOCUSED_TEACHING_REPLACEMENT_REQUIRED";
+  if (!data) {
+    if (loading && !error && recoveryState === "IDLE") {
       return (
-        <Card className="transfer-result-card">
-          <h1>
-            {needsReplacement
-              ? text(
-                  "这份旧训练需要补上专项教学",
-                  "This earlier paper needs focused teaching",
-                )
-              : text("专项教学暂不可用", "Focused teaching unavailable")}
-          </h1>
-          <p>
-            {replacementState === "PREPARING"
-              ? text(
-                  "新版训练正在准备中。你的原有训练记录已保留；你可以先返回批改报告，稍后再回来查看。",
-                  "Your updated practice is being prepared. Your earlier record is safe; you can return to feedback and check again later.",
-                )
-              : replacementState === "UNAVAILABLE"
-                ? text(
-                    "你的原有训练记录已保留。新版训练暂时无法生成；你可以稍后重试，或返回批改报告。",
-                    "Your earlier practice record is safe. The updated practice is unavailable for now; try again later or return to feedback.",
-                  )
-                : needsReplacement
-                  ? text(
-                      "系统会保留原作文和批改依据，重新生成“专项教学＋完整训练卷”，避免你在没有学会方法前直接做题。",
-                      "Your essay and diagnosis will be preserved while the teaching module and complete paper are regenerated.",
-                    )
-                  : error.message}
-          </p>
-          <div className="completion-actions">
-            {needsReplacement && lessonId ? (
-              <Button disabled={replacing} onClick={startReplacement}>
-                {replacing
-                  ? text("正在生成新版内容…", "Generating…")
-                  : replacementState === "PREPARING"
-                    ? text("检查是否已准备好", "Check whether it is ready")
-                    : text(
-                        "生成专项教学和新版训练卷",
-                        "Generate teaching and a new paper",
-                      )}
-              </Button>
-            ) : (
-              <Button onClick={retry} variant="secondary">
-                {text("重试", "Try again")}
-              </Button>
-            )}
-            <ActionLink href={feedbackHref}>
-              {text("返回批改报告", "Return to feedback")}
-            </ActionLink>
-          </div>
-        </Card>
+        <Skeleton
+          label={text("正在准备专项教学", "Preparing focused teaching")}
+        />
       );
     }
 
+    const preparing = recoveryState === "PREPARING";
     return (
-      <Skeleton
-        label={text("正在准备专项教学", "Preparing focused teaching")}
-      />
+      <Card className="transfer-result-card" role="status">
+        <h1>
+          {preparing
+            ? text("正在为你准备专项教学", "Preparing your focused teaching")
+            : text(
+                "专项教学会继续准备",
+                "Your focused teaching will keep preparing",
+              )}
+        </h1>
+        <p>
+          {preparing
+            ? text(
+                "你的原有学习记录已保留。完成后，这里会自动显示教学内容和训练卷。",
+                "Your earlier learning record is safe. This page will show the teaching and paper automatically when they are ready.",
+              )
+            : text(
+                "你的原有学习记录已保留。你可以先查看批改报告或继续写作，稍后回来即可。",
+                "Your earlier learning record is safe. You can review feedback or keep writing, then return later.",
+              )}
+        </p>
+        <div className="completion-actions">
+          <ActionLink href={feedbackHref}>
+            {text("查看批改报告", "View feedback")}
+          </ActionLink>
+          <ActionLink href={writingHref} variant="secondary">
+            {text("继续写作", "Keep writing")}
+          </ActionLink>
+        </div>
+      </Card>
     );
   }
 

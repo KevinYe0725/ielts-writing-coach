@@ -3,13 +3,11 @@
 import { use, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  AlertTriangle,
   CheckCircle2,
   Clock3,
   FileCheck2,
   FileText,
   LoaderCircle,
-  RotateCcw,
   Send,
 } from "lucide-react";
 
@@ -24,6 +22,7 @@ import {
   Skeleton,
 } from "@/components/ui";
 import { useDemoResource } from "@/components/use-demo-resource";
+import { useFocusedPackageRecovery } from "@/components/use-focused-package-recovery";
 import {
   LearningClientError,
   learningClient,
@@ -120,33 +119,22 @@ export default function PracticePaperPage({
   const [now, setNow] = useState(() => Date.now());
   const [submitting, setSubmitting] = useState(false);
   const [finishing, setFinishing] = useState(false);
-  const [replacing, setReplacing] = useState(false);
   const [submitError, setSubmitError] = useState("");
-  const [replacementState, setReplacementState] = useState<
-    "PREPARING" | "CONTINUING_SAFELY" | "UNAVAILABLE" | null
-  >(null);
+  const replace = useCallback(
+    (targetLessonId: string) =>
+      learningClient.replaceLegacyLesson(targetLessonId),
+    [],
+  );
+  const recoveryState = useFocusedPackageRecovery({
+    available: Boolean(data),
+    error,
+    lessonId,
+    refresh: retry,
+    replace,
+  });
   const feedbackHref = cycleId
     ? learningRouteHref("/feedback", { cycleId })
     : "/today";
-
-  const startReplacement = () => {
-    if (!lessonId) return;
-    setReplacing(true);
-    setSubmitError("");
-    void learningClient
-      .replaceLegacyLesson(lessonId)
-      .then((result) => {
-        if (result.state === "READY") {
-          setReplacementState(null);
-          retry();
-          router.refresh();
-          return;
-        }
-        setReplacementState(result.state);
-      })
-      .catch(() => setReplacementState("UNAVAILABLE"))
-      .finally(() => setReplacing(false));
-  };
 
   useEffect(() => {
     if (!data) return;
@@ -207,73 +195,43 @@ export default function PracticePaperPage({
     [data],
   );
 
-  if (loading) return <Skeleton label={messages.common.loading} />;
-  if (error || !data) {
-    const legacy =
-      error instanceof LearningClientError &&
-      error.code === "PRACTICE_PAPER_REPLACEMENT_REQUIRED";
+  if (!data) {
+    if (loading && !error && recoveryState === "IDLE")
+      return <Skeleton label={messages.common.loading} />;
+
+    const preparing = recoveryState === "PREPARING";
+    const writingHref = cycleId
+      ? learningRouteHref("/write", { cycleId })
+      : "/write";
     return (
-      <Card className="practice-paper-replace" role="alert">
-        {legacy ? (
-          <FileText aria-hidden="true" size={42} />
-        ) : (
-          <AlertTriangle aria-hidden="true" size={42} />
-        )}
+      <Card className="practice-paper-replace" role="status">
         <h1>
-          {legacy
-            ? text(
-                "旧版专项训练已停止使用",
-                "The old practice format has been retired",
-              )
-            : text("专项训练卷暂不可用", "Practice paper unavailable")}
+          {preparing
+            ? text("正在为你准备专项训练卷", "Preparing your focused paper")
+            : text(
+                "专项训练卷会继续准备",
+                "Your focused paper will keep preparing",
+              )}
         </h1>
         <p>
-          {replacementState === "PREPARING"
+          {preparing
             ? text(
-                "新版训练正在准备中。你的原有训练记录已保留；你可以先返回批改报告，稍后再回来查看。",
-                "Your updated practice is being prepared. Your earlier record is safe; you can return to feedback and check again later.",
+                "你的原有学习记录已保留。完成后，这里会自动显示与专项教学对应的完整训练卷。",
+                "Your earlier learning record is safe. This page will show the complete paper that matches your focused teaching automatically when it is ready.",
               )
-            : replacementState === "UNAVAILABLE"
-              ? text(
-                  "你的原有训练记录已保留。新版训练暂时无法生成；你可以稍后重试，或返回批改报告。",
-                  "Your earlier practice record is safe. The updated practice is unavailable for now; try again later or return to feedback.",
-                )
-              : legacy
-                ? text(
-                    "系统会保留原有训练记录，并根据可用信息生成一份完整的60分钟专项训练卷。",
-                    "Your earlier practice record will be preserved while one complete 60-minute paper is prepared.",
-                  )
-                : error?.message}
+            : text(
+                "你的原有学习记录已保留。你可以先查看批改报告或继续写作，稍后回来即可。",
+                "Your earlier learning record is safe. You can review feedback or keep writing, then return later.",
+              )}
         </p>
         <div className="completion-actions">
-          {legacy && lessonId ? (
-            <Button disabled={replacing} onClick={startReplacement}>
-              {replacing ? (
-                <LoadingButtonContent
-                  label={text("正在生成新版试卷", "Creating the new paper")}
-                />
-              ) : (
-                <>
-                  {replacementState === "PREPARING"
-                    ? text("检查是否已准备好", "Check whether it is ready")
-                    : text(
-                        "生成新的专项教学和训练卷",
-                        "Create updated teaching and paper",
-                      )}
-                </>
-              )}
-            </Button>
-          ) : (
-            <Button onClick={retry} variant="secondary">
-              <RotateCcw aria-hidden="true" size={17} />
-              {text("重试", "Try again")}
-            </Button>
-          )}
-          <ActionLink href={feedbackHref} variant="secondary">
-            {text("返回批改报告", "Return to feedback")}
+          <ActionLink href={feedbackHref}>
+            {text("查看批改报告", "View feedback")}
+          </ActionLink>
+          <ActionLink href={writingHref} variant="secondary">
+            {text("继续写作", "Keep writing")}
           </ActionLink>
         </div>
-        {submitError ? <p role="alert">{submitError}</p> : null}
       </Card>
     );
   }
