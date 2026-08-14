@@ -39,6 +39,10 @@ const nextConfig: NextConfig = {
           // their query string until client hydration strips them. Never send
           // those URLs in Referer headers, including to same-origin assets.
           { key: "Referrer-Policy", value: "no-referrer" },
+          // A cached document shell can reference routes from a deployment
+          // that no longer exists. Railway keeps edge caches across releases,
+          // so always revalidate application documents after deployment.
+          { key: "Cache-Control", value: "no-store" },
           ...(production
             ? [
                 {

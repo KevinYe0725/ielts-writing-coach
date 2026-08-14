@@ -93,6 +93,15 @@ describe("API security architecture", () => {
 });
 
 describe("one-time link response policy", () => {
+  it("prevents document shells from surviving a Railway deployment cache", () => {
+    const nextConfig = readFileSync(
+      join(currentDirectory, "../../../next.config.ts"),
+      "utf8",
+    );
+
+    expect(nextConfig).toContain('{ key: "Cache-Control", value: "no-store" }');
+  });
+
   it("uses a global no-referrer policy while one-time query strings hydrate", () => {
     const nextConfig = readFileSync(
       join(currentDirectory, "../../../next.config.ts"),
