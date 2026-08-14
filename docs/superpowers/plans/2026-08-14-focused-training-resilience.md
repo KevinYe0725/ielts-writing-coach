@@ -23,12 +23,14 @@
 ### Task 1: Define validated source-owned packages for all supported skills
 
 **Files:**
+
 - Create: `apps/worker/src/focused-recovery-package.ts`
 - Create: `apps/worker/src/focused-recovery-package.test.ts`
 - Modify: `apps/worker/src/tasks/ai.ts:1173-1307`
 - Modify: `apps/worker/src/tasks/ai.lesson-generation.test.ts`
 
 **Interfaces:**
+
 - Produces `sourceOwnedFocusedRecoveryPackage(skillId: SkillId): FocusedLearningPackage` and `focusedRecoveryLessonFor(skillId: SkillId): FocusedRecoveryLesson`.
 - Consumes `SKILL_IDS`, `FocusedLearningPackage`, and `validateFocusedLearningPackage`.
 - Worker uses this helper only after model failure or validation rejection; its output still passes the same package validator before persistence.
@@ -41,7 +43,9 @@ it.each(SKILL_IDS)("returns a valid recovery package for %s", (skillId) => {
   expect(value.teachingModule.blueprint.coreAbilityZh).toBe(
     focusedRecoveryLessonFor(skillId).coreAbilityZh,
   );
-  expect(validateFocusedLearningPackage(value, "A preserved first draft.")).toBe(true);
+  expect(
+    validateFocusedLearningPackage(value, "A preserved first draft."),
+  ).toBe(true);
   expect(value.paper.items).toHaveLength(8);
 });
 ```
@@ -55,9 +59,14 @@ Expected: FAIL because `sourceOwnedFocusedRecoveryPackage` does not exist.
 - [ ] **Step 3: Implement the bounded source-owned package factory**
 
 ```ts
-export function sourceOwnedFocusedRecoveryPackage(skillId: SkillId): FocusedLearningPackage {
+export function sourceOwnedFocusedRecoveryPackage(
+  skillId: SkillId,
+): FocusedLearningPackage {
   const lesson = RECOVERY_LESSONS[skillId];
-  return buildFocusedPackage({ lesson, practiceContexts: lesson.practiceContexts });
+  return buildFocusedPackage({
+    lesson,
+    practiceContexts: lesson.practiceContexts,
+  });
 }
 ```
 
@@ -66,11 +75,12 @@ Use a complete owned `RECOVERY_LESSONS` record keyed by every `SkillId`. Each re
 - [ ] **Step 4: Replace the mechanism-only Worker fallback**
 
 ```ts
-const deterministicRecoveryPackage = (): GenerationResult<FocusedLearningPackage> => ({
-  value: sourceOwnedFocusedRecoveryPackage(canonicalSkillId),
-  model: "source-owned-recovery-v1",
-  usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
-});
+const deterministicRecoveryPackage =
+  (): GenerationResult<FocusedLearningPackage> => ({
+    value: sourceOwnedFocusedRecoveryPackage(canonicalSkillId),
+    model: "source-owned-recovery-v1",
+    usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+  });
 ```
 
 Use it for adapter failure or invalid structured package. Validate the returned package before persistence.
@@ -91,6 +101,7 @@ git commit -m "feat: add focused training content fallback"
 ### Task 2: Make server recovery idempotent, diagnostic-safe, and self-healing
 
 **Files:**
+
 - Modify: `apps/web/src/app/api/v1/lessons/[id]/replace/route.ts`
 - Create: `apps/web/src/app/api/v1/lessons/[id]/replace/route.test.ts`
 - Modify: `apps/web/src/lib/client/types.ts`
@@ -98,6 +109,7 @@ git commit -m "feat: add focused training content fallback"
 - Modify: `apps/web/src/lib/client/http-service.test.ts`
 
 **Interfaces:**
+
 - Produces `LegacyLessonRecoveryResult` with only `READY`, `PREPARING`, or `CONTINUING_SAFELY` for client consumption.
 - Consumes the lesson row, cycle core skill, preserved assessment issues, and active/recent generation jobs.
 - Uses `deriveRecoverySkill(...): SkillId` even when `coreSkillId` is absent.
@@ -106,15 +118,22 @@ git commit -m "feat: add focused training content fallback"
 
 ```ts
 it("derives the most severe valid issue skill when the old cycle has no core skill", async () => {
-  routeState.cycle = replacementCycle({ coreSkillId: null, issues: [{ skillId: "cohesion_progression", severity: 4 }] });
+  routeState.cycle = replacementCycle({
+    coreSkillId: null,
+    issues: [{ skillId: "cohesion_progression", severity: 4 }],
+  });
   await replaceTeaching(legacyRequest(), routeParams());
-  expect(routeState.queuedInput).toMatchObject({ protectedReference: { skillId: "cohesion_progression" } });
+  expect(routeState.queuedInput).toMatchObject({
+    protectedReference: { skillId: "cohesion_progression" },
+  });
 });
 
 it("uses task response when the old diagnosis is absent", async () => {
   routeState.cycle = replacementCycle({ coreSkillId: null, issues: [] });
   await replaceTeaching(legacyRequest(), routeParams());
-  expect(routeState.queuedInput).toMatchObject({ protectedReference: { skillId: "task_response" } });
+  expect(routeState.queuedInput).toMatchObject({
+    protectedReference: { skillId: "task_response" },
+  });
 });
 ```
 
@@ -127,9 +146,16 @@ Expected: FAIL because the route rejects a missing `coreSkillId` and has no cons
 - [ ] **Step 3: Implement explicit recovery selection and the 15-minute guard**
 
 ```ts
-function deriveRecoverySkill(cycle: RecoveryCycle, plan: LessonPlanRow): SkillId {
-  return validSkill(cycle.coreSkillId) ?? validSkill(plan.coreSkillId) ??
-    highestSeveritySkill(cycle.writingAttempts) ?? "task_response";
+function deriveRecoverySkill(
+  cycle: RecoveryCycle,
+  plan: LessonPlanRow,
+): SkillId {
+  return (
+    validSkill(cycle.coreSkillId) ??
+    validSkill(plan.coreSkillId) ??
+    highestSeveritySkill(cycle.writingAttempts) ??
+    "task_response"
+  );
 }
 ```
 
@@ -162,6 +188,7 @@ git commit -m "feat: make focused recovery self-healing"
 ### Task 3: Replace manual recovery pages with automatic preparation and safe continuation
 
 **Files:**
+
 - Create: `apps/web/src/lib/client/focused-recovery.ts`
 - Create: `apps/web/src/lib/client/focused-recovery.test.ts`
 - Modify: `apps/web/src/app/lesson/page.tsx`
@@ -170,6 +197,7 @@ git commit -m "feat: make focused recovery self-healing"
 - Modify: `tests/e2e/lesson.spec.ts`
 
 **Interfaces:**
+
 - Produces `beginFocusedRecovery({ lessonId, load, recover, clock })` with phase `LOADING | PREPARING | CONTINUING_SAFELY | READY`.
 - Consumes `LearningClient.getFocusedTeaching` or `getPracticePaper` and `replaceLegacyLesson`.
 - Both pages render the same preparing and safe-continuation state; only their successful body differs.
@@ -178,14 +206,23 @@ git commit -m "feat: make focused recovery self-healing"
 
 ```ts
 it("automatically starts recovery when the loader reports an incomplete package", async () => {
-  const recover = vi.fn().mockResolvedValue({ state: "PREPARING", jobId: "job-1" });
-  const result = await beginFocusedRecovery({ load: missingTeaching, recover, clock });
+  const recover = vi
+    .fn()
+    .mockResolvedValue({ state: "PREPARING", jobId: "job-1" });
+  const result = await beginFocusedRecovery({
+    load: missingTeaching,
+    recover,
+    clock,
+  });
   expect(recover).toHaveBeenCalledOnce();
   expect(result.phase).toBe("PREPARING");
 });
 
 it("changes to safe continuation after twenty seconds", async () => {
-  const result = await waitForFocusedRecovery(preparingRecovery, fakeClock.advanceBy(20_000));
+  const result = await waitForFocusedRecovery(
+    preparingRecovery,
+    fakeClock.advanceBy(20_000),
+  );
   expect(result).toMatchObject({ phase: "CONTINUING_SAFELY" });
 });
 ```
@@ -201,7 +238,9 @@ Expected: FAIL because automatic recovery and the 20-second continuation transit
 ```ts
 if (isRecoveryRequired(error)) {
   const recovery = await recover(lessonId);
-  return recovery.state === "READY" ? reload() : { phase: "PREPARING", startedAt: clock.now() };
+  return recovery.state === "READY"
+    ? reload()
+    : { phase: "PREPARING", startedAt: clock.now() };
 }
 ```
 
@@ -210,11 +249,15 @@ Poll the page loader while preparing. At 20 seconds return `CONTINUING_SAFELY`, 
 - [ ] **Step 4: Write and run browser RED tests**
 
 ```ts
-test("automatically recovers an old focused lesson and opens its paper", async ({ page }) => {
+test("automatically recovers an old focused lesson and opens its paper", async ({
+  page,
+}) => {
   await page.goto("/lesson?cycle=cycle-legacy&lesson=lesson-legacy");
   await expect(page.getByText("正在为你准备专项教学")).toBeVisible();
   await expect(page.getByRole("button", { name: /生成|检查/ })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "开始60分钟训练卷" })).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "开始60分钟训练卷" }),
+  ).toBeVisible();
 });
 ```
 
@@ -236,11 +279,13 @@ git commit -m "feat: automatically recover focused learning pages"
 ### Task 4: Verify migration safety, workspace quality, and Railway behavior
 
 **Files:**
+
 - Modify: `docs/quality/v1-quality-evidence.md`
 - Modify: `apps/web/src/lib/server/lesson-recovery-route.test.ts`
 - Modify: `tests/e2e/lesson.spec.ts`
 
 **Interfaces:**
+
 - No new runtime interface.
 - Confirms `legacyMigrationSnapshot`, existing `paperAnswers`, and ready packages retain their prior values across recovery paths.
 
@@ -251,7 +296,9 @@ it("preserves earlier answers and the evaluation snapshot while recovery becomes
   const before = await readLegacyLesson(lessonId);
   await runLegacyRecoveryJob(jobId);
   const after = await readLegacyLesson(lessonId);
-  expect(after.legacyMigrationSnapshot).toMatchObject({ paperAnswers: before.paperAnswers });
+  expect(after.legacyMigrationSnapshot).toMatchObject({
+    paperAnswers: before.paperAnswers,
+  });
 });
 ```
 
