@@ -1182,6 +1182,8 @@ The suggested minutes across all 8 questions must total exactly 60. Every questi
 
 All eight English prompts must be substantively different. REPAIR questions must include the exact flawed source sentence. The public criterion weights for each question must total 100. Reject trivia, meta-questions about grammar labels, and instructions that require the learner to guess the intended content.
 
+When the diagnosis context source is MIGRATED_LEGACY_FALLBACK: Do not claim that an unavailable diagnosis found a personal weakness. Teach the named skill as a careful general recovery topic and keep every learner-facing statement conditional on the visible task.
+
 Original IELTS question: ${cycle.question.prompt}
 Selected-skill diagnosis context: ${JSON.stringify(diagnosisContext)}
 Learner Version 1 for context only: ${(version1?.content ?? "").slice(0, 4_000)}`,

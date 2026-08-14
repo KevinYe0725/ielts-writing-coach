@@ -294,6 +294,9 @@ describe("adaptive lesson generation evidence", () => {
     expect(lessonState.failure).toBeUndefined();
     expect(lessonState.generatedInput).toContain("MIGRATED_LEGACY_FALLBACK");
     expect(lessonState.generatedInput).toContain("mechanism_chain");
+    expect(lessonState.generatedInput).toContain(
+      "Do not claim that an unavailable diagnosis found a personal weakness.",
+    );
   });
 
   it("does not mutate an older lesson when its replacement cannot be generated", async () => {
