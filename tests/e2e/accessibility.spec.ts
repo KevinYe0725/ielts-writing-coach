@@ -54,8 +54,11 @@ test.describe("cross-browser accessibility smoke checks", () => {
     const skipLink = page.locator('a[href="#main-content"]');
     if (testInfo.project.name === "webkit") {
       // Playwright's WebKit does not emulate Safari's macOS "Press Tab to
-      // highlight each item" preference. Start on the link explicitly, then
-      // keep the activation and destination assertions keyboard-driven.
+      // highlight each item" preference. Let client hydration settle before
+      // focusing the link explicitly; otherwise WebKit can replace the
+      // server-rendered anchor after the focus call. Activation and destination
+      // assertions remain keyboard-driven.
+      await page.waitForTimeout(300);
       await skipLink.focus();
     } else {
       await page.keyboard.press("Tab");
@@ -75,6 +78,7 @@ test.describe("cross-browser accessibility smoke checks", () => {
     await page.goto("/setup");
     const skipLink = page.locator('a[href="#main-content"]');
     if (testInfo.project.name === "webkit") {
+      await page.waitForTimeout(300);
       await skipLink.focus();
     } else {
       await page.keyboard.press("Tab");

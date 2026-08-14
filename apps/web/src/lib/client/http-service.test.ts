@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 import { DraftConflictError, LearningClientError } from "./errors";
 import { HttpLearningClient } from "./http-service";
@@ -60,6 +62,18 @@ const savedPersonalizedResponse: TeachingPracticeResponseData = {
   analysisState: "ANALYSIS_READY",
   analysis: validPersonalizedAnalysis,
 };
+
+describe("browser-safe core imports", () => {
+  it("keeps the next-action wire guard out of the validator barrel", () => {
+    const source = readFileSync(
+      fileURLToPath(new URL("./http-service.ts", import.meta.url)),
+      "utf8",
+    );
+
+    expect(source).toContain("const NEXT_ACTION_KINDS = [");
+    expect(source).not.toContain('from "@iwc/learning-core"');
+  });
+});
 
 describe("legacy practice recovery client", () => {
   it("returns a safe continuation state instead of waiting on a blocked replacement", async () => {

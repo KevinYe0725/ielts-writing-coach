@@ -58,9 +58,11 @@ test.describe("timed writing rooms", () => {
     ).toHaveCount(0);
 
     await expect(page.getByRole("timer")).toContainText("40:00");
-    // Jump once instead of executing 2,100 individual interval ticks. The
-    // assertion remains tied to the app's Date-based deadline calculation.
-    await page.clock.fastForward("35:00");
+    // The room starts its deadline in a zero-delay hydration effect. Advance
+    // that effect first, then jump to the final-five window; otherwise a busy
+    // WebKit/mobile run can start the 40-minute clock after the jump.
+    await page.clock.fastForward("00:01");
+    await page.clock.fastForward("34:59");
 
     await expect(page.getByRole("timer")).toContainText("05:00");
     await expect(page.getByText("检查比较对象是否完整")).toBeVisible();

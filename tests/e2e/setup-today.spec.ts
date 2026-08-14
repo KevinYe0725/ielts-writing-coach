@@ -26,6 +26,10 @@ test.describe("deterministic setup and Today experience", () => {
       page.getByRole("button", { name: /仅我使用/ }),
     ).toHaveAttribute("aria-pressed", "true");
     await expectBasicAccessibility(page);
+    // The setup panel is server-rendered first. Wait for its client handler to
+    // hydrate before exercising the first state transition on a busy mobile
+    // browser, rather than treating a pre-hydration click as a user action.
+    await page.waitForTimeout(300);
     await page.getByRole("button", { name: "继续", exact: true }).click();
 
     await expect(

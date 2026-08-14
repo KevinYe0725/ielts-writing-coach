@@ -4,7 +4,6 @@ import {
   LearningClientError,
   type ApiProblemDetails,
 } from "./errors";
-import { NEXT_ACTION_KINDS } from "@iwc/learning-core";
 import {
   projectTeachingPracticeResponse,
   unavailableTeachingPracticeResponse,
@@ -62,6 +61,30 @@ import type {
   UserPreferences,
   WritingPrompt,
 } from "./types";
+
+// Keep this browser-only wire guard independent of the server learning-core
+// barrel, which also exports Ajv-backed validators that cannot run under the
+// production Content Security Policy.
+const NEXT_ACTION_KINDS = [
+  "START_ATTEMPT_1",
+  "CONTINUE_ATTEMPT_1",
+  "WAIT_FOR_ASSESSMENT",
+  "REVIEW_FEEDBACK",
+  "WAIT_FOR_LESSON",
+  "START_LESSON",
+  "CONTINUE_LESSON",
+  "COMPLETE_CORE_PREREQUISITE",
+  "WAIT_FOR_REWRITE_SCHEDULING",
+  "WAIT_FOR_REWRITE_UNLOCK",
+  "RESCHEDULE_REWRITE",
+  "START_REWRITE",
+  "CONTINUE_REWRITE",
+  "WAIT_FOR_COMPARISON",
+  "START_TRANSFER",
+  "RESCHEDULE_TRANSFER",
+  "START_MIXED_REVIEW",
+  "START_NEW_CYCLE",
+] as const;
 
 type Fetch = typeof globalThis.fetch;
 type JsonRecord = Record<string, unknown>;
