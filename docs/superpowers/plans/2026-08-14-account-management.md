@@ -37,12 +37,14 @@
 ## Task 1: Safe account-session boundary
 
 **Files:**
+
 - Create: `apps/web/src/lib/client/account-session.ts`
 - Create: `apps/web/src/lib/client/account-session.test.ts`
 - Modify: `apps/web/src/lib/client/learning-navigation.ts`
 - Modify: `apps/web/src/lib/client/learning-navigation.test.ts`
 
 **Interfaces:**
+
 - Produces `AccountIdentity`, `getAccountIdentity()`, `changeAccountPassword(input)`, `signOutAccount()`, and `clearLearningDestinations()`.
 - Consumes Better Auth’s anonymous `GET /api/v1/auth/get-session` and protected POST endpoints.
 - Later tasks only receive `AccountIdentity | null`; they never consume raw auth payloads.
@@ -51,7 +53,9 @@
 
 ```ts
 it("projects only email, initial, and role from a session", async () => {
-  mockFetchJson({ user: { id: "private", email: "learner@example.com", role: "learner" } });
+  mockFetchJson({
+    user: { id: "private", email: "learner@example.com", role: "learner" },
+  });
   await expect(getAccountIdentity()).resolves.toEqual({
     email: "learner@example.com",
     initial: "L",
@@ -81,10 +85,17 @@ Expected: FAIL because the account-session module and cleanup helper do not exis
 
 ```ts
 export type AccountRole = "owner" | "admin" | "learner";
-export interface AccountIdentity { email: string; initial: string; role: AccountRole; }
+export interface AccountIdentity {
+  email: string;
+  initial: string;
+  role: AccountRole;
+}
 
 export async function getAccountIdentity(): Promise<AccountIdentity | null> {
-  const response = await fetch("/api/v1/auth/get-session", { credentials: "include", cache: "no-store" });
+  const response = await fetch("/api/v1/auth/get-session", {
+    credentials: "include",
+    cache: "no-store",
+  });
   if (response.status === 401 || response.status === 403) return null;
   if (!response.ok) return null;
   return projectAccountIdentity(await response.json());
@@ -114,12 +125,14 @@ git commit -m "feat: add safe account session client"
 ## Task 2: Accessible account menu in both navigation surfaces
 
 **Files:**
+
 - Create: `apps/web/src/components/account-menu.tsx`
 - Create: `apps/web/src/components/account-menu.test.tsx`
 - Modify: `apps/web/src/components/app-shell.tsx`
 - Modify: `apps/web/src/app/globals.css`
 
 **Interfaces:**
+
 - Consumes `getAccountIdentity()` and `signOutAccount()` from Task 1.
 - Produces `<AccountMenu variant="sidebar" | "mobile" />`.
 - The menu accepts no raw session data; it loads/refreshes its own safe identity.
@@ -129,9 +142,13 @@ git commit -m "feat: add safe account session client"
 ```tsx
 it("opens from the profile trigger and restores trigger focus on Escape", async () => {
   render(<AccountMenu variant="sidebar" />);
-  await user.click(screen.getByRole("button", { name: /learner@example.com/i }));
+  await user.click(
+    screen.getByRole("button", { name: /learner@example.com/i }),
+  );
   await user.keyboard("{Escape}");
-  expect(screen.getByRole("button", { name: /learner@example.com/i })).toHaveFocus();
+  expect(
+    screen.getByRole("button", { name: /learner@example.com/i }),
+  ).toHaveFocus();
 });
 
 it("shows Account and security and Sign out, but no data-management actions", async () => {
@@ -150,11 +167,21 @@ Expected: FAIL because the menu component is absent.
 - [ ] **Step 3: Implement the shared menu and wire AppShell**
 
 ```tsx
-<button aria-expanded={open} aria-haspopup="menu" onClick={toggle} ref={triggerRef} type="button">
-  <span className="avatar" aria-hidden="true">{identity.initial}</span>
+<button
+  aria-expanded={open}
+  aria-haspopup="menu"
+  onClick={toggle}
+  ref={triggerRef}
+  type="button"
+>
+  <span className="avatar" aria-hidden="true">
+    {identity.initial}
+  </span>
   <span>{identity.email}</span>
-</button>
-{open ? <div role="menu">...</div> : null}
+</button>;
+{
+  open ? <div role="menu">...</div> : null;
+}
 ```
 
 Use a document-level pointer/focus boundary only while open. Escape closes the menu and focuses `triggerRef`. The account link uses `/account`. The sign-out action is disabled only while its request is pending and calls `router.replace("/signin")` only after `signOutAccount()` resolves.
@@ -177,11 +204,13 @@ git commit -m "feat: add account menu and sign out"
 ## Task 3: Account and security page
 
 **Files:**
+
 - Create: `apps/web/src/app/account/page.tsx`
 - Create: `apps/web/src/app/account/account.module.css`
 - Create: `apps/web/src/app/account/page.test.tsx`
 
 **Interfaces:**
+
 - Consumes `getAccountIdentity()` and `changeAccountPassword()` from Task 1.
 - Requires an authenticated `AccountIdentity`; otherwise redirects to `/signin`.
 - Does not create or change records outside Better Auth’s password/session records.
@@ -199,14 +228,18 @@ it("blocks mismatched or short passwords before submit", async () => {
   render(<AccountPage />);
   await user.type(screen.getByLabelText(/new password/i), "short");
   await user.type(screen.getByLabelText(/confirm/i), "different");
-  expect(screen.getByRole("button", { name: /update password/i })).toBeDisabled();
+  expect(
+    screen.getByRole("button", { name: /update password/i }),
+  ).toBeDisabled();
 });
 
 it("clears all password fields after a successful update", async () => {
   changeAccountPasswordMock.mockResolvedValue(undefined);
   render(<AccountPage />);
   // fill valid values and submit
-  await waitFor(() => expect(screen.getByText(/password updated/i)).toBeVisible());
+  await waitFor(() =>
+    expect(screen.getByText(/password updated/i)).toBeVisible(),
+  );
 });
 ```
 
@@ -219,16 +252,24 @@ Expected: FAIL because `/account` does not exist.
 - [ ] **Step 3: Implement the page**
 
 ```tsx
-const valid = currentPassword.length > 0 && newPassword.length >= 12 && newPassword.length <= 128 && newPassword === confirmation;
+const valid =
+  currentPassword.length > 0 &&
+  newPassword.length >= 12 &&
+  newPassword.length <= 128 &&
+  newPassword === confirmation;
 
 <form onSubmit={submitPassword}>
   <label htmlFor="current-password">Current password</label>
-  <input autoComplete="current-password" id="current-password" type="password" />
+  <input
+    autoComplete="current-password"
+    id="current-password"
+    type="password"
+  />
   <label htmlFor="new-password">New password</label>
   <input autoComplete="new-password" id="new-password" type="password" />
   <label htmlFor="confirm-password">Confirm new password</label>
   <input autoComplete="new-password" id="confirm-password" type="password" />
-</form>
+</form>;
 ```
 
 Render only learner-facing headings and descriptions. Use `role="status"` for success, `role="alert"` for expected failures, and disable submission while invalid or pending. Clear all password state in a `finally` branch only on successful update, and in an unmount cleanup.
@@ -249,28 +290,38 @@ git commit -m "feat: add account security page"
 ## Task 4: Browser acceptance and release verification
 
 **Files:**
+
 - Create: `tests/e2e/account.spec.ts`
 - Modify: `apps/web/src/lib/server/api-security-invariants.test.ts` only if an existing auth contract needs a no-store/mutation regression.
 
 **Interfaces:**
+
 - Uses the real rendered `<AccountMenu />` and `/account` page from Tasks 2–3.
 - Uses the existing authentication fixture/session setup, never an injected raw token.
 
 - [ ] **Step 1: Write failing browser acceptance tests**
 
 ```ts
-test("desktop account menu opens by keyboard, reaches security, and signs out", async ({ page }) => {
+test("desktop account menu opens by keyboard, reaches security, and signs out", async ({
+  page,
+}) => {
   await page.goto("/today");
-  await page.getByRole("button", { name: /learner@example.com/i }).press("Enter");
+  await page
+    .getByRole("button", { name: /learner@example.com/i })
+    .press("Enter");
   await page.getByRole("link", { name: /account and security/i }).click();
   await expect(page).toHaveURL(/\/account$/);
   await expect(page.getByRole("button", { name: /sign out/i })).toHaveCount(0);
 });
 
-test("mobile account controls remain keyboard reachable and omit data controls", async ({ page }) => {
+test("mobile account controls remain keyboard reachable and omit data controls", async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/today");
-  await expect(page.getByText(/export learning|delete learning/i)).toHaveCount(0);
+  await expect(page.getByText(/export learning|delete learning/i)).toHaveCount(
+    0,
+  );
 });
 ```
 

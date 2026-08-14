@@ -27,8 +27,8 @@ The menu is fully keyboard accessible: it can be opened with Enter or Space, clo
 
 `/account` is a focused account page, visually consistent with the existing app rather than a generic settings dashboard. It has two small sections:
 
-* **Signed-in account** — email and role in plain learner-facing language.
-* **Password** — current password, new password, confirmation, inline validation, and a single “Update password” action.
+- **Signed-in account** — email and role in plain learner-facing language.
+- **Password** — current password, new password, confirmation, inline validation, and a single “Update password” action.
 
 The page does not display account IDs, sessions, API routes, provider settings, or infrastructure information. It does not offer learning-data export or deletion.
 
@@ -44,28 +44,28 @@ On success, the page confirms that the password was updated. On an expected auth
 
 ## Security and reliability rules
 
-* All authentication requests use `credentials: "include"` and existing origin/CSRF protections.
-* Password values remain form-local, are never stored in browser storage, and are cleared after a successful change or unmount.
-* Password validation mirrors the existing server bounds (12–128 characters) and requires confirmation before sending. The server remains authoritative.
-* Session loads have explicit loading, unavailable, and signed-out states. A failed session lookup cannot make a stale identity appear signed in.
-* Sign-out failure keeps the person on the current page and provides a concise retryable message; it never pretends they were signed out.
-* Account text is no-store and contains no infrastructure, provider, job, or implementation terminology.
+- All authentication requests use `credentials: "include"` and existing origin/CSRF protections.
+- Password values remain form-local, are never stored in browser storage, and are cleared after a successful change or unmount.
+- Password validation mirrors the existing server bounds (12–128 characters) and requires confirmation before sending. The server remains authoritative.
+- Session loads have explicit loading, unavailable, and signed-out states. A failed session lookup cannot make a stale identity appear signed in.
+- Sign-out failure keeps the person on the current page and provides a concise retryable message; it never pretends they were signed out.
+- Account text is no-store and contains no infrastructure, provider, job, or implementation terminology.
 
 ## Accessibility and responsive behavior
 
-* Menus use semantic buttons, menu items/links, Escape handling, visible focus, and focus restoration.
-* The profile trigger’s accessible name includes the signed-in email without exposing it unnecessarily in decorative content.
-* The account page has a single page heading, correctly associated form labels, alert/live feedback, and no layout-only controls.
-* On narrow screens, account actions live inside the existing navigation panel; no horizontal overflow or hidden hover-only interaction is introduced.
+- Menus use semantic buttons, menu items/links, Escape handling, visible focus, and focus restoration.
+- The profile trigger’s accessible name includes the signed-in email without exposing it unnecessarily in decorative content.
+- The account page has a single page heading, correctly associated form labels, alert/live feedback, and no layout-only controls.
+- On narrow screens, account actions live inside the existing navigation panel; no horizontal overflow or hidden hover-only interaction is introduced.
 
 ## Out of scope
 
-* Learning-data export.
-* Learning-data deletion.
-* Account deletion.
-* Email-address changes or verification flows.
-* Global session/device management.
-* Billing, teams, organization switching, or copying Railway visual assets/branding.
+- Learning-data export.
+- Learning-data deletion.
+- Account deletion.
+- Email-address changes or verification flows.
+- Global session/device management.
+- Billing, teams, organization switching, or copying Railway visual assets/branding.
 
 ## Verification
 
