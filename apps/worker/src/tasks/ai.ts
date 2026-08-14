@@ -6,7 +6,6 @@ import { and, asc, eq, ne, notInArray, or } from "drizzle-orm";
 import type { JobHelpers } from "graphile-worker";
 
 import {
-  MockAdapter,
   PROMPT_REGISTRY,
   focusedTeachingProfileFor,
   type AITaskKind,
@@ -86,6 +85,7 @@ import {
   validateAdaptiveTeachingModule,
   validateTimedPracticePaper,
 } from "../focused-learning";
+import { sourceOwnedFocusedRecoveryPackage } from "../focused-recovery-package";
 import {
   buildProviderAwareDelayedRewriteEvidence,
   buildProviderAwareExerciseEvidence,
@@ -1170,39 +1170,26 @@ async function generateLesson(
   const version1 = cycle.writingAttempts.find(
     (attempt) => attempt.kind === "version_1",
   );
-  const deterministicMechanismRecoveryPackage = async (): Promise<
-    GenerationResult<FocusedLearningPackage>
-  > => {
-    const fallback =
-      await new MockAdapter().generateStructured<FocusedLearningPackage>({
-        model: "mock-deterministic-v1",
-        input:
-          "Create the validated mechanism-chain teaching article and timed practice paper.",
-        schemaName: "iwc_focused_learning_package_v4",
-        schema: focusedLearningPackageSchema as unknown as Record<
-          string,
-          unknown
-        >,
-        validate: (value): value is FocusedLearningPackage =>
-          typeof value === "object" &&
-          value !== null &&
-          validateFocusedLearningPackage(
-            value as FocusedLearningPackage,
-            version1?.content,
-          ),
-        maxOutputTokens: 8_000,
-      });
-    return {
-      ...fallback,
-      // This path makes no additional paid provider request. The job's frozen
-      // provider snapshot remains the source of truth for the learner's cycle.
-      usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+  const sourceOwnedRecoveryPackage =
+    (): GenerationResult<FocusedLearningPackage> => {
+      const value = sourceOwnedFocusedRecoveryPackage(canonicalSkillId);
+      if (!validateFocusedLearningPackage(value, version1?.content)) {
+        throw new Error(
+          "The source-owned focused recovery package is invalid.",
+        );
+      }
+      return {
+        value,
+        model: "source-owned-recovery-v1",
+        // This path makes no additional paid provider request. The job's frozen
+        // provider snapshot remains the source of truth for the learner's cycle.
+        usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+      };
     };
-  };
-  const adapter = await adapterForJob(job);
   const generateCompatiblePackage = async (): Promise<
     GenerationResult<FocusedLearningPackage>
   > => {
+    const adapter = await adapterForJob(job);
     const teaching = await adapter.generateStructured<AdaptiveTeachingModule>({
       model: model(job),
       idempotencyKey: `${job.id}:teaching`,
@@ -1284,32 +1271,18 @@ Original IELTS question: ${cycle.question.prompt}`,
         : { rawFinishReason: paper.rawFinishReason }),
     };
   };
-  const result =
-    adapter.kind === "compatible"
-      ? await generateCompatiblePackage().catch((error: unknown) => {
-          const code =
-            typeof error === "object" &&
-            error !== null &&
-            typeof (error as { code?: unknown }).code === "string"
-              ? (error as { code: string }).code
-              : undefined;
-          // This deterministic package is deliberately limited to the
-          // mechanism-chain family it teaches. It is a continuity fallback
-          // for a schema-invalid response, never a substitute for a provider
-          // outage or a different learner target.
-          if (
-            code === "INVALID_RESPONSE" &&
-            canonicalSkillId === "mechanism_chain"
-          ) {
-            return deterministicMechanismRecoveryPackage();
-          }
-          throw error;
-        })
-      : await adapter.generateStructured<FocusedLearningPackage>({
-          model: model(job),
-          idempotencyKey: job.id,
-          system: PROMPT_REGISTRY.exercise_generation.system,
-          input: `Create one complete focused-learning package for the learner. First generate a self-contained adaptive teaching article, then create the 60-minute practice paper. The diagnosed top-level priority is ${canonicalSkillId}; narrow it to one observable micro-skill rather than covering every issue in the essay.
+  const result = await (async (): Promise<
+    GenerationResult<FocusedLearningPackage>
+  > => {
+    try {
+      const adapter = await adapterForJob(job);
+      if (adapter.kind === "compatible")
+        return await generateCompatiblePackage();
+      return await adapter.generateStructured<FocusedLearningPackage>({
+        model: model(job),
+        idempotencyKey: job.id,
+        system: PROMPT_REGISTRY.exercise_generation.system,
+        input: `Create one complete focused-learning package for the learner. First generate a self-contained adaptive teaching article, then create the 60-minute practice paper. The diagnosed top-level priority is ${canonicalSkillId}; narrow it to one observable micro-skill rather than covering every issue in the essay.
 
 Plan teachingModule.blueprint before writing any learner-facing sections. Choose exactly one difficultyType from the evidence: CONCEPT_GAP, RECOGNISES_BUT_CANNOT_REVISE, REVISES_BUT_CANNOT_GENERATE, SAME_CONTEXT_ONLY, or UNSTABLE_CONTROL. Set one precise bilingual coreAbility and completion standard. Use empty strings when no prerequisite or supporting ability is genuinely needed, and never add more than one of either. selectedBlockKinds must contain each actual block kind exactly once.
 
@@ -1334,20 +1307,24 @@ Selected-skill diagnosis context: ${JSON.stringify(diagnosisContext)}
 Teaching resource for this priority (use it for planning; do not expose these labels):
 ${focusedTeachingProfileFor(canonicalSkillId)}
 Learner Version 1 for context only: ${(version1?.content ?? "").slice(0, 4_000)}`,
-          schemaName: "iwc_focused_learning_package_v4",
-          schema: focusedLearningPackageSchema as unknown as Record<
-            string,
-            unknown
-          >,
-          validate: (value): value is FocusedLearningPackage =>
-            typeof value === "object" &&
-            value !== null &&
-            validateFocusedLearningPackage(
-              value as FocusedLearningPackage,
-              version1?.content,
-            ),
-          maxOutputTokens: 16_000,
-        });
+        schemaName: "iwc_focused_learning_package_v4",
+        schema: focusedLearningPackageSchema as unknown as Record<
+          string,
+          unknown
+        >,
+        validate: (value): value is FocusedLearningPackage =>
+          typeof value === "object" &&
+          value !== null &&
+          validateFocusedLearningPackage(
+            value as FocusedLearningPackage,
+            version1?.content,
+          ),
+        maxOutputTokens: 16_000,
+      });
+    } catch {
+      return sourceOwnedRecoveryPackage();
+    }
+  })();
   const planId = legacyPlan?.id ?? newDomainId();
   const objectiveId = newDomainId();
   const paperContent = {

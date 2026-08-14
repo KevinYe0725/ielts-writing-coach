@@ -351,21 +351,45 @@ describe("adaptive lesson generation evidence", () => {
     );
   });
 
-  it("does not mutate an older lesson when its replacement cannot be generated", async () => {
+  it("uses a source-owned package when an older non-mechanism lesson cannot be generated", async () => {
     lessonState.protectedReference = {
       cycleId: "cycle-1",
       lessonPlanId: "legacy-plan-1",
       migrationMode: "LEGACY_RECOVERY",
-      skillId: "mechanism_chain",
+      skillId: "reference_linking",
     };
-    lessonState.lessonPlans = [{ id: "legacy-plan-1" }];
+    lessonState.lessonPlans = [
+      {
+        id: "legacy-plan-1",
+        coreSkillId: "reference_linking",
+        practiceFormat: "LEGACY_EXERCISES",
+        paperContent: { old: true },
+        paperAnswers: { oldQuestion: "My saved answer" },
+        paperResult: { old: true },
+        paperSubmittedAt: new Date("2026-08-01T10:00:00Z"),
+        stages: [],
+        runtimeStatus: "READY",
+        runtimeState: {},
+        elapsedSeconds: 0,
+        productiveSeconds: 0,
+        legacyMigrationSnapshot: null,
+      },
+    ];
+    lessonState.adapterKind = "compatible";
     lessonState.adapterFailure = new Error("provider unavailable");
 
     await generateLesson();
 
-    expect(lessonState.failure).toBeInstanceOf(Error);
-    expect(lessonState.updated).toEqual([]);
-    expect(lessonState.inserted).toEqual([]);
+    expect(lessonState.failure).toBeUndefined();
+    expect(lessonState.updated).toContainEqual(
+      expect.objectContaining({
+        table: lessonPlan,
+        values: expect.objectContaining({
+          coreSkillId: "reference_linking",
+          practiceFormat: "TIMED_PAPER_V2",
+        }),
+      }),
+    );
   });
 
   it("uses separately validated article and paper requests for compatible providers", async () => {
@@ -387,19 +411,20 @@ describe("adaptive lesson generation evidence", () => {
     );
   });
 
-  it("does not mutate lesson data when compatible paper generation fails", async () => {
+  it("uses a source-owned package when compatible paper generation fails", async () => {
     lessonState.adapterKind = "compatible";
     lessonState.paperFailure = new Error("invalid structured response");
 
     await generateLesson();
 
-    expect(lessonState.failure).toBeInstanceOf(Error);
+    expect(lessonState.failure).toBeUndefined();
     expect(lessonState.generatedSchemaNames).toEqual([
       "iwc_adaptive_teaching_article_v1",
       "iwc_timed_practice_paper_v3",
     ]);
-    expect(lessonState.updated).toEqual([]);
-    expect(lessonState.inserted).toEqual([]);
+    expect(lessonState.inserted.some(({ table }) => table === lessonPlan)).toBe(
+      true,
+    );
   });
 
   it("uses a safe ready-to-practise fallback when a compatible response remains structurally invalid", async () => {
