@@ -12,7 +12,6 @@ import {
   BarChart3,
   BookOpenCheck,
   BrainCircuit,
-  ChevronDown,
   ClipboardCheck,
   FileDiff,
   Feather,
@@ -30,6 +29,7 @@ import {
 
 import { useLocale } from "@/components/locale-provider";
 import { NotificationCenter } from "@/components/notification-center";
+import { AccountMenu } from "@/components/account-menu";
 import { cn } from "@/components/utils";
 import {
   buildLearningDestinations,
@@ -243,16 +243,7 @@ function Sidebar({ hidden }: { hidden: boolean }) {
             </span>
           </div>
         </div>
-        <div className="profile-row">
-          <span className="avatar" aria-hidden="true">
-            U
-          </span>
-          <div>
-            <strong>{text("当前学习者", "Current learner")}</strong>
-            <span>{text("个人学习档案", "Personal learning record")}</span>
-          </div>
-          <ChevronDown aria-hidden="true" size={16} />
-        </div>
+        <AccountMenu variant="sidebar" />
       </div>
     </aside>
   );
@@ -277,6 +268,7 @@ function MobileHeader() {
                 <Settings aria-hidden="true" size={17} />
                 {messages.nav.settings}
               </Link>
+              <AccountMenu variant="mobile" />
             </div>
           </div>
         </details>

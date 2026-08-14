@@ -1,9 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  getAccountIdentity,
-  signOutAccount,
-} from "./account-session";
+import { getAccountIdentity, signOutAccount } from "./account-session";
 
 const sessionStorageState = new Map<string, string>();
 const dispatchEvent = vi.fn();
@@ -60,12 +57,17 @@ describe("account session", () => {
   });
 
   it("treats absent and malformed sessions as signed out", async () => {
-    vi.stubGlobal("fetch", vi.fn<typeof fetch>().mockResolvedValue(response({}, 401)));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>().mockResolvedValue(response({}, 401)),
+    );
     await expect(getAccountIdentity()).resolves.toBeNull();
 
     vi.stubGlobal(
       "fetch",
-      vi.fn<typeof fetch>().mockResolvedValue(response({ user: { email: 42 } })),
+      vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(response({ user: { email: 42 } })),
     );
     await expect(getAccountIdentity()).resolves.toBeNull();
   });
@@ -78,10 +80,14 @@ describe("account session", () => {
     vi.stubGlobal("fetch", fetcher);
 
     await expect(signOutAccount()).rejects.toThrow("Try again");
-    expect(sessionStorageState.get("iwc:learning-navigation:v1")).not.toBeNull();
+    expect(
+      sessionStorageState.get("iwc:learning-navigation:v1"),
+    ).not.toBeNull();
 
     await expect(signOutAccount()).resolves.toBeUndefined();
-    expect(sessionStorageState.get("iwc:learning-navigation:v1")).toBeUndefined();
+    expect(
+      sessionStorageState.get("iwc:learning-navigation:v1"),
+    ).toBeUndefined();
     expect(fetcher).toHaveBeenLastCalledWith("/api/v1/auth/sign-out", {
       body: "{}",
       credentials: "include",

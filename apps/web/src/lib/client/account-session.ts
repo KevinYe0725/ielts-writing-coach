@@ -72,7 +72,10 @@ export async function changeAccountPassword({
   });
   if (!response.ok) {
     throw new Error(
-      await responseProblem(response, "Unable to update the password right now."),
+      await responseProblem(
+        response,
+        "Unable to update the password right now.",
+      ),
     );
   }
 }
@@ -85,7 +88,9 @@ export async function signOutAccount(): Promise<void> {
     method: "POST",
   });
   if (!response.ok) {
-    throw new Error(await responseProblem(response, "Unable to sign out right now."));
+    throw new Error(
+      await responseProblem(response, "Unable to sign out right now."),
+    );
   }
   clearLearningDestinations();
 }
