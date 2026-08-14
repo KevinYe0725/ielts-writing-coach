@@ -10,7 +10,7 @@ import {
   EXPECTED_DATABASE_MIGRATION_HASH,
   newDomainId,
 } from "./index";
-import { instanceConfiguration } from "./schema";
+import { instanceConfiguration, lessonPlan } from "./schema";
 
 describe("database identity primitives", () => {
   it("creates RFC 9562 UUIDv7 domain identifiers", () => {
@@ -46,6 +46,10 @@ describe("database identity primitives", () => {
     expect(createHash("sha256").update(migration).digest("hex")).toBe(
       EXPECTED_DATABASE_MIGRATION_HASH,
     );
+  });
+
+  it("has a private place to preserve a legacy practice before conversion", () => {
+    expect(lessonPlan.legacyMigrationSnapshot).toBeDefined();
   });
 });
 

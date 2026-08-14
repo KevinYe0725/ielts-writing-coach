@@ -562,6 +562,26 @@ export const learningObjective = pgTable(
   ],
 );
 
+/**
+ * A private, one-time preservation of the learner-visible legacy lesson before
+ * a validated current practice paper overwrites the same lesson row. This is
+ * deliberately not part of any public lesson response.
+ */
+export interface LegacyPracticeMigrationSnapshot {
+  migrationVersion: "LEGACY_PRACTICE_RECOVERY_V1";
+  capturedAt: string;
+  practiceFormat: string;
+  paperContent: Record<string, unknown> | null;
+  paperAnswers: Record<string, string>;
+  paperResult: Record<string, unknown> | null;
+  paperSubmittedAt: string | null;
+  stages: unknown[];
+  runtimeStatus: string;
+  runtimeState: Record<string, unknown>;
+  elapsedSeconds: number;
+  productiveSeconds: number;
+}
+
 export const lessonPlan = pgTable(
   "lesson_plan",
   {
@@ -661,6 +681,10 @@ export const lessonPlan = pgTable(
       () => aiJob.id,
       { onDelete: "set null" },
     ),
+    /** Never returned to learners; captured only before an in-place recovery. */
+    legacyMigrationSnapshot: jsonb(
+      "legacy_migration_snapshot",
+    ).$type<LegacyPracticeMigrationSnapshot>(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

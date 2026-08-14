@@ -1,0 +1,1 @@
+ALTER TABLE "lesson_plan" ADD COLUMN "legacy_migration_snapshot" jsonb;
