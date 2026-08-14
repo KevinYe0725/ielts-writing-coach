@@ -21,5 +21,6 @@ output/
 .idea/
 .vscode/
 .coach-ielts-writing/
+.local-run/
 /backups/
 tmp/

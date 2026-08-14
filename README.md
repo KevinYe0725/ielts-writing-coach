@@ -164,6 +164,19 @@ docker compose logs bootstrap   # prints the one-time setup token
 
 Both the Web app and PostgreSQL bind to `127.0.0.1` by default. To publish through a maintained reverse proxy, set `IWC_BIND_ADDRESS` explicitly, configure HTTPS, and never expose PostgreSQL.
 
+### ⚡ No Docker? One command
+
+Prefer the native local environment? On macOS and Linux you can run the whole stack without Docker:
+
+```bash
+brew install node@24 postgresql@17   # first time only, if missing
+
+pnpm run:local        # postgres + migrations + seed + web + worker, one command
+pnpm run:local:stop   # stop the project-local PostgreSQL
+```
+
+The script auto-detects Node.js ≥ 24.14, pnpm 11.16, and PostgreSQL 17 binaries, initialises a project-local PostgreSQL cluster inside the gitignored `.local-run/` directory on a free local port, generates stable secrets, and prints the one-time setup URL. Restart any time with `pnpm run:local` — data and accounts persist. See `scripts/local-run.sh --help` for details.
+
 ## 🧠 AI providers
 
 Built-in presets for 21 providers, plus a custom option for any OpenAI-compatible endpoint. Every selected model is **probed before it becomes a scoring route**, and stored provider keys are never sent to browser-side code.

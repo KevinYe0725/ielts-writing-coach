@@ -16,6 +16,8 @@
     "compose:restore": "bash scripts/compose-restore.sh",
     "compose:upgrade": "bash scripts/compose-upgrade.sh",
     "dev": "pnpm --parallel --filter @iwc/web --filter @iwc/worker dev",
+    "run:local": "bash scripts/local-run.sh",
+    "run:local:stop": "bash scripts/local-run.sh --stop",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "pnpm -r --if-present lint",

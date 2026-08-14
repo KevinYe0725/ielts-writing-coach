@@ -164,6 +164,19 @@ docker compose logs bootstrap   # 打印一次性初始化令牌
 
 Web 应用和 PostgreSQL 默认只绑定 `127.0.0.1`。如需通过反向代理对外发布，请显式设置 `IWC_BIND_ADDRESS`、配置 HTTPS，并且**切勿**暴露 PostgreSQL 端口。
 
+### ⚡ 不用 Docker？一条命令搞定
+
+更喜欢直接用本机环境？在 macOS 和 Linux 上，一条命令即可跑起整个系统，完全不需要 Docker：
+
+```bash
+brew install node@24 postgresql@17   # 仅首次需要（如缺失）
+
+pnpm run:local        # 一条命令：PostgreSQL + 迁移 + 种子数据 + Web + Worker
+pnpm run:local:stop   # 停止项目本地的 PostgreSQL
+```
+
+脚本会自动探测 Node.js ≥ 24.14、pnpm 11.16 与 PostgreSQL 17 二进制文件，在仓库内已 gitignore 的 `.local-run/` 目录中初始化项目专属的 PostgreSQL 集群（自动选择空闲端口）、生成稳定的密钥，并打印一次性初始化链接。任何时候用 `pnpm run:local` 重启即可——数据与账号都会保留。详情见 `scripts/local-run.sh --help`。
+
 ## 🧠 AI 提供商
 
 内置 21 家提供商预设，另支持任意 OpenAI 兼容接口的自定义配置。每个选中的模型在成为评分通道前都会**先通过探测验证**，已存储的 API 密钥永远不会发送到浏览器端。
