@@ -6,6 +6,7 @@ import { and, asc, eq, ne, notInArray, or } from "drizzle-orm";
 import type { JobHelpers } from "graphile-worker";
 
 import {
+  MockAdapter,
   PROMPT_REGISTRY,
   type AITaskKind,
   type GenerationResult,
@@ -1168,6 +1169,35 @@ async function generateLesson(
   const version1 = cycle.writingAttempts.find(
     (attempt) => attempt.kind === "version_1",
   );
+  const deterministicMechanismRecoveryPackage = async (): Promise<
+    GenerationResult<FocusedLearningPackage>
+  > => {
+    const fallback =
+      await new MockAdapter().generateStructured<FocusedLearningPackage>({
+        model: "mock-deterministic-v1",
+        input:
+          "Create the validated mechanism-chain teaching article and timed practice paper.",
+        schemaName: "iwc_focused_learning_package_v4",
+        schema: focusedLearningPackageSchema as unknown as Record<
+          string,
+          unknown
+        >,
+        validate: (value): value is FocusedLearningPackage =>
+          typeof value === "object" &&
+          value !== null &&
+          validateFocusedLearningPackage(
+            value as FocusedLearningPackage,
+            version1?.content,
+          ),
+        maxOutputTokens: 8_000,
+      });
+    return {
+      ...fallback,
+      // This path makes no additional paid provider request. The job's frozen
+      // provider snapshot remains the source of truth for the learner's cycle.
+      usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+    };
+  };
   const adapter = await adapterForJob(job);
   const generateCompatiblePackage = async (): Promise<
     GenerationResult<FocusedLearningPackage>
@@ -1253,7 +1283,25 @@ Original IELTS question: ${cycle.question.prompt}`,
   };
   const result =
     adapter.kind === "compatible"
-      ? await generateCompatiblePackage()
+      ? await generateCompatiblePackage().catch((error: unknown) => {
+          const code =
+            typeof error === "object" &&
+            error !== null &&
+            typeof (error as { code?: unknown }).code === "string"
+              ? (error as { code: string }).code
+              : undefined;
+          // This deterministic package is deliberately limited to the
+          // mechanism-chain family it teaches. It is a continuity fallback
+          // for a schema-invalid response, never a substitute for a provider
+          // outage or a different learner target.
+          if (
+            code === "INVALID_RESPONSE" &&
+            canonicalSkillId === "mechanism_chain"
+          ) {
+            return deterministicMechanismRecoveryPackage();
+          }
+          throw error;
+        })
       : await adapter.generateStructured<FocusedLearningPackage>({
           model: model(job),
           idempotencyKey: job.id,

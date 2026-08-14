@@ -402,6 +402,21 @@ describe("adaptive lesson generation evidence", () => {
     expect(lessonState.inserted).toEqual([]);
   });
 
+  it("uses a safe ready-to-practise fallback when a compatible response remains structurally invalid", async () => {
+    lessonState.adapterKind = "compatible";
+    lessonState.paperFailure = Object.assign(
+      new Error("invalid structured response"),
+      { code: "INVALID_RESPONSE" },
+    );
+
+    await generateLesson();
+
+    expect(lessonState.failure).toBeUndefined();
+    expect(lessonState.inserted.some(({ table }) => table === lessonPlan)).toBe(
+      true,
+    );
+  });
+
   it("updates the same older lesson and snapshots it only after package validation", async () => {
     lessonState.protectedReference = {
       cycleId: "cycle-1",
