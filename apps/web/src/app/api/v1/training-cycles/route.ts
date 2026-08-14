@@ -84,13 +84,13 @@ export const POST = apiRoute(async (request) => {
             ne(trainingCycle.status, "CORE_CYCLE_COMPLETED"),
           ),
         );
-      if (active.length >= 2) {
+      if (active.length >= 8) {
         throw new ApiProblem({
-          title: "Two active cycles already exist",
+          title: "Eight essays are already in progress",
           status: 409,
           code: "ACTIVE_CYCLE_LIMIT",
           detail:
-            "Resolve or archive an active training cycle before starting another.",
+            "You already have eight essays in progress. Continue one of them before starting another.",
         });
       }
 

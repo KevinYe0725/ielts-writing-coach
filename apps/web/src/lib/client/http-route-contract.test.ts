@@ -207,10 +207,10 @@ describe.skipIf(!databaseUrl)(
       ).resolves.toHaveLength(2);
     });
 
-    it("serializes concurrent cycle creation so a learner never exceeds two active cycles", async () => {
+    it("serializes concurrent cycle creation so a learner never exceeds eight active essays", async () => {
       const suffix = newDomainId();
       const userId = `http-cycle-limit-${suffix}`;
-      const questionIds = [newDomainId(), newDomainId(), newDomainId()];
+      const questionIds = Array.from({ length: 9 }, () => newDomainId());
       const externalIds = questionIds.map(
         (_id, index) => `cycle-limit-${suffix}-${index}`,
       );
@@ -236,13 +236,15 @@ describe.skipIf(!databaseUrl)(
           prompt: `Concurrent cycle question ${index + 1}?`,
         })),
       );
-      await database.db.insert(trainingCycle).values({
-        userId,
-        questionId: questionIds[0]!,
-        status: "QUESTION_READY",
-        schemaVersion: "1.0.0",
-        timezone: "UTC",
-      });
+      await database.db.insert(trainingCycle).values(
+        questionIds.slice(0, 7).map((questionId) => ({
+          userId,
+          questionId,
+          status: "QUESTION_READY" as const,
+          schemaVersion: "1.0.0",
+          timezone: "UTC",
+        })),
+      );
 
       const makeRequest = (questionId: string, key: string) =>
         new Request("https://coach.test/api/v1/training-cycles", {
@@ -255,8 +257,8 @@ describe.skipIf(!databaseUrl)(
           method: "POST",
         });
       const responses = await Promise.all([
-        createCycle(makeRequest(externalIds[1]!, `cycle-limit-${suffix}-a`)),
-        createCycle(makeRequest(externalIds[2]!, `cycle-limit-${suffix}-b`)),
+        createCycle(makeRequest(externalIds[7]!, `cycle-limit-${suffix}-a`)),
+        createCycle(makeRequest(externalIds[8]!, `cycle-limit-${suffix}-b`)),
       ]);
 
       expect(responses.map((response) => response.status).sort()).toEqual([
@@ -266,10 +268,11 @@ describe.skipIf(!databaseUrl)(
         database.db.query.trainingCycle.findMany({
           where: eq(trainingCycle.userId, userId),
         }),
-      ).resolves.toHaveLength(2);
+      ).resolves.toHaveLength(8);
       const conflict = responses.find((response) => response.status === 409)!;
       await expect(conflict.json()).resolves.toMatchObject({
         code: "ACTIVE_CYCLE_LIMIT",
+        detail: expect.stringMatching(/eight essays/i),
       });
     });
 
