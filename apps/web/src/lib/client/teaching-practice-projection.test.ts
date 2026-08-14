@@ -1,9 +1,14 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
 
 import { projectTeachingPracticeResponse } from "./teaching-practice-projection";
 
 const submittedAnswer =
   "Protected lanes reduce perceived danger, so more commuters choose bicycles.";
+const currentDirectory = dirname(fileURLToPath(import.meta.url));
 
 function readyAtoms(analysis: unknown) {
   return {
@@ -17,6 +22,18 @@ function readyAtoms(analysis: unknown) {
 }
 
 describe("teaching-practice typed analysis browser boundary", () => {
+  it("does not pull the AJV-backed contracts barrel into the browser", () => {
+    const source = readFileSync(
+      join(currentDirectory, "teaching-practice-projection.ts"),
+      "utf8",
+    );
+
+    expect(source).toContain(
+      'from "@iwc/learning-contracts/teaching-practice-analysis-atoms"',
+    );
+    expect(source).not.toContain('from "@iwc/learning-contracts"');
+  });
+
   it("renders first-party copy from strict atoms and exact evidence", () => {
     expect(
       projectTeachingPracticeResponse(

@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./teaching-practice-analysis-atoms": "./src/teaching-practice-analysis-atoms.ts",
     "./schemas/*": "./schemas/*"
   },
   "scripts": {

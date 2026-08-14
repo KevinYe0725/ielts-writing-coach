@@ -6,7 +6,7 @@ import type {
 import {
   projectTeachingPracticeAnalysisAtoms,
   renderTeachingPracticeAnalysisAtoms,
-} from "@iwc/learning-contracts";
+} from "@iwc/learning-contracts/teaching-practice-analysis-atoms";
 
 type UnknownRecord = Record<string, unknown>;
 
