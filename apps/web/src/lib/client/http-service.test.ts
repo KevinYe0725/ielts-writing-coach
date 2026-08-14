@@ -62,7 +62,7 @@ const savedPersonalizedResponse: TeachingPracticeResponseData = {
 };
 
 describe("legacy practice recovery client", () => {
-  it("returns a non-blocking unavailable state instead of waiting on a blocked replacement", async () => {
+  it("returns a safe continuation state instead of waiting on a blocked replacement", async () => {
     const fetcher = vi.fn<typeof fetch>(async (input) => {
       expect(String(input)).toContain("/lessons/lesson-legacy/replace");
       return jsonResponse({
@@ -83,10 +83,31 @@ describe("legacy practice recovery client", () => {
     )) as unknown;
 
     expect(result).toEqual({
-      state: "UNAVAILABLE",
-      jobId: "legacy-recovery-job",
+      state: "CONTINUING_SAFELY",
+      jobId: null,
     });
     expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns a safe continuation state without exposing the failed recovery details", async () => {
+    const fetcher = vi.fn<typeof fetch>(async () =>
+      jsonResponse({
+        replacement_started: false,
+        lesson_id: null,
+        job_id: null,
+        job_status: "CONTINUING_SAFELY",
+      }),
+    );
+    const client = new HttpLearningClient({
+      baseUrl: "https://coach.test/api/v1",
+      fetch: fetcher,
+      origin: "https://coach.test",
+    });
+
+    await expect(client.replaceLegacyLesson("lesson-legacy")).resolves.toEqual({
+      state: "CONTINUING_SAFELY",
+      jobId: null,
+    });
   });
 });
 

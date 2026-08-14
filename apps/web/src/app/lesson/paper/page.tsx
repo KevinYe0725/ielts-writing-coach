@@ -123,7 +123,7 @@ export default function PracticePaperPage({
   const [replacing, setReplacing] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [replacementState, setReplacementState] = useState<
-    "PREPARING" | "UNAVAILABLE" | null
+    "PREPARING" | "CONTINUING_SAFELY" | "UNAVAILABLE" | null
   >(null);
   const feedbackHref = cycleId
     ? learningRouteHref("/feedback", { cycleId })

@@ -1274,6 +1274,9 @@ Original IELTS question: ${cycle.question.prompt}`,
   const result = await (async (): Promise<
     GenerationResult<FocusedLearningPackage>
   > => {
+    if (job.protectedReference.sourceOwnedFallback === "true") {
+      return sourceOwnedRecoveryPackage();
+    }
     try {
       const adapter = await adapterForJob(job);
       if (adapter.kind === "compatible")

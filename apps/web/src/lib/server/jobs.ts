@@ -148,6 +148,19 @@ export function unconfiguredJobDecision(input: {
   };
 }
 
+export function sourceOwnedFocusedGenerationDecision(
+  decision: ReturnType<typeof unconfiguredJobDecision>,
+): ReturnType<typeof unconfiguredJobDecision> & {
+  status: "QUEUED";
+  sourceOwnedFallback: true;
+} {
+  return {
+    ...decision,
+    status: "QUEUED",
+    sourceOwnedFallback: true,
+  };
+}
+
 async function addGraphileJob(
   transaction: DatabaseTransaction,
   jobId: string,
@@ -333,16 +346,22 @@ export async function enqueueAIJob(
           : {}),
       });
   const id = newDomainId();
+  const sourceOwnedFallback =
+    input.taskKind === "exercise_generation" &&
+    configured.status === "WAITING_FOR_CONSENT";
+  const effectiveConfiguration = sourceOwnedFallback
+    ? sourceOwnedFocusedGenerationDecision(configured)
+    : configured;
   const graphileJobKey = `ai-job:${id}`;
   const snapshot = {
     ...promptSnapshot(
       input.taskKind,
-      configured.model,
+      effectiveConfiguration.model,
       route?.routeVersion ?? 1,
     ),
     schemaVersion: "1.0.0",
-    providerKind: configured.providerKind,
-    providerConnectionId: configured.providerConnectionId,
+    providerKind: effectiveConfiguration.providerKind,
+    providerConnectionId: effectiveConfiguration.providerConnectionId,
     fallbackEnabled: String(route?.fallbackEnabled ?? false),
   };
 
@@ -350,24 +369,27 @@ export async function enqueueAIJob(
     id,
     ownerId: input.ownerId,
     taskKind: input.taskKind,
-    status: configured.status,
+    status: effectiveConfiguration.status,
     providerConnectionId:
-      configured.providerConnectionId === "environment-openai" ||
-      configured.providerConnectionId === "unconfigured"
+      effectiveConfiguration.providerConnectionId === "environment-openai" ||
+      effectiveConfiguration.providerConnectionId === "unconfigured"
         ? null
-        : configured.providerConnectionId,
-    modelRouteId: configured.status === "QUEUED" ? route?.id : null,
-    protectedReference: input.protectedReference,
+        : effectiveConfiguration.providerConnectionId,
+    modelRouteId: effectiveConfiguration.status === "QUEUED" ? route?.id : null,
+    protectedReference: {
+      ...input.protectedReference,
+      ...(sourceOwnedFallback ? { sourceOwnedFallback: "true" } : {}),
+    },
     versionSnapshot: snapshot,
     idempotencyKey: input.idempotencyKey,
     graphileJobKey,
   });
-  if (configured.status === "QUEUED") {
+  if (effectiveConfiguration.status === "QUEUED") {
     await addGraphileJob(transaction, id, graphileJobKey);
   }
   return {
     id,
-    status: configured.status,
+    status: effectiveConfiguration.status,
     location: `/api/v1/ai-jobs/${id}`,
   };
 }

@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 
 import { aiJob, lessonPlan, trainingCycle } from "@iwc/db";
 import { SKILL_IDS, type SkillId } from "@iwc/learning-contracts";
@@ -26,6 +26,33 @@ function isSkillId(value: unknown): value is SkillId {
     typeof value === "string" &&
     (SKILL_IDS as readonly string[]).includes(value)
   );
+}
+
+function highestValidIssueSkill(value: unknown): SkillId | null {
+  if (!Array.isArray(value)) return null;
+  const candidates = value
+    .flatMap((issue) => {
+      if (typeof issue !== "object" || issue === null) return [];
+      const record = issue as {
+        skillId?: unknown;
+        severity?: unknown;
+        confidence?: unknown;
+      };
+      if (!isSkillId(record.skillId)) return [];
+      return [
+        {
+          skillId: record.skillId,
+          severity: typeof record.severity === "number" ? record.severity : 0,
+          confidence:
+            typeof record.confidence === "number" ? record.confidence : 0,
+        },
+      ];
+    })
+    .sort(
+      (left, right) =>
+        right.severity - left.severity || right.confidence - left.confidence,
+    );
+  return candidates[0]?.skillId ?? null;
 }
 
 export const POST = apiRoute(
@@ -91,20 +118,11 @@ export const POST = apiRoute(
           (attempt) => attempt.kind === "version_1",
         );
         const assessmentId = version1?.assessment?.id;
-        const coreSkillId = isSkillId(cycle.coreSkillId)
-          ? cycle.coreSkillId
-          : isSkillId(plan.coreSkillId)
-            ? plan.coreSkillId
-            : null;
-        if (!coreSkillId) {
-          throw new ApiProblem({
-            title: "Practice recovery unavailable",
-            status: 409,
-            code: "PRACTICE_PAPER_RECOVERY_UNAVAILABLE",
-            detail:
-              "This earlier practice does not contain enough information to create a safe updated paper.",
-          });
-        }
+        const coreSkillId =
+          (isSkillId(cycle.coreSkillId) ? cycle.coreSkillId : null) ??
+          (isSkillId(plan.coreSkillId) ? plan.coreSkillId : null) ??
+          highestValidIssueSkill(version1?.assessment?.issues) ??
+          "task_instruction_coverage";
         const activeJob = await transaction.query.aiJob.findFirst({
           where: and(
             eq(aiJob.ownerId, actor.id),
@@ -118,6 +136,26 @@ export const POST = apiRoute(
             lessonId: null,
             jobId: activeJob.id,
             jobStatus: activeJob.status,
+          };
+        }
+        const recentFailedRecovery = await transaction.query.aiJob.findFirst({
+          where: and(
+            eq(aiJob.ownerId, actor.id),
+            eq(aiJob.taskKind, "exercise_generation"),
+            eq(aiJob.status, "FAILED"),
+            sql`${aiJob.protectedReference}->>'lessonPlanId' = ${plan.id}`,
+          ),
+          orderBy: [desc(aiJob.completedAt)],
+        });
+        if (
+          recentFailedRecovery?.completedAt &&
+          Date.now() - recentFailedRecovery.completedAt.getTime() <
+            15 * 60 * 1_000
+        ) {
+          return {
+            lessonId: null,
+            jobId: null,
+            jobStatus: "CONTINUING_SAFELY",
           };
         }
         const job = await enqueueAIJob(transaction, {
@@ -136,20 +174,22 @@ export const POST = apiRoute(
         return { lessonId: null, jobId: job.id, jobStatus: job.status };
       });
       const responseBody = {
-        replacement_started: output.lessonId === null,
+        replacement_started:
+          output.lessonId === null && output.jobStatus !== "CONTINUING_SAFELY",
         lesson_id: output.lessonId,
         job_id: output.jobId,
         job_status: output.jobStatus,
       };
+      const safeContinuation = output.jobStatus === "CONTINUING_SAFELY";
       await completeIdempotentResponse(
         db,
         actor.id,
         reservation.key,
-        output.lessonId ? 200 : 202,
+        output.lessonId || safeContinuation ? 200 : 202,
         responseBody,
       );
       return Response.json(responseBody, {
-        status: output.lessonId ? 200 : 202,
+        status: output.lessonId || safeContinuation ? 200 : 202,
         ...(output.jobId
           ? { headers: { location: `/api/v1/ai-jobs/${output.jobId}` } }
           : {}),

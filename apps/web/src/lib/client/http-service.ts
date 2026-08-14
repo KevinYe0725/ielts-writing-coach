@@ -2465,10 +2465,13 @@ export class HttpLearningClient implements LearningClient {
     if (data.lesson_id || data.job_status === "SUCCEEDED") {
       return { state: "READY", jobId: data.job_id ?? null };
     }
+    if (data.job_status === "CONTINUING_SAFELY") {
+      return { state: "CONTINUING_SAFELY", jobId: null };
+    }
     if (data.job_status === "QUEUED" || data.job_status === "RUNNING") {
       return { state: "PREPARING", jobId: data.job_id ?? null };
     }
-    return { state: "UNAVAILABLE", jobId: data.job_id ?? null };
+    return { state: "CONTINUING_SAFELY", jobId: null };
   }
 
   async completePracticePaper(lessonId: string): Promise<void> {

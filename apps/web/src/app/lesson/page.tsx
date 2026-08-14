@@ -40,7 +40,7 @@ export default function FocusedTeachingPage({
   const { data, error, loading, retry } = useDemoResource(loader);
   const [replacing, setReplacing] = useState(false);
   const [replacementState, setReplacementState] = useState<
-    "PREPARING" | "UNAVAILABLE" | null
+    "PREPARING" | "CONTINUING_SAFELY" | "UNAVAILABLE" | null
   >(null);
   const feedbackHref = cycleId
     ? learningRouteHref("/feedback", { cycleId })

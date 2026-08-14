@@ -25,6 +25,7 @@ import {
   resolveAIJobRoute,
   resumeBlockedAIJobsForProvider,
   resumeWaitingAIJobsForRoutes,
+  sourceOwnedFocusedGenerationDecision,
   unconfiguredJobDecision,
 } from "./jobs";
 
@@ -53,6 +54,18 @@ describe("AI job routing without an explicit model route", () => {
       providerKind: "openai",
       providerConnectionId: "environment-openai",
       model: "gpt-test",
+    });
+  });
+
+  it("queues source-owned focused learning when no provider is configured", () => {
+    expect(
+      sourceOwnedFocusedGenerationDecision(unconfiguredJobDecision({})),
+    ).toEqual({
+      status: "QUEUED",
+      providerKind: "unconfigured",
+      providerConnectionId: "unconfigured",
+      model: "unconfigured",
+      sourceOwnedFallback: true,
     });
   });
 });

@@ -427,6 +427,23 @@ describe("adaptive lesson generation evidence", () => {
     );
   });
 
+  it("does not call a provider when the generation job was queued for source-owned recovery", async () => {
+    lessonState.protectedReference = {
+      cycleId: "cycle-1",
+      assessmentId: "assessment-1",
+      skillId: "paragraph_function_order",
+      sourceOwnedFallback: "true",
+    };
+
+    await generateLesson();
+
+    expect(lessonState.failure).toBeUndefined();
+    expect(lessonState.generatedSchemaNames).toEqual([]);
+    expect(lessonState.inserted.some(({ table }) => table === lessonPlan)).toBe(
+      true,
+    );
+  });
+
   it("uses a safe ready-to-practise fallback when a compatible response remains structurally invalid", async () => {
     lessonState.adapterKind = "compatible";
     lessonState.paperFailure = Object.assign(

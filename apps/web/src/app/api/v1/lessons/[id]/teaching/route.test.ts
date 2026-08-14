@@ -14,6 +14,8 @@ const routeState = vi.hoisted(() => ({
   deletedTables: [] as unknown[],
   queuedInput: null as Record<string, unknown> | null,
   activeRecoveryJob: null as Record<string, unknown> | null,
+  recentRecoveryJob: null as Record<string, unknown> | null,
+  recoveryLookupCount: 0,
 }));
 
 vi.mock("@/lib/server/session", () => ({
@@ -63,7 +65,12 @@ const transaction = {
       findFirst: async () => routeState.cycle,
     },
     aiJob: {
-      findFirst: async () => routeState.activeRecoveryJob,
+      findFirst: async () => {
+        routeState.recoveryLookupCount += 1;
+        return routeState.recoveryLookupCount === 1
+          ? routeState.activeRecoveryJob
+          : routeState.recentRecoveryJob;
+      },
     },
   },
   delete: (table: unknown) => {
@@ -152,6 +159,8 @@ describe("focused teaching adaptive article routes", () => {
     routeState.deletedTables = [];
     routeState.queuedInput = null;
     routeState.activeRecoveryJob = null;
+    routeState.recentRecoveryJob = null;
+    routeState.recoveryLookupCount = 0;
   });
 
   it("returns replacement-required instead of serving a legacy teaching module", async () => {
@@ -457,6 +466,92 @@ describe("focused teaching adaptive article routes", () => {
     expect(routeState.deletedTables).toEqual([]);
   });
 
+  it("derives a recoverable skill from the preserved assessment when an old cycle has no core skill", async () => {
+    routeState.lesson = {
+      id: lessonId,
+      cycleId: "cycle-1",
+      coreSkillId: null,
+      practiceFormat: "LEGACY_EXERCISES",
+      paperContent: { teachingModule: legacyTeaching(), paper: {} },
+    };
+    routeState.cycle = {
+      id: "cycle-1",
+      coreSkillId: null,
+      writingAttempts: [
+        {
+          id: "version-1",
+          kind: "version_1",
+          assessment: {
+            id: "assessment-1",
+            issues: [
+              {
+                skillId: "reference_linking",
+                severity: 4,
+                confidence: 0.9,
+              },
+              {
+                skillId: "mechanism_chain",
+                severity: 3,
+                confidence: 1,
+              },
+            ],
+          },
+        },
+      ],
+    };
+
+    const response = await replaceTeaching(
+      new Request(`https://coach.test/api/v1/lessons/${lessonId}/replace`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": "recover-assessment-skill",
+          origin: "https://coach.test",
+        },
+        body: "{}",
+      }),
+      { params: Promise.resolve({ id: lessonId }) },
+    );
+
+    expect(response.status).toBe(202);
+    expect(routeState.queuedInput).toMatchObject({
+      protectedReference: { skillId: "reference_linking" },
+    });
+  });
+
+  it("uses the conservative foundation skill when neither cycle nor assessment provides one", async () => {
+    routeState.lesson = {
+      id: lessonId,
+      cycleId: "cycle-1",
+      coreSkillId: null,
+      practiceFormat: "LEGACY_EXERCISES",
+      paperContent: { teachingModule: legacyTeaching(), paper: {} },
+    };
+    routeState.cycle = {
+      id: "cycle-1",
+      coreSkillId: null,
+      writingAttempts: [],
+    };
+
+    const response = await replaceTeaching(
+      new Request(`https://coach.test/api/v1/lessons/${lessonId}/replace`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": "recover-conservative-skill",
+          origin: "https://coach.test",
+        },
+        body: "{}",
+      }),
+      { params: Promise.resolve({ id: lessonId }) },
+    );
+
+    expect(response.status).toBe(202);
+    expect(routeState.queuedInput).toMatchObject({
+      protectedReference: { skillId: "task_instruction_coverage" },
+    });
+  });
+
   it("reuses an active legacy recovery job instead of queuing a second one", async () => {
     routeState.lesson = {
       id: lessonId,
@@ -495,5 +590,43 @@ describe("focused teaching adaptive article routes", () => {
     });
     expect(routeState.queuedInput).toBeNull();
     expect(routeState.deletedTables).toEqual([]);
+  });
+
+  it("waits safely instead of repeatedly queuing a lesson whose recovery just failed", async () => {
+    routeState.lesson = {
+      id: lessonId,
+      cycleId: "cycle-1",
+      coreSkillId: "mechanism_chain",
+      practiceFormat: "LEGACY_EXERCISES",
+      paperContent: { teachingModule: legacyTeaching(), paper: {} },
+    };
+    routeState.cycle = replacementCycle();
+    routeState.recentRecoveryJob = {
+      id: "recent-failed-recovery",
+      status: "FAILED",
+      completedAt: new Date(Date.now() - 5 * 60 * 1_000),
+    };
+
+    const response = await replaceTeaching(
+      new Request(`https://coach.test/api/v1/lessons/${lessonId}/replace`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": "wait-after-recent-failure",
+          origin: "https://coach.test",
+        },
+        body: "{}",
+      }),
+      { params: Promise.resolve({ id: lessonId }) },
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      replacement_started: false,
+      lesson_id: null,
+      job_id: null,
+      job_status: "CONTINUING_SAFELY",
+    });
+    expect(routeState.queuedInput).toBeNull();
   });
 });
