@@ -54,6 +54,7 @@ import {
   transferTask,
   writingAttempt,
   userSkillState,
+  type LegacyPracticeMigrationSnapshot,
 } from "@iwc/db";
 
 import {
@@ -1082,6 +1083,9 @@ async function generateLesson(
 ): Promise<Record<string, number>> {
   const cycleId = job.protectedReference.cycleId;
   const skillId = job.protectedReference.skillId;
+  const isLegacyRecovery =
+    job.protectedReference.migrationMode === "LEGACY_RECOVERY";
+  const legacyLessonPlanId = job.protectedReference.lessonPlanId;
   if (
     !cycleId ||
     !skillId ||
@@ -1096,14 +1100,21 @@ async function generateLesson(
     with: { question: true, writingAttempts: true, lessonPlans: true },
   });
   if (!cycle) throw new Error("The training cycle no longer exists.");
-  if (cycle.lessonPlans.length > 0) return {};
+  if (!isLegacyRecovery && cycle.lessonPlans.length > 0) return {};
+  const legacyPlan = isLegacyRecovery
+    ? cycle.lessonPlans.find((plan) => plan.id === legacyLessonPlanId)
+    : undefined;
+  if (isLegacyRecovery && !legacyPlan)
+    throw new Error("The protected legacy practice no longer exists.");
   const canonicalSkillId = skillId as SkillId;
   const assessmentId = job.protectedReference.assessmentId;
-  if (!assessmentId)
+  if (!assessmentId && !isLegacyRecovery)
     throw new Error("Lesson generation requires its source assessment ID.");
-  const issueRows = await databaseContext.db.query.issueEvidence.findMany({
-    where: eq(issueEvidence.assessmentId, assessmentId),
-  });
+  const issueRows = assessmentId
+    ? await databaseContext.db.query.issueEvidence.findMany({
+        where: eq(issueEvidence.assessmentId, assessmentId),
+      })
+    : [];
   const selectedIssueRows = issueRows
     .filter((issue) => issue.skillId === canonicalSkillId)
     .sort(
@@ -1117,7 +1128,7 @@ async function generateLesson(
     .slice(0, 4);
   const sourceEvidenceIds = selectedIssueRows.map((issue) => issue.id);
   const assessmentSummary =
-    selectedIssueRows.length > 0
+    selectedIssueRows.length > 0 || !assessmentId
       ? undefined
       : (
           await databaseContext.db.query.assessment.findFirst({
@@ -1135,11 +1146,16 @@ async function generateLesson(
             diagnosis: issue.diagnosis,
           })),
         }
-      : {
-          source: "ASSESSMENT_SUMMARY_FALLBACK",
-          skillId: canonicalSkillId,
-          assessmentSummary: assessmentSummary ?? {},
-        };
+      : assessmentId
+        ? {
+            source: "ASSESSMENT_SUMMARY_FALLBACK",
+            skillId: canonicalSkillId,
+            assessmentSummary: assessmentSummary ?? {},
+          }
+        : {
+            source: "MIGRATED_LEGACY_FALLBACK",
+            skillId: canonicalSkillId,
+          };
   const version1 = cycle.writingAttempts.find(
     (attempt) => attempt.kind === "version_1",
   );
@@ -1180,7 +1196,7 @@ Learner Version 1 for context only: ${(version1?.content ?? "").slice(0, 4_000)}
       ),
     maxOutputTokens: 16_000,
   });
-  const planId = newDomainId();
+  const planId = legacyPlan?.id ?? newDomainId();
   const objectiveId = newDomainId();
   const paperContent = {
     teachingModule: result.value.teachingModule,
@@ -1197,30 +1213,92 @@ Learner Version 1 for context only: ${(version1?.content ?? "").slice(0, 4_000)}
     format: "TIMED_PAPER_V2",
   };
   await databaseContext.db.transaction(async (transaction) => {
-    await transaction.insert(learningObjective).values({
+    const objectiveValues = {
       id: objectiveId,
       cycleId,
       skillId: canonicalSkillId,
-      role: "CORE",
+      role: "CORE" as const,
       sourceEvidenceIds: [...sourceEvidenceIds],
       priority: 1,
       successCriterion:
         "Meet the public criteria on the complete timed practice paper.",
-    });
-    await transaction.insert(lessonPlan).values({
-      id: planId,
-      cycleId,
-      coreSkillId: canonicalSkillId,
-      schemaVersion: LEARNING_CONTRACT_VERSION,
-      plannedMinutes: 60,
-      coreMinutes: 60,
-      activeOutputRatio: 0.75,
-      selectionRatio: 0.125,
-      remediationMinutes: 0,
-      stages: [],
-      practiceFormat: "TIMED_PAPER_V2",
-      paperContent,
-    });
+    };
+    if (legacyPlan) {
+      const legacyMigrationSnapshot: LegacyPracticeMigrationSnapshot =
+        legacyPlan.legacyMigrationSnapshot ?? {
+          migrationVersion: "LEGACY_PRACTICE_RECOVERY_V1",
+          capturedAt: new Date().toISOString(),
+          practiceFormat: legacyPlan.practiceFormat,
+          paperContent: legacyPlan.paperContent ?? null,
+          paperAnswers: { ...legacyPlan.paperAnswers },
+          paperResult: legacyPlan.paperResult ?? null,
+          paperSubmittedAt: legacyPlan.paperSubmittedAt?.toISOString() ?? null,
+          stages: [...legacyPlan.stages],
+          runtimeStatus: legacyPlan.runtimeStatus,
+          runtimeState: { ...legacyPlan.runtimeState },
+          elapsedSeconds: legacyPlan.elapsedSeconds,
+          productiveSeconds: legacyPlan.productiveSeconds,
+        };
+      await transaction
+        .insert(learningObjective)
+        .values(objectiveValues)
+        .onConflictDoUpdate({
+          target: [learningObjective.cycleId, learningObjective.role],
+          set: {
+            skillId: canonicalSkillId,
+            sourceEvidenceIds: [...sourceEvidenceIds],
+            priority: 1,
+            successCriterion:
+              "Meet the public criteria on the complete timed practice paper.",
+          },
+        });
+      await transaction
+        .update(lessonPlan)
+        .set({
+          coreSkillId: canonicalSkillId,
+          schemaVersion: LEARNING_CONTRACT_VERSION,
+          plannedMinutes: 60,
+          coreMinutes: 60,
+          activeOutputRatio: 0.75,
+          selectionRatio: 0.125,
+          remediationMinutes: 0,
+          stages: [],
+          runtimeStatus: "READY",
+          startedAt: null,
+          activeStartedAt: null,
+          pausedAt: null,
+          timeboxExpiredAt: null,
+          resolvedAt: null,
+          elapsedSeconds: 0,
+          productiveSeconds: 0,
+          runtimeRevision: 1,
+          runtimeState: { split: "NONE", refresher: "NOT_REQUIRED" },
+          practiceFormat: "TIMED_PAPER_V2",
+          paperContent,
+          paperAnswers: {},
+          paperResult: null,
+          paperSubmittedAt: null,
+          paperEvaluationJobId: null,
+          legacyMigrationSnapshot,
+        })
+        .where(eq(lessonPlan.id, planId));
+    } else {
+      await transaction.insert(learningObjective).values(objectiveValues);
+      await transaction.insert(lessonPlan).values({
+        id: planId,
+        cycleId,
+        coreSkillId: canonicalSkillId,
+        schemaVersion: LEARNING_CONTRACT_VERSION,
+        plannedMinutes: 60,
+        coreMinutes: 60,
+        activeOutputRatio: 0.75,
+        selectionRatio: 0.125,
+        remediationMinutes: 0,
+        stages: [],
+        practiceFormat: "TIMED_PAPER_V2",
+        paperContent,
+      });
+    }
     const current = cycle.status;
     const feedbackReady =
       current === "ANALYZING"
@@ -1236,7 +1314,7 @@ Learner Version 1 for context only: ${(version1?.content ?? "").slice(0, 4_000)}
         : generating;
     await transaction
       .update(trainingCycle)
-      .set({ status: ready })
+      .set({ status: ready, coreSkillId: canonicalSkillId })
       .where(eq(trainingCycle.id, cycleId));
   });
   return usageRecord(result.usage);

@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { lessonPlan } from "@iwc/db";
+
 const lessonState = vi.hoisted(() => ({
   issues: [] as Array<{
     id: string;
@@ -17,18 +19,36 @@ const lessonState = vi.hoisted(() => ({
   } as Record<string, string>,
   generatedInput: "",
   failure: undefined as unknown,
+  adapterFailure: undefined as unknown,
+  protectedReference: {
+    cycleId: "cycle-1",
+    assessmentId: "assessment-1",
+    skillId: "mechanism_chain",
+  } as Record<string, string>,
+  lessonPlans: [] as Array<Record<string, unknown>>,
+  inserted: [] as Array<{ table: unknown; values: unknown }>,
+  updated: [] as Array<{ table: unknown; values: unknown }>,
 }));
 
 vi.mock("../runtime", () => {
   const transaction = {
-    insert: vi.fn(() => ({ values: vi.fn(async () => undefined) })),
-    update: vi.fn(() => ({
-      set: vi.fn(() => ({ where: vi.fn(async () => undefined) })),
+    insert: vi.fn((table: unknown) => ({
+      values: vi.fn((values: unknown) => {
+        lessonState.inserted.push({ table, values });
+        return { onConflictDoUpdate: vi.fn(async () => undefined) };
+      }),
+    })),
+    update: vi.fn((table: unknown) => ({
+      set: vi.fn((values: unknown) => {
+        lessonState.updated.push({ table, values });
+        return { where: vi.fn(async () => undefined) };
+      }),
     })),
   };
   return {
     adapterForJob: vi.fn(async () => ({
       generateStructured: vi.fn(async (request: { input: string }) => {
+        if (lessonState.adapterFailure) throw lessonState.adapterFailure;
         lessonState.generatedInput = request.input;
         return {
           value: {
@@ -45,9 +65,7 @@ vi.mock("../runtime", () => {
       ownerId: "learner-1",
       taskKind: "exercise_generation",
       protectedReference: {
-        cycleId: "cycle-1",
-        assessmentId: "assessment-1",
-        skillId: "mechanism_chain",
+        ...lessonState.protectedReference,
       },
       versionSnapshot: {
         model: "mock-deterministic-v1",
@@ -74,7 +92,7 @@ vi.mock("../runtime", () => {
                     "Schools can prepare young people for important adult decisions.",
                 },
               ],
-              lessonPlans: [],
+              lessonPlans: lessonState.lessonPlans,
             })),
           },
           issueEvidence: {
@@ -129,6 +147,15 @@ describe("adaptive lesson generation evidence", () => {
     lessonState.generatedInput = "";
     lessonState.failure = undefined;
     lessonState.issues = [];
+    lessonState.adapterFailure = undefined;
+    lessonState.protectedReference = {
+      cycleId: "cycle-1",
+      assessmentId: "assessment-1",
+      skillId: "mechanism_chain",
+    };
+    lessonState.lessonPlans = [];
+    lessonState.inserted = [];
+    lessonState.updated = [];
   });
 
   it("passes only the selected skill's top four issues in stable priority and position order", async () => {
@@ -234,6 +261,98 @@ describe("adaptive lesson generation evidence", () => {
     );
     expect(lessonState.generatedInput).not.toContain(
       "DO_NOT_MIX_THIS_OTHER_SKILL",
+    );
+  });
+
+  it("uses a truthful generic recovery context when an older lesson has no assessment", async () => {
+    lessonState.protectedReference = {
+      cycleId: "cycle-1",
+      lessonPlanId: "legacy-plan-1",
+      migrationMode: "LEGACY_RECOVERY",
+      skillId: "mechanism_chain",
+    };
+    lessonState.lessonPlans = [
+      {
+        id: "legacy-plan-1",
+        coreSkillId: "mechanism_chain",
+        practiceFormat: "LEGACY_EXERCISES",
+        paperContent: { old: true },
+        paperAnswers: { oldQuestion: "My saved answer" },
+        paperResult: { old: true },
+        paperSubmittedAt: new Date("2026-08-01T10:00:00Z"),
+        stages: [],
+        runtimeStatus: "READY",
+        runtimeState: {},
+        elapsedSeconds: 0,
+        productiveSeconds: 0,
+        legacyMigrationSnapshot: null,
+      },
+    ];
+
+    await generateLesson();
+
+    expect(lessonState.failure).toBeUndefined();
+    expect(lessonState.generatedInput).toContain("MIGRATED_LEGACY_FALLBACK");
+    expect(lessonState.generatedInput).toContain("mechanism_chain");
+  });
+
+  it("does not mutate an older lesson when its replacement cannot be generated", async () => {
+    lessonState.protectedReference = {
+      cycleId: "cycle-1",
+      lessonPlanId: "legacy-plan-1",
+      migrationMode: "LEGACY_RECOVERY",
+      skillId: "mechanism_chain",
+    };
+    lessonState.lessonPlans = [{ id: "legacy-plan-1" }];
+    lessonState.adapterFailure = new Error("provider unavailable");
+
+    await generateLesson();
+
+    expect(lessonState.failure).toBeInstanceOf(Error);
+    expect(lessonState.updated).toEqual([]);
+    expect(lessonState.inserted).toEqual([]);
+  });
+
+  it("updates the same older lesson and snapshots it only after package validation", async () => {
+    lessonState.protectedReference = {
+      cycleId: "cycle-1",
+      lessonPlanId: "legacy-plan-1",
+      migrationMode: "LEGACY_RECOVERY",
+      skillId: "mechanism_chain",
+    };
+    lessonState.lessonPlans = [
+      {
+        id: "legacy-plan-1",
+        coreSkillId: "mechanism_chain",
+        practiceFormat: "LEGACY_EXERCISES",
+        paperContent: { old: true },
+        paperAnswers: { oldQuestion: "My saved answer" },
+        paperResult: { old: true },
+        paperSubmittedAt: new Date("2026-08-01T10:00:00Z"),
+        stages: [],
+        runtimeStatus: "READY",
+        runtimeState: {},
+        elapsedSeconds: 0,
+        productiveSeconds: 0,
+        legacyMigrationSnapshot: null,
+      },
+    ];
+
+    await generateLesson();
+
+    const lessonUpdate = lessonState.updated.find(
+      ({ table }) => table === lessonPlan,
+    );
+    expect(lessonUpdate?.values).toMatchObject({
+      coreSkillId: "mechanism_chain",
+      practiceFormat: "TIMED_PAPER_V2",
+      legacyMigrationSnapshot: {
+        migrationVersion: "LEGACY_PRACTICE_RECOVERY_V1",
+        paperAnswers: { oldQuestion: "My saved answer" },
+      },
+    });
+    expect(lessonState.inserted.some(({ table }) => table === lessonPlan)).toBe(
+      false,
     );
   });
 });
