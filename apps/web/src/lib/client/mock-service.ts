@@ -1800,8 +1800,11 @@ export class MockLearningClient implements LearningClient {
     await delay(160);
   }
 
-  async replaceLegacyLesson(_lessonId: string): Promise<void> {
+  async replaceLegacyLesson(
+    _lessonId: string,
+  ): Promise<import("./types").LegacyLessonRecoveryResult> {
     await delay(120);
+    return { state: "READY", jobId: null };
   }
 
   async completePracticePaper(_lessonId: string): Promise<void> {

@@ -638,6 +638,11 @@ export interface PracticePaperResult {
   }>;
 }
 
+export interface LegacyLessonRecoveryResult {
+  readonly state: "READY" | "PREPARING" | "UNAVAILABLE";
+  readonly jobId: string | null;
+}
+
 export interface PracticePaperData {
   id: string;
   cycleId: string;
@@ -979,7 +984,7 @@ export interface LearningClient {
     lessonId: string,
     answers: Record<string, string>,
   ): Promise<void>;
-  replaceLegacyLesson(lessonId: string): Promise<void>;
+  replaceLegacyLesson(lessonId: string): Promise<LegacyLessonRecoveryResult>;
   completePracticePaper(lessonId: string): Promise<void>;
   saveLessonProgress(
     lessonId: string,

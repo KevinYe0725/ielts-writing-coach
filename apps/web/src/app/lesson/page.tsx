@@ -39,7 +39,32 @@ export default function FocusedTeachingPage({
   );
   const { data, error, loading, retry } = useDemoResource(loader);
   const [replacing, setReplacing] = useState(false);
-  const [replacementError, setReplacementError] = useState<string | null>(null);
+  const [replacementState, setReplacementState] = useState<
+    "PREPARING" | "UNAVAILABLE" | null
+  >(null);
+  const feedbackHref = cycleId
+    ? learningRouteHref("/feedback", { cycleId })
+    : "/today";
+
+  const startReplacement = () => {
+    if (!lessonId) return;
+    setReplacing(true);
+    void learningClient
+      .replaceLegacyLesson(lessonId)
+      .then((result) => {
+        if (result.state === "READY") {
+          setReplacementState(null);
+          retry();
+          router.refresh();
+          return;
+        }
+        setReplacementState(result.state);
+      })
+      .catch(() => {
+        setReplacementState("UNAVAILABLE");
+      })
+      .finally(() => setReplacing(false));
+  };
 
   if (loading || !data) {
     if (error) {
@@ -57,53 +82,42 @@ export default function FocusedTeachingPage({
               : text("专项教学暂不可用", "Focused teaching unavailable")}
           </h1>
           <p>
-            {needsReplacement
+            {replacementState === "PREPARING"
               ? text(
-                  "系统会保留原作文和批改依据，重新生成“专项教学＋完整训练卷”，避免你在没有学会方法前直接做题。",
-                  "Your essay and diagnosis will be preserved while the teaching module and complete paper are regenerated.",
+                  "新版训练正在准备中。你的原有训练记录已保留；你可以先返回批改报告，稍后再回来查看。",
+                  "Your updated practice is being prepared. Your earlier record is safe; you can return to feedback and check again later.",
                 )
-              : error.message}
+              : replacementState === "UNAVAILABLE"
+                ? text(
+                    "你的原有训练记录已保留。新版训练暂时无法生成；你可以稍后重试，或返回批改报告。",
+                    "Your earlier practice record is safe. The updated practice is unavailable for now; try again later or return to feedback.",
+                  )
+                : needsReplacement
+                  ? text(
+                      "系统会保留原作文和批改依据，重新生成“专项教学＋完整训练卷”，避免你在没有学会方法前直接做题。",
+                      "Your essay and diagnosis will be preserved while the teaching module and complete paper are regenerated.",
+                    )
+                  : error.message}
           </p>
-          {replacementError ? (
-            <p className="error-text">{replacementError}</p>
-          ) : null}
           <div className="completion-actions">
             {needsReplacement && lessonId ? (
-              <Button
-                disabled={replacing}
-                onClick={() => {
-                  setReplacing(true);
-                  setReplacementError(null);
-                  void learningClient
-                    .replaceLegacyLesson(lessonId)
-                    .then(() => router.push("/today"))
-                    .catch((cause) => {
-                      setReplacementError(
-                        cause instanceof Error
-                          ? cause.message
-                          : text(
-                              "生成失败，请稍后再试。",
-                              "Generation failed.",
-                            ),
-                      );
-                    })
-                    .finally(() => setReplacing(false));
-                }}
-              >
+              <Button disabled={replacing} onClick={startReplacement}>
                 {replacing
                   ? text("正在生成新版内容…", "Generating…")
-                  : text(
-                      "生成专项教学和新版训练卷",
-                      "Generate teaching and a new paper",
-                    )}
+                  : replacementState === "PREPARING"
+                    ? text("检查是否已准备好", "Check whether it is ready")
+                    : text(
+                        "生成专项教学和新版训练卷",
+                        "Generate teaching and a new paper",
+                      )}
               </Button>
             ) : (
               <Button onClick={retry} variant="secondary">
                 {text("重试", "Try again")}
               </Button>
             )}
-            <ActionLink href="/today">
-              {text("返回今日计划", "Return to Today")}
+            <ActionLink href={feedbackHref}>
+              {text("返回批改报告", "Return to feedback")}
             </ActionLink>
           </div>
         </Card>

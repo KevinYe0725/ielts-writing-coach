@@ -122,6 +122,31 @@ export default function PracticePaperPage({
   const [finishing, setFinishing] = useState(false);
   const [replacing, setReplacing] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [replacementState, setReplacementState] = useState<
+    "PREPARING" | "UNAVAILABLE" | null
+  >(null);
+  const feedbackHref = cycleId
+    ? learningRouteHref("/feedback", { cycleId })
+    : "/today";
+
+  const startReplacement = () => {
+    if (!lessonId) return;
+    setReplacing(true);
+    setSubmitError("");
+    void learningClient
+      .replaceLegacyLesson(lessonId)
+      .then((result) => {
+        if (result.state === "READY") {
+          setReplacementState(null);
+          retry();
+          router.refresh();
+          return;
+        }
+        setReplacementState(result.state);
+      })
+      .catch(() => setReplacementState("UNAVAILABLE"))
+      .finally(() => setReplacing(false));
+  };
 
   useEffect(() => {
     if (!data) return;
@@ -203,42 +228,38 @@ export default function PracticePaperPage({
             : text("专项训练卷暂不可用", "Practice paper unavailable")}
         </h1>
         <p>
-          {legacy
+          {replacementState === "PREPARING"
             ? text(
-                "逐题即时判定容易产生隐藏标准和卡关。系统将删除本轮旧题、旧答案与旧评价，并根据原作文诊断生成一份完整的60分钟试卷。",
-                "The item-by-item format is being replaced with one complete 60-minute paper based on the original diagnosis.",
+                "新版训练正在准备中。你的原有训练记录已保留；你可以先返回批改报告，稍后再回来查看。",
+                "Your updated practice is being prepared. Your earlier record is safe; you can return to feedback and check again later.",
               )
-            : error?.message}
+            : replacementState === "UNAVAILABLE"
+              ? text(
+                  "你的原有训练记录已保留。新版训练暂时无法生成；你可以稍后重试，或返回批改报告。",
+                  "Your earlier practice record is safe. The updated practice is unavailable for now; try again later or return to feedback.",
+                )
+              : legacy
+                ? text(
+                    "系统会保留原有训练记录，并根据可用信息生成一份完整的60分钟专项训练卷。",
+                    "Your earlier practice record will be preserved while one complete 60-minute paper is prepared.",
+                  )
+                : error?.message}
         </p>
         <div className="completion-actions">
           {legacy && lessonId ? (
-            <Button
-              disabled={replacing}
-              onClick={() => {
-                setReplacing(true);
-                void learningClient
-                  .replaceLegacyLesson(lessonId)
-                  .then(() => router.push("/today"))
-                  .catch((cause) =>
-                    setSubmitError(
-                      cause instanceof Error
-                        ? cause.message
-                        : "Replacement failed.",
-                    ),
-                  )
-                  .finally(() => setReplacing(false));
-              }}
-            >
+            <Button disabled={replacing} onClick={startReplacement}>
               {replacing ? (
                 <LoadingButtonContent
                   label={text("正在生成新版试卷", "Creating the new paper")}
                 />
               ) : (
                 <>
-                  {text(
-                    "删除旧训练并生成新版试卷",
-                    "Replace with the complete paper",
-                  )}
+                  {replacementState === "PREPARING"
+                    ? text("检查是否已准备好", "Check whether it is ready")
+                    : text(
+                        "生成新的专项教学和训练卷",
+                        "Create updated teaching and paper",
+                      )}
                 </>
               )}
             </Button>
@@ -248,8 +269,8 @@ export default function PracticePaperPage({
               {text("重试", "Try again")}
             </Button>
           )}
-          <ActionLink href="/today" variant="secondary">
-            {text("返回今日计划", "Return to Today")}
+          <ActionLink href={feedbackHref} variant="secondary">
+            {text("返回批改报告", "Return to feedback")}
           </ActionLink>
         </div>
         {submitError ? <p role="alert">{submitError}</p> : null}

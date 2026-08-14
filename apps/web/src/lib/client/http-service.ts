@@ -33,6 +33,7 @@ import type {
   LessonResponseInput,
   LessonRuntimeData,
   LessonRuntimeUpdate,
+  LegacyLessonRecoveryResult,
   PracticePaperData,
   PracticePaperQuestion,
   PracticePaperResult,
@@ -2449,21 +2450,25 @@ export class HttpLearningClient implements LearningClient {
       await this.waitForJob(data.job_id);
   }
 
-  async replaceLegacyLesson(lessonId: string): Promise<void> {
+  async replaceLegacyLesson(
+    lessonId: string,
+  ): Promise<LegacyLessonRecoveryResult> {
     const { data } = await this.request<{
       job_id?: string | null;
       job_status?: string;
+      lesson_id?: string | null;
     }>(`/lessons/${encodeURIComponent(lessonId)}/replace`, {
       body: {},
       idempotent: true,
       method: "POST",
     });
-    if (
-      data.job_id &&
-      data.job_status !== "WAITING_FOR_CONSENT" &&
-      data.job_status !== "SUCCEEDED"
-    )
-      await this.waitForJob(data.job_id);
+    if (data.lesson_id || data.job_status === "SUCCEEDED") {
+      return { state: "READY", jobId: data.job_id ?? null };
+    }
+    if (data.job_status === "QUEUED" || data.job_status === "RUNNING") {
+      return { state: "PREPARING", jobId: data.job_id ?? null };
+    }
+    return { state: "UNAVAILABLE", jobId: data.job_id ?? null };
   }
 
   async completePracticePaper(lessonId: string): Promise<void> {

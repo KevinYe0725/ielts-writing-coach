@@ -61,6 +61,35 @@ const savedPersonalizedResponse: TeachingPracticeResponseData = {
   analysis: validPersonalizedAnalysis,
 };
 
+describe("legacy practice recovery client", () => {
+  it("returns a non-blocking unavailable state instead of waiting on a blocked replacement", async () => {
+    const fetcher = vi.fn<typeof fetch>(async (input) => {
+      expect(String(input)).toContain("/lessons/lesson-legacy/replace");
+      return jsonResponse({
+        replacement_started: true,
+        lesson_id: null,
+        job_id: "legacy-recovery-job",
+        job_status: "WAITING_FOR_CONSENT",
+      });
+    });
+    const client = new HttpLearningClient({
+      baseUrl: "https://coach.test/api/v1",
+      fetch: fetcher,
+      origin: "https://coach.test",
+    });
+
+    const result = (await client.replaceLegacyLesson(
+      "lesson-legacy",
+    )) as unknown;
+
+    expect(result).toEqual({
+      state: "UNAVAILABLE",
+      jobId: "legacy-recovery-job",
+    });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+});
+
 function problem(status: number, code: string): Response {
   return jsonResponse(
     {
