@@ -4,6 +4,26 @@ Review date: 2026-08-13 (Asia/Shanghai)
 Checkout: current working tree, demo-mode Web application  
 Verdict: **NOT MET — do not claim WCAG 2.2 AA conformance or a completed accessibility release gate yet.**
 
+## 2026-08-14 current-UI addendum
+
+The product changed after the review below: focused learning is now an adaptive
+article followed by a complete timed paper, rather than the former item-by-item
+lesson with a pause dialog. The historical pause-dialog observations therefore
+do not describe the current page and must not be used as current evidence.
+
+The current four-project Playwright matrix was rerun with Node 24.19.0 against
+the 2026-08-14 working tree: 181 passed, 95 intentional contract-mode or
+touch-only skips, and 0 failed. Core-route axe/landmark scans, current writing
+dialog focus, adaptive-article navigation, feedback annotation linkage, timed
+paper behavior, sidebar destinations, mobile layout, and skip-link destination
+focus passed. The runner now uses four workers and avoids a redundant health
+navigation before each already-isolated browser context.
+
+This addendum does **not** change the release verdict. No real screen reader was
+operated, actual 200%/400% browser zoom was not completed, and the manual
+installed-browser/physical-device matrix remains incomplete. The detailed
+2026-08-13 observations below are retained as dated historical evidence only.
+
 ## Executive result
 
 The product defects found during this review were fixed in the current checkout
@@ -137,7 +157,7 @@ using the Playwright CLI, not by calling React handlers directly.
 | Write editor                | After skip-link activation, `Tab` reached `textarea#essay-editor`; `:focus-visible` was true with a 3 px solid `rgb(24, 89, 173)` outline                 |
 | Rewrite editor              | Same named textbox and visible 3 px focus indicator were observed                                                                                         |
 | Write submit dialog         | Focus entered “继续检查”, `Shift+Tab` wrapped to “确认提交”, `Escape` closed it, and focus returned to “提交作文”                                         |
-| Lesson pause dialog         | Focus entered “继续当前练习”, reverse/forward tabbing stayed inside, `Escape` closed it, and focus returned to “暂停”                                     |
+| Former lesson pause dialog  | Historical 2026-08-13 check only; this control was removed by the adaptive-article and complete-paper redesign                                            |
 | Settings delete dialog      | Focus entered the confirmation input, both Tab directions wrapped between enabled controls, `Escape` closed it, and focus returned to “删除…”             |
 | 320 CSS-pixel settings tabs | The local tab strip scrolled the off-screen tab into view as keyboard focus advanced; the document itself did not scroll horizontally                     |
 | Responsive visual review    | Setup, write, lesson, rewrite, and settings remained readable at 640 and 320 CSS-pixel widths; no content loss or page-level two-axis scroll was observed |
@@ -190,14 +210,14 @@ cannot close the manual zoom gate.
 
 ## Defects found and closed during this review
 
-| Finding                  | Initial behavior                                                 | Final verification                                                                                                        |
-| ------------------------ | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| Nested lesson landmark   | Two nested `main` elements                                       | One `main` in all four automated targets and CDP tree                                                                     |
-| Setup skip destination   | Fragment changed but focus stayed on `body`                      | Headed Chrome and all desktop-engine checks focus `main`                                                                  |
-| Essay focus visibility   | Textarea suppressed its outline                                  | Write/rewrite show a 3 px solid focus indicator                                                                           |
-| Write/lesson modal focus | No initial focus/trap/Escape/restore                             | Focus contract passes in Chromium, Firefox, WebKit and headed Chrome                                                      |
-| Settings deletion modal  | Focus stayed outside, escaped the dialog, and Escape did nothing | Initial input focus, both-direction containment, Escape and invoker restore pass in all desktop engines and headed Chrome |
-| Setup subtitle contrast  | 4.39:1–4.44:1 at sampled gradient points                         | 5.182:1–5.245:1 after the color change                                                                                    |
+| Finding                         | Initial behavior                                                 | Final verification                                                                                                        |
+| ------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Nested lesson landmark          | Two nested `main` elements                                       | One `main` in all four automated targets and CDP tree                                                                     |
+| Setup skip destination          | Fragment changed but focus stayed on `body`                      | Headed Chrome and all desktop-engine checks focus `main`                                                                  |
+| Essay focus visibility          | Textarea suppressed its outline                                  | Write/rewrite show a 3 px solid focus indicator                                                                           |
+| Write/former lesson modal focus | No initial focus/trap/Escape/restore                             | Writing still passes; the former lesson pause dialog was removed by the 2026-08-14 redesign                               |
+| Settings deletion modal         | Focus stayed outside, escaped the dialog, and Escape did nothing | Initial input focus, both-direction containment, Escape and invoker restore pass in all desktop engines and headed Chrome |
+| Setup subtitle contrast         | 4.39:1–4.44:1 at sampled gradient points                         | 5.182:1–5.245:1 after the color change                                                                                    |
 
 The Web package lint rerun completed with 0 errors and 3 existing
 `react-refresh/only-export-components` warnings unrelated to this review.

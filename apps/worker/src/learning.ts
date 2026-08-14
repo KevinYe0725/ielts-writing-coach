@@ -93,43 +93,148 @@ export interface PracticePaperContent {
   readonly items: readonly PracticePaperItemContent[];
 }
 
-export interface FocusedTeachingModule {
-  readonly targetTitleZh: string;
-  readonly targetTitleEn: string;
-  readonly whyItMattersZh: string;
-  readonly whyItMattersEn: string;
-  readonly currentPattern: string;
-  readonly decisionRuleZh: string;
-  readonly decisionRuleEn: string;
-  readonly knowledgeCards: readonly {
-    readonly titleZh: string;
-    readonly explanationZh: string;
-    readonly exampleEn: string;
+export type TeachingDifficultyType =
+  | "CONCEPT_GAP"
+  | "RECOGNISES_BUT_CANNOT_REVISE"
+  | "REVISES_BUT_CANNOT_GENERATE"
+  | "SAME_CONTEXT_ONLY"
+  | "UNSTABLE_CONTROL";
+
+export type TeachingBlockKind =
+  | "EXPLANATION"
+  | "CONTRAST"
+  | "REASONING"
+  | "TOOLKIT"
+  | "PITFALLS"
+  | "PRACTICE"
+  | "SUMMARY";
+
+interface TeachingBlockBase {
+  readonly titleZh: string;
+  readonly titleEn: string;
+}
+
+export interface ExplanationTeachingBlock extends TeachingBlockBase {
+  readonly kind: "EXPLANATION";
+  readonly paragraphsZh: readonly string[];
+  readonly paragraphsEn: readonly string[];
+  readonly keyPointZh: string;
+  readonly keyPointEn: string;
+}
+
+export interface ContrastTeachingBlock extends TeachingBlockBase {
+  readonly kind: "CONTRAST";
+  readonly weakExampleEn: string;
+  readonly strongExampleEn: string;
+  readonly differenceZh: string;
+  readonly differenceEn: string;
+}
+
+export interface ReasoningTeachingBlock extends TeachingBlockBase {
+  readonly kind: "REASONING";
+  readonly scenarioZh: string;
+  readonly scenarioEn: string;
+  readonly steps: readonly {
+    readonly thinkingZh: string;
+    readonly thinkingEn: string;
   }[];
-  readonly expressionBank: readonly {
+  readonly resultEn: string;
+  readonly takeawayZh: string;
+  readonly takeawayEn: string;
+}
+
+export interface ToolkitTeachingBlock extends TeachingBlockBase {
+  readonly kind: "TOOLKIT";
+  readonly tools: readonly {
     readonly expressionEn: string;
     readonly functionZh: string;
-    readonly usageZh: string;
+    readonly functionEn: string;
+    readonly conditionZh: string;
+    readonly conditionEn: string;
+    readonly cautionZh: string;
+    readonly cautionEn: string;
     readonly exampleEn: string;
   }[];
-  readonly workedExample: {
-    readonly taskZh: string;
-    readonly weakAnswerEn: string;
-    readonly thinkingStepsZh: readonly string[];
-    readonly improvedAnswerEn: string;
-    readonly explanationZh: string;
-  };
-  readonly quickChecks: readonly {
-    readonly promptZh: string;
-    readonly optionsZh: readonly string[];
-    readonly answerZh: string;
-    readonly explanationZh: string;
+}
+
+export interface PitfallsTeachingBlock extends TeachingBlockBase {
+  readonly kind: "PITFALLS";
+  readonly items: readonly {
+    readonly patternEn: string;
+    readonly problemZh: string;
+    readonly problemEn: string;
+    readonly betterEn: string;
   }[];
-  readonly readyChecklistZh: readonly string[];
+}
+
+export interface TeachingPracticePrompt {
+  readonly id: string;
+  readonly instructionZh: string;
+  readonly instructionEn: string;
+  readonly promptEn: string;
+  readonly responseMode: "CHOICE" | "SHORT_TEXT";
+  readonly context: "SAME_TOPIC" | "UNSEEN_TOPIC";
+  readonly optionsEn: readonly string[];
+  readonly referenceAnswerEn: string;
+  readonly referenceReasoningZh: string;
+  readonly referenceReasoningEn: string;
+}
+
+export interface PracticeTeachingBlock extends TeachingBlockBase {
+  readonly kind: "PRACTICE";
+  readonly prompts: readonly TeachingPracticePrompt[];
+}
+
+export interface SummaryTeachingBlock extends TeachingBlockBase {
+  readonly kind: "SUMMARY";
+  readonly rulesZh: readonly string[];
+  readonly rulesEn: readonly string[];
+  readonly selfCheckZh: string;
+  readonly selfCheckEn: string;
+}
+
+export type TeachingBlock =
+  | ExplanationTeachingBlock
+  | ContrastTeachingBlock
+  | ReasoningTeachingBlock
+  | ToolkitTeachingBlock
+  | PitfallsTeachingBlock
+  | PracticeTeachingBlock
+  | SummaryTeachingBlock;
+
+export interface TeachingBlueprint {
+  readonly coreAbilityZh: string;
+  readonly coreAbilityEn: string;
+  readonly difficultyType: TeachingDifficultyType;
+  readonly completionStandardZh: string;
+  readonly completionStandardEn: string;
+  readonly prerequisiteAbilityZh: string;
+  readonly prerequisiteAbilityEn: string;
+  readonly supportingAbilityZh: string;
+  readonly supportingAbilityEn: string;
+  readonly selectedBlockKinds: readonly TeachingBlockKind[];
+}
+
+export interface TeachingSection {
+  readonly anchor: string;
+  readonly titleZh: string;
+  readonly titleEn: string;
+  readonly blocks: readonly TeachingBlock[];
+}
+
+export interface AdaptiveTeachingModule {
+  readonly format: "ADAPTIVE_ARTICLE_V1";
+  readonly titleZh: string;
+  readonly titleEn: string;
+  readonly introductionZh: string;
+  readonly introductionEn: string;
+  readonly estimatedMinutes: number;
+  readonly blueprint: TeachingBlueprint;
+  readonly sections: readonly TeachingSection[];
 }
 
 export interface FocusedLearningPackage {
-  readonly teachingModule: FocusedTeachingModule;
+  readonly teachingModule: AdaptiveTeachingModule;
   readonly paper: PracticePaperContent;
 }
 
@@ -258,59 +363,408 @@ export function validatePracticePaperContent(
   });
 }
 
-function substantive(value: string, minimum = 4): boolean {
-  return value.trim().length >= minimum;
+function substantive(value: unknown, minimum = 4): value is string {
+  return typeof value === "string" && value.trim().length >= minimum;
 }
 
-/** Keeps the teaching and testing halves of one lesson aligned and useful. */
+function validBilingualCopy(
+  chinese: unknown,
+  english: unknown,
+  minimum = 2,
+): boolean {
+  return substantive(chinese, minimum) && substantive(english, minimum);
+}
+
+function validTeachingBlock(block: TeachingBlock): boolean {
+  if (!validBilingualCopy(block.titleZh, block.titleEn)) return false;
+  switch (block.kind) {
+    case "EXPLANATION":
+      return (
+        block.paragraphsZh.length >= 1 &&
+        block.paragraphsZh.length <= 4 &&
+        block.paragraphsEn.length >= 1 &&
+        block.paragraphsEn.length <= 4 &&
+        block.paragraphsZh.every((paragraph) => substantive(paragraph, 8)) &&
+        block.paragraphsEn.every((paragraph) => substantive(paragraph, 12)) &&
+        validBilingualCopy(block.keyPointZh, block.keyPointEn, 6)
+      );
+    case "CONTRAST":
+      return (
+        substantive(block.weakExampleEn, 8) &&
+        substantive(block.strongExampleEn, 8) &&
+        block.weakExampleEn.trim() !== block.strongExampleEn.trim() &&
+        validBilingualCopy(block.differenceZh, block.differenceEn, 8)
+      );
+    case "REASONING":
+      return (
+        validBilingualCopy(block.scenarioZh, block.scenarioEn, 6) &&
+        block.steps.length >= 2 &&
+        block.steps.length <= 5 &&
+        block.steps.every((step) =>
+          validBilingualCopy(step.thinkingZh, step.thinkingEn, 6),
+        ) &&
+        substantive(block.resultEn, 12) &&
+        validBilingualCopy(block.takeawayZh, block.takeawayEn, 6)
+      );
+    case "TOOLKIT":
+      return (
+        block.tools.length >= 1 &&
+        block.tools.length <= 6 &&
+        block.tools.every(
+          (tool) =>
+            substantive(tool.expressionEn, 2) &&
+            validBilingualCopy(tool.functionZh, tool.functionEn, 4) &&
+            validBilingualCopy(tool.conditionZh, tool.conditionEn, 6) &&
+            validBilingualCopy(tool.cautionZh, tool.cautionEn, 6) &&
+            substantive(tool.exampleEn, 8),
+        )
+      );
+    case "PITFALLS":
+      return (
+        block.items.length >= 1 &&
+        block.items.length <= 6 &&
+        block.items.every(
+          (item) =>
+            substantive(item.patternEn, 2) &&
+            validBilingualCopy(item.problemZh, item.problemEn, 6) &&
+            substantive(item.betterEn, 2),
+        )
+      );
+    case "PRACTICE": {
+      if (block.prompts.length < 2 || block.prompts.length > 3) return false;
+      const promptIds = new Set(block.prompts.map((prompt) => prompt.id));
+      return (
+        promptIds.size === block.prompts.length &&
+        block.prompts.every((prompt) => {
+          if (
+            !/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(prompt.id) ||
+            !validBilingualCopy(
+              prompt.instructionZh,
+              prompt.instructionEn,
+              6,
+            ) ||
+            !substantive(prompt.promptEn, 8) ||
+            !substantive(prompt.referenceAnswerEn, 2) ||
+            !validBilingualCopy(
+              prompt.referenceReasoningZh,
+              prompt.referenceReasoningEn,
+              6,
+            )
+          )
+            return false;
+          if (prompt.responseMode === "SHORT_TEXT")
+            return prompt.optionsEn.length === 0;
+          return (
+            prompt.optionsEn.length >= 2 &&
+            prompt.optionsEn.length <= 4 &&
+            prompt.optionsEn.includes(prompt.referenceAnswerEn)
+          );
+        })
+      );
+    }
+    case "SUMMARY":
+      return (
+        block.rulesZh.length >= 2 &&
+        block.rulesZh.length <= 5 &&
+        block.rulesEn.length === block.rulesZh.length &&
+        block.rulesZh.every((rule) => substantive(rule, 6)) &&
+        block.rulesEn.every((rule) => substantive(rule, 6)) &&
+        validBilingualCopy(block.selfCheckZh, block.selfCheckEn, 8)
+      );
+  }
+}
+
+function collectStrings(value: unknown, output: string[]): void {
+  if (typeof value === "string") {
+    output.push(value);
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) collectStrings(item, output);
+    return;
+  }
+  if (typeof value !== "object" || value === null) return;
+  for (const item of Object.values(value)) collectStrings(item, output);
+}
+
+function wordTokens(value: string): string[] {
+  return (
+    value
+      .normalize("NFKC")
+      .toLocaleLowerCase()
+      .match(/[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*/gu) ?? []
+  );
+}
+
+/** Returns true when one generated field copies a long exact word run. */
+export function hasLongExactWordOverlap(
+  source: string,
+  generatedFields: readonly string[],
+  minimumWords = 12,
+): boolean {
+  if (minimumWords < 1) return false;
+  const sourceWords = wordTokens(source);
+  if (sourceWords.length < minimumWords) return false;
+  const sourceSequences = new Set<string>();
+  for (let index = 0; index <= sourceWords.length - minimumWords; index += 1) {
+    sourceSequences.add(
+      sourceWords.slice(index, index + minimumWords).join("\u0000"),
+    );
+  }
+  return generatedFields.some((field) => {
+    const fieldWords = wordTokens(field);
+    for (let index = 0; index <= fieldWords.length - minimumWords; index += 1) {
+      if (
+        sourceSequences.has(
+          fieldWords.slice(index, index + minimumWords).join("\u0000"),
+        )
+      )
+        return true;
+    }
+    return false;
+  });
+}
+
+function learnerFacingTeachingStrings(
+  teaching: AdaptiveTeachingModule,
+): string[] {
+  const strings: string[] = [
+    teaching.titleZh,
+    teaching.titleEn,
+    teaching.introductionZh,
+    teaching.introductionEn,
+  ];
+  collectStrings(teaching.sections, strings);
+  return strings;
+}
+
+function exactHanSequenceOverlap(
+  source: string,
+  generatedFields: readonly string[],
+  minimumCharacters: number,
+): boolean {
+  const sourceCharacters = source.match(/\p{Script=Han}/gu) ?? [];
+  if (sourceCharacters.length < minimumCharacters) return false;
+  const sourceSequences = new Set<string>();
+  for (
+    let index = 0;
+    index <= sourceCharacters.length - minimumCharacters;
+    index += 1
+  ) {
+    sourceSequences.add(
+      sourceCharacters.slice(index, index + minimumCharacters).join(""),
+    );
+  }
+  return generatedFields.some((field) => {
+    const fieldCharacters = field.match(/\p{Script=Han}/gu) ?? [];
+    for (
+      let index = 0;
+      index <= fieldCharacters.length - minimumCharacters;
+      index += 1
+    ) {
+      if (
+        sourceSequences.has(
+          fieldCharacters.slice(index, index + minimumCharacters).join(""),
+        )
+      )
+        return true;
+    }
+    return false;
+  });
+}
+
+function futurePaperAnswerStrings(paper: PracticePaperContent): string[] {
+  const answerFields = new Set([
+    "acceptedAnswers",
+    "referenceAnswerEn",
+    "referenceAnswerZh",
+    "modelAnswerEn",
+    "modelAnswerZh",
+    "sampleAnswerEn",
+    "sampleAnswerZh",
+    "suggestedAnswerEn",
+    "suggestedAnswerZh",
+    "answerEn",
+    "answerZh",
+    "answerExplanationEn",
+    "answerExplanationZh",
+  ]);
+  const answers: string[] = [];
+  for (const item of paper.items) {
+    for (const acceptedAnswer of item.acceptedAnswers) {
+      answers.push(acceptedAnswer);
+      const option = item.options.find(
+        (candidate) => candidate.key === acceptedAnswer,
+      );
+      if (option) answers.push(option.labelEn);
+    }
+    const itemRecord = item as unknown as Record<string, unknown>;
+    for (const [key, answer] of Object.entries(itemRecord)) {
+      if (answerFields.has(key)) collectStrings(answer, answers);
+    }
+  }
+  return [...new Set(answers.map((answer) => answer.trim()).filter(Boolean))];
+}
+
+function leaksFuturePaperAnswer(
+  learnerFacingFields: readonly string[],
+  paper: PracticePaperContent,
+): boolean {
+  return futurePaperAnswerStrings(paper).some(
+    (answer) =>
+      hasLongExactWordOverlap(answer, learnerFacingFields, 8) ||
+      exactHanSequenceOverlap(answer, learnerFacingFields, 18),
+  );
+}
+
+function containsOversizedLearnerFacingField(
+  learnerFacingFields: readonly string[],
+): boolean {
+  return learnerFacingFields.some((field) => wordTokens(field).length > 140);
+}
+
+function hasInternalVocabulary(fields: readonly string[]): boolean {
+  const unambiguousEnglish =
+    /\b(?:schema|skill[_ -]?id|evidence[_ -]?gate|ai[_ -]?job|job[_ -]?id)\b/iu;
+  const technicalPrompt =
+    /\b(?:(?:system|internal|hidden|developer|generation|evaluation|assessment|backend)\s+prompt|prompt\s+(?:version|registry|template|id|schema|pipeline|configuration|config))\b/iu;
+  const technicalModel =
+    /\b(?:(?:ai|language|foundation|llm)\s+model|model\s+(?:output|version|provider|route|response|id|configuration|config)|(?:the|this|a)\s+model\s+(?:generated|generates|chose|chooses|selected|selects|scored|scores|returned|returns|produced|produces|evaluated|evaluates|classified|classifies))\b/iu;
+  const technicalJob =
+    /\b(?:(?:ai|background|generation|evaluation|assessment|queued|pending|running)\s+job|job\s+(?:id|status|queue|runner|failed|failure|completed|running)|wait(?:ing)?\s+for\s+(?:the\s+)?job)\b/iu;
+  const scoringImplementation =
+    /\b(?:scoring|score)[_ -]?(?:implementation|logic|rule|algorithm|pipeline|engine|code)\b/iu;
+  const technicalConfidence =
+    /\b(?:(?:model|evaluation|assessment|prediction|output|judg(?:e)?ment)\s+confidence|confidence\s+(?:score|threshold|value|gate|rating)|(?:low|high)[_ -]?confidence\s+(?:judg(?:e)?ment|evaluation|result|output))\b/iu;
+  const chineseInternalVocabulary =
+    /(?:系统提示词|内部提示词|隐藏提示词|开发者提示词|提示词版本|提示词注册表|提示词ID|AI模型|人工智能模型|语言模型|大语言模型|系统模型|后台模型|评分模型|生成服务模型|模型输出|模型版本|模型供应商|模型提供商|模型路由|模型响应|后台任务|生成任务|评估任务|任务ID|任务状态|等待任务完成|能力ID|技能ID|证据门槛|证据阈值|评分实现|评分逻辑|评分算法|内部评分规则|打分实现|打分逻辑|置信度|置信分数|置信阈值|低置信|内部字段)/iu;
+
+  return fields.some((field) => {
+    if (
+      unambiguousEnglish.test(field) ||
+      technicalPrompt.test(field) ||
+      technicalModel.test(field) ||
+      technicalJob.test(field) ||
+      scoringImplementation.test(field) ||
+      technicalConfidence.test(field) ||
+      chineseInternalVocabulary.test(field)
+    )
+      return true;
+    return false;
+  });
+}
+
+function sameUniqueKinds(
+  selectedKinds: readonly TeachingBlockKind[],
+  actualKinds: readonly TeachingBlockKind[],
+): boolean {
+  const selected = new Set(selectedKinds);
+  const actual = new Set(actualKinds);
+  return (
+    selected.size === selectedKinds.length &&
+    selected.size === actual.size &&
+    [...selected].every((kind) => actual.has(kind))
+  );
+}
+
+/** Keeps the adaptive tutorial and timed paper aligned and pedagogically useful. */
 export function validateFocusedLearningPackage(
   value: FocusedLearningPackage,
+  version1Essay?: string,
 ): boolean {
   const teaching = value.teachingModule;
-  const normalizedTarget = normalizedInstructionText(teaching.targetTitleZh);
-  const normalizedObjective = normalizedInstructionText(
-    value.paper.objectiveZh,
+  if (
+    teaching.format !== "ADAPTIVE_ARTICLE_V1" ||
+    !validatePracticePaperContent(value.paper) ||
+    !validBilingualCopy(teaching.titleZh, teaching.titleEn, 6) ||
+    !validBilingualCopy(teaching.introductionZh, teaching.introductionEn, 12) ||
+    teaching.estimatedMinutes < 10 ||
+    teaching.estimatedMinutes > 25 ||
+    teaching.sections.length < 2 ||
+    teaching.sections.length > 5 ||
+    !validBilingualCopy(
+      teaching.blueprint.coreAbilityZh,
+      teaching.blueprint.coreAbilityEn,
+      6,
+    ) ||
+    !validBilingualCopy(
+      teaching.blueprint.completionStandardZh,
+      teaching.blueprint.completionStandardEn,
+      10,
+    ) ||
+    !substantive(value.paper.objectiveZh, 12) ||
+    !substantive(value.paper.objectiveEn, 12)
+  )
+    return false;
+
+  const normalizedTargetZh = normalizedInstructionText(
+    teaching.blueprint.coreAbilityZh,
   );
-  return (
-    validatePracticePaperContent(value.paper) &&
-    substantive(teaching.targetTitleZh, 6) &&
-    substantive(teaching.targetTitleEn, 8) &&
-    normalizedObjective.includes(normalizedTarget) &&
-    substantive(teaching.whyItMattersZh, 12) &&
-    substantive(teaching.currentPattern, 4) &&
-    substantive(teaching.decisionRuleZh, 12) &&
-    teaching.knowledgeCards.length >= 3 &&
-    teaching.knowledgeCards.length <= 5 &&
-    teaching.knowledgeCards.every(
-      (card) =>
-        substantive(card.titleZh) &&
-        substantive(card.explanationZh, 10) &&
-        substantive(card.exampleEn, 8),
-    ) &&
-    teaching.expressionBank.length >= 2 &&
-    teaching.expressionBank.length <= 8 &&
-    teaching.expressionBank.every(
-      (entry) =>
-        substantive(entry.expressionEn) &&
-        substantive(entry.functionZh) &&
-        substantive(entry.usageZh, 6) &&
-        substantive(entry.exampleEn, 8),
-    ) &&
-    teaching.workedExample.thinkingStepsZh.length >= 3 &&
-    substantive(teaching.workedExample.taskZh, 6) &&
-    substantive(teaching.workedExample.weakAnswerEn, 8) &&
-    substantive(teaching.workedExample.improvedAnswerEn, 16) &&
-    substantive(teaching.workedExample.explanationZh, 10) &&
-    teaching.quickChecks.length === 2 &&
-    teaching.quickChecks.every(
-      (check) =>
-        substantive(check.promptZh, 6) &&
-        substantive(check.answerZh, 1) &&
-        substantive(check.explanationZh, 6),
-    ) &&
-    teaching.readyChecklistZh.length >= 3 &&
-    teaching.readyChecklistZh.every((item) => substantive(item, 6))
+  const normalizedTargetEn = normalizedInstructionText(
+    teaching.blueprint.coreAbilityEn,
   );
+  if (
+    !normalizedInstructionText(value.paper.objectiveZh).includes(
+      normalizedTargetZh,
+    ) ||
+    !normalizedInstructionText(value.paper.objectiveEn).includes(
+      normalizedTargetEn,
+    )
+  )
+    return false;
+
+  const anchors = teaching.sections.map((section) => section.anchor);
+  if (
+    new Set(anchors).size !== anchors.length ||
+    anchors.some((anchor) => !/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(anchor)) ||
+    teaching.sections.some(
+      (section) =>
+        !validBilingualCopy(section.titleZh, section.titleEn) ||
+        section.blocks.length === 0 ||
+        !section.blocks.every(validTeachingBlock),
+    )
+  )
+    return false;
+
+  const blocks = teaching.sections.flatMap((section) => section.blocks);
+  if (blocks.length < 4 || blocks.length > 8) return false;
+  const actualKinds = blocks.map((block) => block.kind);
+  if (
+    !sameUniqueKinds(teaching.blueprint.selectedBlockKinds, actualKinds) ||
+    !actualKinds.includes("EXPLANATION") ||
+    !actualKinds.some((kind) => kind === "CONTRAST" || kind === "REASONING")
+  )
+    return false;
+
+  const practicePrompts = blocks
+    .filter(
+      (block): block is PracticeTeachingBlock => block.kind === "PRACTICE",
+    )
+    .flatMap((block) => block.prompts);
+  if (
+    practicePrompts.length < 2 ||
+    !practicePrompts.some((prompt) => prompt.responseMode === "SHORT_TEXT") ||
+    !practicePrompts.some((prompt) => prompt.context === "UNSEEN_TOPIC")
+  )
+    return false;
+
+  const summaryIndexes = blocks.flatMap((block, index) =>
+    block.kind === "SUMMARY" ? [index] : [],
+  );
+  if (summaryIndexes.length !== 1 || summaryIndexes[0] !== blocks.length - 1)
+    return false;
+
+  const learnerFacingFields = learnerFacingTeachingStrings(teaching);
+  if (
+    hasInternalVocabulary(learnerFacingFields) ||
+    containsOversizedLearnerFacingField(learnerFacingFields) ||
+    leaksFuturePaperAnswer(learnerFacingFields, value.paper) ||
+    (substantive(version1Essay, 1) &&
+      hasLongExactWordOverlap(version1Essay, learnerFacingFields))
+  )
+    return false;
+
+  return true;
 }
 
 export function sanitizePracticePaperJudgment(input: {

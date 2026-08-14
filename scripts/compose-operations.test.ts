@@ -14,6 +14,8 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
+import { DATABASE_SCHEMA_VERSION } from "../packages/db/src/schema-version";
+
 const repositoryRoot = fileURLToPath(new URL("..", import.meta.url));
 const scripts = {
   backup: fileURLToPath(new URL("./compose-backup.sh", import.meta.url)),
@@ -267,7 +269,7 @@ describe("supported Compose operator commands", () => {
       JSON.stringify({
         createdAt: "2026-08-13T12:00:00.000Z",
         applicationVersion: "1.0.0",
-        databaseSchemaVersion: "0009_sharp_maddog",
+        databaseSchemaVersion: DATABASE_SCHEMA_VERSION,
         database: {
           name: "iwc",
           sizeBytes: 1,

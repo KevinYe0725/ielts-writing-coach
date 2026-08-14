@@ -201,6 +201,9 @@ importers:
       '@iwc/learning-core':
         specifier: workspace:*
         version: link:../../packages/learning-core
+      ajv:
+        specifier: 'catalog:'
+        version: 8.20.0
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.45.2(@types/pg@8.21.0)(kysely@0.29.5)(pg@8.23.0)

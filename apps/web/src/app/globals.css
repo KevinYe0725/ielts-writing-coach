@@ -149,6 +149,10 @@ h3 {
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
 }
 
+.app-shell[data-sidebar-state="collapsed"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .sidebar {
   position: sticky;
   top: 0;
@@ -159,6 +163,10 @@ h3 {
   border-right: 1px solid var(--line);
   flex-direction: column;
   overflow-y: auto;
+}
+
+.sidebar[hidden] {
+  display: none;
 }
 
 .brand {
@@ -355,6 +363,43 @@ h3 {
   justify-content: space-between;
 }
 
+.topbar-leading,
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.topbar-leading {
+  min-width: 0;
+}
+
+.sidebar-toggle {
+  display: inline-flex;
+  min-height: 36px;
+  padding: 7px 10px;
+  color: var(--ink-soft);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  font-size: 0.73rem;
+  font-weight: 700;
+  cursor: pointer;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.sidebar-toggle:hover {
+  color: var(--blue-dark);
+  border-color: #b8c8dc;
+}
+
+.sidebar-toggle:focus-visible {
+  outline: 3px solid rgba(24, 89, 173, 0.24);
+  outline-offset: 2px;
+}
+
 .focus-message {
   display: flex;
   color: var(--ink-soft);
@@ -392,6 +437,10 @@ h3 {
   min-height: calc(100vh - 64px);
   padding: 42px clamp(24px, 4vw, 58px) 80px;
   margin: 0 auto;
+}
+
+.app-shell[data-sidebar-state="collapsed"] .main-content {
+  width: min(1320px, 100%);
 }
 
 .mobile-header {
@@ -4854,6 +4903,12 @@ h3 {
   }
   .band-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 961px) and (max-width: 1120px) {
+  .focus-message {
+    display: none;
   }
 }
 

@@ -4,6 +4,11 @@ import {
   LearningClientError,
   type ApiProblemDetails,
 } from "./errors";
+import {
+  projectTeachingPracticeResponse,
+  unavailableTeachingPracticeResponse,
+} from "./teaching-practice-projection";
+import { AI_TASK_KINDS } from "./types";
 import type {
   AiConnection,
   AiConnectionInput,
@@ -47,6 +52,8 @@ import type {
   TransferSubmission,
   TransferTaskData,
   TransferTaskStatus,
+  TeachingPracticePrompt,
+  TeachingPracticeResponseData,
   AiTaskKind,
   UserPreferences,
   WritingPrompt,
@@ -157,10 +164,12 @@ interface WireAssessment extends JsonRecord {
 interface WireIssue extends JsonRecord {
   confidence?: number;
   diagnosis?: JsonRecord;
+  endOffset?: number;
   excerpt?: string;
   id?: string;
   severity?: number;
   skillId?: string;
+  startOffset?: number;
 }
 
 const issueTypes = [
@@ -417,6 +426,18 @@ function finiteNumber(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value)
     ? value
     : undefined;
+}
+
+function isRecoverableTeachingAnalysisError(error: unknown): boolean {
+  if (!(error instanceof LearningClientError)) return false;
+  return (
+    error.code === "NETWORK_ERROR" ||
+    error.status === 408 ||
+    error.status === 425 ||
+    error.status === 429 ||
+    error.status >= 500 ||
+    (error.status === 0 && error.retryable)
+  );
 }
 
 function randomId(): string {
@@ -897,6 +918,9 @@ function mapIssue(issue: WireIssue, index: number): FeedbackIssue {
     titleZh: title.zh,
     titleEn: title.en,
     evidence: issue.excerpt ?? "No excerpt was stored.",
+    startOffset:
+      typeof issue.startOffset === "number" ? issue.startOffset : null,
+    endOffset: typeof issue.endOffset === "number" ? issue.endOffset : null,
     explanationZh: explanation.zh,
     explanationEn: explanation.en,
     transferRuleZh: transfer.zh,
@@ -927,6 +951,7 @@ function mapIssue(issue: WireIssue, index: number): FeedbackIssue {
           ? "naturalness"
           : "must_fix",
     confidence: issue.confidence ?? 0.7,
+    skillId: issue.skillId,
   };
 }
 
@@ -1333,16 +1358,7 @@ function humanizeSkillId(skillId: string): string {
     .join(" ");
 }
 
-const AI_TASK_KIND_SET = new Set<AiTaskKind>([
-  "ielts_assessment",
-  "issue_classification",
-  "objective_prioritization",
-  "exercise_generation",
-  "open_sentence_evaluation",
-  "paragraph_evaluation",
-  "version_comparison",
-  "transfer_evaluation",
-]);
+const AI_TASK_KIND_SET = new Set<AiTaskKind>(AI_TASK_KINDS);
 
 function isAiTaskKind(value: unknown): value is AiTaskKind {
   return typeof value === "string" && AI_TASK_KIND_SET.has(value as AiTaskKind);
@@ -1976,6 +1992,9 @@ export class HttpLearningClient implements LearningClient {
       });
     const summary = record(assessment.summary);
     const issues = (assessment.issues ?? []).map(mapIssue);
+    const targetSkillId = cycle.lessonPlans?.[0]?.coreSkillId;
+    const targetIssueId =
+      issues.find((issue) => issue.skillId === targetSkillId)?.id ?? null;
     const overall = assessment.overallBand ?? 0;
     const { mergeLearningDestinations } = await import("./learning-navigation");
     mergeLearningDestinations({
@@ -2009,6 +2028,7 @@ export class HttpLearningClient implements LearningClient {
       ),
       scores: criterionScores(assessment),
       issues,
+      targetIssueId,
       prompt: cycle.question?.prompt ?? "",
       originalEssay: attempt.content ?? "",
       overallSummaryZh: textValue(
@@ -2082,6 +2102,101 @@ export class HttpLearningClient implements LearningClient {
       write: `/write?cycle=${encodeURIComponent(cycleId)}`,
     });
     return { ...teaching, id: lessonId, cycleId };
+  }
+
+  async submitTeachingPracticeAnswer(
+    lessonId: string,
+    prompt: TeachingPracticePrompt,
+    answer: string,
+  ): Promise<TeachingPracticeResponseData> {
+    const fallback = unavailableTeachingPracticeResponse({
+      id: `local:${lessonId}:${prompt.id}`,
+      promptId: prompt.id,
+      submittedAnswer: answer,
+      responseMode: prompt.responseMode,
+    });
+    try {
+      const { data } = await this.request<{ response?: unknown }>(
+        `/lessons/${encodeURIComponent(lessonId)}/teaching-practice/${encodeURIComponent(prompt.id)}/responses`,
+        {
+          body: { answer },
+          idempotent: true,
+          method: "POST",
+        },
+      );
+      const response = projectTeachingPracticeResponse(data.response);
+      if (!response)
+        throw new LearningClientError(
+          "The saved tutorial answer could not be restored safely.",
+          {
+            status: 502,
+            code: "TEACHING_PRACTICE_RESPONSE_INVALID",
+            retryable: true,
+          },
+        );
+      return response;
+    } catch (error) {
+      if (isRecoverableTeachingAnalysisError(error)) return fallback;
+      throw error;
+    }
+  }
+
+  async getTeachingPracticeResponse(
+    lessonId: string,
+    promptId: string,
+    fallback?: TeachingPracticeResponseData,
+  ): Promise<TeachingPracticeResponseData | null> {
+    try {
+      const { data, response } = await this.request<{ response?: unknown }>(
+        `/lessons/${encodeURIComponent(lessonId)}/teaching-practice/${encodeURIComponent(promptId)}/responses`,
+        { permitStatuses: [404] },
+      );
+      if (response.status === 404) return null;
+      const restored = projectTeachingPracticeResponse(data.response);
+      if (!restored)
+        throw new LearningClientError(
+          "The tutorial response could not be restored safely.",
+          {
+            status: 502,
+            code: "TEACHING_PRACTICE_RESPONSE_INVALID",
+            retryable: true,
+          },
+        );
+      return restored;
+    } catch (error) {
+      if (fallback && isRecoverableTeachingAnalysisError(error)) {
+        return unavailableTeachingPracticeResponse(fallback);
+      }
+      if (isRecoverableTeachingAnalysisError(error)) return null;
+      throw error;
+    }
+  }
+
+  async retryTeachingPracticeAnalysis(
+    response: TeachingPracticeResponseData,
+  ): Promise<TeachingPracticeResponseData> {
+    const unavailable = unavailableTeachingPracticeResponse(response);
+    if (!response.id || response.id.startsWith("local:")) return unavailable;
+    try {
+      const { data } = await this.request<{ response?: unknown }>(
+        `/teaching-practice-responses/${encodeURIComponent(response.id)}/retry`,
+        { body: {}, idempotent: true, method: "POST" },
+      );
+      const retried = projectTeachingPracticeResponse(data.response);
+      if (!retried)
+        throw new LearningClientError(
+          "The tutorial analysis retry could not be restored safely.",
+          {
+            status: 502,
+            code: "TEACHING_PRACTICE_RESPONSE_INVALID",
+            retryable: true,
+          },
+        );
+      return retried;
+    } catch (error) {
+      if (isRecoverableTeachingAnalysisError(error)) return unavailable;
+      throw error;
+    }
   }
 
   async getLesson(cycleId: string, lessonId: string): Promise<LessonData> {
@@ -3543,16 +3658,7 @@ export class HttpLearningClient implements LearningClient {
           fallback_enabled: false,
           model: input.model,
           provider_connection_id: provider.data.provider.id,
-          tasks: [
-            "ielts_assessment",
-            "issue_classification",
-            "objective_prioritization",
-            "exercise_generation",
-            "open_sentence_evaluation",
-            "paragraph_evaluation",
-            "version_comparison",
-            "transfer_evaluation",
-          ],
+          tasks: [...AI_TASK_KINDS],
         },
         idempotent: true,
         method: "PUT",
@@ -3589,16 +3695,7 @@ export class HttpLearningClient implements LearningClient {
         fallback_enabled: false,
         model: input.model,
         provider_connection_id: providerId,
-        tasks: [
-          "ielts_assessment",
-          "issue_classification",
-          "objective_prioritization",
-          "exercise_generation",
-          "open_sentence_evaluation",
-          "paragraph_evaluation",
-          "version_comparison",
-          "transfer_evaluation",
-        ],
+        tasks: [...AI_TASK_KINDS],
       },
       idempotent: true,
       method: "PUT",

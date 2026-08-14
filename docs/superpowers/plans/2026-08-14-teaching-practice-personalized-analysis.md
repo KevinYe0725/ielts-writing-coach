@@ -63,10 +63,10 @@
 **Interfaces:**
 
 - Adds `teaching_practice_analysis` to `AITaskKind` and `PROMPT_REGISTRY`.
-- Produces `TeachingPracticeAnalysisJudgment` with bilingual summary, at most two bilingual strengths, one key gap, why it matters, `improvedAnswerEn`, one bilingual next check, exact `userAnswerEvidence`, `confidence`, and optional uncertainty text.
+- Produces a closed typed-atoms v2 judgment: disposition, bounded strength/comparison/improvement codes, exact immutable-answer evidence, and confidence. Provider-authored learner prose and rewrites are forbidden; first-party templates render the learner-facing explanation.
 - Worker consumes only `protectedReference.teachingPracticeResponseId`, reads the response and canonical tutorial prompt, verifies evidence spans against the immutable answer, and updates only `teachingPracticeResponse`.
 
-- [ ] Add failing prompt/schema tests for alternative valid wording, no fabricated weakness, one highest-value change, exact answer evidence, and explicit uncertainty.
+- [ ] Add failing prompt/schema tests for alternative valid wording, no fabricated weakness, one highest-value change, exact answer evidence, closed atom codes, and low-confidence degradation.
 - [ ] Add failing Worker tests proving success persists projected analysis and creates no SkillEvidenceEvent or state update.
 - [ ] Add failing Worker tests for low confidence and Mock mode: both become learner-safe non-gating results, never mastery evidence.
 - [ ] Run focused AI/Worker tests and confirm failures come from the missing task/schema/handler.
@@ -120,7 +120,7 @@
 
 - [ ] Add failing Chromium tests that submit a short-text answer and immediately see both answers before AI analysis completes.
 - [ ] Add a table-driven failing browser test for loading, failed, blocked/unconfigured, low-confidence, Mock/demo, and success; in every row assert the paper link remains enabled and navigable.
-- [ ] Add failing tests for personalized strengths/gap/improved answer, optional rewrite, refresh recovery, no scores/pass-fail/backend vocabulary, and 390px single-column order.
+- [ ] Add failing tests for personalized strengths/gap rendered from first-party templates, optional learner-authored rewrite, refresh recovery, no scores/pass-fail/backend vocabulary, and 390px single-column order.
 - [ ] Run the focused tests and confirm they fail on the current static reveal behavior.
 - [ ] Implement submitted-answer snapshots, asynchronous analysis state, safe retry, optional rewrite, and article-style result presentation.
 - [ ] Keep reveal/reference available synchronously and keep the paper action outside all analysis branches.

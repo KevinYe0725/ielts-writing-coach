@@ -36,7 +36,7 @@ projects below.
 | ---------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
 | `chromium` | Desktop Chrome profile   | Full setup, Today, lesson, writing, delayed rewrite, IndexedDB recovery, structural accessibility, and keyboard skip-link flow |
 | `firefox`  | Desktop Firefox profile  | Same desktop journeys and accessibility checks                                                                                 |
-| `webkit`   | Desktop Safari profile   | Same desktop journeys; uses Safari/WebKit's `Alt+Tab` link-navigation behavior for the skip-link check                         |
+| `webkit`   | Desktop Safari profile   | Same desktop journeys; skip-link activation and destination focus are checked after the page has settled                       |
 | `mobile`   | iPhone 14 WebKit profile | Core page structure, setup, Today, lesson, delayed rewrite, IndexedDB recovery, and mobile navigation/overflow                 |
 
 The touch project intentionally does not claim a hardware-keyboard contract.
@@ -70,16 +70,35 @@ NEXT_PUBLIC_DEMO_MODE=true PLAYWRIGHT_BASE_URL=http://127.0.0.1:3201 pnpm test:e
 node tests/quality/verify-release-version.mjs v1.0.0
 ```
 
-Local release-candidate audit on 2026-08-13 used Node 24.19.0 and PostgreSQL
-17.6. The complete, immutable result belongs in the first public GitHub Actions
-run and is intentionally not replaced here by fragile test-count snapshots.
-Before the initial commit, the local package suite, PostgreSQL migrations and
-integration tests, type checks, lint, deterministic quality suite, and current
-13-session Skill forward-evidence validator passed. The final browser and
-production-image checks are rerun after the source tree is frozen. These local
-results are evidence of that checkout only; they are not a claim that GitHub
-Actions, a real provider, a cloud template, or the manual accessibility matrix
-has already passed.
+The current local release-candidate audit was rerun on 2026-08-14 with Node
+24.19.0 and PostgreSQL 17. The following passed on the same working tree:
+
+- `pnpm validate`, including formatting, lint (0 errors), all workspace type
+  checks, and 561 package/database tests;
+- the four-project demo browser matrix with 181 passed, 95 contract-mode or
+  touch-only intentional skips, and 0 failed;
+- production Web and Worker builds;
+- dependency vulnerability and license-policy checks;
+- 12 deterministic quality tests; and
+- the current Skill digest against 13 newly executed isolated Codex sessions,
+  with 0 protected-answer leaks.
+
+The browser runner is capped at four workers. Each Playwright test already has
+an isolated browser context, so reset no longer makes a redundant request to
+the development server before every case. WebKit's macOS full-keyboard-access
+preference cannot be toggled by Playwright; its skip-link test therefore places
+focus on the link explicitly, then verifies keyboard activation and focus at
+the destination. Chromium and Firefox still verify first-`Tab` discovery.
+
+These are local checkout results, not a substitute for the first immutable
+public GitHub Actions run. The already-running Railway instance returned live
+and ready on 2026-08-14, and its Web, Worker, and PostgreSQL services were
+online, but `/api/version` still reported database schema
+`0009_sharp_maddog`. The current checkout contains schema 0011 and the new
+tutorial-answer analysis flow, so the hosted instance is explicitly **not**
+accepted as evidence for this checkout until that exact source is deployed and
+the real-provider journey is rerun. Human review and the manual accessibility
+matrix also remain open.
 
 ## Required real-AI and human evidence before stronger claims
 

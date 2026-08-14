@@ -58,7 +58,9 @@ test.describe("timed writing rooms", () => {
     ).toHaveCount(0);
 
     await expect(page.getByRole("timer")).toContainText("40:00");
-    await page.clock.runFor("35:00");
+    // Jump once instead of executing 2,100 individual interval ticks. The
+    // assertion remains tied to the app's Date-based deadline calculation.
+    await page.clock.fastForward("35:00");
 
     await expect(page.getByRole("timer")).toContainText("05:00");
     await expect(page.getByText("检查比较对象是否完整")).toBeVisible();
@@ -133,7 +135,7 @@ test.describe("timed writing rooms", () => {
 
     await page.goto("/feedback?cycle=cycle-demo");
     await expect(
-      page.getByRole("link", { name: "先做 3 分钟热身" }),
+      page.getByRole("link", { name: "进入专项教学" }),
     ).toHaveAttribute(
       "href",
       "/lesson?cycle=cycle-demo&lesson=lesson-collocation-perspective",

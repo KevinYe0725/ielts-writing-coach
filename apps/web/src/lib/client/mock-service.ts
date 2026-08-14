@@ -21,6 +21,8 @@ import type {
   SettingsData,
   SystemStatus,
   TodayData,
+  TeachingPracticePrompt,
+  TeachingPracticeResponseData,
   TransferResponseInput,
   TransferResult,
   TransferSubmission,
@@ -32,6 +34,10 @@ import {
   mergeLearningDestinations,
 } from "./learning-navigation";
 import { LearningClientError } from "./errors";
+import {
+  projectTeachingPracticeResponse,
+  unavailableTeachingPracticeResponse,
+} from "./teaching-practice-projection";
 
 const STORAGE_KEYS = {
   ai: "iwc.demo.ai-enabled",
@@ -50,6 +56,7 @@ const STORAGE_KEYS = {
   transferAnswer: "iwc.demo.transfer-answer",
   transferWindowExpired: "iwc.demo.transfer-window-expired",
   transferResult: "iwc.demo.transfer-result",
+  teachingPracticeResponses: "iwc.demo.teaching-practice-responses",
 } as const;
 
 const delay = async (milliseconds = 160): Promise<void> => {
@@ -73,6 +80,105 @@ const countWords = (value: string): number =>
 const removeStorage = (key: string): void => {
   if (canUseStorage()) window.localStorage.removeItem(key);
 };
+
+const teachingPracticeResponseKey = (lessonId: string, promptId: string) =>
+  `${lessonId}:${promptId}`;
+
+const readTeachingPracticeResponses = (): Record<
+  string,
+  TeachingPracticeResponseData
+> => {
+  const stored = readStorage(STORAGE_KEYS.teachingPracticeResponses);
+  if (!stored) return {};
+  try {
+    const value = JSON.parse(stored) as unknown;
+    if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+    const responses: Record<string, TeachingPracticeResponseData> = {};
+    for (const [key, candidate] of Object.entries(value)) {
+      const projected = projectTeachingPracticeResponse(candidate);
+      if (projected) responses[key] = projected;
+    }
+    return responses;
+  } catch {
+    return {};
+  }
+};
+
+const writeTeachingPracticeResponses = (
+  value: Record<string, TeachingPracticeResponseData>,
+) =>
+  writeStorage(STORAGE_KEYS.teachingPracticeResponses, JSON.stringify(value));
+
+function deterministicMockChoice(
+  prompt: TeachingPracticePrompt,
+  answer: string,
+): TeachingPracticeResponseData["analysis"] {
+  const followsReference = answer === prompt.referenceAnswerEn;
+  return {
+    kind: "DETERMINISTIC_CHOICE",
+    summary: followsReference
+      ? {
+          zh: "你的选择与参考思路采用了同一条作用路径；参考选项只是其中一种可行表达。",
+          en: "Your choice follows the reference path, which is one possible answer rather than the only valid wording.",
+        }
+      : {
+          zh: "你的选择强调了不同的句子功能；下面只做结构对照，不把参考选项当作唯一答案。",
+          en: "Your choice emphasizes a different sentence function. This is a structural comparison, not a single-answer verdict.",
+        },
+    strengths: followsReference
+      ? [
+          {
+            zh: "你识别出了参考思路强调的作用过程。",
+            en: "You identified the functional process emphasized by the reference.",
+            userAnswerEvidence: [answer],
+          },
+        ]
+      : [],
+    comparisonPoints: [
+      {
+        aspect: { zh: "句子功能", en: "Sentence function" },
+        referenceFeature: {
+          zh: prompt.referenceReasoningZh,
+          en: prompt.referenceReasoningEn,
+        },
+        learnerDifference: followsReference
+          ? {
+              zh: "你的选择呈现了相同的作用过程。",
+              en: "Your choice presents the same functional process.",
+            }
+          : {
+              zh: "你的选择呈现了另一条表达路径，可以继续检查它是否完成题目要求。",
+              en: "Your choice takes another path; check whether it completes the requested function.",
+            },
+        userAnswerEvidence: [answer],
+      },
+    ],
+    nextCheck: {
+      zh: "检查选项是否明确完成题目要求的句子功能。",
+      en: "Check whether the option clearly performs the requested sentence function.",
+    },
+  };
+}
+
+function mockShortTextAnalysis(): TeachingPracticeResponseData["analysis"] {
+  return {
+    kind: "DEMO_ONLY",
+    summary: {
+      zh: "你的答案已保存；当前演示只展示解析版式。",
+      en: "Your answer was saved; this demo only shows the analysis layout.",
+    },
+    strengths: [],
+    comparisonPoints: [],
+    nextCheck: {
+      zh: "完整解析可用后，再根据你的原句查看有证据支持的个性化建议。",
+      en: "When full analysis is available, review evidence-based suggestions tied to your sentence.",
+    },
+    uncertainty: {
+      zh: "演示模式没有判断你的英语质量，也不会据此记录能力。",
+      en: "Demo mode did not judge your English quality or record a skill result.",
+    },
+  };
+}
 
 const defaultEssay = `In recent years, an increasing number of primary schools have introduced foreign-language lessons. In my view, the advantages of beginning this process at an early age outweigh the possible disadvantages.
 
@@ -172,6 +278,19 @@ const getPreferences = (): UserPreferences => {
 
 const aiEnabled = (): boolean => readStorage(STORAGE_KEYS.ai) !== "false";
 
+const feedbackEssay =
+  "First of all, children always have a better ability to absorb new knowledges than the elder one especially in learning a new foreign language. They can understand new vocabulary and improve their listening skills easily, which makes children can develop a foreign language mindset more naturally.\n\nOn the other hand, the pressure from the courses in primary school is much slighter. Children have more time to explore new cultures and take part in other activities.\n\nIn conclusion, the advantages of learning a foreign language at primary school outweigh the disadvantages.";
+
+const feedbackSpan = (evidence: string) => {
+  const startOffset = feedbackEssay.indexOf(evidence);
+  if (startOffset < 0) {
+    throw new Error(
+      `Demo feedback evidence is not present in Version 1: ${evidence}`,
+    );
+  }
+  return { endOffset: startOffset + evidence.length, startOffset };
+};
+
 const feedback: FeedbackData = {
   cycleId: "cycle-demo",
   attemptId: "attempt-v1",
@@ -187,8 +306,7 @@ const feedback: FeedbackData = {
     "Your position is clear and both sides are addressed with a recognisable argument structure.",
   prompt:
     "Some experts believe that it is better for children to begin learning a foreign language at primary school rather than secondary school. Do the advantages outweigh the disadvantages?",
-  originalEssay:
-    "First of all, children always have a better ability to absorb new knowledges than the elder one especially in learning a new foreign language. They can understand new vocabulary and improve their listening skills easily, which makes children can develop a foreign language mindset more naturally.\n\nOn the other hand, the pressure from the courses in primary school is much slighter. Children have more time to explore new cultures and take part in other activities.\n\nIn conclusion, the advantages of learning a foreign language at primary school outweigh the disadvantages.",
+  originalEssay: feedbackEssay,
   overallSummaryZh:
     "文章立场明确并完成了优缺点比较，但语言准确度、自然搭配和因果展开仍限制说服力。",
   overallSummaryEn:
@@ -291,7 +409,10 @@ const feedback: FeedbackData = {
       titleZh: "从“课程造成压力”切换为“学生承受压力”",
       titleEn: "Shift from courses causing pressure to pupils facing pressure",
       evidence:
-        "The pressure from the courses in primary school is much slighter.",
+        "the pressure from the courses in primary school is much slighter.",
+      ...feedbackSpan(
+        "the pressure from the courses in primary school is much slighter.",
+      ),
       explanationZh:
         "much slighter 在形式上可以构成比较级，但英语更常让承受压力的人作主语，并搭配 face academic pressure。",
       explanationEn:
@@ -316,7 +437,10 @@ const feedback: FeedbackData = {
       titleZh: "比较对象必须完整且属于同一类别",
       titleEn: "Make both sides of a comparison complete and parallel",
       evidence:
-        "children have a better ability to absorb new knowledge than the older",
+        "children always have a better ability to absorb new knowledges than the elder one",
+      ...feedbackSpan(
+        "children always have a better ability to absorb new knowledges than the elder one",
+      ),
       explanationZh:
         "older 在这里是形容词，缺少 people 或 learners，导致比较对象不完整。",
       explanationEn:
@@ -341,7 +465,10 @@ const feedback: FeedbackData = {
       titleEn:
         "Add the mechanism between a cause and its long-term significance",
       evidence:
-        "Children can learn languages easily, so it is beneficial for their future.",
+        "They can understand new vocabulary and improve their listening skills easily, which makes children can develop a foreign language mindset more naturally.",
+      ...feedbackSpan(
+        "They can understand new vocabulary and improve their listening skills easily, which makes children can develop a foreign language mindset more naturally.",
+      ),
       explanationZh:
         "观点方向正确，但需要说明早期接触如何形成基础，以及这个基础为何能降低后期学习成本。",
       explanationEn:
@@ -357,9 +484,329 @@ const feedback: FeedbackData = {
       confidence: 0.9,
     },
   ],
+  targetIssueId: "issue-argument",
   lessonScheduledLabelZh: "专项教学已经准备好；学完后再进入60分钟训练卷。",
   lessonScheduledLabelEn:
     "Your focused teaching is ready; the 60-minute paper follows after it.",
+};
+
+export const mechanismChainTeachingFixture: FocusedTeachingData = {
+  id: "lesson-demo",
+  cycleId: "cycle-demo",
+  format: "ADAPTIVE_ARTICLE_V1",
+  titleZh: "别让论证从原因直接跳到结果",
+  titleEn: "Build the missing link in a causal argument",
+  introductionZh:
+    "这篇教程集中训练一件事：把中间发生的过程说清楚，让读者能够跟上你的推理。",
+  introductionEn:
+    "This tutorial focuses on making the missing process in a causal argument visible.",
+  estimatedMinutes: 18,
+  sections: [
+    {
+      anchor: "see-the-missing-link",
+      titleZh: "看见被跳过的一步",
+      titleEn: "See the missing link",
+      blocks: [
+        {
+          kind: "EXPLANATION",
+          titleZh: "机制不是重复原因",
+          titleEn: "A mechanism is not a repeated cause",
+          paragraphsZh: [
+            "原因告诉读者起点，结果告诉读者终点，机制说明变化如何从起点走到终点。只有补出中间发生的变化，论证才真正向前推进。",
+          ],
+          paragraphsEn: [
+            "A cause supplies the starting condition; a mechanism shows what changes before the result appears.",
+          ],
+          keyPointZh: "机制句必须增加一个新的中间步骤。",
+          keyPointEn: "A mechanism must add a new intermediate step.",
+        },
+        {
+          kind: "CONTRAST",
+          titleZh: "同一个观点，差在哪里",
+          titleEn: "The same claim with and without a mechanism",
+          weakExampleEn:
+            "Remote work is flexible, so employees are more productive.",
+          strongExampleEn:
+            "Remote work removes many daily interruptions, allowing employees to protect longer periods for concentrated tasks and therefore complete demanding work more efficiently.",
+          differenceZh:
+            "较强的句子补上了“减少打断”和“保留专注时间”两个可理解步骤，而不是只重复远程办公有好处。",
+          differenceEn:
+            "The stronger version adds fewer interruptions and longer periods of concentration as the missing process.",
+        },
+      ],
+    },
+    {
+      anchor: "build-one-step-at-a-time",
+      titleZh: "从一个问题推出机制",
+      titleEn: "Build the mechanism one step at a time",
+      blocks: [
+        {
+          kind: "REASONING",
+          titleZh: "把抽象好处推成可观察结果",
+          titleEn: "Reason from an abstract benefit to an observable result",
+          scenarioZh: "城市增加独立自行车道为什么可以改善通勤？",
+          scenarioEn: "Why can additional cycle lanes improve commuting?",
+          steps: [
+            {
+              thinkingZh: "先找到直接变化：骑行者不必与汽车争抢道路空间。",
+              thinkingEn:
+                "Identify the immediate change: cyclists no longer compete with cars for the same road space.",
+            },
+            {
+              thinkingZh: "再追问行为会怎样改变：更多人愿意在短途通勤时骑车。",
+              thinkingEn:
+                "Ask what behavior changes: more people are willing to cycle on short commutes.",
+            },
+            {
+              thinkingZh: "最后落到可以观察的结果：繁忙道路上的汽车压力下降。",
+              thinkingEn:
+                "Finish with an observable result: fewer cars place pressure on busy roads.",
+            },
+          ],
+          resultEn:
+            "Separated cycle lanes make short journeys feel safer, which encourages commuters to replace some car trips and reduces pressure on busy roads.",
+          takeawayZh: "用“直接变化→行为变化→可观察结果”检查链条。",
+          takeawayEn:
+            "Check for an immediate change, a behavior change, and an observable result.",
+        },
+      ],
+    },
+    {
+      anchor: "try-and-check",
+      titleZh: "换一个话题验证方法",
+      titleEn: "Transfer the method to a new topic",
+      blocks: [
+        {
+          kind: "PRACTICE",
+          titleZh: "两次主动生成",
+          titleEn: "Generate two missing mechanisms",
+          prompts: [
+            {
+              id: "workplace-mechanism",
+              instructionZh: "用一句英文补出灵活工作与生产力之间的中间机制。",
+              instructionEn:
+                "Write one English sentence that supplies the mechanism between flexible work and productivity.",
+              promptEn:
+                "Flexible schedules can improve employee productivity because …",
+              responseMode: "SHORT_TEXT",
+              context: "SAME_TOPIC",
+              optionsEn: [],
+              referenceAnswerEn:
+                "Employees can reserve their most demanding tasks for the hours when they concentrate best.",
+              referenceReasoningZh:
+                "参考答案说明了灵活时间如何改变任务安排，而不只是再次声称生产力会上升。",
+              referenceReasoningEn:
+                "The reference explains how flexible time changes task scheduling rather than repeating the outcome.",
+            },
+            {
+              id: "environment-transfer",
+              instructionZh: "换到环境话题，用两句英文写出一条新的机制链。",
+              instructionEn:
+                "Move to an environmental topic and write a new two-sentence mechanism chain.",
+              promptEn:
+                "Explain how charging households for excess waste could reduce landfill use.",
+              responseMode: "SHORT_TEXT",
+              context: "UNSEEN_TOPIC",
+              optionsEn: [],
+              referenceAnswerEn:
+                "A direct charge makes unnecessary disposal more expensive. Households therefore have a reason to reuse products and separate recyclable material.",
+              referenceReasoningZh:
+                "价格变化先影响家庭选择，再影响进入填埋场的废物量。",
+              referenceReasoningEn:
+                "The price change affects choices before it changes the amount of landfill waste.",
+            },
+          ],
+        },
+        {
+          kind: "SUMMARY",
+          titleZh: "下次写作只检查这三件事",
+          titleEn: "Three checks for your next essay",
+          rulesZh: [
+            "原因和结果之间是否出现了新的中间步骤？",
+            "中间步骤是否回答了影响如何发生？",
+            "结果是否具体到可以被观察？",
+          ],
+          rulesEn: [
+            "Add a new intermediate step between cause and result.",
+            "Make the step answer how the change happens.",
+            "Finish with a result that could be observed.",
+          ],
+          selfCheckZh:
+            "删掉中间句后，推理是否几乎没有变？如果是，它可能只在重复。",
+          selfCheckEn:
+            "If removing the middle sentence changes almost nothing, it may only repeat the claim.",
+        },
+      ],
+    },
+  ],
+};
+
+export const collocationControlTeachingFixture: FocusedTeachingData = {
+  id: "lesson-collocation-control",
+  cycleId: "cycle-collocation-control",
+  format: "ADAPTIVE_ARTICLE_V1",
+  titleZh: "搭配不是正确单词的随意相加",
+  titleEn: "Collocation is more than combining correct words",
+  introductionZh:
+    "这篇教程训练你先辨别语境中的关系，再从看似正确的候选表达中做出稳定选择。",
+  introductionEn:
+    "This tutorial trains a context-first method for choosing among plausible expressions.",
+  estimatedMinutes: 14,
+  sections: [
+    {
+      anchor: "choose-by-relationship",
+      titleZh: "先判断关系，再选择词组",
+      titleEn: "Choose by relationship, not translation",
+      blocks: [
+        {
+          kind: "EXPLANATION",
+          titleZh: "自然搭配同时受意义和语境限制",
+          titleEn: "Natural collocation depends on meaning and context",
+          paragraphsZh: [
+            "两个词分别正确，不代表它们组合后就是英语使用者在这个语境中的常见选择。稳定的选择来自对主语、动作和受影响对象之间关系的判断。",
+          ],
+          paragraphsEn: [
+            "Two individually correct words do not automatically form the usual expression for a particular relationship.",
+          ],
+          keyPointZh: "先问这个动词通常由什么主语对什么宾语使用。",
+          keyPointEn:
+            "Check which subjects and objects usually participate in the expression.",
+        },
+        {
+          kind: "TOOLKIT",
+          titleZh: "用使用条件而不是中文释义记搭配",
+          titleEn: "Store expressions with their usage conditions",
+          tools: [
+            {
+              expressionEn: "pose a risk to",
+              functionZh: "说明某事物带来潜在危害",
+              functionEn: "State that something creates a potential danger",
+              conditionZh: "主语是危险来源，宾语是受到影响的对象。",
+              conditionEn:
+                "The subject is the source of danger and the object is exposed to it.",
+              cautionZh: "不要仅仅因为某人感到担忧，就让人作这个短语的主语。",
+              cautionEn:
+                "Do not use a person as the subject merely because that person feels worried.",
+              exampleEn:
+                "Untreated industrial waste poses a serious risk to river ecosystems.",
+            },
+            {
+              expressionEn: "have an influence on",
+              functionZh: "说明一个因素对另一事物产生影响",
+              functionEn: "State that one factor affects another",
+              conditionZh: "主语是影响来源，on后面接被影响的对象。",
+              conditionEn:
+                "The subject is the source of influence and the object follows on.",
+              cautionZh: "不能写成make an influence on。",
+              cautionEn: "Do not write make an influence on.",
+              exampleEn:
+                "Housing costs have a substantial influence on where young adults choose to live.",
+            },
+          ],
+        },
+        {
+          kind: "PITFALLS",
+          titleZh: "两种会让选择失稳的捷径",
+          titleEn: "Two shortcuts that make choices unstable",
+          items: [
+            {
+              patternEn: "learn knowledge",
+              problemZh: "只根据中文“学知识”逐词翻译，没有检查常见动宾关系。",
+              problemEn:
+                "It follows a word-for-word translation instead of the usual verb–object relationship.",
+              betterEn: "acquire knowledge",
+            },
+            {
+              patternEn: "a heavy improvement",
+              problemZh: "看到“大幅”就直接选择heavy，而没有检查固定组合。",
+              problemEn:
+                "It chooses heavy from a dictionary meaning rather than an established combination.",
+              betterEn: "a substantial improvement",
+            },
+          ],
+        },
+        {
+          kind: "CONTRAST",
+          titleZh: "相似词并不承担相同关系",
+          titleEn: "Similar words do not express the same relationship",
+          weakExampleEn:
+            "The policy makes a strong influence on household spending.",
+          strongExampleEn:
+            "The policy has a substantial influence on household spending.",
+          differenceZh:
+            "make与influence不构成这个含义下的常见动宾组合；have an influence on才是稳定选择。",
+          differenceEn:
+            "Have an influence on is the established verb–noun pattern for this meaning.",
+        },
+      ],
+    },
+    {
+      anchor: "decide-in-new-contexts",
+      titleZh: "在新语境中做出选择",
+      titleEn: "Decide in new contexts",
+      blocks: [
+        {
+          kind: "PRACTICE",
+          titleZh: "先辨别，再独立生成",
+          titleEn: "Recognise once, then generate independently",
+          prompts: [
+            {
+              id: "risk-choice",
+              instructionZh: "选出能表示潜在危害的自然搭配。",
+              instructionEn:
+                "Choose the natural expression for creating a potential danger.",
+              promptEn:
+                "Air pollution may ___ a serious risk to children's health.",
+              responseMode: "CHOICE",
+              context: "SAME_TOPIC",
+              optionsEn: ["pose", "perform", "produce"],
+              referenceAnswerEn: "pose",
+              referenceReasoningZh:
+                "pose a risk to表示危险来源对暴露对象带来潜在危害。",
+              referenceReasoningEn:
+                "Pose a risk to expresses a source of potential danger affecting an exposed object.",
+            },
+            {
+              id: "health-transfer",
+              instructionZh: "在新的健康话题中，用一个自然搭配写一句完整英文。",
+              instructionEn:
+                "Write one complete English sentence with a natural collocation in a new health topic.",
+              promptEn:
+                "Explain one effect of prolonged sleep deprivation on workers.",
+              responseMode: "SHORT_TEXT",
+              context: "UNSEEN_TOPIC",
+              optionsEn: [],
+              referenceAnswerEn:
+                "Prolonged sleep deprivation can seriously impair workers' ability to make safe decisions.",
+              referenceReasoningZh:
+                "impair someone's ability to do something清晰表示某因素削弱一种能力。",
+              referenceReasoningEn:
+                "Impair someone's ability to do something expresses a reduction in capability.",
+            },
+          ],
+        },
+        {
+          kind: "SUMMARY",
+          titleZh: "用三个问题管住搭配选择",
+          titleEn: "Control collocation choices with three questions",
+          rulesZh: [
+            "这个表达通常由什么主语发出？",
+            "它通常作用于什么对象？",
+            "例句中的关系和当前语境相同吗？",
+          ],
+          rulesEn: [
+            "Identify the usual subject.",
+            "Identify the usual object.",
+            "Match the example's relationship to the present context.",
+          ],
+          selfCheckZh:
+            "我能说明这个搭配在本句中为什么自然，而不是只说“以前见过”吗？",
+          selfCheckEn:
+            "Can I explain why this combination fits the relationship rather than only recall seeing it?",
+        },
+      ],
+    },
+  ],
 };
 
 const lesson: LessonData = {
@@ -1060,119 +1507,79 @@ export class MockLearningClient implements LearningClient {
       lesson: `/lesson?cycle=${encodeURIComponent(cycleId)}&lesson=${encodeURIComponent(lessonId)}`,
       write: `/write?cycle=${encodeURIComponent(cycleId)}`,
     });
-    return {
-      id: lessonId,
-      cycleId,
-      targetTitleZh: "用原因—机制—结果完整表达观点",
-      targetTitleEn: "Build a complete cause–mechanism–result chain",
-      whyItMattersZh:
-        "你的原文能够提出观点，但有时从原因直接跳到beneficial，读者看不到影响是怎样发生的。IELTS高分论证不只需要观点正确，还要让推理过程可追踪。",
-      whyItMattersEn:
-        "Your essay can state claims, but sometimes jumps directly to beneficial without showing how the effect occurs.",
-      currentPattern:
-        "Children can learn languages easily, so it is beneficial for their future.",
-      decisionRuleZh:
-        "写完一个观点后依次追问：为什么？它通过什么过程产生影响？最后出现什么具体结果？",
-      decisionRuleEn:
-        "After a claim, ask why, explain the process, and state the specific result.",
-      knowledgeCards: [
-        {
-          titleZh: "观点不等于论证",
-          explanationZh:
-            "“早学语言有好处”只是立场。读者还需要看到重复接触如何形成熟悉度，以及熟悉度怎样降低后续学习成本。",
-          exampleEn:
-            "Regular exposure makes basic patterns familiar, so later study requires less processing effort.",
-        },
-        {
-          titleZh: "机制不是重复原因",
-          explanationZh:
-            "原因写发生了什么，机制写它怎样起作用。把“儿童学得快”换成“重复模仿使语音和句型逐渐自动化”，推理才真正向前。",
-          exampleEn:
-            "Repeated imitation gradually makes unfamiliar sounds easier to recognise and reproduce.",
-        },
-        {
-          titleZh: "结果必须落地",
-          explanationZh:
-            "少用空泛的useful、good和beneficial，改写成学习者以后能做什么，或者会减少什么成本。",
-          exampleEn:
-            "As a result, pupils can understand later lessons with less effort and greater confidence.",
-        },
-        {
-          titleZh: "一条链只服务一个观点",
-          explanationZh:
-            "不要在一句话中同时加入文化、就业和认知三个方向。一个主体观点配一条完整链，比堆多个未展开好处更有说服力。",
-          exampleEn:
-            "Early pronunciation practice builds accurate sound patterns, which makes later speaking practice less frustrating.",
-        },
-      ],
-      expressionBank: [
-        {
-          expressionEn: "This allows + 人/事物 + to do",
-          functionZh: "把中间机制连接到可观察结果",
-          usageZh: "allow后必须有宾语，再接to do；不要写allow somebody do。",
-          exampleEn:
-            "This allows pupils to process new vocabulary more efficiently.",
-        },
-        {
-          expressionEn: "which in turn + 动词",
-          functionZh: "说明前一影响继续引发下一步结果",
-          usageZh: "只有前后确实存在递进因果时使用，不能只为增加连接词。",
-          exampleEn:
-            "Familiar patterns reduce processing effort, which in turn makes later study less demanding.",
-        },
-        {
-          expressionEn: "Over time, + 累积变化",
-          functionZh: "表达重复或长期积累的结果",
-          usageZh: "适合习惯、熟悉度、信心等逐渐形成的变化，不适合瞬间结果。",
-          exampleEn: "Over time, regular exposure builds automatic recall.",
-        },
-        {
-          expressionEn: "As a result, + 具体结果",
-          functionZh: "收束因果链",
-          usageZh: "后面不要再次写同一个原因，而要落到表现、行为或成本。",
-          exampleEn:
-            "As a result, learners can participate more confidently in later lessons.",
-        },
-      ],
-      workedExample: {
-        taskZh: "说明早期语言接触为什么能降低后续学习难度。",
-        weakAnswerEn:
-          "Children learn quickly, so language lessons are beneficial.",
-        thinkingStepsZh: [
-          "先把原因具体化：儿童反复听到并模仿声音和基本句型。",
-          "再找中间过程：重复让陌生模式逐渐变得熟悉。",
-          "最后落到结果：正式学习时识别和处理新内容所需的努力更少。",
-        ],
-        improvedAnswerEn:
-          "Regular exposure makes basic sounds and patterns familiar, so children need less effort to process new material when formal study becomes more demanding.",
-        explanationZh:
-          "改写保留了原来的好处，但用“接触—熟悉—降低处理难度”让读者看见了完整推理。",
-      },
-      quickChecks: [
-        {
-          promptZh: "哪一句真正包含机制，而不是只重复观点？",
-          optionsZh: [
-            "A. Early lessons are beneficial for children.",
-            "B. Repeated exposure makes common patterns familiar, so later processing becomes easier.",
-          ],
-          answerZh: "B",
-          explanationZh: "B写出了“重复接触→变熟悉→处理更容易”的中间过程。",
-        },
-        {
-          promptZh: "把it is beneficial改成一个具体的学习结果。",
-          optionsZh: [],
-          answerZh:
-            "例如：learners can process new material with less effort。",
-          explanationZh:
-            "这个结果可以观察，也直接说明早期接触怎样影响后续学习。",
-        },
-      ],
-      readyChecklistZh: [
-        "我能区分观点、原因、机制和结果。",
-        "我能不用照抄示例，也解释一个影响怎样发生。",
-        "我会把good或beneficial换成具体、可观察的结果。",
-      ],
+    const fixture =
+      lessonId === "lesson-collocation-control"
+        ? collocationControlTeachingFixture
+        : mechanismChainTeachingFixture;
+    return { ...fixture, id: lessonId, cycleId };
+  }
+
+  async submitTeachingPracticeAnswer(
+    lessonId: string,
+    prompt: TeachingPracticePrompt,
+    answer: string,
+  ): Promise<TeachingPracticeResponseData> {
+    await delay(40);
+    const key = teachingPracticeResponseKey(lessonId, prompt.id);
+    const responses = readTeachingPracticeResponses();
+    const existing = responses[key];
+    if (existing) return existing;
+    if (
+      prompt.responseMode === "CHOICE" &&
+      !prompt.optionsEn.includes(answer)
+    ) {
+      throw new LearningClientError("Choose one of the displayed answers.", {
+        status: 422,
+        code: "TEACHING_PRACTICE_CHOICE_INVALID",
+      });
+    }
+    const response: TeachingPracticeResponseData = {
+      id: `demo:${lessonId}:${prompt.id}`,
+      promptId: prompt.id,
+      submittedAnswer: answer,
+      responseMode: prompt.responseMode,
+      analysisState:
+        prompt.responseMode === "CHOICE" ? "ANALYSIS_READY" : "DEMO_ONLY",
+      analysis:
+        prompt.responseMode === "CHOICE"
+          ? deterministicMockChoice(prompt, answer)
+          : mockShortTextAnalysis(),
     };
+    const projected = projectTeachingPracticeResponse(response);
+    if (!projected) {
+      return unavailableTeachingPracticeResponse(response);
+    }
+    responses[key] = projected;
+    writeTeachingPracticeResponses(responses);
+    return projected;
+  }
+
+  async getTeachingPracticeResponse(
+    lessonId: string,
+    promptId: string,
+    fallback?: TeachingPracticeResponseData,
+  ): Promise<TeachingPracticeResponseData | null> {
+    await delay(20);
+    return (
+      readTeachingPracticeResponses()[
+        teachingPracticeResponseKey(lessonId, promptId)
+      ] ??
+      (fallback ? projectTeachingPracticeResponse(fallback) : null) ??
+      null
+    );
+  }
+
+  async retryTeachingPracticeAnalysis(
+    response: TeachingPracticeResponseData,
+  ): Promise<TeachingPracticeResponseData> {
+    await delay(20);
+    return (
+      Object.values(readTeachingPracticeResponses()).find(
+        (candidate) => candidate.id === response.id,
+      ) ??
+      projectTeachingPracticeResponse(response) ??
+      unavailableTeachingPracticeResponse(response)
+    );
   }
 
   async getLesson(_cycleId: string, _lessonId: string): Promise<LessonData> {
@@ -1714,6 +2121,7 @@ export class MockLearningClient implements LearningClient {
       STORAGE_KEYS.lessonPracticeComplete,
       STORAGE_KEYS.transferAnswer,
       STORAGE_KEYS.transferResult,
+      STORAGE_KEYS.teachingPracticeResponses,
     ])
       removeStorage(key);
     await delay(120);

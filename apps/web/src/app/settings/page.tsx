@@ -41,6 +41,7 @@ import { useDialogFocus } from "@/components/use-dialog-focus";
 import { cn } from "@/components/utils";
 import {
   LearningClientError,
+  AI_TASK_KINDS,
   learningClient,
   type AiTaskKind,
   type ConnectionProbe,
@@ -52,48 +53,40 @@ import {
 
 type SettingsTab = "learning" | "schedule" | "ai" | "data";
 
-const AI_ROUTE_TASKS: ReadonlyArray<{
-  id: AiTaskKind;
-  zh: string;
-  en: string;
-}> = [
-  { id: "ielts_assessment", zh: "IELTS 四项估分", en: "IELTS assessment" },
-  {
-    id: "issue_classification",
+const AI_ROUTE_TASK_COPY: Record<
+  AiTaskKind,
+  { readonly zh: string; readonly en: string }
+> = {
+  ielts_assessment: { zh: "IELTS 四项估分", en: "IELTS assessment" },
+  issue_classification: {
     zh: "问题发现与分类",
     en: "Issue classification",
   },
-  {
-    id: "objective_prioritization",
+  objective_prioritization: {
     zh: "目标优先级",
     en: "Objective priority",
   },
-  {
-    id: "exercise_generation",
-    zh: "专项题生成",
-    en: "Exercise generation",
-  },
-  {
-    id: "open_sentence_evaluation",
+  exercise_generation: { zh: "专项题生成", en: "Exercise generation" },
+  open_sentence_evaluation: {
     zh: "开放句评价",
     en: "Open-sentence evaluation",
   },
-  {
-    id: "paragraph_evaluation",
+  paragraph_evaluation: {
     zh: "段落目标评价",
     en: "Paragraph evaluation",
   },
-  {
-    id: "version_comparison",
-    zh: "V1 / V2 比较",
-    en: "V1 / V2 comparison",
+  teaching_practice_analysis: {
+    zh: "教程作答解析",
+    en: "Tutorial answer analysis",
   },
-  {
-    id: "transfer_evaluation",
-    zh: "迁移表现判断",
-    en: "Transfer evaluation",
-  },
-];
+  version_comparison: { zh: "V1 / V2 比较", en: "V1 / V2 comparison" },
+  transfer_evaluation: { zh: "迁移表现判断", en: "Transfer evaluation" },
+};
+
+const AI_ROUTE_TASKS = AI_TASK_KINDS.map((id) => ({
+  id,
+  ...AI_ROUTE_TASK_COPY[id],
+}));
 
 export default function SettingsPage() {
   const { text, locale, setLocale } = useLocale();

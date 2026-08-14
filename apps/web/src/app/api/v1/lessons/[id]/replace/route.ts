@@ -18,6 +18,8 @@ import {
   settleIdempotentError,
 } from "@/lib/server/security";
 
+import { learnerFacingTeachingArticle } from "../adaptive-teaching";
+
 export const POST = apiRoute(
   async (request, context: { params: Promise<{ id: string }> }) => {
     protectMutation(request);
@@ -68,15 +70,12 @@ export const POST = apiRoute(
             detail: "The earlier practice does not belong to this learner.",
           });
         }
-        const hasTeaching =
-          typeof plan.paperContent === "object" &&
-          plan.paperContent !== null &&
-          typeof (plan.paperContent as { teachingModule?: unknown })
-            .teachingModule === "object";
+        const hasAdaptiveTeaching =
+          learnerFacingTeachingArticle(plan.paperContent) !== null;
         if (
           plan.practiceFormat === "TIMED_PAPER_V2" &&
           plan.paperContent &&
-          hasTeaching
+          hasAdaptiveTeaching
         ) {
           return { lessonId: plan.id, jobId: null, jobStatus: "SUCCEEDED" };
         }

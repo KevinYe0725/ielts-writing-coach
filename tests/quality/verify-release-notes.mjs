@@ -2,6 +2,11 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import {
+  DATABASE_SCHEMA_VERSION,
+  EXPECTED_DATABASE_MIGRATION_COUNT,
+} from "../../packages/db/src/schema-version.ts";
+
 const repositoryRoot = dirname(
   dirname(dirname(fileURLToPath(import.meta.url))),
 );
@@ -58,6 +63,21 @@ for (const section of requiredSections) {
 if (/\b(?:TBD|TODO|PLACEHOLDER|COMING SOON)\b/iu.test(notes)) {
   failures.push("release notes must not contain unresolved placeholder text");
 }
+if (!notes.includes(`\`${DATABASE_SCHEMA_VERSION}\``)) {
+  failures.push(
+    `release notes must name current database schema ${DATABASE_SCHEMA_VERSION}`,
+  );
+}
+if (
+  !new RegExp(
+    `\\b${EXPECTED_DATABASE_MIGRATION_COUNT}\\s+application\\s+migrations\\b`,
+    "u",
+  ).test(notes)
+) {
+  failures.push(
+    `release notes must name ${EXPECTED_DATABASE_MIGRATION_COUNT} application migrations`,
+  );
+}
 
 if (failures.length > 0) {
   throw new Error(
@@ -68,5 +88,5 @@ if (failures.length > 0) {
 }
 
 console.log(
-  `Release notes ${tag} contain migration, breaking-change, and external-gate sections.`,
+  `Release notes ${tag} contain migration, breaking-change, and external-gate sections for ${DATABASE_SCHEMA_VERSION} (${EXPECTED_DATABASE_MIGRATION_COUNT} migrations).`,
 );

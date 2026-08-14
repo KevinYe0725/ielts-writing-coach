@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -9,6 +9,10 @@ const protocolPath = join(
   repositoryRoot,
   "tests/human-review/v1/review-plan.json",
 );
+const essayCorpusPath = join(
+  repositoryRoot,
+  "tests/benchmarks/v1/essay-samples.json",
+);
 const runPath = process.argv[2];
 
 if (runPath === undefined) {
@@ -16,8 +20,15 @@ if (runPath === undefined) {
     "Usage: node tests/quality/validate-human-review.mjs <completed-run.json>",
   );
 }
+if (!existsSync(runPath)) {
+  console.error(
+    `A completed human-review run is required at ${runPath}. Copy tests/human-review/v1/review-run.template.json, complete the review protocol, and do not mark it COMPLETE until both independent reviews and adjudication are recorded.`,
+  );
+  process.exit(1);
+}
 
 const protocol = JSON.parse(readFileSync(protocolPath, "utf8"));
+const essayCorpus = JSON.parse(readFileSync(essayCorpusPath, "utf8"));
 const run = JSON.parse(readFileSync(runPath, "utf8"));
 const failures = [];
 const requireCondition = (condition, message) => {
@@ -27,6 +38,17 @@ const nonEmptyString = (value) =>
   typeof value === "string" && value.trim().length > 0;
 const validDate = (value) =>
   nonEmptyString(value) && Number.isFinite(Date.parse(value));
+const validProbability = (value) =>
+  typeof value === "number" &&
+  Number.isFinite(value) &&
+  value >= 0 &&
+  value <= 1;
+const validIeltsBand = (value) =>
+  typeof value === "number" &&
+  Number.isFinite(value) &&
+  value >= 0 &&
+  value <= 9 &&
+  Number.isInteger(value * 2);
 const unique = (values) => new Set(values).size === values.length;
 const countBySkill = (records) =>
   records.reduce((counts, record) => {
@@ -48,6 +70,19 @@ const hasTwoIndependentLabels = (record, reviewerIds) =>
       reviewerIds.has(review.reviewerId) &&
       review.independent === true &&
       validDate(review.reviewedAt),
+  );
+const generatedReviewHasJudgment = (review, criteria) =>
+  criteria.every(
+    (criterion) => typeof review.labels?.[criterion] === "boolean",
+  ) && nonEmptyString(review.rationale);
+const openReviewHasJudgment = (review) =>
+  typeof review.pass === "boolean" && nonEmptyString(review.rationale);
+const essayReviewHasJudgment = (review) =>
+  validIeltsBand(review.overallBand) &&
+  ["TR", "CC", "LR", "GRA"].every(
+    (criterion) =>
+      validIeltsBand(review.criteria?.[criterion]?.band) &&
+      nonEmptyString(review.criteria?.[criterion]?.rationale),
   );
 
 requireCondition(
@@ -139,6 +174,12 @@ for (const record of generated) {
     `${record.sampleId}: two independent dated reviews are required`,
   );
   requireCondition(
+    (record.reviews ?? []).every((review) =>
+      generatedReviewHasJudgment(review, generatedPlan.requiredCriteria),
+    ),
+    `${record.sampleId}: independent generated-item reviews must include all four labels and a rationale`,
+  );
+  requireCondition(
     generatedPlan.requiredCriteria.every(
       (criterion) => typeof record.adjudicated?.[criterion] === "boolean",
     ),
@@ -162,6 +203,10 @@ for (const record of generated) {
 const acceptedGenerated = generated.filter(
   (record) => record.adjudicated?.accepted === true,
 ).length;
+requireCondition(
+  acceptedGenerated > 0 && acceptedGenerated < generated.length,
+  "generated-item review must retain both accepted and rejected samples",
+);
 const generatedRate =
   generated.length === 0 ? 0 : acceptedGenerated / generated.length;
 requireCondition(
@@ -207,6 +252,10 @@ for (const record of openResponses) {
     `${record.sampleId}: two independent dated reviews are required`,
   );
   requireCondition(
+    (record.reviews ?? []).every(openReviewHasJudgment),
+    `${record.sampleId}: independent open-response reviews must include pass and rationale`,
+  );
+  requireCondition(
     typeof record.adjudicated?.pass === "boolean" &&
       typeof record.modelJudgment?.pass === "boolean",
     `${record.sampleId}: adjudicated and model pass judgments are required`,
@@ -216,7 +265,30 @@ for (const record of openResponses) {
       nonEmptyString(record.modelJudgment?.evidence),
     `${record.sampleId}: adjudicated rationale and model evidence are required`,
   );
+  requireCondition(
+    nonEmptyString(record.prompt) &&
+      nonEmptyString(record.answer) &&
+      nonEmptyString(record.modelJudgment?.evidence) &&
+      record.answer.includes(record.modelJudgment.evidence) &&
+      typeof record.modelJudgment?.confidence === "number",
+    `${record.sampleId}: open-response prompt, answer, and exact model evidence are required`,
+  );
+  requireCondition(
+    validProbability(record.modelJudgment?.confidence),
+    `${record.sampleId}: model confidence must be between 0 and 1`,
+  );
+  requireCondition(
+    nonEmptyString(record.adjudicated?.adjudicatorId) &&
+      reviewerIds.has(record.adjudicated.adjudicatorId) &&
+      validDate(record.adjudicated?.adjudicatedAt),
+    `${record.sampleId}: open-response adjudicator and adjudicatedAt are required`,
+  );
 }
+requireCondition(
+  openResponses.some((record) => record.adjudicated?.pass === true) &&
+    openResponses.some((record) => record.adjudicated?.pass === false),
+  "open-response review must include both pass and fail cases",
+);
 
 const essayAdjudications = run.essayAdjudications ?? [];
 requireCondition(
@@ -227,22 +299,50 @@ requireCondition(
   unique(essayAdjudications.map((record) => record.essayId)),
   "essay adjudication IDs must be unique",
 );
+const lockedEssayIds = essayCorpus.map((record) => record.id).sort();
+const reviewedEssayIds = essayAdjudications
+  .map((record) => record.essayId)
+  .sort();
+requireCondition(
+  JSON.stringify(reviewedEssayIds) === JSON.stringify(lockedEssayIds),
+  "essay adjudications must use the locked benchmark essay IDs",
+);
 for (const record of essayAdjudications) {
   requireCondition(
     hasTwoIndependentLabels(record, reviewerIds),
     `${record.essayId}: two independent dated essay reviews are required`,
   );
   requireCondition(
+    (record.reviews ?? []).every(essayReviewHasJudgment),
+    `${record.essayId}: independent essay reviews must include four criterion bands, rationales, and overall band`,
+  );
+  requireCondition(
+    (record.reviews ?? []).every(
+      (review) =>
+        validIeltsBand(review.overallBand) &&
+        ["TR", "CC", "LR", "GRA"].every((criterion) =>
+          validIeltsBand(review.criteria?.[criterion]?.band),
+        ),
+    ),
+    `${record.essayId}: essay review bands must use IELTS half-band values from 0 to 9`,
+  );
+  requireCondition(
     ["TR", "CC", "LR", "GRA"].every(
       (criterion) =>
-        typeof record.adjudicated?.criteria?.[criterion]?.band === "number" &&
+        validIeltsBand(record.adjudicated?.criteria?.[criterion]?.band) &&
         nonEmptyString(record.adjudicated?.criteria?.[criterion]?.rationale),
     ),
     `${record.essayId}: adjudicated TR/CC/LR/GRA band and rationale are required`,
   );
   requireCondition(
-    typeof record.adjudicated?.overallBand === "number",
+    validIeltsBand(record.adjudicated?.overallBand),
     `${record.essayId}: adjudicated overallBand is required`,
+  );
+  requireCondition(
+    nonEmptyString(record.adjudicated?.adjudicatorId) &&
+      reviewerIds.has(record.adjudicated.adjudicatorId) &&
+      validDate(record.adjudicated?.adjudicatedAt),
+    `${record.essayId}: essay adjudicator and adjudicatedAt are required`,
   );
 }
 

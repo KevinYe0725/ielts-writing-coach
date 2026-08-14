@@ -72,10 +72,13 @@ from the raw records, and run:
 node tests/quality/validate-human-review.mjs path/to/completed-run.json
 ```
 
-The validator rejects Mock runs, missing metadata, fewer than two independent
-reviews, insufficient skill coverage, missing failures, inconsistent summary
-denominators, generated-item rates below 95%, unadjudicated essays, and removal
-of the “not official IELTS” caveat.
+The validator rejects Mock runs, missing metadata, reviewer shells without
+actual judgments, fewer than two independent reviews, insufficient skill
+coverage, missing pass/fail or accepted/rejected cases, model evidence that is
+not an exact answer substring, reviews of essays outside the locked corpus,
+missing adjudicators, inconsistent summary denominators, generated-item rates
+below 95%, unadjudicated essays, and removal of the “not official IELTS”
+caveat.
 
 Publish the de-identified run file, its frozen thresholds, and the model input
 fixture checksums. Keep reviewer contact details, learner data, secrets, and raw
@@ -108,7 +111,14 @@ fields must remain machine-readable.
         {
           "reviewerId": "reviewer-a",
           "independent": true,
-          "reviewedAt": "2026-08-13T12:00:00.000Z"
+          "reviewedAt": "2026-08-13T12:00:00.000Z",
+          "labels": {
+            "goalClarity": true,
+            "answerDeterminacy": true,
+            "meaningPreservation": true,
+            "languageNaturalness": true
+          },
+          "rationale": "Required independent rationale"
         }
       ],
       "adjudicated": {
@@ -127,20 +137,51 @@ fields must remain machine-readable.
       "sampleId": "open-001",
       "skillId": "mechanism_chain",
       "level": "paragraph",
-      "reviews": [],
-      "adjudicated": { "pass": false, "rationale": "Required rationale" },
+      "prompt": "The exact reviewed prompt",
+      "answer": "The immutable learner answer containing cited evidence",
+      "reviews": [
+        {
+          "reviewerId": "reviewer-a",
+          "independent": true,
+          "reviewedAt": "2026-08-13T12:00:00.000Z",
+          "pass": false,
+          "rationale": "Required independent rationale"
+        }
+      ],
+      "adjudicated": {
+        "pass": false,
+        "rationale": "Required rationale",
+        "adjudicatorId": "reviewer-a",
+        "adjudicatedAt": "2026-08-14T12:00:00.000Z"
+      },
       "modelJudgment": {
         "pass": true,
-        "evidence": "The exact answer evidence cited by the model"
+        "evidence": "answer evidence",
+        "confidence": 0.78
       }
     }
   ],
   "essayAdjudications": [
     {
       "essayId": "essay-001",
-      "reviews": [],
+      "reviews": [
+        {
+          "reviewerId": "reviewer-a",
+          "independent": true,
+          "reviewedAt": "2026-08-13T12:00:00.000Z",
+          "overallBand": 6.5,
+          "criteria": {
+            "TR": { "band": 6, "rationale": "Required rationale" },
+            "CC": { "band": 7, "rationale": "Required rationale" },
+            "LR": { "band": 6, "rationale": "Required rationale" },
+            "GRA": { "band": 6, "rationale": "Required rationale" }
+          }
+        }
+      ],
       "adjudicated": {
         "overallBand": 6.5,
+        "adjudicatorId": "reviewer-a",
+        "adjudicatedAt": "2026-08-14T12:00:00.000Z",
         "criteria": {
           "TR": { "band": 6, "rationale": "Required rationale" },
           "CC": { "band": 7, "rationale": "Required rationale" },
@@ -153,8 +194,13 @@ fields must remain machine-readable.
 }
 ```
 
-Each actual record needs two independent `reviews`; abbreviated empty arrays in
-the shape example are not valid completed data. The summary must contain
+Each actual record needs two independent `reviews`; the single-entry arrays in
+the shape example are abbreviated and are not valid completed data. A review
+must contain its own labels and rationale; reviewer identity plus a timestamp
+is not a judgment and will be rejected. Open-response evidence must be an exact
+substring of the immutable answer. Open-response and essay decisions require a
+named, dated adjudicator, and essay IDs must exactly match the locked 12-item
+benchmark corpus. The summary must contain
 `generatedItemDenominator`, `generatedItemAccepted`,
 `generatedItemAcceptanceRate`, `openResponseDenominator`, and
 `essayDenominator`; the validator recomputes each value from raw records.

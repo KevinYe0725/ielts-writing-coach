@@ -3,23 +3,10 @@ import { expect, type Page } from "@playwright/test";
 export const deterministicDemo = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 
 export async function resetDemoState(page: Page): Promise<void> {
-  // Clear once, before the test starts. A persistent addInitScript would run on
-  // every reload and erase the deliberately injected recovery draft.
-  await page.goto("/api/v1/health/live");
-  await page.evaluate(async () => {
-    window.localStorage.clear();
-    for (const database of [
-      "ielts-writing-coach",
-      "ielts-writing-coach-lessons",
-    ]) {
-      await new Promise<void>((resolve, reject) => {
-        const request = indexedDB.deleteDatabase(database);
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
-        request.onblocked = () => reject(new Error("IndexedDB reset blocked"));
-      });
-    }
-  });
+  // Playwright creates a fresh, isolated browser context for every test, so its
+  // localStorage and IndexedDB are already empty. Keep cookie cleanup defensive,
+  // but do not make every test compete for an otherwise unnecessary HTTP page.
+  await page.context().clearCookies();
 }
 
 export async function expectBasicAccessibility(page: Page): Promise<void> {

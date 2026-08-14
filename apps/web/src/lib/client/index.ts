@@ -26,3 +26,4 @@ export * from "./errors";
 export { HttpLearningClient } from "./http-service";
 export type { HttpLearningClientOptions } from "./http-service";
 export type * from "./types";
+export { AI_TASK_KINDS } from "./types";

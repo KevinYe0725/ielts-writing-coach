@@ -7,13 +7,7 @@ import { ApiProblem, apiRoute } from "@/lib/server/problem";
 import { parseDomainId } from "@/lib/server/request";
 import { requireSession } from "@/lib/server/session";
 
-function teachingModule(value: unknown): Record<string, unknown> | null {
-  if (typeof value !== "object" || value === null) return null;
-  const teaching = (value as { teachingModule?: unknown }).teachingModule;
-  return typeof teaching === "object" && teaching !== null
-    ? (teaching as Record<string, unknown>)
-    : null;
-}
+import { learnerFacingTeachingArticle } from "../adaptive-teaching";
 
 export const GET = apiRoute(
   async (request, context: { params: Promise<{ id: string }> }) => {
@@ -33,7 +27,7 @@ export const GET = apiRoute(
         detail: "The focused teaching module does not exist.",
       });
     }
-    const teaching = teachingModule(plan.paperContent);
+    const teaching = learnerFacingTeachingArticle(plan.paperContent);
     if (!teaching) {
       throw new ApiProblem({
         title: "Focused teaching unavailable",

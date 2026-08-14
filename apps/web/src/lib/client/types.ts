@@ -146,6 +146,9 @@ export interface FeedbackIssue {
   titleZh: string;
   titleEn: string;
   evidence: string;
+  /** Immutable Version 1 source span. Historical records may not have one. */
+  startOffset: number | null;
+  endOffset: number | null;
   explanationZh: string;
   explanationEn: string;
   transferRuleZh: string;
@@ -164,6 +167,8 @@ export interface FeedbackIssue {
   knowledgePointZh: string;
   severity: "must_fix" | "naturalness" | "polish";
   confidence: number;
+  /** Internal linkage used to connect the diagnosis to the selected lesson. */
+  skillId?: string | undefined;
 }
 
 export interface ParagraphFeedback {
@@ -190,6 +195,8 @@ export interface FeedbackData {
   strengthZh: string;
   strengthEn: string;
   issues: FeedbackIssue[];
+  /** The report issue selected as this cycle's focused teaching target. */
+  targetIssueId?: string | null;
   prompt: string;
   originalEssay: string;
   overallSummaryZh: string;
@@ -204,41 +211,170 @@ export interface FeedbackData {
   } | null;
 }
 
-export interface FocusedTeachingData {
-  id: string;
-  cycleId: string;
-  targetTitleZh: string;
-  targetTitleEn: string;
-  whyItMattersZh: string;
-  whyItMattersEn: string;
-  currentPattern: string;
-  decisionRuleZh: string;
-  decisionRuleEn: string;
-  knowledgeCards: Array<{
-    titleZh: string;
-    explanationZh: string;
-    exampleEn: string;
-  }>;
-  expressionBank: Array<{
-    expressionEn: string;
-    functionZh: string;
-    usageZh: string;
-    exampleEn: string;
-  }>;
-  workedExample: {
-    taskZh: string;
-    weakAnswerEn: string;
-    thinkingStepsZh: string[];
-    improvedAnswerEn: string;
-    explanationZh: string;
+export type TeachingBlockKind =
+  | "EXPLANATION"
+  | "CONTRAST"
+  | "REASONING"
+  | "TOOLKIT"
+  | "PITFALLS"
+  | "PRACTICE"
+  | "SUMMARY";
+
+interface TeachingBlockBase {
+  readonly titleZh: string;
+  readonly titleEn: string;
+}
+
+export interface ExplanationTeachingBlock extends TeachingBlockBase {
+  readonly kind: "EXPLANATION";
+  readonly paragraphsZh: readonly string[];
+  readonly paragraphsEn: readonly string[];
+  readonly keyPointZh: string;
+  readonly keyPointEn: string;
+}
+
+export interface ContrastTeachingBlock extends TeachingBlockBase {
+  readonly kind: "CONTRAST";
+  readonly weakExampleEn: string;
+  readonly strongExampleEn: string;
+  readonly differenceZh: string;
+  readonly differenceEn: string;
+}
+
+export interface ReasoningTeachingBlock extends TeachingBlockBase {
+  readonly kind: "REASONING";
+  readonly scenarioZh: string;
+  readonly scenarioEn: string;
+  readonly steps: readonly {
+    readonly thinkingZh: string;
+    readonly thinkingEn: string;
+  }[];
+  readonly resultEn: string;
+  readonly takeawayZh: string;
+  readonly takeawayEn: string;
+}
+
+export interface ToolkitTeachingBlock extends TeachingBlockBase {
+  readonly kind: "TOOLKIT";
+  readonly tools: readonly {
+    readonly expressionEn: string;
+    readonly functionZh: string;
+    readonly functionEn: string;
+    readonly conditionZh: string;
+    readonly conditionEn: string;
+    readonly cautionZh: string;
+    readonly cautionEn: string;
+    readonly exampleEn: string;
+  }[];
+}
+
+export interface PitfallsTeachingBlock extends TeachingBlockBase {
+  readonly kind: "PITFALLS";
+  readonly items: readonly {
+    readonly patternEn: string;
+    readonly problemZh: string;
+    readonly problemEn: string;
+    readonly betterEn: string;
+  }[];
+}
+
+export interface TeachingPracticePrompt {
+  readonly id: string;
+  readonly instructionZh: string;
+  readonly instructionEn: string;
+  readonly promptEn: string;
+  readonly responseMode: "CHOICE" | "SHORT_TEXT";
+  readonly context: "SAME_TOPIC" | "UNSEEN_TOPIC";
+  readonly optionsEn: readonly string[];
+  readonly referenceAnswerEn: string;
+  readonly referenceReasoningZh: string;
+  readonly referenceReasoningEn: string;
+}
+
+export interface TeachingPracticeLocalizedText {
+  readonly zh: string;
+  readonly en: string;
+}
+
+export interface TeachingPracticeAnalysis {
+  readonly kind: "PERSONALIZED" | "DETERMINISTIC_CHOICE" | "DEMO_ONLY";
+  readonly summary: TeachingPracticeLocalizedText;
+  readonly strengths: readonly {
+    readonly zh: string;
+    readonly en: string;
+    readonly userAnswerEvidence: readonly string[];
+  }[];
+  readonly keyImprovement?: {
+    readonly title: TeachingPracticeLocalizedText;
+    readonly explanation: TeachingPracticeLocalizedText;
+    readonly whyItMatters: TeachingPracticeLocalizedText;
+    readonly userAnswerEvidence: readonly string[];
   };
-  quickChecks: Array<{
-    promptZh: string;
-    optionsZh: string[];
-    answerZh: string;
-    explanationZh: string;
-  }>;
-  readyChecklistZh: string[];
+  readonly comparisonPoints: readonly {
+    readonly aspect: TeachingPracticeLocalizedText;
+    readonly referenceFeature: TeachingPracticeLocalizedText;
+    readonly learnerDifference: TeachingPracticeLocalizedText;
+    readonly userAnswerEvidence: readonly string[];
+  }[];
+  readonly nextCheck: TeachingPracticeLocalizedText;
+  readonly uncertainty?: TeachingPracticeLocalizedText;
+}
+
+export type TeachingPracticeAnalysisState =
+  | "REFERENCE_READY"
+  | "ANALYSIS_PENDING"
+  | "ANALYSIS_READY"
+  | "ANALYSIS_UNAVAILABLE"
+  | "DEMO_ONLY";
+
+export interface TeachingPracticeResponseData {
+  readonly id: string;
+  readonly promptId: string;
+  readonly submittedAnswer: string;
+  readonly responseMode: "CHOICE" | "SHORT_TEXT";
+  readonly analysisState: TeachingPracticeAnalysisState;
+  readonly analysis: TeachingPracticeAnalysis | null;
+}
+
+export interface PracticeTeachingBlock extends TeachingBlockBase {
+  readonly kind: "PRACTICE";
+  readonly prompts: readonly TeachingPracticePrompt[];
+}
+
+export interface SummaryTeachingBlock extends TeachingBlockBase {
+  readonly kind: "SUMMARY";
+  readonly rulesZh: readonly string[];
+  readonly rulesEn: readonly string[];
+  readonly selfCheckZh: string;
+  readonly selfCheckEn: string;
+}
+
+export type TeachingBlock =
+  | ExplanationTeachingBlock
+  | ContrastTeachingBlock
+  | ReasoningTeachingBlock
+  | ToolkitTeachingBlock
+  | PitfallsTeachingBlock
+  | PracticeTeachingBlock
+  | SummaryTeachingBlock;
+
+export interface TeachingSection {
+  readonly anchor: string;
+  readonly titleZh: string;
+  readonly titleEn: string;
+  readonly blocks: readonly TeachingBlock[];
+}
+
+export interface FocusedTeachingData {
+  readonly id: string;
+  readonly cycleId: string;
+  readonly format: "ADAPTIVE_ARTICLE_V1";
+  readonly titleZh: string;
+  readonly titleEn: string;
+  readonly introductionZh: string;
+  readonly introductionEn: string;
+  readonly estimatedMinutes: number;
+  readonly sections: readonly TeachingSection[];
 }
 
 export type LessonStage =
@@ -667,15 +803,19 @@ export interface CycleExportOption {
   createdAt: string;
 }
 
-export type AiTaskKind =
-  | "ielts_assessment"
-  | "issue_classification"
-  | "objective_prioritization"
-  | "exercise_generation"
-  | "open_sentence_evaluation"
-  | "paragraph_evaluation"
-  | "version_comparison"
-  | "transfer_evaluation";
+export const AI_TASK_KINDS = [
+  "ielts_assessment",
+  "issue_classification",
+  "objective_prioritization",
+  "exercise_generation",
+  "open_sentence_evaluation",
+  "paragraph_evaluation",
+  "teaching_practice_analysis",
+  "version_comparison",
+  "transfer_evaluation",
+] as const;
+
+export type AiTaskKind = (typeof AI_TASK_KINDS)[number];
 
 export interface ModelRouteSetting {
   id: string;
@@ -817,6 +957,19 @@ export interface LearningClient {
     cycleId: string,
     lessonId: string,
   ): Promise<FocusedTeachingData>;
+  submitTeachingPracticeAnswer(
+    lessonId: string,
+    prompt: TeachingPracticePrompt,
+    answer: string,
+  ): Promise<TeachingPracticeResponseData>;
+  getTeachingPracticeResponse(
+    lessonId: string,
+    promptId: string,
+    fallback?: TeachingPracticeResponseData,
+  ): Promise<TeachingPracticeResponseData | null>;
+  retryTeachingPracticeAnalysis(
+    response: TeachingPracticeResponseData,
+  ): Promise<TeachingPracticeResponseData>;
   getLesson(cycleId: string, lessonId: string): Promise<LessonData>;
   getPracticePaper(
     cycleId: string,

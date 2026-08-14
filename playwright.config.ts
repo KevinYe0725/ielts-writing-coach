@@ -11,6 +11,9 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 2 : 0,
+  // Four browser projects already provide useful parallelism. Capping workers
+  // prevents a single Next server from becoming the thing under test.
+  workers: 4,
   reporter: [["html", { open: "never" }], ["list"]],
   use: {
     baseURL,

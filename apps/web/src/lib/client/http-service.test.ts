@@ -3,7 +3,197 @@ import { describe, expect, it, vi } from "vitest";
 import { DraftConflictError, LearningClientError } from "./errors";
 import { HttpLearningClient } from "./http-service";
 import { createLearningClient } from "./index";
-import { MockLearningClient } from "./mock-service";
+import { AI_TASK_KINDS } from "./types";
+import { renderTeachingPracticeAnalysisAtoms } from "@iwc/learning-contracts";
+import {
+  collocationControlTeachingFixture,
+  mechanismChainTeachingFixture,
+  MockLearningClient,
+} from "./mock-service";
+import type {
+  FocusedTeachingData,
+  TeachingPracticeAnalysis,
+  TeachingPracticePrompt,
+  TeachingPracticeResponseData,
+} from "./types";
+
+const tutorialShortTextPrompt: TeachingPracticePrompt = {
+  id: "workplace-link",
+  instructionZh: "用一句英文补出灵活工作与生产力之间的机制。",
+  instructionEn: "Write one sentence that links flexible work to productivity.",
+  promptEn: "Flexible schedules can improve employee productivity because …",
+  responseMode: "SHORT_TEXT",
+  context: "SAME_TOPIC",
+  optionsEn: [],
+  referenceAnswerEn:
+    "Employees can reserve demanding tasks for the hours when they concentrate best.",
+  referenceReasoningZh: "参考答案说明灵活时间如何改变任务安排。",
+  referenceReasoningEn:
+    "The reference shows how flexible time changes task scheduling.",
+};
+
+const tutorialAnswer =
+  "Employees can protect longer periods for demanding work.";
+
+const validPersonalizedAtoms = {
+  kind: "PERSONALIZED_ATOMS_V1" as const,
+  strengths: [
+    { code: "SPECIFIC_MECHANISM" as const, evidence: "protect longer periods" },
+  ],
+  comparisons: [
+    { code: "VALID_ALTERNATIVE_PATH" as const, evidence: "demanding work" },
+  ],
+  improvements: [
+    { code: "MAKE_OUTCOME_SPECIFIC" as const, evidence: "demanding work" },
+  ],
+  uncertainty: "NONE" as const,
+};
+
+const validPersonalizedAnalysis: TeachingPracticeAnalysis =
+  renderTeachingPracticeAnalysisAtoms(validPersonalizedAtoms);
+
+const savedPersonalizedResponse: TeachingPracticeResponseData = {
+  id: "019-safe-personalized",
+  promptId: tutorialShortTextPrompt.id,
+  submittedAnswer: tutorialAnswer,
+  responseMode: "SHORT_TEXT",
+  analysisState: "ANALYSIS_READY",
+  analysis: validPersonalizedAnalysis,
+};
+
+function problem(status: number, code: string): Response {
+  return jsonResponse(
+    {
+      title: "Tutorial request failed",
+      status,
+      detail: "The tutorial request could not be completed.",
+      code,
+    },
+    { status },
+  );
+}
+
+const adaptiveTeachingPayload: Omit<FocusedTeachingData, "id" | "cycleId"> = {
+  format: "ADAPTIVE_ARTICLE_V1",
+  titleZh: "把因果论证中间的一步讲清楚",
+  titleEn: "Make the missing step in causal reasoning visible",
+  introductionZh:
+    "这篇教程集中训练如何解释一个原因经过什么过程产生可观察的结果。",
+  introductionEn:
+    "This tutorial focuses on showing how a cause produces an observable result.",
+  estimatedMinutes: 16,
+  sections: [
+    {
+      anchor: "understand-the-link",
+      titleZh: "先理解什么是机制",
+      titleEn: "Understand the mechanism",
+      blocks: [
+        {
+          kind: "EXPLANATION",
+          titleZh: "机制连接起点与终点",
+          titleEn: "A mechanism connects the start and the result",
+          paragraphsZh: [
+            "原因说明起点，结果说明终点，而机制说明中间发生了什么变化。",
+          ],
+          paragraphsEn: [
+            "A cause gives the starting condition, while a mechanism shows what changes before the result appears.",
+          ],
+          keyPointZh: "有效的机制会增加一个新的中间步骤。",
+          keyPointEn: "An effective mechanism adds a new intermediate step.",
+        },
+        {
+          kind: "REASONING",
+          titleZh: "从直接变化推出最终影响",
+          titleEn: "Reason from an immediate change to a final effect",
+          scenarioZh: "为什么独立自行车道可以改善通勤？",
+          scenarioEn: "Why can separated cycle lanes improve commuting?",
+          steps: [
+            {
+              thinkingZh: "先找直接变化：骑行者不再与汽车争抢道路空间。",
+              thinkingEn:
+                "Find the immediate change: cyclists no longer compete with cars for the same space.",
+            },
+            {
+              thinkingZh: "再找行为变化：更多人愿意骑车完成短途通勤。",
+              thinkingEn:
+                "Find the behavior change: more people are willing to cycle on short journeys.",
+            },
+          ],
+          resultEn:
+            "Separated lanes make short journeys feel safer, encouraging some commuters to replace car trips and reducing pressure on busy roads.",
+          takeawayZh: "依次检查直接变化、行为变化和可观察结果。",
+          takeawayEn:
+            "Check the immediate change, behavior change, and observable result.",
+        },
+      ],
+    },
+    {
+      anchor: "apply-the-method",
+      titleZh: "换一个话题应用",
+      titleEn: "Apply the method in a new topic",
+      blocks: [
+        {
+          kind: "PRACTICE",
+          titleZh: "主动补出中间机制",
+          titleEn: "Generate the missing mechanism",
+          prompts: [
+            {
+              id: "workplace-link",
+              instructionZh: "用一句英文补出灵活工作与生产力之间的机制。",
+              instructionEn:
+                "Write one sentence that links flexible work to productivity.",
+              promptEn:
+                "Flexible schedules can improve employee productivity because …",
+              responseMode: "SHORT_TEXT",
+              context: "SAME_TOPIC",
+              optionsEn: [],
+              referenceAnswerEn:
+                "Employees can reserve demanding tasks for the hours when they concentrate best.",
+              referenceReasoningZh: "参考答案说明灵活时间如何改变任务安排。",
+              referenceReasoningEn:
+                "The reference shows how flexible time changes task scheduling.",
+            },
+            {
+              id: "waste-transfer",
+              instructionZh: "在环境话题中写出一条两句的机制链。",
+              instructionEn:
+                "Write a two-sentence mechanism chain for an environmental topic.",
+              promptEn:
+                "Explain how charging households for excess waste could reduce landfill use.",
+              responseMode: "SHORT_TEXT",
+              context: "UNSEEN_TOPIC",
+              optionsEn: [],
+              referenceAnswerEn:
+                "A direct charge makes unnecessary disposal more expensive. Households therefore have a reason to reuse products and separate recyclable material.",
+              referenceReasoningZh:
+                "价格变化先影响家庭选择，再影响进入填埋场的废物量。",
+              referenceReasoningEn:
+                "The price change affects household choices before it changes landfill waste.",
+            },
+          ],
+        },
+        {
+          kind: "SUMMARY",
+          titleZh: "写作时只检查三件事",
+          titleEn: "Three checks for the next essay",
+          rulesZh: [
+            "原因和结果之间增加新的中间步骤。",
+            "让中间步骤回答影响如何发生。",
+            "以可以观察的具体结果收束。",
+          ],
+          rulesEn: [
+            "Add a new intermediate step.",
+            "Make it explain how the effect happens.",
+            "Finish with an observable result.",
+          ],
+          selfCheckZh: "删掉中间句后推理是否几乎没有变化？",
+          selfCheckEn:
+            "If the middle sentence disappears, does the reasoning remain almost unchanged?",
+        },
+      ],
+    },
+  ],
+};
 
 function jsonResponse(
   body: unknown,
@@ -23,7 +213,802 @@ function requestHeaders(call: unknown[]): Headers {
 }
 
 describe("HttpLearningClient protocol", () => {
-  it("loads focused teaching without starting the timed paper", async () => {
+  it("returns a saved tutorial answer immediately without reading an AI job", async () => {
+    const safeResponse = {
+      id: "019teaching-response",
+      promptId: tutorialShortTextPrompt.id,
+      submittedAnswer:
+        "Employees can plan demanding work for their most productive hours.",
+      responseMode: "SHORT_TEXT",
+      analysisState: "ANALYSIS_PENDING",
+      analysis: null,
+    };
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        jsonResponse({ response: safeResponse }, { status: 202 }),
+      );
+    const client = new HttpLearningClient({
+      baseUrl: "https://coach.test/api/v1",
+      fetch: fetcher,
+      idempotencyKey: () => "tutorial-submit-1",
+      origin: "https://coach.test",
+    });
+
+    await expect(
+      client.submitTeachingPracticeAnswer(
+        "lesson-1",
+        tutorialShortTextPrompt,
+        safeResponse.submittedAnswer,
+      ),
+    ).resolves.toEqual(safeResponse);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(String(fetcher.mock.calls[0]?.[0])).toBe(
+      "https://coach.test/api/v1/lessons/lesson-1/teaching-practice/workplace-link/responses",
+    );
+    expect(
+      fetcher.mock.calls.some(([input]) => String(input).includes("/ai-jobs/")),
+    ).toBe(false);
+    expect(
+      JSON.parse(String((fetcher.mock.calls[0]?.[1] as RequestInit).body)),
+    ).toEqual({
+      answer: safeResponse.submittedAnswer,
+    });
+  });
+
+  it("routes a newly configured provider to every learner task including tutorial analysis", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        jsonResponse({ provider: { id: "provider-tutorial" } }),
+      )
+      .mockResolvedValueOnce(jsonResponse({ routes: [] }));
+    const client = new HttpLearningClient({
+      baseUrl: "https://coach.test/api/v1",
+      fetch: fetcher,
+      idempotencyKey: () => "provider-all-tasks",
+      origin: "https://coach.test",
+    });
+
+    await client.configureAiConnection({
+      provider: "compatible",
+      providerVendor: "custom",
+      baseUrl: "https://models.example.test/v1",
+      apiKey: "test-only",
+      model: "custom-model",
+      secretSource: "encrypted",
+    });
+    const routeBody = JSON.parse(
+      String((fetcher.mock.calls[1]?.[1] as RequestInit).body),
+    );
+    expect(routeBody.tasks).toEqual([...AI_TASK_KINDS]);
+    expect(routeBody.tasks).toContain("teaching_practice_analysis");
+    expect(new Set(routeBody.tasks).size).toBe(routeBody.tasks.length);
+  });
+
+  it("restores through the safe response resource and retries through the dedicated endpoint", async () => {
+    const saved = {
+      id: "019teaching-response",
+      promptId: tutorialShortTextPrompt.id,
+      submittedAnswer: "A saved immutable answer.",
+      responseMode: "SHORT_TEXT",
+      analysisState: "ANALYSIS_UNAVAILABLE",
+      analysis: null,
+    } as const;
+    const pending = { ...saved, analysisState: "ANALYSIS_PENDING" as const };
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({ response: saved }))
+      .mockResolvedValueOnce(
+        jsonResponse({ response: pending }, { status: 202 }),
+      );
+    const client = new HttpLearningClient({
+      baseUrl: "https://coach.test/api/v1",
+      fetch: fetcher,
+      idempotencyKey: () => "tutorial-retry-1",
+      origin: "https://coach.test",
+    });
+
+    await expect(
+      client.getTeachingPracticeResponse(
+        "lesson-1",
+        tutorialShortTextPrompt.id,
+      ),
+    ).resolves.toEqual(saved);
+    await expect(client.retryTeachingPracticeAnalysis(saved)).resolves.toEqual(
+      pending,
+    );
+    expect(fetcher.mock.calls.map(([input]) => String(input))).toEqual([
+      "https://coach.test/api/v1/lessons/lesson-1/teaching-practice/workplace-link/responses",
+      "https://coach.test/api/v1/teaching-practice-responses/019teaching-response/retry",
+    ]);
+    expect(
+      fetcher.mock.calls.some(([input]) => String(input).includes("/ai-jobs/")),
+    ).toBe(false);
+  });
+
+  it("keeps the exact answer usable when tutorial analysis cannot be reached", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockRejectedValue(new Error("offline"));
+    const client = new HttpLearningClient({
+      baseUrl: "https://coach.test/api/v1",
+      fetch: fetcher,
+      idempotencyKey: () => "tutorial-offline-1",
+      origin: "https://coach.test",
+      sleep: async () => undefined,
+    });
+    const answer = "  My exact answer remains visible.  ";
+
+    await expect(
+      client.submitTeachingPracticeAnswer(
+        "lesson-1",
+        tutorialShortTextPrompt,
+        answer,
+      ),
+    ).resolves.toMatchObject({
+      promptId: tutorialShortTextPrompt.id,
+      submittedAnswer: answer,
+      responseMode: "SHORT_TEXT",
+      analysisState: "ANALYSIS_UNAVAILABLE",
+      analysis: null,
+    });
+  });
+
+  it("recovers a malformed completed analysis as unavailable without discarding the answer", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(
+      jsonResponse({
+        response: {
+          id: "019-safe-malformed",
+          promptId: tutorialShortTextPrompt.id,
+          submittedAnswer: "The answer must remain visible.",
+          responseMode: "SHORT_TEXT",
+          analysisState: "ANALYSIS_READY",
+          analysis: null,
+        },
+      }),
+    );
+    const client = new HttpLearningClient({
+      baseUrl: "https://coach.test/api/v1",
+      fetch: fetcher,
+      origin: "https://coach.test",
+    });
+
+    await expect(
+      client.getTeachingPracticeResponse(
+        "lesson-1",
+        tutorialShortTextPrompt.id,
+      ),
+    ).resolves.toMatchObject({
+      submittedAnswer: "The answer must remain visible.",
+      analysisState: "ANALYSIS_UNAVAILABLE",
+      analysis: null,
+    });
+  });
+
+  it("accepts one strictly projected personalized analysis and drops internal fields", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(
+      jsonResponse({
+        response: {
+          ...savedPersonalizedResponse,
+          jobId: "private-job",
+          model: "private-model",
+          analysis: validPersonalizedAtoms,
+        },
+      }),
+    );
+    const client = new HttpLearningClient({
+      baseUrl: "https://coach.test/api/v1",
+      fetch: fetcher,
+      origin: "https://coach.test",
+    });
+
+    const result = await client.getTeachingPracticeResponse(
+      "lesson-1",
+      tutorialShortTextPrompt.id,
+    );
+    expect(result).toEqual(savedPersonalizedResponse);
+    expect(Object.keys(result ?? {}).sort()).toEqual([
+      "analysis",
+      "analysisState",
+      "id",
+      "promptId",
+      "responseMode",
+      "submittedAnswer",
+    ]);
+    expect(result?.analysis).not.toHaveProperty("confidence");
+    expect(result?.analysis).not.toHaveProperty("score");
+  });
+
+  it.each([
+    {
+      label: "empty strength evidence",
+      responseMode: "SHORT_TEXT",
+      analysisState: "ANALYSIS_READY",
+      analysis: {
+        ...validPersonalizedAnalysis,
+        strengths: [
+          {
+            zh: "无证据判断",
+            en: "Unsupported judgment",
+            userAnswerEvidence: [],
+          },
+        ],
+      },
+    },
+    {
+      label: "standalone rewrite",
+      responseMode: "SHORT_TEXT",
+      analysisState: "ANALYSIS_READY",
+      analysis: {
+        ...validPersonalizedAnalysis,
+        keyImprovement: undefined,
+        improvedAnswerEn: "A rewrite without a supported improvement.",
+      },
+    },
+    {
+      label: "judgment-bearing demo",
+      responseMode: "SHORT_TEXT",
+      analysisState: "DEMO_ONLY",
+      analysis: {
+        kind: "DEMO_ONLY",
+        summary: { zh: "演示", en: "Demo" },
+        strengths: [
+          {
+            zh: "语法很好",
+            en: "Your grammar is strong",
+            userAnswerEvidence: ["Employees"],
+          },
+        ],
+        comparisonPoints: [],
+        improvedAnswerEn: "A rewritten answer.",
+        nextCheck: { zh: "检查", en: "Check" },
+        uncertainty: {
+          zh: "这里只演示流程。",
+          en: "This only demonstrates the flow.",
+        },
+      },
+    },
+    {
+      label: "demo without uncertainty",
+      responseMode: "SHORT_TEXT",
+      analysisState: "DEMO_ONLY",
+      analysis: {
+        kind: "DEMO_ONLY",
+        summary: { zh: "演示", en: "Demo" },
+        strengths: [],
+        comparisonPoints: [],
+        nextCheck: { zh: "检查", en: "Check" },
+      },
+    },
+    {
+      label: "too many strengths",
+      responseMode: "SHORT_TEXT",
+      analysisState: "ANALYSIS_READY",
+      analysis: {
+        ...validPersonalizedAnalysis,
+        strengths: [
+          validPersonalizedAnalysis.strengths[0],
+          validPersonalizedAnalysis.strengths[0],
+          validPersonalizedAnalysis.strengths[0],
+        ],
+      },
+    },
+    {
+      label: "too many comparisons",
+      responseMode: "SHORT_TEXT",
+      analysisState: "ANALYSIS_READY",
+      analysis: {
+        ...validPersonalizedAnalysis,
+        comparisonPoints: [
+          validPersonalizedAnalysis.comparisonPoints[0],
+          validPersonalizedAnalysis.comparisonPoints[0],
+          validPersonalizedAnalysis.comparisonPoints[0],
+          validPersonalizedAnalysis.comparisonPoints[0],
+        ],
+      },
+    },
+    {
+      label: "too many evidence spans",
+      responseMode: "SHORT_TEXT",
+      analysisState: "ANALYSIS_READY",
+      analysis: {
+        ...validPersonalizedAnalysis,
+        strengths: [
+          {
+            ...validPersonalizedAnalysis.strengths[0],
+            userAnswerEvidence: [
+              "Employees",
+              "protect",
+              "longer",
+              "periods",
+              "demanding work",
+            ],
+          },
+        ],
+      },
+    },
+    {
+      label: "invented learner evidence",
+      responseMode: "SHORT_TEXT",
+      analysisState: "ANALYSIS_READY",
+      analysis: {
+        ...validPersonalizedAnalysis,
+        strengths: [
+          {
+            ...validPersonalizedAnalysis.strengths[0],
+            userAnswerEvidence: ["words absent from the learner answer"],
+          },
+        ],
+      },
+    },
+    {
+      label: "personalized analysis on choice response",
+      responseMode: "CHOICE",
+      analysisState: "ANALYSIS_READY",
+      analysis: validPersonalizedAnalysis,
+    },
+    {
+      label: "deterministic analysis on short text response",
+      responseMode: "SHORT_TEXT",
+      analysisState: "ANALYSIS_READY",
+      analysis: {
+        ...validPersonalizedAnalysis,
+        kind: "DETERMINISTIC_CHOICE",
+      },
+    },
+    {
+      label: "ready analysis while state is pending",
+      responseMode: "SHORT_TEXT",
+      analysisState: "ANALYSIS_PENDING",
+      analysis: validPersonalizedAnalysis,
+    },
+    {
+      label: "choice response marked pending without analysis",
+      responseMode: "CHOICE",
+      analysisState: "ANALYSIS_PENDING",
+      analysis: null,
+    },
+    {
+      label: "choice response marked reference-ready without analysis",
+      responseMode: "CHOICE",
+      analysisState: "REFERENCE_READY",
+      analysis: null,
+    },
+  ])(
+    "collapses malformed analysis to an unavailable non-judgmental resource: $label",
+    async ({ responseMode, analysisState, analysis }) => {
+      const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(
+        jsonResponse({
+          response: {
+            id: "019-malformed-present",
+            promptId: tutorialShortTextPrompt.id,
+            submittedAnswer: tutorialAnswer,
+            responseMode,
+            analysisState,
+            analysis,
+          },
+        }),
+      );
+      const client = new HttpLearningClient({
+        baseUrl: "https://coach.test/api/v1",
+        fetch: fetcher,
+        origin: "https://coach.test",
+      });
+
+      await expect(
+        client.getTeachingPracticeResponse(
+          "lesson-1",
+          tutorialShortTextPrompt.id,
+        ),
+      ).resolves.toEqual({
+        id: "019-malformed-present",
+        promptId: tutorialShortTextPrompt.id,
+        submittedAnswer: tutorialAnswer,
+        responseMode,
+        analysisState: "ANALYSIS_UNAVAILABLE",
+        analysis: null,
+      });
+    },
+  );
+
+  it("neutralizes a structurally valid demo instead of trusting learner judgments in its text", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(
+      jsonResponse({
+        response: {
+          id: "019-demo-neutral",
+          promptId: tutorialShortTextPrompt.id,
+          submittedAnswer: tutorialAnswer,
+          responseMode: "SHORT_TEXT",
+          analysisState: "DEMO_ONLY",
+          analysis: {
+            kind: "DEMO_ONLY",
+            summary: { zh: "你的语法很好。", en: "Your grammar is excellent." },
+            strengths: [],
+            comparisonPoints: [],
+            nextCheck: { zh: "你已经掌握。", en: "You have mastered this." },
+            uncertainty: { zh: "置信度很高。", en: "Confidence is high." },
+          },
+        },
+      }),
+    );
+    const client = new HttpLearningClient({
+      baseUrl: "https://coach.test/api/v1",
+      fetch: fetcher,
+      origin: "https://coach.test",
+    });
+
+    const result = await client.getTeachingPracticeResponse(
+      "lesson-1",
+      tutorialShortTextPrompt.id,
+    );
+    expect(result).toMatchObject({
+      analysisState: "DEMO_ONLY",
+      analysis: {
+        kind: "DEMO_ONLY",
+        strengths: [],
+        comparisonPoints: [],
+      },
+    });
+    expect(JSON.stringify(result)).not.toMatch(
+      /grammar is excellent|语法很好|mastered|已经掌握|confidence is high|置信度很高/i,
+    );
+  });
+
+  it.each([
+    { label: "network", kind: "network" },
+    { label: "rate limit", kind: "status", status: 429 },
+    { label: "server failure", kind: "status", status: 500 },
+    { label: "temporary outage", kind: "status", status: 503 },
+    { label: "malformed success", kind: "malformed" },
+  ])(
+    "keeps the exact local submission on recoverable $label failure",
+    async ({ kind, status }) => {
+      const fetcher = vi.fn<typeof fetch>();
+      if (kind === "network") fetcher.mockRejectedValue(new Error("offline"));
+      else if (kind === "malformed")
+        fetcher.mockResolvedValue(jsonResponse({ response: { broken: true } }));
+      else
+        fetcher.mockResolvedValue(
+          problem(status ?? 500, `RECOVERABLE_${status ?? 500}`),
+        );
+      const client = new HttpLearningClient({
+        baseUrl: "https://coach.test/api/v1",
+        fetch: fetcher,
+        idempotencyKey: () => `submit-recovery-${kind}-${status ?? "none"}`,
+        origin: "https://coach.test",
+        sleep: async () => undefined,
+      });
+
+      await expect(
+        client.submitTeachingPracticeAnswer(
+          "lesson-1",
+          tutorialShortTextPrompt,
+          tutorialAnswer,
+        ),
+      ).resolves.toEqual({
+        id: `local:lesson-1:${tutorialShortTextPrompt.id}`,
+        promptId: tutorialShortTextPrompt.id,
+        submittedAnswer: tutorialAnswer,
+        responseMode: "SHORT_TEXT",
+        analysisState: "ANALYSIS_UNAVAILABLE",
+        analysis: null,
+      });
+    },
+  );
+
+  it.each([
+    [400, "BAD_REQUEST"],
+    [401, "UNAUTHENTICATED"],
+    [403, "FORBIDDEN"],
+    [404, "TEACHING_PRACTICE_RESPONSE_NOT_FOUND"],
+    [409, "IDEMPOTENCY_CONFLICT"],
+    [422, "TEACHING_PRACTICE_CHOICE_INVALID"],
+  ])("does not hide semantic submit error HTTP %i", async (status, code) => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(problem(status, code));
+    const client = new HttpLearningClient({
+      baseUrl: "https://coach.test/api/v1",
+      fetch: fetcher,
+      idempotencyKey: () => `semantic-submit-${status}`,
+      origin: "https://coach.test",
+    });
+
+    await expect(
+      client.submitTeachingPracticeAnswer(
+        "lesson-1",
+        tutorialShortTextPrompt,
+        tutorialAnswer,
+      ),
+    ).rejects.toMatchObject({ status, code });
+  });
+
+  it.each([
+    { label: "network", kind: "network" },
+    { label: "rate limit", kind: "status", status: 429 },
+    { label: "server failure", kind: "status", status: 500 },
+    { label: "temporary outage", kind: "status", status: 503 },
+    { label: "malformed success", kind: "malformed" },
+  ])(
+    "sanitizes a known restore fallback on recoverable $label failure",
+    async ({ kind, status }) => {
+      const fetcher = vi.fn<typeof fetch>();
+      if (kind === "network") fetcher.mockRejectedValue(new Error("offline"));
+      else if (kind === "malformed")
+        fetcher.mockResolvedValue(jsonResponse({ response: { broken: true } }));
+      else
+        fetcher.mockResolvedValue(
+          problem(status ?? 500, `RECOVERABLE_${status ?? 500}`),
+        );
+      const client = new HttpLearningClient({
+        baseUrl: "https://coach.test/api/v1",
+        fetch: fetcher,
+        origin: "https://coach.test",
+      });
+
+      await expect(
+        client.getTeachingPracticeResponse(
+          "lesson-1",
+          tutorialShortTextPrompt.id,
+          savedPersonalizedResponse,
+        ),
+      ).resolves.toEqual({
+        ...savedPersonalizedResponse,
+        analysisState: "ANALYSIS_UNAVAILABLE",
+        analysis: null,
+      });
+    },
+  );
+
+  it.each([
+    [401, "UNAUTHENTICATED"],
+    [403, "FORBIDDEN"],
+    [409, "IDEMPOTENCY_CONFLICT"],
+    [422, "VALIDATION_ERROR"],
+  ])(
+    "does not hide semantic restore error HTTP %i even with a fallback",
+    async (status, code) => {
+      const client = new HttpLearningClient({
+        baseUrl: "https://coach.test/api/v1",
+        fetch: vi.fn<typeof fetch>().mockResolvedValue(problem(status, code)),
+        origin: "https://coach.test",
+      });
+      await expect(
+        client.getTeachingPracticeResponse(
+          "lesson-1",
+          tutorialShortTextPrompt.id,
+          savedPersonalizedResponse,
+        ),
+      ).rejects.toMatchObject({ status, code });
+    },
+  );
+
+  it("keeps a true restore 404 as null with or without a fallback", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockImplementation(async () =>
+        problem(404, "TEACHING_PRACTICE_RESPONSE_NOT_FOUND"),
+      );
+    const client = new HttpLearningClient({
+      baseUrl: "https://coach.test/api/v1",
+      fetch: fetcher,
+      origin: "https://coach.test",
+    });
+    await expect(
+      client.getTeachingPracticeResponse(
+        "lesson-1",
+        tutorialShortTextPrompt.id,
+      ),
+    ).resolves.toBeNull();
+    await expect(
+      client.getTeachingPracticeResponse(
+        "lesson-1",
+        tutorialShortTextPrompt.id,
+        savedPersonalizedResponse,
+      ),
+    ).resolves.toBeNull();
+  });
+
+  it.each([
+    { label: "network", kind: "network" },
+    { label: "rate limit", kind: "status", status: 429 },
+    { label: "server failure", kind: "status", status: 500 },
+    { label: "temporary outage", kind: "status", status: 503 },
+    { label: "malformed success", kind: "malformed" },
+  ])(
+    "sanitizes retry fallback on recoverable $label failure",
+    async ({ kind, status }) => {
+      const fetcher = vi.fn<typeof fetch>();
+      if (kind === "network") fetcher.mockRejectedValue(new Error("offline"));
+      else if (kind === "malformed")
+        fetcher.mockResolvedValue(jsonResponse({ response: { broken: true } }));
+      else
+        fetcher.mockResolvedValue(
+          problem(status ?? 500, `RECOVERABLE_${status ?? 500}`),
+        );
+      const client = new HttpLearningClient({
+        baseUrl: "https://coach.test/api/v1",
+        fetch: fetcher,
+        idempotencyKey: () => `retry-recovery-${kind}-${status ?? "none"}`,
+        origin: "https://coach.test",
+        sleep: async () => undefined,
+      });
+
+      await expect(
+        client.retryTeachingPracticeAnalysis(savedPersonalizedResponse),
+      ).resolves.toEqual({
+        ...savedPersonalizedResponse,
+        analysisState: "ANALYSIS_UNAVAILABLE",
+        analysis: null,
+      });
+    },
+  );
+
+  it.each([
+    [400, "BAD_REQUEST"],
+    [401, "UNAUTHENTICATED"],
+    [403, "FORBIDDEN"],
+    [404, "TEACHING_PRACTICE_RESPONSE_NOT_FOUND"],
+    [409, "IDEMPOTENCY_CONFLICT"],
+    [422, "VALIDATION_ERROR"],
+  ])("does not hide semantic retry error HTTP %i", async (status, code) => {
+    const client = new HttpLearningClient({
+      baseUrl: "https://coach.test/api/v1",
+      fetch: vi.fn<typeof fetch>().mockResolvedValue(problem(status, code)),
+      idempotencyKey: () => `semantic-retry-${status}`,
+      origin: "https://coach.test",
+    });
+    await expect(
+      client.retryTeachingPracticeAnalysis(savedPersonalizedResponse),
+    ).rejects.toMatchObject({ status, code });
+  });
+
+  it("keeps one immutable Mock answer and labels short-text analysis as demonstration only", async () => {
+    const previousWindow = Object.getOwnPropertyDescriptor(
+      globalThis,
+      "window",
+    );
+    const values = new Map<string, string>();
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: {
+        localStorage: {
+          getItem: (key: string) => values.get(key) ?? null,
+          setItem: (key: string, value: string) => values.set(key, value),
+          removeItem: (key: string) => values.delete(key),
+        },
+        setTimeout: (callback: () => void) => {
+          callback();
+          return 0;
+        },
+      },
+    });
+    try {
+      const client = new MockLearningClient();
+      const first = await client.submitTeachingPracticeAnswer(
+        "lesson-demo",
+        tutorialShortTextPrompt,
+        "The first exact answer.",
+      );
+      const second = await client.submitTeachingPracticeAnswer(
+        "lesson-demo",
+        tutorialShortTextPrompt,
+        "A later replacement attempt.",
+      );
+      expect(first).toEqual(second);
+      expect(first).toMatchObject({
+        submittedAnswer: "The first exact answer.",
+        analysisState: "DEMO_ONLY",
+        analysis: {
+          kind: "DEMO_ONLY",
+          strengths: [],
+          comparisonPoints: [],
+        },
+      });
+      expect(first.analysis).not.toHaveProperty("keyImprovement");
+      expect(first.analysis).not.toHaveProperty("improvedAnswerEn");
+      await expect(
+        client.retryTeachingPracticeAnalysis(first),
+      ).resolves.toEqual(first);
+    } finally {
+      if (previousWindow)
+        Object.defineProperty(globalThis, "window", previousWindow);
+      else Reflect.deleteProperty(globalThis, "window");
+    }
+  });
+
+  it("projects tampered Mock persistence before submit, restore, or retry can return it", async () => {
+    const previousWindow = Object.getOwnPropertyDescriptor(
+      globalThis,
+      "window",
+    );
+    const values = new Map<string, string>();
+    const storageKey = "iwc.demo.teaching-practice-responses";
+    values.set(
+      storageKey,
+      JSON.stringify({
+        [`lesson-demo:${tutorialShortTextPrompt.id}`]: {
+          id: "demo:lesson-demo:workplace-link",
+          promptId: tutorialShortTextPrompt.id,
+          submittedAnswer: "The first tampered answer must remain immutable.",
+          responseMode: "SHORT_TEXT",
+          analysisState: "DEMO_ONLY",
+          analysis: {
+            kind: "DEMO_ONLY",
+            summary: { zh: "你的语法很好。", en: "Your grammar is excellent." },
+            strengths: [
+              {
+                zh: "虚构优点",
+                en: "Fabricated strength",
+                userAnswerEvidence: [],
+              },
+            ],
+            comparisonPoints: [],
+            improvedAnswerEn: "A fabricated rewrite.",
+            nextCheck: { zh: "已经掌握", en: "Already mastered" },
+          },
+          jobId: "private-job",
+          provider: "private-provider",
+          score: 100,
+        },
+      }),
+    );
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: {
+        localStorage: {
+          getItem: (key: string) => values.get(key) ?? null,
+          setItem: (key: string, value: string) => values.set(key, value),
+          removeItem: (key: string) => values.delete(key),
+        },
+        setTimeout: (callback: () => void) => {
+          callback();
+          return 0;
+        },
+      },
+    });
+    try {
+      const client = new MockLearningClient();
+      const submitted = await client.submitTeachingPracticeAnswer(
+        "lesson-demo",
+        tutorialShortTextPrompt,
+        "A replacement attempt must not overwrite the stored first answer.",
+      );
+      const restored = await client.getTeachingPracticeResponse(
+        "lesson-demo",
+        tutorialShortTextPrompt.id,
+      );
+      const retried = await client.retryTeachingPracticeAnalysis(submitted);
+      for (const result of [submitted, restored, retried]) {
+        expect(result).toEqual({
+          id: "demo:lesson-demo:workplace-link",
+          promptId: tutorialShortTextPrompt.id,
+          submittedAnswer: "The first tampered answer must remain immutable.",
+          responseMode: "SHORT_TEXT",
+          analysisState: "ANALYSIS_UNAVAILABLE",
+          analysis: null,
+        });
+        expect(Object.keys(result ?? {}).sort()).toEqual([
+          "analysis",
+          "analysisState",
+          "id",
+          "promptId",
+          "responseMode",
+          "submittedAnswer",
+        ]);
+        expect(JSON.stringify(result)).not.toMatch(
+          /private-job|private-provider|fabricated|grammar is excellent|语法很好|mastered|已经掌握|score/i,
+        );
+      }
+    } finally {
+      if (previousWindow)
+        Object.defineProperty(globalThis, "window", previousWindow);
+      else Reflect.deleteProperty(globalThis, "window");
+    }
+  });
+
+  it("loads an adaptive teaching article without starting the timed paper", async () => {
     const fetcher = vi.fn<typeof fetch>(async (input) => {
       const url = String(input);
       if (url.endsWith("/training-cycles/cycle-teaching"))
@@ -35,20 +1020,7 @@ describe("HttpLearningClient protocol", () => {
         });
       if (url.endsWith("/lessons/lesson-teaching/teaching"))
         return jsonResponse({
-          teaching: {
-            targetTitleZh: "用原因—机制—结果完整表达观点",
-            targetTitleEn: "Build a complete causal chain",
-            whyItMattersZh: "原文缺少中间机制。",
-            whyItMattersEn: "The mechanism is missing.",
-            currentPattern: "It is useful.",
-            decisionRuleZh: "写出原因、机制和具体结果。",
-            decisionRuleEn: "State a cause, mechanism and result.",
-            knowledgeCards: [],
-            expressionBank: [],
-            workedExample: {},
-            quickChecks: [],
-            readyChecklistZh: [],
-          },
+          teaching: adaptiveTeachingPayload,
         });
       throw new Error(`Unexpected URL: ${url}`);
     });
@@ -63,11 +1035,95 @@ describe("HttpLearningClient protocol", () => {
     ).resolves.toMatchObject({
       id: "lesson-teaching",
       cycleId: "cycle-teaching",
-      targetTitleZh: "用原因—机制—结果完整表达观点",
+      format: "ADAPTIVE_ARTICLE_V1",
+      titleZh: "把因果论证中间的一步讲清楚",
+      sections: [
+        { anchor: "understand-the-link" },
+        { anchor: "apply-the-method" },
+      ],
     });
+    expect(fetcher).toHaveBeenCalledTimes(2);
     expect(
       fetcher.mock.calls.some(([input]) => String(input).endsWith("/start")),
     ).toBe(false);
+  });
+
+  it("serves the demo as a dynamic article instead of a fixed lesson template", async () => {
+    const previousWindow = Object.getOwnPropertyDescriptor(
+      globalThis,
+      "window",
+    );
+    const sessionValues = new Map<string, string>();
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: {
+        dispatchEvent: () => true,
+        sessionStorage: {
+          getItem: (key: string) => sessionValues.get(key) ?? null,
+          setItem: (key: string, value: string) =>
+            sessionValues.set(key, value),
+        },
+        setTimeout: globalThis.setTimeout,
+      },
+    });
+
+    try {
+      const teaching = await new MockLearningClient().getFocusedTeaching(
+        "cycle-demo",
+        "lesson-demo",
+      );
+
+      expect(teaching).toMatchObject({
+        format: "ADAPTIVE_ARTICLE_V1",
+        id: "lesson-demo",
+        cycleId: "cycle-demo",
+      });
+      expect(teaching.sections.map((section) => section.anchor)).toEqual([
+        "see-the-missing-link",
+        "build-one-step-at-a-time",
+        "try-and-check",
+      ]);
+      expect(teaching).not.toHaveProperty("currentPattern");
+      expect(teaching).not.toHaveProperty("knowledgeCards");
+    } finally {
+      if (previousWindow) {
+        Object.defineProperty(globalThis, "window", previousWindow);
+      } else {
+        Reflect.deleteProperty(globalThis, "window");
+      }
+    }
+  });
+
+  it("provides a structurally different fixture without adding fixed chapters", () => {
+    const blockKinds = (teaching: FocusedTeachingData) =>
+      teaching.sections.flatMap((section) =>
+        section.blocks.map((block) => block.kind),
+      );
+
+    expect(mechanismChainTeachingFixture.sections).toHaveLength(3);
+    expect(collocationControlTeachingFixture.sections).toHaveLength(2);
+    expect(blockKinds(mechanismChainTeachingFixture)).toEqual([
+      "EXPLANATION",
+      "CONTRAST",
+      "REASONING",
+      "PRACTICE",
+      "SUMMARY",
+    ]);
+    expect(blockKinds(collocationControlTeachingFixture)).toEqual([
+      "EXPLANATION",
+      "TOOLKIT",
+      "PITFALLS",
+      "CONTRAST",
+      "PRACTICE",
+      "SUMMARY",
+    ]);
+    expect(
+      collocationControlTeachingFixture.sections.map(
+        (section) => section.titleZh,
+      ),
+    ).not.toEqual(
+      mechanismChainTeachingFixture.sections.map((section) => section.titleZh),
+    );
   });
 
   it("uses HTTP by default and selects the local demo only when explicit", () => {

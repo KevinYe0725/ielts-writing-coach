@@ -35,7 +35,8 @@ function mockStructuredValue(
   const generated = mockValueFromSchema(request.schema);
   if (
     request.schemaName === "iwc_practice_paper_v2" ||
-    request.schemaName === "iwc_focused_learning_package_v3"
+    request.schemaName === "iwc_focused_learning_package_v3" ||
+    request.schemaName === "iwc_focused_learning_package_v4"
   ) {
     const sections = [
       "FOUNDATION",
@@ -143,6 +144,155 @@ function mockStructuredValue(
       }),
     };
     if (request.schemaName === "iwc_practice_paper_v2") return paper;
+    if (request.schemaName === "iwc_focused_learning_package_v4") {
+      const coreAbilityZh = "用原因机制结果完整展开一个观点";
+      const coreAbilityEn =
+        "Develop one claim through a cause, mechanism, and result";
+      return {
+        teachingModule: {
+          format: "ADAPTIVE_ARTICLE_V1",
+          titleZh: "让读者看见观点如何一步步成立",
+          titleEn: "Show how a claim works step by step",
+          introductionZh:
+            "这篇短教程用全新的例子说明如何补上中间机制，并让你在陌生话题中独立完成一次迁移。",
+          introductionEn:
+            "This short tutorial uses fresh examples to make the missing mechanism visible and then asks you to transfer the method to an unfamiliar topic.",
+          estimatedMinutes: 16,
+          blueprint: {
+            coreAbilityZh,
+            coreAbilityEn,
+            difficultyType: "REVISES_BUT_CANNOT_GENERATE",
+            completionStandardZh:
+              "能够在陌生话题中独立写出包含原因、作用过程和具体结果的两至三句话。",
+            completionStandardEn:
+              "Independently write two or three sentences that contain a cause, a working mechanism, and a specific result on an unseen topic.",
+            prerequisiteAbilityZh: "",
+            prerequisiteAbilityEn: "",
+            supportingAbilityZh: "",
+            supportingAbilityEn: "",
+            selectedBlockKinds: [
+              "EXPLANATION",
+              "CONTRAST",
+              "PRACTICE",
+              "SUMMARY",
+            ],
+          },
+          sections: [
+            {
+              anchor: "see-the-link",
+              titleZh: "先找到缺失的中间一环",
+              titleEn: "Find the missing middle link",
+              blocks: [
+                {
+                  kind: "EXPLANATION",
+                  titleZh: "结果不会自动证明原因",
+                  titleEn: "A result does not explain its own cause",
+                  paragraphsZh: [
+                    "完整论证不只是把原因和好处放在同一句里。读者还需要看到原因改变了什么，这个变化又怎样推动最终结果。",
+                  ],
+                  paragraphsEn: [
+                    "A complete argument does more than place a cause beside a benefit. It shows what the cause changes and how that change produces the final outcome.",
+                  ],
+                  keyPointZh:
+                    "写完原因后追问：它先改变了什么具体过程？答案就是需要补出的机制。",
+                  keyPointEn:
+                    "After stating the cause, ask what process changes first; that answer supplies the missing mechanism.",
+                },
+                {
+                  kind: "CONTRAST",
+                  titleZh: "对比跳跃论证与完整论证",
+                  titleEn: "Compare a jump with a complete explanation",
+                  weakExampleEn:
+                    "Flexible schedules are useful, so employees perform better.",
+                  strongExampleEn:
+                    "Flexible schedules let employees work during their most productive hours, which improves concentration and raises the quality of their output.",
+                  differenceZh:
+                    "较强的版本没有重复“有用”，而是说明弹性安排先改善专注，再带来可观察的工作结果。",
+                  differenceEn:
+                    "The stronger version replaces a vague benefit with the intermediate change in concentration and a concrete workplace outcome.",
+                },
+              ],
+            },
+            {
+              anchor: "try-and-transfer",
+              titleZh: "缩短支架并迁移到新话题",
+              titleEn: "Remove the scaffold and transfer",
+              blocks: [
+                {
+                  kind: "PRACTICE",
+                  titleZh: "先判断，再独立生成",
+                  titleEn: "Decide first, then generate independently",
+                  prompts: [
+                    {
+                      id: "spot-the-mechanism",
+                      instructionZh:
+                        "选择真正解释了中间作用过程的一句，并在作答后查看理由。",
+                      instructionEn:
+                        "Choose the sentence that explains an intermediate process, then reveal the reasoning.",
+                      promptEn:
+                        "A city adds protected bicycle lanes to several busy roads.",
+                      responseMode: "CHOICE",
+                      context: "SAME_TOPIC",
+                      optionsEn: [
+                        "Cycling infrastructure is beneficial for cities.",
+                        "Protected lanes reduce perceived danger, so more commuters feel able to cycle regularly.",
+                        "Many cities experience traffic during peak hours.",
+                      ],
+                      referenceAnswerEn:
+                        "Protected lanes reduce perceived danger, so more commuters feel able to cycle regularly.",
+                      referenceReasoningZh:
+                        "这句话写出了基础设施先降低风险感受，再改变通勤者选择的中间过程。",
+                      referenceReasoningEn:
+                        "It shows the infrastructure reducing perceived risk before that change affects commuters' choices.",
+                    },
+                    {
+                      id: "unseen-health-transfer",
+                      instructionZh:
+                        "用两至三句英文解释定期健康检查如何减少严重疾病风险，必须写出原因、机制和具体结果。",
+                      instructionEn:
+                        "In two or three English sentences, explain how regular health checks can reduce serious illness through a cause, mechanism, and concrete result.",
+                      promptEn:
+                        "Transfer the reasoning pattern to preventive healthcare without copying the examples above.",
+                      responseMode: "SHORT_TEXT",
+                      context: "UNSEEN_TOPIC",
+                      optionsEn: [],
+                      referenceAnswerEn:
+                        "Regular screening can reveal warning signs before symptoms become severe. Earlier detection gives patients time to begin treatment, reducing the likelihood of avoidable complications.",
+                      referenceReasoningZh:
+                        "参考思路依次写出早期发现、及时治疗和降低并发症风险，没有只停留在“检查有好处”。",
+                      referenceReasoningEn:
+                        "The response moves from early detection to timely treatment and then to a reduced risk of complications.",
+                    },
+                  ],
+                },
+                {
+                  kind: "SUMMARY",
+                  titleZh: "把方法带进下一次写作",
+                  titleEn: "Carry the method into the next essay",
+                  rulesZh: [
+                    "先明确原因改变的对象或过程，不要从原因直接跳到好处。",
+                    "把最终结果写成读者能够观察或验证的变化。",
+                  ],
+                  rulesEn: [
+                    "Name the process or condition changed by the cause instead of jumping straight to a benefit.",
+                    "Express the final result as a change a reader could observe or verify.",
+                  ],
+                  selfCheckZh:
+                    "遮住连接词后，我还能指出这段话里的原因、中间变化和具体结果吗？",
+                  selfCheckEn:
+                    "If I hide the linking words, can I still identify the cause, the intermediate change, and the concrete result?",
+                },
+              ],
+            },
+          ],
+        },
+        paper: {
+          ...paper,
+          objectiveZh: `${coreAbilityZh}：在识别、修改、独立造句和段落应用中完成一次完整训练。`,
+          objectiveEn: `${coreAbilityEn}: apply the ability through diagnosis, repair, independent generation, and paragraph writing.`,
+        },
+      };
+    }
     return {
       teachingModule: {
         targetTitleZh,
@@ -288,6 +438,15 @@ function mockStructuredValue(
       summaryZh:
         "这是整卷流程演示结果；连接真实模型后，系统才会评价语言准确性、自然度和论证质量。",
       itemResults,
+    };
+  }
+  if (request.schemaName === "iwc_teaching_practice_analysis_v2") {
+    return {
+      disposition: "INSUFFICIENT_EVIDENCE",
+      strengths: [],
+      comparisons: [],
+      improvements: [],
+      confidence: 0,
     };
   }
   if (request.schemaName === "iwc_exercise_evaluation_v1") {

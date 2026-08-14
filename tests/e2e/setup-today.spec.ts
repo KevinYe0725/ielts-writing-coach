@@ -68,11 +68,18 @@ test.describe("deterministic setup and Today experience", () => {
     page,
   }) => {
     await page.goto("/today");
+    await page.waitForLoadState("networkidle");
     const taskPrompt = "Closed-book rewrite: early language learning";
 
-    await page
-      .getByRole("button", { name: "切换到英文界面", exact: true })
-      .click();
+    const header =
+      (page.viewportSize()?.width ?? 1_000) < 700
+        ? page.locator(".mobile-header")
+        : page.locator(".topbar");
+    const localeSwitch = header.getByRole("button", {
+      name: "切换到英文界面",
+      exact: true,
+    });
+    await localeSwitch.click();
 
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
     await expect(
@@ -82,7 +89,7 @@ test.describe("deterministic setup and Today experience", () => {
     ).toBeVisible();
     await expect(page.getByText(taskPrompt, { exact: true })).toBeVisible();
     await expect(
-      page.getByRole("button", {
+      header.getByRole("button", {
         name: "Switch to Chinese interface",
         exact: true,
       }),

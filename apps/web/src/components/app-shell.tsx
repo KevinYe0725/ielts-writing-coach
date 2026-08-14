@@ -2,7 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
 import {
   BarChart3,
   BookOpenCheck,
@@ -14,6 +19,8 @@ import {
   Home,
   Languages,
   Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
   PenLine,
   RefreshCw,
   Settings,
@@ -43,6 +50,50 @@ const navItems = [
 const utilityItems = [
   { href: "/settings", key: "settings", icon: Settings },
 ] as const;
+
+const SIDEBAR_STORAGE_KEY = "iwc:sidebar-collapsed:v1";
+const SIDEBAR_CHANGE_EVENT = "iwc:sidebar-preference";
+let transientSidebarCollapsed = false;
+
+function sidebarCollapsedSnapshot() {
+  if (typeof window === "undefined") return false;
+  try {
+    const saved = window.localStorage.getItem(SIDEBAR_STORAGE_KEY);
+    if (saved !== null) transientSidebarCollapsed = saved === "true";
+  } catch {
+    // The in-memory preference still keeps this tab usable when storage is off.
+  }
+  return transientSidebarCollapsed;
+}
+
+function subscribeToSidebarPreference(onStoreChange: () => void) {
+  const handleStorage = (event: StorageEvent) => {
+    if (event.key === SIDEBAR_STORAGE_KEY) {
+      transientSidebarCollapsed = event.newValue === "true";
+      onStoreChange();
+    }
+  };
+  window.addEventListener("storage", handleStorage);
+  window.addEventListener(SIDEBAR_CHANGE_EVENT, onStoreChange);
+  return () => {
+    window.removeEventListener("storage", handleStorage);
+    window.removeEventListener(SIDEBAR_CHANGE_EVENT, onStoreChange);
+  };
+}
+
+function saveSidebarPreference(collapsed: boolean) {
+  transientSidebarCollapsed = collapsed;
+  try {
+    if (collapsed) {
+      window.localStorage.setItem(SIDEBAR_STORAGE_KEY, "true");
+    } else {
+      window.localStorage.removeItem(SIDEBAR_STORAGE_KEY);
+    }
+  } catch {
+    // Keep the in-memory preference for this tab.
+  }
+  window.dispatchEvent(new Event(SIDEBAR_CHANGE_EVENT));
+}
 
 function LocaleSwitch() {
   const { locale, setLocale, text } = useLocale();
@@ -174,10 +225,10 @@ function Navigation({ compact = false }: { compact?: boolean }) {
   );
 }
 
-function Sidebar() {
+function Sidebar({ hidden }: { hidden: boolean }) {
   const { text } = useLocale();
   return (
-    <aside className="sidebar">
+    <aside className="sidebar" hidden={hidden} id="primary-sidebar">
       <Brand />
       <Navigation />
       <div className="sidebar-foot">
@@ -234,21 +285,55 @@ function MobileHeader() {
   );
 }
 
-function Topbar() {
+function Topbar({
+  sidebarExpanded,
+  onToggleSidebar,
+}: {
+  sidebarExpanded: boolean;
+  onToggleSidebar: () => void;
+}) {
   const { text } = useLocale();
   return (
     <header className="topbar">
-      <div className="focus-message">
-        <Sparkles aria-hidden="true" size={16} />
-        <span>
-          {text(
-            "流程已经排好，你只需完成眼前一步",
-            "The sequence is planned; focus only on the next action",
+      <div className="topbar-leading">
+        <button
+          aria-controls="primary-sidebar"
+          aria-expanded={sidebarExpanded}
+          aria-label={text(
+            sidebarExpanded ? "隐藏侧边栏" : "显示侧边栏",
+            sidebarExpanded ? "Hide sidebar" : "Show sidebar",
           )}
-        </span>
+          className="sidebar-toggle"
+          data-sidebar-toggle
+          onClick={onToggleSidebar}
+          type="button"
+        >
+          {sidebarExpanded ? (
+            <PanelLeftClose aria-hidden="true" size={18} />
+          ) : (
+            <PanelLeftOpen aria-hidden="true" size={18} />
+          )}
+          <span>
+            {text(
+              sidebarExpanded ? "隐藏侧栏" : "显示侧栏",
+              sidebarExpanded ? "Hide sidebar" : "Show sidebar",
+            )}
+          </span>
+        </button>
+        <div className="focus-message">
+          <Sparkles aria-hidden="true" size={16} />
+          <span>
+            {text(
+              "流程已经排好，你只需完成眼前一步",
+              "The sequence is planned; focus only on the next action",
+            )}
+          </span>
+        </div>
       </div>
-      <NotificationCenter />
-      <LocaleSwitch />
+      <div className="topbar-actions">
+        <NotificationCenter />
+        <LocaleSwitch />
+      </div>
     </header>
   );
 }
@@ -256,6 +341,11 @@ function Topbar() {
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { text } = useLocale();
+  const sidebarCollapsed = useSyncExternalStore(
+    subscribeToSidebarPreference,
+    sidebarCollapsedSnapshot,
+    () => false,
+  );
   const setup = ["/setup", "/signin", "/join", "/recover"].some((path) =>
     pathname.startsWith(path),
   );
@@ -278,14 +368,21 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="app-shell">
+    <div
+      className="app-shell"
+      data-app-shell
+      data-sidebar-state={sidebarCollapsed ? "collapsed" : "expanded"}
+    >
       <a className="skip-link" href="#main-content">
         {text("跳到主要内容", "Skip to main content")}
       </a>
-      <Sidebar />
+      <Sidebar hidden={sidebarCollapsed} />
       <div className="app-column">
         <MobileHeader />
-        <Topbar />
+        <Topbar
+          onToggleSidebar={() => saveSidebarPreference(!sidebarCollapsed)}
+          sidebarExpanded={!sidebarCollapsed}
+        />
         <main className="main-content" id="main-content" tabIndex={-1}>
           {children}
         </main>

@@ -1,4 +1,9 @@
-import { SKILL_IDS } from "@iwc/learning-contracts";
+import {
+  SKILL_IDS,
+  TEACHING_PRACTICE_COMPARISON_CODES,
+  TEACHING_PRACTICE_IMPROVEMENT_CODES,
+  TEACHING_PRACTICE_STRENGTH_CODES,
+} from "@iwc/learning-contracts";
 
 const band = {
   type: "number",
@@ -419,6 +424,267 @@ export const practicePaperContentSchema = {
   properties: practicePaperProperties,
 } as const;
 
+const teachingTitleProperties = {
+  titleZh: { type: "string", minLength: 2, maxLength: 100 },
+  titleEn: { type: "string", minLength: 2, maxLength: 160 },
+} as const;
+
+const teachingBlockSchema = {
+  anyOf: [
+    {
+      type: "object",
+      additionalProperties: false,
+      required: [
+        "kind",
+        "titleZh",
+        "titleEn",
+        "paragraphsZh",
+        "paragraphsEn",
+        "keyPointZh",
+        "keyPointEn",
+      ],
+      properties: {
+        kind: { type: "string", const: "EXPLANATION" },
+        ...teachingTitleProperties,
+        paragraphsZh: {
+          type: "array",
+          minItems: 1,
+          maxItems: 4,
+          items: { type: "string", minLength: 8, maxLength: 700 },
+        },
+        paragraphsEn: {
+          type: "array",
+          minItems: 1,
+          maxItems: 4,
+          items: { type: "string", minLength: 12, maxLength: 900 },
+        },
+        keyPointZh: { type: "string", minLength: 6, maxLength: 300 },
+        keyPointEn: { type: "string", minLength: 6, maxLength: 420 },
+      },
+    },
+    {
+      type: "object",
+      additionalProperties: false,
+      required: [
+        "kind",
+        "titleZh",
+        "titleEn",
+        "weakExampleEn",
+        "strongExampleEn",
+        "differenceZh",
+        "differenceEn",
+      ],
+      properties: {
+        kind: { type: "string", const: "CONTRAST" },
+        ...teachingTitleProperties,
+        weakExampleEn: { type: "string", minLength: 8, maxLength: 700 },
+        strongExampleEn: { type: "string", minLength: 8, maxLength: 1200 },
+        differenceZh: { type: "string", minLength: 8, maxLength: 500 },
+        differenceEn: { type: "string", minLength: 8, maxLength: 700 },
+      },
+    },
+    {
+      type: "object",
+      additionalProperties: false,
+      required: [
+        "kind",
+        "titleZh",
+        "titleEn",
+        "scenarioZh",
+        "scenarioEn",
+        "steps",
+        "resultEn",
+        "takeawayZh",
+        "takeawayEn",
+      ],
+      properties: {
+        kind: { type: "string", const: "REASONING" },
+        ...teachingTitleProperties,
+        scenarioZh: { type: "string", minLength: 6, maxLength: 400 },
+        scenarioEn: { type: "string", minLength: 6, maxLength: 600 },
+        steps: {
+          type: "array",
+          minItems: 2,
+          maxItems: 5,
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["thinkingZh", "thinkingEn"],
+            properties: {
+              thinkingZh: { type: "string", minLength: 6, maxLength: 400 },
+              thinkingEn: { type: "string", minLength: 6, maxLength: 600 },
+            },
+          },
+        },
+        resultEn: { type: "string", minLength: 12, maxLength: 900 },
+        takeawayZh: { type: "string", minLength: 6, maxLength: 300 },
+        takeawayEn: { type: "string", minLength: 6, maxLength: 420 },
+      },
+    },
+    {
+      type: "object",
+      additionalProperties: false,
+      required: ["kind", "titleZh", "titleEn", "tools"],
+      properties: {
+        kind: { type: "string", const: "TOOLKIT" },
+        ...teachingTitleProperties,
+        tools: {
+          type: "array",
+          minItems: 1,
+          maxItems: 6,
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: [
+              "expressionEn",
+              "functionZh",
+              "functionEn",
+              "conditionZh",
+              "conditionEn",
+              "cautionZh",
+              "cautionEn",
+              "exampleEn",
+            ],
+            properties: {
+              expressionEn: { type: "string", minLength: 2, maxLength: 140 },
+              functionZh: { type: "string", minLength: 4, maxLength: 200 },
+              functionEn: { type: "string", minLength: 4, maxLength: 280 },
+              conditionZh: { type: "string", minLength: 6, maxLength: 320 },
+              conditionEn: { type: "string", minLength: 6, maxLength: 440 },
+              cautionZh: { type: "string", minLength: 6, maxLength: 320 },
+              cautionEn: { type: "string", minLength: 6, maxLength: 440 },
+              exampleEn: { type: "string", minLength: 8, maxLength: 700 },
+            },
+          },
+        },
+      },
+    },
+    {
+      type: "object",
+      additionalProperties: false,
+      required: ["kind", "titleZh", "titleEn", "items"],
+      properties: {
+        kind: { type: "string", const: "PITFALLS" },
+        ...teachingTitleProperties,
+        items: {
+          type: "array",
+          minItems: 1,
+          maxItems: 6,
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["patternEn", "problemZh", "problemEn", "betterEn"],
+            properties: {
+              patternEn: { type: "string", minLength: 2, maxLength: 300 },
+              problemZh: { type: "string", minLength: 6, maxLength: 320 },
+              problemEn: { type: "string", minLength: 6, maxLength: 440 },
+              betterEn: { type: "string", minLength: 2, maxLength: 500 },
+            },
+          },
+        },
+      },
+    },
+    {
+      type: "object",
+      additionalProperties: false,
+      required: ["kind", "titleZh", "titleEn", "prompts"],
+      properties: {
+        kind: { type: "string", const: "PRACTICE" },
+        ...teachingTitleProperties,
+        prompts: {
+          type: "array",
+          minItems: 2,
+          maxItems: 3,
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: [
+              "id",
+              "instructionZh",
+              "instructionEn",
+              "promptEn",
+              "responseMode",
+              "context",
+              "optionsEn",
+              "referenceAnswerEn",
+              "referenceReasoningZh",
+              "referenceReasoningEn",
+            ],
+            properties: {
+              id: {
+                type: "string",
+                pattern: "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+              },
+              instructionZh: { type: "string", minLength: 6, maxLength: 300 },
+              instructionEn: { type: "string", minLength: 6, maxLength: 420 },
+              promptEn: { type: "string", minLength: 8, maxLength: 700 },
+              responseMode: {
+                type: "string",
+                enum: ["CHOICE", "SHORT_TEXT"],
+              },
+              context: {
+                type: "string",
+                enum: ["SAME_TOPIC", "UNSEEN_TOPIC"],
+              },
+              optionsEn: {
+                type: "array",
+                maxItems: 4,
+                items: { type: "string", minLength: 1, maxLength: 300 },
+              },
+              referenceAnswerEn: {
+                type: "string",
+                minLength: 2,
+                maxLength: 900,
+              },
+              referenceReasoningZh: {
+                type: "string",
+                minLength: 6,
+                maxLength: 500,
+              },
+              referenceReasoningEn: {
+                type: "string",
+                minLength: 6,
+                maxLength: 700,
+              },
+            },
+          },
+        },
+      },
+    },
+    {
+      type: "object",
+      additionalProperties: false,
+      required: [
+        "kind",
+        "titleZh",
+        "titleEn",
+        "rulesZh",
+        "rulesEn",
+        "selfCheckZh",
+        "selfCheckEn",
+      ],
+      properties: {
+        kind: { type: "string", const: "SUMMARY" },
+        ...teachingTitleProperties,
+        rulesZh: {
+          type: "array",
+          minItems: 2,
+          maxItems: 5,
+          items: { type: "string", minLength: 6, maxLength: 300 },
+        },
+        rulesEn: {
+          type: "array",
+          minItems: 2,
+          maxItems: 5,
+          items: { type: "string", minLength: 6, maxLength: 420 },
+        },
+        selfCheckZh: { type: "string", minLength: 8, maxLength: 400 },
+        selfCheckEn: { type: "string", minLength: 8, maxLength: 560 },
+      },
+    },
+  ],
+} as const;
+
 export const focusedLearningPackageSchema = {
   type: "object",
   additionalProperties: false,
@@ -428,106 +694,122 @@ export const focusedLearningPackageSchema = {
       type: "object",
       additionalProperties: false,
       required: [
-        "targetTitleZh",
-        "targetTitleEn",
-        "whyItMattersZh",
-        "whyItMattersEn",
-        "currentPattern",
-        "decisionRuleZh",
-        "decisionRuleEn",
-        "knowledgeCards",
-        "expressionBank",
-        "workedExample",
-        "quickChecks",
-        "readyChecklistZh",
+        "format",
+        "titleZh",
+        "titleEn",
+        "introductionZh",
+        "introductionEn",
+        "estimatedMinutes",
+        "blueprint",
+        "sections",
       ],
       properties: {
-        targetTitleZh: { type: "string", minLength: 6, maxLength: 80 },
-        targetTitleEn: { type: "string", minLength: 8, maxLength: 120 },
-        whyItMattersZh: { type: "string", minLength: 12, maxLength: 400 },
-        whyItMattersEn: { type: "string", minLength: 12, maxLength: 500 },
-        currentPattern: { type: "string", minLength: 4, maxLength: 800 },
-        decisionRuleZh: { type: "string", minLength: 12, maxLength: 400 },
-        decisionRuleEn: { type: "string", minLength: 12, maxLength: 500 },
-        knowledgeCards: {
-          type: "array",
-          minItems: 3,
-          maxItems: 5,
-          items: {
-            type: "object",
-            additionalProperties: false,
-            required: ["titleZh", "explanationZh", "exampleEn"],
-            properties: {
-              titleZh: { type: "string", minLength: 2, maxLength: 60 },
-              explanationZh: { type: "string", minLength: 10, maxLength: 400 },
-              exampleEn: { type: "string", minLength: 8, maxLength: 500 },
-            },
-          },
-        },
-        expressionBank: {
-          type: "array",
-          minItems: 2,
-          maxItems: 8,
-          items: {
-            type: "object",
-            additionalProperties: false,
-            required: ["expressionEn", "functionZh", "usageZh", "exampleEn"],
-            properties: {
-              expressionEn: { type: "string", minLength: 2, maxLength: 100 },
-              functionZh: { type: "string", minLength: 2, maxLength: 80 },
-              usageZh: { type: "string", minLength: 6, maxLength: 240 },
-              exampleEn: { type: "string", minLength: 8, maxLength: 500 },
-            },
-          },
-        },
-        workedExample: {
+        format: { type: "string", const: "ADAPTIVE_ARTICLE_V1" },
+        titleZh: { type: "string", minLength: 6, maxLength: 100 },
+        titleEn: { type: "string", minLength: 6, maxLength: 160 },
+        introductionZh: { type: "string", minLength: 12, maxLength: 500 },
+        introductionEn: { type: "string", minLength: 12, maxLength: 700 },
+        estimatedMinutes: { type: "integer", minimum: 10, maximum: 25 },
+        blueprint: {
           type: "object",
           additionalProperties: false,
           required: [
-            "taskZh",
-            "weakAnswerEn",
-            "thinkingStepsZh",
-            "improvedAnswerEn",
-            "explanationZh",
+            "coreAbilityZh",
+            "coreAbilityEn",
+            "difficultyType",
+            "completionStandardZh",
+            "completionStandardEn",
+            "prerequisiteAbilityZh",
+            "prerequisiteAbilityEn",
+            "supportingAbilityZh",
+            "supportingAbilityEn",
+            "selectedBlockKinds",
           ],
           properties: {
-            taskZh: { type: "string", minLength: 6 },
-            weakAnswerEn: { type: "string", minLength: 8 },
-            thinkingStepsZh: {
-              type: "array",
-              minItems: 3,
-              maxItems: 6,
-              items: { type: "string", minLength: 4 },
+            coreAbilityZh: { type: "string", minLength: 6, maxLength: 100 },
+            coreAbilityEn: { type: "string", minLength: 6, maxLength: 160 },
+            difficultyType: {
+              type: "string",
+              enum: [
+                "CONCEPT_GAP",
+                "RECOGNISES_BUT_CANNOT_REVISE",
+                "REVISES_BUT_CANNOT_GENERATE",
+                "SAME_CONTEXT_ONLY",
+                "UNSTABLE_CONTROL",
+              ],
             },
-            improvedAnswerEn: { type: "string", minLength: 16 },
-            explanationZh: { type: "string", minLength: 10 },
+            completionStandardZh: {
+              type: "string",
+              minLength: 10,
+              maxLength: 300,
+            },
+            completionStandardEn: {
+              type: "string",
+              minLength: 10,
+              maxLength: 420,
+            },
+            prerequisiteAbilityZh: {
+              type: "string",
+              minLength: 0,
+              maxLength: 120,
+            },
+            prerequisiteAbilityEn: {
+              type: "string",
+              minLength: 0,
+              maxLength: 180,
+            },
+            supportingAbilityZh: {
+              type: "string",
+              minLength: 0,
+              maxLength: 120,
+            },
+            supportingAbilityEn: {
+              type: "string",
+              minLength: 0,
+              maxLength: 180,
+            },
+            selectedBlockKinds: {
+              type: "array",
+              minItems: 4,
+              maxItems: 7,
+              uniqueItems: true,
+              items: {
+                type: "string",
+                enum: [
+                  "EXPLANATION",
+                  "CONTRAST",
+                  "REASONING",
+                  "TOOLKIT",
+                  "PITFALLS",
+                  "PRACTICE",
+                  "SUMMARY",
+                ],
+              },
+            },
           },
         },
-        quickChecks: {
+        sections: {
           type: "array",
           minItems: 2,
-          maxItems: 2,
+          maxItems: 5,
           items: {
             type: "object",
             additionalProperties: false,
-            required: ["promptZh", "optionsZh", "answerZh", "explanationZh"],
+            required: ["anchor", "titleZh", "titleEn", "blocks"],
             properties: {
-              promptZh: { type: "string", minLength: 6 },
-              optionsZh: {
-                type: "array",
-                maxItems: 4,
-                items: { type: "string" },
+              anchor: {
+                type: "string",
+                pattern: "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
               },
-              answerZh: { type: "string", minLength: 1 },
-              explanationZh: { type: "string", minLength: 6 },
+              ...teachingTitleProperties,
+              blocks: {
+                type: "array",
+                minItems: 1,
+                maxItems: 8,
+                items: teachingBlockSchema,
+              },
             },
           },
-        },
-        readyChecklistZh: {
-          type: "array",
-          minItems: 3,
-          maxItems: 5,
-          items: { type: "string", minLength: 6 },
         },
       },
     },
@@ -604,6 +886,64 @@ export const practicePaperEvaluationSchema = {
         },
       },
     },
+  },
+} as const;
+
+export const teachingPracticeAnalysisSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "disposition",
+    "strengths",
+    "comparisons",
+    "improvements",
+    "confidence",
+  ],
+  properties: {
+    disposition: {
+      type: "string",
+      enum: ["SUPPORTED", "NO_CLEAR_IMPROVEMENT", "INSUFFICIENT_EVIDENCE"],
+    },
+    strengths: {
+      type: "array",
+      maxItems: 2,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["code", "evidence"],
+        properties: {
+          code: { type: "string", enum: TEACHING_PRACTICE_STRENGTH_CODES },
+          evidence: { type: "string", minLength: 1, maxLength: 500 },
+        },
+      },
+    },
+    comparisons: {
+      type: "array",
+      maxItems: 3,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["code", "evidence"],
+        properties: {
+          code: { type: "string", enum: TEACHING_PRACTICE_COMPARISON_CODES },
+          evidence: { type: "string", minLength: 1, maxLength: 500 },
+        },
+      },
+    },
+    improvements: {
+      type: "array",
+      maxItems: 1,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["code", "evidence"],
+        properties: {
+          code: { type: "string", enum: TEACHING_PRACTICE_IMPROVEMENT_CODES },
+          evidence: { type: "string", minLength: 1, maxLength: 500 },
+        },
+      },
+    },
+    confidence,
   },
 } as const;
 

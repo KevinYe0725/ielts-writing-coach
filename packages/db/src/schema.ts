@@ -97,6 +97,14 @@ export const notificationChannel = pgEnum("notification_channel", [
   "email",
 ]);
 
+export type TeachingPracticeResponseMode = "CHOICE" | "SHORT_TEXT";
+export type TeachingPracticeResponseStatus =
+  | "REFERENCE_READY"
+  | "ANALYSIS_PENDING"
+  | "ANALYSIS_READY"
+  | "ANALYSIS_UNAVAILABLE"
+  | "DEMO_ONLY";
+
 // Better Auth tables deliberately use text identifiers to remain adapter-compatible.
 export const user = pgTable(
   "user",
@@ -659,6 +667,43 @@ export const lessonPlan = pgTable(
   (table) => [uniqueIndex("lesson_plan_cycle_unique").on(table.cycleId)],
 );
 
+/**
+ * Tutorial practice is deliberately isolated from lesson runtime, timed-paper
+ * answers, and evidence tables.  The unique key makes the first submitted
+ * answer the durable response for one canonical tutorial prompt.
+ */
+export const teachingPracticeResponse = pgTable(
+  "teaching_practice_response",
+  {
+    id: domainId(),
+    lessonPlanId: uuid("lesson_plan_id")
+      .notNull()
+      .references(() => lessonPlan.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    promptId: text("prompt_id").notNull(),
+    submittedAnswer: text("submitted_answer").notNull(),
+    responseMode: text("response_mode")
+      .$type<TeachingPracticeResponseMode>()
+      .notNull(),
+    status: text("status").$type<TeachingPracticeResponseStatus>().notNull(),
+    aiJobId: uuid("ai_job_id").references(() => aiJob.id, {
+      onDelete: "set null",
+    }),
+    analysis: jsonb("analysis").$type<Record<string, unknown>>(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("teaching_practice_response_prompt_unique").on(
+      table.lessonPlanId,
+      table.userId,
+      table.promptId,
+    ),
+  ],
+);
+
 export const exerciseItem = pgTable(
   "exercise_item",
   {
@@ -1131,7 +1176,26 @@ export const lessonPlanRelations = relations(lessonPlan, ({ one, many }) => ({
     references: [trainingCycle.id],
   }),
   items: many(exerciseItem),
+  practiceResponses: many(teachingPracticeResponse),
 }));
+
+export const teachingPracticeResponseRelations = relations(
+  teachingPracticeResponse,
+  ({ one }) => ({
+    lessonPlan: one(lessonPlan, {
+      fields: [teachingPracticeResponse.lessonPlanId],
+      references: [lessonPlan.id],
+    }),
+    user: one(user, {
+      fields: [teachingPracticeResponse.userId],
+      references: [user.id],
+    }),
+    aiJob: one(aiJob, {
+      fields: [teachingPracticeResponse.aiJobId],
+      references: [aiJob.id],
+    }),
+  }),
+);
 
 export const exerciseItemRelations = relations(
   exerciseItem,
@@ -1236,6 +1300,8 @@ export const schema = {
   rewriteTaskRelations,
   session,
   skillEvidenceEvent,
+  teachingPracticeResponse,
+  teachingPracticeResponseRelations,
   trainingCycle,
   trainingCycleRelations,
   transferTask,

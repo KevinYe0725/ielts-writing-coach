@@ -1,6 +1,17 @@
+import Ajv2020, { type AnySchemaObject } from "ajv/dist/2020.js";
 import { describe, expect, it } from "vitest";
 
+import {
+  type FocusedLearningPackage,
+  validateFocusedLearningPackage,
+} from "../../../apps/worker/src/learning";
+import {
+  focusedLearningPackageSchema,
+  teachingPracticeAnalysisSchema,
+} from "../../../apps/worker/src/schemas";
 import { MockAdapter } from "./mock";
+
+const ajv = new Ajv2020({ allErrors: true, strict: true });
 
 describe("deterministic Mock Provider", () => {
   it("returns repeatable structured values that satisfy the caller validator", async () => {
@@ -107,6 +118,77 @@ describe("deterministic Mock Provider", () => {
     expect(result.value.feedbackEn).toContain("did not score language");
   });
 
+  it("returns deterministic tutorial demo atoms without a learner judgment", async () => {
+    const adapter = new MockAdapter();
+    const validate = ajv.compile(
+      teachingPracticeAnalysisSchema as AnySchemaObject,
+    );
+    const answer =
+      "Protected lanes reduce perceived danger, which gives more commuters a practical reason to cycle.";
+    const request = {
+      model: "mock-deterministic-v1",
+      input: `Immutable learner answer: ${JSON.stringify(answer)}`,
+      schemaName: "iwc_teaching_practice_analysis_v2",
+      schema: teachingPracticeAnalysisSchema,
+      validate,
+    };
+
+    const first = await adapter.generateStructured(request);
+    const second = await adapter.generateStructured(request);
+    const value = first.value as {
+      disposition: string;
+      strengths: unknown[];
+      comparisons: unknown[];
+      improvements: unknown[];
+      confidence: number;
+    };
+
+    expect(first.value).toEqual(second.value);
+    expect(validate(first.value), ajv.errorsText(validate.errors)).toBe(true);
+    expect(value).toMatchObject({
+      disposition: "INSUFFICIENT_EVIDENCE",
+      strengths: [],
+      comparisons: [],
+      improvements: [],
+      confidence: 0,
+    });
+    expect(JSON.stringify(value)).not.toMatch(/summary|rewrite|score|grade/i);
+  });
+
+  it("gives strong- and weak-looking tutorial answers the same non-judgmental Mock semantics", async () => {
+    const adapter = new MockAdapter();
+    const validate = ajv.compile(
+      teachingPracticeAnalysisSchema as AnySchemaObject,
+    );
+    const answers = [
+      "Regular screening reveals warning signs early, allowing treatment to begin before avoidable complications develop.",
+      "bad",
+    ];
+
+    const values = await Promise.all(
+      answers.map(async (answer) => {
+        const result = await adapter.generateStructured({
+          model: "mock-deterministic-v1",
+          input: `Immutable learner answer: ${JSON.stringify(answer)}`,
+          schemaName: "iwc_teaching_practice_analysis_v2",
+          schema: teachingPracticeAnalysisSchema,
+          validate,
+        });
+        return result.value as Record<string, unknown>;
+      }),
+    );
+
+    for (const value of values) {
+      expect(value.strengths).toEqual([]);
+      expect(value.comparisons).toEqual([]);
+      expect(value.improvements).toEqual([]);
+      expect(value.disposition).toBe("INSUFFICIENT_EVIDENCE");
+      expect(JSON.stringify(value)).not.toMatch(
+        /\b(?:pass|fail|score|mastery|applied|retained|transferred)\b/i,
+      );
+    }
+  });
+
   it("generates a clear, non-repeating complete practice paper", async () => {
     const adapter = new MockAdapter();
     const result = await adapter.generateStructured({
@@ -153,35 +235,52 @@ describe("deterministic Mock Provider", () => {
     ).toBe(true);
   });
 
-  it("generates teaching and a paper with the same named target", async () => {
+  it("generates a valid adaptive article and isolated paper without legacy fields or source leakage", async () => {
     const adapter = new MockAdapter();
+    const version1 =
+      "Children always have a better ability to absorb new knowledge than adults because early lessons introduce regular exposure to common language patterns.";
     const result = await adapter.generateStructured({
       model: "mock-deterministic-v1",
-      input: "Create the focused learning package.",
-      schemaName: "iwc_focused_learning_package_v3",
-      schema: { type: "object" },
-      validate: (
-        value: unknown,
-      ): value is {
-        teachingModule: {
-          targetTitleZh: string;
-          knowledgeCards: unknown[];
-          expressionBank: unknown[];
-        };
-        paper: { objectiveZh: string; items: unknown[] };
-      } =>
+      input: `Create the focused learning package. Learner Version 1 for context only: ${version1}`,
+      schemaName: "iwc_focused_learning_package_v4",
+      schema: focusedLearningPackageSchema as unknown as Record<
+        string,
+        unknown
+      >,
+      validate: (value: unknown): value is FocusedLearningPackage =>
         typeof value === "object" &&
         value !== null &&
-        "teachingModule" in value &&
-        "paper" in value,
+        validateFocusedLearningPackage(
+          value as FocusedLearningPackage,
+          version1,
+        ),
     });
 
-    expect(result.value.teachingModule.knowledgeCards).toHaveLength(3);
-    expect(
-      result.value.teachingModule.expressionBank.length,
-    ).toBeGreaterThanOrEqual(2);
+    expect(result.value.teachingModule).toMatchObject({
+      format: "ADAPTIVE_ARTICLE_V1",
+      blueprint: {
+        difficultyType: expect.any(String),
+        selectedBlockKinds: expect.arrayContaining([
+          "EXPLANATION",
+          "PRACTICE",
+          "SUMMARY",
+        ]),
+      },
+    });
+    expect(result.value.teachingModule.sections.length).toBeGreaterThanOrEqual(
+      2,
+    );
+    expect(result.value.teachingModule).not.toHaveProperty("knowledgeCards");
+    expect(result.value.teachingModule).not.toHaveProperty("expressionBank");
+    expect(result.value.teachingModule).not.toHaveProperty("workedExample");
+    expect(JSON.stringify(result.value.teachingModule)).not.toContain(
+      "Children always have a better ability to absorb new knowledge than adults",
+    );
     expect(result.value.paper.objectiveZh).toContain(
-      result.value.teachingModule.targetTitleZh,
+      result.value.teachingModule.blueprint.coreAbilityZh,
+    );
+    expect(result.value.paper.objectiveEn).toContain(
+      result.value.teachingModule.blueprint.coreAbilityEn,
     );
     expect(result.value.paper.items).toHaveLength(8);
   });
