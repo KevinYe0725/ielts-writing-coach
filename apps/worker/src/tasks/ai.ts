@@ -8,6 +8,7 @@ import type { JobHelpers } from "graphile-worker";
 import {
   MockAdapter,
   PROMPT_REGISTRY,
+  focusedTeachingProfileFor,
   type AITaskKind,
   type GenerationResult,
   type NormalizedUsage,
@@ -1210,7 +1211,7 @@ async function generateLesson(
 
 Plan the private blueprint before writing any learner-facing sections. Choose exactly one difficultyType from the evidence: CONCEPT_GAP, RECOGNISES_BUT_CANNOT_REVISE, REVISES_BUT_CANNOT_GENERATE, SAME_CONTEXT_ONLY, or UNSTABLE_CONTROL. Set one precise bilingual coreAbility and completion standard. Use empty strings when no prerequisite or supporting ability is genuinely needed, and never add more than one of either. selectedBlockKinds must contain each actual block kind exactly once.
 
-Return ADAPTIVE_ARTICLE_V1 with 2–5 dynamically titled sections, 4–8 total blocks, and an estimated 10–25 minutes. Include EXPLANATION; include at least one CONTRAST or REASONING demonstration; include PRACTICE with 2–3 prompts; and make one SUMMARY the final block. TOOLKIT, PITFALLS, and additional demonstration blocks are optional and should appear only when they serve this learner's difficulty. At least one practice prompt must require SHORT_TEXT output and at least one must use UNSEEN_TOPIC. Use fresh examples and contexts created for this tutorial. Do not locate, highlight, quote, or closely imitate the learner's Version 1, and do not reproduce a complete essay. Keep blueprint enums and all implementation vocabulary out of learner-facing titles, prose, examples, instructions, and reference reasoning.
+Return ADAPTIVE_ARTICLE_V1 with 3–6 dynamically titled sections, 7–12 total blocks, and 15–35 minutes. Build a substantial tutorial, not a collection of short tips: teach the decision; use CONTRAST or REASONING to make the choice visible; include TOOLKIT or PITFALLS when it will prevent a realistic mistake; then use PRACTICE with 3–4 prompts and finish with one SUMMARY as the final block. At least one practice prompt must require SHORT_TEXT output and at least one must use UNSEEN_TOPIC. The exact mix must suit the learner's difficulty, rather than following a fixed visible template. Use fresh examples and contexts created for this tutorial. Do not locate, highlight, quote, or closely imitate the learner's Version 1, and do not reproduce a complete essay. Keep blueprint enums and all implementation vocabulary out of learner-facing titles, prose, examples, instructions, and reference reasoning.
 
 Teaching reference answers are for reveal-after-attempt only. A later practice paper will use different material, so do not write a complete essay or any future-paper answer.
 
@@ -1218,6 +1219,8 @@ When the diagnosis context source is MIGRATED_LEGACY_FALLBACK: Do not claim that
 
 Original IELTS question: ${cycle.question.prompt}
 Selected-skill diagnosis context: ${JSON.stringify(diagnosisContext)}
+Teaching resource for this priority (use it for planning; do not expose these labels):
+${focusedTeachingProfileFor(canonicalSkillId)}
 Learner Version 1 for context only: ${(version1?.content ?? "").slice(0, 4_000)}`,
       schemaName: "iwc_adaptive_teaching_article_v1",
       schema: adaptiveTeachingModuleSchema as unknown as Record<
@@ -1310,7 +1313,7 @@ Original IELTS question: ${cycle.question.prompt}`,
 
 Plan teachingModule.blueprint before writing any learner-facing sections. Choose exactly one difficultyType from the evidence: CONCEPT_GAP, RECOGNISES_BUT_CANNOT_REVISE, REVISES_BUT_CANNOT_GENERATE, SAME_CONTEXT_ONLY, or UNSTABLE_CONTROL. Set one precise bilingual coreAbility and completion standard. Use empty strings when no prerequisite or supporting ability is genuinely needed, and never add more than one of either. selectedBlockKinds must contain each actual block kind exactly once.
 
-Return teachingModule.format ADAPTIVE_ARTICLE_V1 with 2–5 dynamically titled sections, 4–8 total blocks, and an estimated 10–25 minutes. Include EXPLANATION; include at least one CONTRAST or REASONING demonstration; include PRACTICE with 2–3 prompts; and make one SUMMARY the final block. TOOLKIT, PITFALLS, and additional demonstration blocks are optional and should appear only when they serve this learner's difficulty. At least one practice prompt must require SHORT_TEXT output and at least one must use UNSEEN_TOPIC. Use fresh examples and contexts created for this tutorial. Do not locate, highlight, quote, or closely imitate the learner's Version 1, and do not reproduce a complete essay. Keep blueprint enums and all implementation vocabulary out of learner-facing titles, prose, examples, instructions, and reference reasoning.
+Return teachingModule.format ADAPTIVE_ARTICLE_V1 with 3–6 dynamically titled sections, 7–12 total blocks, and 15–35 minutes. Build a substantial tutorial, not a collection of short tips: teach the decision; use CONTRAST or REASONING to make the choice visible; include TOOLKIT or PITFALLS when it will prevent a realistic mistake; then use PRACTICE with 3–4 prompts and finish with one SUMMARY as the final block. At least one practice prompt must require SHORT_TEXT output and at least one must use UNSEEN_TOPIC. The exact mix must suit the learner's difficulty, rather than following a fixed visible template. Use fresh examples and contexts created for this tutorial. Do not locate, highlight, quote, or closely imitate the learner's Version 1, and do not reproduce a complete essay. Keep blueprint enums and all implementation vocabulary out of learner-facing titles, prose, examples, instructions, and reference reasoning.
 
 The teaching reference answers are for reveal-after-attempt only. Build the later paper with different material: do not disclose, copy, or closely paraphrase any paper answer in the tutorial. Both paper.objectiveZh and paper.objectiveEn must contain the corresponding blueprint coreAbility verbatim.
 
@@ -1328,6 +1331,8 @@ When the diagnosis context source is MIGRATED_LEGACY_FALLBACK: Do not claim that
 
 Original IELTS question: ${cycle.question.prompt}
 Selected-skill diagnosis context: ${JSON.stringify(diagnosisContext)}
+Teaching resource for this priority (use it for planning; do not expose these labels):
+${focusedTeachingProfileFor(canonicalSkillId)}
 Learner Version 1 for context only: ${(version1?.content ?? "").slice(0, 4_000)}`,
           schemaName: "iwc_focused_learning_package_v4",
           schema: focusedLearningPackageSchema as unknown as Record<

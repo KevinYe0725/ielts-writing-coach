@@ -268,8 +268,26 @@ describe("deterministic Mock Provider", () => {
       },
     });
     expect(result.value.teachingModule.sections.length).toBeGreaterThanOrEqual(
-      2,
+      3,
     );
+    expect(result.value.teachingModule.estimatedMinutes).toBeGreaterThanOrEqual(
+      25,
+    );
+    const blockKinds = result.value.teachingModule.sections.flatMap((section) =>
+      section.blocks.map((block) => block.kind),
+    );
+    expect(blockKinds).toEqual(
+      expect.arrayContaining([
+        "EXPLANATION",
+        "CONTRAST",
+        "REASONING",
+        "TOOLKIT",
+        "PITFALLS",
+        "PRACTICE",
+        "SUMMARY",
+      ]),
+    );
+    expect(blockKinds).toHaveLength(7);
     expect(result.value.teachingModule).not.toHaveProperty("knowledgeCards");
     expect(result.value.teachingModule).not.toHaveProperty("expressionBank");
     expect(result.value.teachingModule).not.toHaveProperty("workedExample");

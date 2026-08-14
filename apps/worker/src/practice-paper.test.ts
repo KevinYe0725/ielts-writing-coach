@@ -112,7 +112,7 @@ function mechanismPackage(): FixtureLearningPackage {
       "本教程集中训练一件事：把中间发生的过程说清楚，让读者能够跟上你的推理。",
     introductionEn:
       "This tutorial focuses on making the missing process in a causal argument visible.",
-    estimatedMinutes: 18,
+    estimatedMinutes: 28,
     blueprint: {
       coreAbilityZh: targetZh,
       coreAbilityEn: targetEn,
@@ -129,6 +129,8 @@ function mechanismPackage(): FixtureLearningPackage {
         "EXPLANATION",
         "CONTRAST",
         "REASONING",
+        "TOOLKIT",
+        "PITFALLS",
         "PRACTICE",
         "SUMMARY",
       ],
@@ -196,6 +198,41 @@ function mechanismPackage(): FixtureLearningPackage {
             takeawayEn:
               "Check for an immediate change, a behavior change, and an observable result.",
           },
+          {
+            kind: "TOOLKIT",
+            titleZh: "用连接词显示已经想清楚的关系",
+            titleEn: "Use links to show a reasoned relationship",
+            tools: [
+              {
+                expressionEn: "This means that …",
+                functionZh: "解释一个具体变化带来的下一步影响。",
+                functionEn: "Explain the next effect of a concrete change.",
+                conditionZh: "前一句已经写出具体变化，再说明它导致什么。",
+                conditionEn: "Use it after a concrete change has been named.",
+                cautionZh: "不要用它连接两个空泛的积极判断。",
+                cautionEn:
+                  "Do not use it to connect two vague positive claims.",
+                exampleEn:
+                  "Regular feedback identifies small gaps early. This means that learners can address them before they become habits.",
+              },
+            ],
+          },
+          {
+            kind: "PITFALLS",
+            titleZh: "别把积极评价当成解释",
+            titleEn: "Do not mistake a positive label for an explanation",
+            items: [
+              {
+                patternEn:
+                  "Exercise improves concentration because it is healthy.",
+                problemZh: "healthy没有说明身体活动怎样影响课堂注意力。",
+                problemEn:
+                  "Healthy does not explain how physical activity affects attention in class.",
+                betterEn:
+                  "Regular exercise can improve sleep quality, leaving students better able to concentrate during demanding lessons.",
+              },
+            ],
+          },
         ],
       },
       {
@@ -208,6 +245,26 @@ function mechanismPackage(): FixtureLearningPackage {
             titleZh: "两次主动生成",
             titleEn: "Generate two missing mechanisms",
             prompts: [
+              {
+                id: "spot-the-mechanism",
+                instructionZh: "选出真正写出中间机制的一句英文。",
+                instructionEn:
+                  "Choose the English sentence that states an intermediate mechanism.",
+                promptEn: "A city creates protected cycle lanes on busy roads.",
+                responseMode: "CHOICE",
+                context: "SAME_TOPIC",
+                optionsEn: [
+                  "Cycle lanes are beneficial for cities.",
+                  "Protected lanes reduce perceived danger, so more commuters feel able to cycle regularly.",
+                  "Many cities have busy roads.",
+                ],
+                referenceAnswerEn:
+                  "Protected lanes reduce perceived danger, so more commuters feel able to cycle regularly.",
+                referenceReasoningZh:
+                  "它说明了道路设计先改变风险感受，再改变通勤选择。",
+                referenceReasoningEn:
+                  "It shows infrastructure changing perceived risk before it changes commuter choices.",
+              },
               {
                 id: "workplace-mechanism",
                 instructionZh: "用一句英文补出灵活工作与生产力之间的中间机制。",
@@ -290,7 +347,7 @@ function collocationPackage(): FixtureLearningPackage {
         "这篇教程训练你先辨别语境中的关系，再从看似正确的候选表达中做出稳定选择。",
       introductionEn:
         "This tutorial trains a context-first method for choosing among plausible expressions.",
-      estimatedMinutes: 14,
+      estimatedMinutes: 22,
       blueprint: {
         coreAbilityZh: targetZh,
         coreAbilityEn: targetEn,
@@ -308,6 +365,7 @@ function collocationPackage(): FixtureLearningPackage {
           "TOOLKIT",
           "PITFALLS",
           "CONTRAST",
+          "REASONING",
           "PRACTICE",
           "SUMMARY",
         ],
@@ -389,6 +447,39 @@ function collocationPackage(): FixtureLearningPackage {
           ],
         },
         {
+          anchor: "test-the-relationship",
+          titleZh: "先说明关系，再决定表达",
+          titleEn: "Name the relationship before choosing the expression",
+          blocks: [
+            {
+              kind: "REASONING",
+              titleZh: "从危险来源推到受影响对象",
+              titleEn: "Reason from a source of risk to the affected object",
+              scenarioZh: "工业废物为什么会威胁河流生态？",
+              scenarioEn:
+                "Why can untreated industrial waste threaten river ecosystems?",
+              steps: [
+                {
+                  thinkingZh:
+                    "先确认废物是危险来源，而河流生态是受到影响的对象。",
+                  thinkingEn:
+                    "First identify waste as the source of danger and river ecosystems as the affected object.",
+                },
+                {
+                  thinkingZh: "再选择能表达这种关系的动词搭配。",
+                  thinkingEn:
+                    "Then choose the verb–noun combination that expresses that relationship.",
+                },
+              ],
+              resultEn:
+                "Untreated industrial waste poses a serious risk to river ecosystems.",
+              takeawayZh: "先找关系，再选词组，避免只按中文逐词翻译。",
+              takeawayEn:
+                "Identify the relationship before choosing the expression instead of translating word by word.",
+            },
+          ],
+        },
+        {
           anchor: "decide-in-new-contexts",
           titleZh: "在新语境中做出选择",
           titleEn: "Decide in new contexts",
@@ -413,6 +504,24 @@ function collocationPackage(): FixtureLearningPackage {
                     "pose a risk to用于危险来源对暴露对象带来潜在危害。",
                   referenceReasoningEn:
                     "Pose a risk to expresses a source of potential danger affecting an exposed object.",
+                },
+                {
+                  id: "guided-policy-sentence",
+                  instructionZh:
+                    "在政策语境中用一个自然搭配写一句完整英文，说明政府减少某种风险。",
+                  instructionEn:
+                    "Write one complete English sentence using a natural collocation to explain how a policy reduces a risk.",
+                  promptEn:
+                    "Explain how stricter safety rules can reduce a risk in factories.",
+                  responseMode: "SHORT_TEXT",
+                  context: "SAME_TOPIC",
+                  optionsEn: [],
+                  referenceAnswerEn:
+                    "Stricter safety rules can reduce the risk of avoidable injuries in factories.",
+                  referenceReasoningZh:
+                    "reduce the risk of清晰表达政策降低某种后果的关系。",
+                  referenceReasoningEn:
+                    "Reduce the risk of clearly expresses a policy lowering the likelihood of a consequence.",
                 },
                 {
                   id: "health-transfer",
@@ -548,6 +657,28 @@ function setAcceptedChoiceAnswer(
 }
 
 describe("complete practice paper contract", () => {
+  it("requires a substantial but still adaptive tutorial before the timed paper", () => {
+    const value = mechanismPackage();
+    const blocks = value.teachingModule.sections.flatMap(
+      (section) => section.blocks,
+    );
+
+    expect(value.teachingModule.estimatedMinutes).toBeGreaterThanOrEqual(25);
+    expect(value.teachingModule.sections).toHaveLength(3);
+    expect(blocks).toHaveLength(7);
+    expect(blocks.map((block) => block.kind)).toEqual(
+      expect.arrayContaining([
+        "EXPLANATION",
+        "CONTRAST",
+        "REASONING",
+        "TOOLKIT",
+        "PITFALLS",
+        "PRACTICE",
+        "SUMMARY",
+      ]),
+    );
+  });
+
   it("publishes mutually exclusive adaptive blocks through the provider-supported anyOf union", () => {
     const teachingModule =
       focusedLearningPackageSchema.properties.teachingModule;
@@ -674,10 +805,12 @@ describe("complete practice paper contract", () => {
     expect(validateFixture(value)).toBe(false);
   });
 
-  it("rejects an article with more than eight blocks", () => {
+  it("rejects an article with more than twelve blocks", () => {
     const value = mechanismPackage();
     const explanation = value.teachingModule.sections[0]!.blocks[0]!;
     value.teachingModule.sections[0]!.blocks.push(
+      structuredClone(explanation),
+      structuredClone(explanation),
       structuredClone(explanation),
       structuredClone(explanation),
       structuredClone(explanation),

@@ -500,7 +500,7 @@ export const mechanismChainTeachingFixture: FocusedTeachingData = {
     "这篇教程集中训练一件事：把中间发生的过程说清楚，让读者能够跟上你的推理。",
   introductionEn:
     "This tutorial focuses on making the missing process in a causal argument visible.",
-  estimatedMinutes: 18,
+  estimatedMinutes: 28,
   sections: [
     {
       anchor: "see-the-missing-link",
@@ -569,6 +569,40 @@ export const mechanismChainTeachingFixture: FocusedTeachingData = {
           takeawayEn:
             "Check for an immediate change, a behavior change, and an observable result.",
         },
+        {
+          kind: "TOOLKIT",
+          titleZh: "用连接词显示已经想清楚的关系",
+          titleEn: "Use links to show a reasoned relationship",
+          tools: [
+            {
+              expressionEn: "This means that …",
+              functionZh: "解释一个具体变化带来的下一步影响。",
+              functionEn: "Explain the next effect of a concrete change.",
+              conditionZh: "前一句已经写出具体变化，再说明它导致什么。",
+              conditionEn: "Use it after a concrete change has been named.",
+              cautionZh: "不要用它连接两个空泛的积极判断。",
+              cautionEn: "Do not use it to connect two vague positive claims.",
+              exampleEn:
+                "Regular feedback identifies small gaps early. This means that learners can address them before the gaps become habits.",
+            },
+          ],
+        },
+        {
+          kind: "PITFALLS",
+          titleZh: "别把积极评价当成解释",
+          titleEn: "Do not mistake a positive label for an explanation",
+          items: [
+            {
+              patternEn:
+                "Exercise improves concentration because it is healthy.",
+              problemZh: "healthy没有说明身体活动怎样影响课堂注意力。",
+              problemEn:
+                "Healthy does not explain how physical activity affects attention in class.",
+              betterEn:
+                "Regular exercise can improve sleep quality, leaving students better able to concentrate during demanding lessons.",
+            },
+          ],
+        },
       ],
     },
     {
@@ -578,9 +612,29 @@ export const mechanismChainTeachingFixture: FocusedTeachingData = {
       blocks: [
         {
           kind: "PRACTICE",
-          titleZh: "两次主动生成",
-          titleEn: "Generate two missing mechanisms",
+          titleZh: "先辨别，再完成两次主动生成",
+          titleEn: "Recognise once, then generate two missing mechanisms",
           prompts: [
+            {
+              id: "spot-the-mechanism",
+              instructionZh: "选出真正写出中间机制的一句英文。",
+              instructionEn:
+                "Choose the English sentence that states an intermediate mechanism.",
+              promptEn: "A city creates protected cycle lanes on busy roads.",
+              responseMode: "CHOICE",
+              context: "SAME_TOPIC",
+              optionsEn: [
+                "Cycle lanes are beneficial for cities.",
+                "Protected lanes reduce perceived danger, so more commuters feel able to cycle regularly.",
+                "Many cities have busy roads.",
+              ],
+              referenceAnswerEn:
+                "Protected lanes reduce perceived danger, so more commuters feel able to cycle regularly.",
+              referenceReasoningZh:
+                "它说明了道路设计先改变风险感受，再改变通勤选择。",
+              referenceReasoningEn:
+                "It shows infrastructure changing perceived risk before it changes commuter choices.",
+            },
             {
               id: "workplace-mechanism",
               instructionZh: "用一句英文补出灵活工作与生产力之间的中间机制。",

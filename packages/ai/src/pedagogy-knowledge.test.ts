@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { pedagogyGuidanceFor } from "./pedagogy-knowledge";
+import {
+  FOCUSED_TEACHING_PROFILES,
+  focusedTeachingProfileFor,
+} from "./focused-teaching-knowledge";
 import { AI_TASK_KINDS, PROMPT_REGISTRY } from "./prompts";
 
 describe("runtime pedagogy knowledge", () => {
@@ -47,13 +51,24 @@ describe("runtime pedagogy knowledge", () => {
   it("allows a bounded flexible article instead of prescribing the legacy lesson template", () => {
     const guidance = pedagogyGuidanceFor("exercise_generation");
 
-    expect(guidance).toContain("2–5 dynamically named sections");
-    expect(guidance).toContain("4–8 blocks");
-    expect(guidance).toContain("optional");
+    expect(guidance).toContain("3–6 dynamically named sections");
+    expect(guidance).toContain("7–12 blocks");
+    expect(guidance).toContain("rather than a fixed course template");
     expect(guidance).toContain("selected block kinds");
     expect(guidance).not.toContain("three to five knowledge points");
     expect(guidance).not.toContain("two quick checks");
     expect(guidance).not.toContain("readiness checklist");
+  });
+
+  it("provides a bounded teaching resource for every supported skill", () => {
+    expect(Object.keys(FOCUSED_TEACHING_PROFILES)).toHaveLength(13);
+    const mechanism = focusedTeachingProfileFor("mechanism_chain");
+    expect(mechanism).toContain("Decision lens");
+    expect(mechanism).toContain("Common confusions");
+    expect(mechanism).toContain("preventive healthcare");
+    expect(focusedTeachingProfileFor("unknown")).toContain(
+      "one observable decision",
+    );
   });
 
   it("requires fresh teaching examples, independent output, unseen transfer, and answer isolation", () => {

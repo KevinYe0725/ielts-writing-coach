@@ -593,8 +593,8 @@ const teachingBlockSchema = {
         ...teachingTitleProperties,
         prompts: {
           type: "array",
-          minItems: 2,
-          maxItems: 3,
+          minItems: 3,
+          maxItems: 4,
           items: {
             type: "object",
             additionalProperties: false,
@@ -668,13 +668,13 @@ const teachingBlockSchema = {
         ...teachingTitleProperties,
         rulesZh: {
           type: "array",
-          minItems: 2,
+          minItems: 3,
           maxItems: 5,
           items: { type: "string", minLength: 6, maxLength: 300 },
         },
         rulesEn: {
           type: "array",
-          minItems: 2,
+          minItems: 3,
           maxItems: 5,
           items: { type: "string", minLength: 6, maxLength: 420 },
         },
@@ -709,7 +709,7 @@ export const focusedLearningPackageSchema = {
         titleEn: { type: "string", minLength: 6, maxLength: 160 },
         introductionZh: { type: "string", minLength: 12, maxLength: 500 },
         introductionEn: { type: "string", minLength: 12, maxLength: 700 },
-        estimatedMinutes: { type: "integer", minimum: 10, maximum: 25 },
+        estimatedMinutes: { type: "integer", minimum: 15, maximum: 35 },
         blueprint: {
           type: "object",
           additionalProperties: false,
@@ -770,7 +770,7 @@ export const focusedLearningPackageSchema = {
             },
             selectedBlockKinds: {
               type: "array",
-              minItems: 4,
+              minItems: 5,
               maxItems: 7,
               uniqueItems: true,
               items: {
@@ -790,8 +790,8 @@ export const focusedLearningPackageSchema = {
         },
         sections: {
           type: "array",
-          minItems: 2,
-          maxItems: 5,
+          minItems: 3,
+          maxItems: 6,
           items: {
             type: "object",
             additionalProperties: false,

@@ -64,8 +64,8 @@ export const PROMPT_REGISTRY: Readonly<Record<AITaskKind, PromptDefinition>> = {
   },
   exercise_generation: {
     task: "exercise_generation",
-    version: "4.0.0",
-    rubricVersion: "iwc-focused-learning-package-4.0.0",
+    version: "5.0.0",
+    rubricVersion: "iwc-focused-learning-package-5.0.0",
     system: withKnowledge(
       "exercise_generation",
       "Create one coherent learning package by planning the private blueprint first, then writing an ADAPTIVE_ARTICLE_V1 tutorial, then creating the timed practice paper. Use the diagnosis only to select one narrow micro-skill and its difficulty; all learner-facing teaching must use new examples rather than quote, locate, or imitate Version 1. Require active SHORT_TEXT production and an UNSEEN_TOPIC transfer opportunity before the summary. The article and paper objectives must name the same precise ability, but the article must never reveal the later timed paper's answers or a complete model essay. The blueprint remains private: use plain learner-facing Chinese for teaching and instructions and natural English for writing material, without difficulty enums or selected block kinds. Do not mention database fields, IDs, schemas, prompts, models, jobs, evidence gates, state machines, retries, or any other implementation detail.",

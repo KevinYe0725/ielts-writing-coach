@@ -157,7 +157,7 @@ function mockStructuredValue(
             "这篇短教程用全新的例子说明如何补上中间机制，并让你在陌生话题中独立完成一次迁移。",
           introductionEn:
             "This short tutorial uses fresh examples to make the missing mechanism visible and then asks you to transfer the method to an unfamiliar topic.",
-          estimatedMinutes: 16,
+          estimatedMinutes: 28,
           blueprint: {
             coreAbilityZh,
             coreAbilityEn,
@@ -173,6 +173,9 @@ function mockStructuredValue(
             selectedBlockKinds: [
               "EXPLANATION",
               "CONTRAST",
+              "REASONING",
+              "TOOLKIT",
+              "PITFALLS",
               "PRACTICE",
               "SUMMARY",
             ],
@@ -214,14 +217,118 @@ function mockStructuredValue(
               ],
             },
             {
+              anchor: "build-the-process",
+              titleZh: "把中间过程一步步写出来",
+              titleEn: "Build the process one step at a time",
+              blocks: [
+                {
+                  kind: "REASONING",
+                  titleZh: "先找直接变化，再找行为变化",
+                  titleEn:
+                    "Find the immediate change before the behaviour change",
+                  scenarioZh: "城市新建连续自行车道为什么可能改善高峰期通勤？",
+                  scenarioEn:
+                    "Why can a connected network of cycle lanes improve peak-hour commuting?",
+                  steps: [
+                    {
+                      thinkingZh:
+                        "直接变化不是“交通变好”，而是骑车的人与汽车分开的道路空间更多。",
+                      thinkingEn:
+                        "The immediate change is not simply better traffic; cyclists have more protected space away from cars.",
+                    },
+                    {
+                      thinkingZh:
+                        "这会降低短途骑行的不确定感，因此更多通勤者愿意把短途汽车出行换成骑车。",
+                      thinkingEn:
+                        "That reduces the uncertainty of short journeys, so more commuters are willing to replace short car trips with cycling.",
+                    },
+                    {
+                      thinkingZh:
+                        "当一部分短途车程被替代后，拥堵道路上的车辆压力才会下降。",
+                      thinkingEn:
+                        "Only after some short car trips are replaced does pressure on congested roads fall.",
+                    },
+                  ],
+                  resultEn:
+                    "Connected cycle lanes make short journeys feel safer, encouraging commuters to replace some car trips and easing pressure on busy roads.",
+                  takeawayZh:
+                    "每一环都要回答前一环改变了什么，而不是重复“这很好”。",
+                  takeawayEn:
+                    "Each link should say what the previous link changes instead of repeating that the policy is beneficial.",
+                },
+                {
+                  kind: "TOOLKIT",
+                  titleZh: "三种把链条写清的连接方式",
+                  titleEn: "Three ways to make the chain visible",
+                  tools: [
+                    {
+                      expressionEn: "This means that …",
+                      functionZh: "把直接变化解释成下一步影响。",
+                      functionEn:
+                        "Explain what the immediate change leads to next.",
+                      conditionZh:
+                        "前一句已经写出具体变化时，再用它说明后续影响。",
+                      conditionEn:
+                        "Use it after naming a concrete change and before explaining its consequence.",
+                      cautionZh: "不要把它放在两个都很空泛的判断之间。",
+                      cautionEn: "Do not place it between two vague claims.",
+                      exampleEn:
+                        "Regular feedback identifies small gaps early. This means that learners can correct them before the gaps become habits.",
+                    },
+                    {
+                      expressionEn: "which in turn …",
+                      functionZh: "把一个已说明的结果推进到下一步。",
+                      functionEn:
+                        "Extend one explained effect to a further consequence.",
+                      conditionZh: "只有前一个变化确实会造成下一个变化时使用。",
+                      conditionEn:
+                        "Use it only when the first change plausibly causes the second one.",
+                      cautionZh: "不要把它当作“因此”的装饰性替换。",
+                      cautionEn:
+                        "Do not use it as a decorative replacement for therefore.",
+                      exampleEn:
+                        "Clearer instructions reduce confusion, which in turn saves time during group work.",
+                    },
+                  ],
+                },
+                {
+                  kind: "PITFALLS",
+                  titleZh: "两个看似完整、其实断开的写法",
+                  titleEn: "Two chains that only look complete",
+                  items: [
+                    {
+                      patternEn:
+                        "Public libraries are useful, so communities become stronger.",
+                      problemZh:
+                        "句子只把“有用”和“更强”放在一起，没有说明图书馆改变了什么行为或机会。",
+                      problemEn:
+                        "The sentence places useful beside stronger without explaining which behaviour or opportunity changes.",
+                      betterEn:
+                        "Public libraries give residents free access to information and study space, helping more people develop practical skills and participate in local opportunities.",
+                    },
+                    {
+                      patternEn:
+                        "Exercise improves concentration because it is healthy.",
+                      problemZh:
+                        "healthy重复了积极评价，没有解释身体活动如何影响课堂注意力。",
+                      problemEn:
+                        "Healthy repeats a positive judgement instead of explaining how activity affects attention in class.",
+                      betterEn:
+                        "Regular exercise can reduce stress and improve sleep quality, leaving students better able to concentrate during demanding lessons.",
+                    },
+                  ],
+                },
+              ],
+            },
+            {
               anchor: "try-and-transfer",
-              titleZh: "缩短支架并迁移到新话题",
-              titleEn: "Remove the scaffold and transfer",
+              titleZh: "从有支架练习到陌生话题",
+              titleEn: "Move from guided practice to a new topic",
               blocks: [
                 {
                   kind: "PRACTICE",
-                  titleZh: "先判断，再独立生成",
-                  titleEn: "Decide first, then generate independently",
+                  titleZh: "先辨别，再补全，再独立生成",
+                  titleEn: "Recognise, complete, then generate independently",
                   prompts: [
                     {
                       id: "spot-the-mechanism",
@@ -244,6 +351,24 @@ function mockStructuredValue(
                         "这句话写出了基础设施先降低风险感受，再改变通勤者选择的中间过程。",
                       referenceReasoningEn:
                         "It shows the infrastructure reducing perceived risk before that change affects commuters' choices.",
+                    },
+                    {
+                      id: "guided-workplace-link",
+                      instructionZh:
+                        "用一句英文补全灵活工作时间与更高工作质量之间的中间过程；写清工作习惯怎样改变。",
+                      instructionEn:
+                        "In one English sentence, supply the mechanism between flexible schedules and higher-quality work by naming the changed work habit.",
+                      promptEn:
+                        "Flexible schedules can improve the quality of employees' work because …",
+                      responseMode: "SHORT_TEXT",
+                      context: "SAME_TOPIC",
+                      optionsEn: [],
+                      referenceAnswerEn:
+                        "Employees can complete demanding tasks during the hours when they concentrate best, reducing avoidable mistakes.",
+                      referenceReasoningZh:
+                        "参考思路没有直接说“弹性安排很好”，而是写出任务安排先改变，再落到错误减少这个结果。",
+                      referenceReasoningEn:
+                        "The reference names a change in task timing before reaching the concrete result of fewer avoidable errors.",
                     },
                     {
                       id: "unseen-health-transfer",
@@ -271,10 +396,12 @@ function mockStructuredValue(
                   titleEn: "Carry the method into the next essay",
                   rulesZh: [
                     "先明确原因改变的对象或过程，不要从原因直接跳到好处。",
+                    "中间句必须增加新的行为、条件或可解释的变化。",
                     "把最终结果写成读者能够观察或验证的变化。",
                   ],
                   rulesEn: [
                     "Name the process or condition changed by the cause instead of jumping straight to a benefit.",
+                    "Make the middle sentence add a new behaviour, condition, or explainable change.",
                     "Express the final result as a change a reader could observe or verify.",
                   ],
                   selfCheckZh:

@@ -46,6 +46,7 @@ export function createProviderAdapter(
 export * from "./compatible";
 export * from "./crypto";
 export * from "./errors";
+export * from "./focused-teaching-knowledge";
 export * from "./mock";
 export * from "./openai";
 export * from "./pedagogy-knowledge";

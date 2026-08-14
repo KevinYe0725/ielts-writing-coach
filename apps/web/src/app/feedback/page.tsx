@@ -674,7 +674,7 @@ export default function FeedbackPage({
           ) : null}
           <span className={styles.duration}>
             <Clock3 aria-hidden="true" size={15} />
-            15–25 {messages.common.minutes}
+            15–35 {messages.common.minutes}
           </span>
         </div>
         <div className={styles.nextStepActions}>

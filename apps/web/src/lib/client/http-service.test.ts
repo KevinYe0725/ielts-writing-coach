@@ -1135,6 +1135,8 @@ describe("HttpLearningClient protocol", () => {
       "EXPLANATION",
       "CONTRAST",
       "REASONING",
+      "TOOLKIT",
+      "PITFALLS",
       "PRACTICE",
       "SUMMARY",
     ]);

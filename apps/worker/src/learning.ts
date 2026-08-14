@@ -431,7 +431,7 @@ function validTeachingBlock(block: TeachingBlock): boolean {
         )
       );
     case "PRACTICE": {
-      if (block.prompts.length < 2 || block.prompts.length > 3) return false;
+      if (block.prompts.length < 3 || block.prompts.length > 4) return false;
       const promptIds = new Set(block.prompts.map((prompt) => prompt.id));
       return (
         promptIds.size === block.prompts.length &&
@@ -464,7 +464,7 @@ function validTeachingBlock(block: TeachingBlock): boolean {
     }
     case "SUMMARY":
       return (
-        block.rulesZh.length >= 2 &&
+        block.rulesZh.length >= 3 &&
         block.rulesZh.length <= 5 &&
         block.rulesEn.length === block.rulesZh.length &&
         block.rulesZh.every((rule) => substantive(rule, 6)) &&
@@ -677,10 +677,10 @@ export function validateAdaptiveTeachingModule(
     teaching.format !== "ADAPTIVE_ARTICLE_V1" ||
     !validBilingualCopy(teaching.titleZh, teaching.titleEn, 6) ||
     !validBilingualCopy(teaching.introductionZh, teaching.introductionEn, 12) ||
-    teaching.estimatedMinutes < 10 ||
-    teaching.estimatedMinutes > 25 ||
-    teaching.sections.length < 2 ||
-    teaching.sections.length > 5 ||
+    teaching.estimatedMinutes < 15 ||
+    teaching.estimatedMinutes > 35 ||
+    teaching.sections.length < 3 ||
+    teaching.sections.length > 6 ||
     !validBilingualCopy(
       teaching.blueprint.coreAbilityZh,
       teaching.blueprint.coreAbilityEn,
@@ -708,12 +708,13 @@ export function validateAdaptiveTeachingModule(
     return false;
 
   const blocks = teaching.sections.flatMap((section) => section.blocks);
-  if (blocks.length < 4 || blocks.length > 8) return false;
+  if (blocks.length < 7 || blocks.length > 12) return false;
   const actualKinds = blocks.map((block) => block.kind);
   if (
     !sameUniqueKinds(teaching.blueprint.selectedBlockKinds, actualKinds) ||
     !actualKinds.includes("EXPLANATION") ||
-    !actualKinds.some((kind) => kind === "CONTRAST" || kind === "REASONING")
+    !actualKinds.some((kind) => kind === "CONTRAST" || kind === "REASONING") ||
+    !actualKinds.some((kind) => kind === "TOOLKIT" || kind === "PITFALLS")
   )
     return false;
 
@@ -723,7 +724,7 @@ export function validateAdaptiveTeachingModule(
     )
     .flatMap((block) => block.prompts);
   if (
-    practicePrompts.length < 2 ||
+    practicePrompts.length < 3 ||
     !practicePrompts.some((prompt) => prompt.responseMode === "SHORT_TEXT") ||
     !practicePrompts.some((prompt) => prompt.context === "UNSEEN_TOPIC")
   )
