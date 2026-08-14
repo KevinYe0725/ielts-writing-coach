@@ -34,6 +34,9 @@ export function createProviderAdapter(
         ...(credentials.thinkingMode === undefined
           ? {}
           : { thinkingMode: credentials.thinkingMode }),
+        ...(credentials.jsonObjectMode === undefined
+          ? {}
+          : { jsonObjectMode: credentials.jsonObjectMode }),
       });
     case "mock":
       return new MockAdapter();

@@ -822,6 +822,14 @@ export const focusedLearningPackageSchema = {
   },
 } as const;
 
+/** Smaller provider contracts used when a compatible model cannot reliably
+ * return the teaching article and eight-question paper in one response. */
+export const adaptiveTeachingModuleSchema =
+  focusedLearningPackageSchema.properties.teachingModule;
+
+export const timedPracticePaperSchema =
+  focusedLearningPackageSchema.properties.paper;
+
 export const practicePaperEvaluationSchema = {
   type: "object",
   additionalProperties: false,

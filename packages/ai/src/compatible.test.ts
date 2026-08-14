@@ -64,6 +64,99 @@ describe("CompatibleAdapter pinned provider requests", () => {
     }
   });
 
+  it("requests JSON-object mode when an approved compatible preset enables it", async () => {
+    let requestBody: Record<string, unknown> | undefined;
+    const server = createServer((request, response) => {
+      const chunks: Buffer[] = [];
+      request.on("data", (chunk: Buffer) => chunks.push(chunk));
+      request.on("end", () => {
+        requestBody = JSON.parse(
+          Buffer.concat(chunks).toString("utf8"),
+        ) as Record<string, unknown>;
+        response.setHeader("content-type", "application/json");
+        response.end(
+          JSON.stringify({
+            model: "safe-model",
+            choices: [{ message: { content: '{"ok":true}' } }],
+          }),
+        );
+      });
+    });
+    const port = await listen(server);
+    const baseUrl = `http://provider.test:${port}`;
+    const adapter = new CompatibleAdapter({
+      baseUrl,
+      jsonObjectMode: true,
+      localBaseUrlAllowlist: [baseUrl],
+      addressResolver: async () => [{ address: "127.0.0.1", family: 4 }],
+    });
+
+    try {
+      await adapter.generateStructured({
+        model: "safe-model",
+        input: "Return JSON.",
+        schemaName: "json_object_mode",
+        schema: {
+          type: "object",
+          additionalProperties: false,
+          required: ["ok"],
+          properties: { ok: { type: "boolean" } },
+        },
+        validate: (value): value is { ok: true } =>
+          typeof value === "object" &&
+          value !== null &&
+          (value as { ok?: unknown }).ok === true,
+      });
+      expect(requestBody).toMatchObject({
+        response_format: { type: "json_object" },
+      });
+    } finally {
+      await close(server);
+    }
+  });
+
+  it("classifies exhausted structured validation as an invalid response", async () => {
+    const server = createServer((_request, response) => {
+      response.setHeader("content-type", "application/json");
+      response.end(
+        JSON.stringify({
+          model: "safe-model",
+          choices: [{ message: { content: "{}" } }],
+        }),
+      );
+    });
+    const port = await listen(server);
+    const baseUrl = `http://provider.test:${port}`;
+    const adapter = new CompatibleAdapter({
+      baseUrl,
+      localBaseUrlAllowlist: [baseUrl],
+      addressResolver: async () => [{ address: "127.0.0.1", family: 4 }],
+    });
+
+    try {
+      const error = await adapter
+        .generateStructured({
+          model: "safe-model",
+          input: "Return JSON.",
+          schemaName: "must_contain_ok",
+          schema: {
+            type: "object",
+            additionalProperties: false,
+            required: ["ok"],
+            properties: { ok: { type: "boolean" } },
+          },
+          validate: (value): value is { ok: true } =>
+            typeof value === "object" &&
+            value !== null &&
+            (value as { ok?: unknown }).ok === true,
+        })
+        .catch((caught: unknown) => caught);
+      expect(adapter.normalizeError(error).code).toBe("INVALID_RESPONSE");
+    } finally {
+      await close(server);
+    }
+  });
+
   it("uses the exact API root and supports a preset-owned api-key header", async () => {
     let requestedPath: string | undefined;
     let apiKeyHeader: string | undefined;

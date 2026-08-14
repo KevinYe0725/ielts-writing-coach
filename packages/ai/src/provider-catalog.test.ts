@@ -51,6 +51,7 @@ describe("provider catalog", () => {
     ).toMatchObject({
       baseUrl: "https://api.deepseek.com",
       thinkingMode: "disabled",
+      jsonObjectMode: true,
       validationModel: "deepseek-v4-flash",
     });
   });

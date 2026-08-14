@@ -8,6 +8,7 @@ import type { JobHelpers } from "graphile-worker";
 import {
   PROMPT_REGISTRY,
   type AITaskKind,
+  type GenerationResult,
   type NormalizedUsage,
 } from "@iwc/ai";
 import {
@@ -67,16 +68,22 @@ import {
   type ClaimedJob,
 } from "../runtime";
 import {
+  adaptiveTeachingModuleSchema,
   assessmentJudgmentSchema,
   comparisonSchema,
   evaluationSchema,
   focusedLearningPackageSchema,
   issueBatchSchema,
   practicePaperEvaluationSchema,
+  timedPracticePaperSchema,
   teachingPracticeAnalysisSchema,
   transferEvaluationSchema,
 } from "../schemas";
-import { findTeachingPrompt } from "../focused-learning";
+import {
+  findTeachingPrompt,
+  validateAdaptiveTeachingModule,
+  validateTimedPracticePaper,
+} from "../focused-learning";
 import {
   buildProviderAwareDelayedRewriteEvidence,
   buildProviderAwareExerciseEvidence,
@@ -89,8 +96,10 @@ import {
   verifyComparisonIssueSpans,
   verifyTransferJudgmentEvidence,
   type ComparisonJudgment,
+  type AdaptiveTeachingModule,
   type ExerciseEvaluationJudgment,
   type FocusedLearningPackage,
+  type PracticePaperContent,
   type PracticePaperJudgment,
   type TransferEvaluationJudgment,
   type VersionScoreSet,
@@ -1160,11 +1169,96 @@ async function generateLesson(
     (attempt) => attempt.kind === "version_1",
   );
   const adapter = await adapterForJob(job);
-  const result = await adapter.generateStructured<FocusedLearningPackage>({
-    model: model(job),
-    idempotencyKey: job.id,
-    system: PROMPT_REGISTRY.exercise_generation.system,
-    input: `Create one complete focused-learning package for the learner. First generate a self-contained adaptive teaching article, then create the 60-minute practice paper. The diagnosed top-level priority is ${canonicalSkillId}; narrow it to one observable micro-skill rather than covering every issue in the essay.
+  const generateCompatiblePackage = async (): Promise<
+    GenerationResult<FocusedLearningPackage>
+  > => {
+    const teaching = await adapter.generateStructured<AdaptiveTeachingModule>({
+      model: model(job),
+      idempotencyKey: `${job.id}:teaching`,
+      system: PROMPT_REGISTRY.exercise_generation.system,
+      input: `Create only a self-contained adaptive teaching article for the learner. The diagnosed top-level priority is ${canonicalSkillId}; narrow it to one observable micro-skill rather than covering every issue in the essay.
+
+Plan the private blueprint before writing any learner-facing sections. Choose exactly one difficultyType from the evidence: CONCEPT_GAP, RECOGNISES_BUT_CANNOT_REVISE, REVISES_BUT_CANNOT_GENERATE, SAME_CONTEXT_ONLY, or UNSTABLE_CONTROL. Set one precise bilingual coreAbility and completion standard. Use empty strings when no prerequisite or supporting ability is genuinely needed, and never add more than one of either. selectedBlockKinds must contain each actual block kind exactly once.
+
+Return ADAPTIVE_ARTICLE_V1 with 2–5 dynamically titled sections, 4–8 total blocks, and an estimated 10–25 minutes. Include EXPLANATION; include at least one CONTRAST or REASONING demonstration; include PRACTICE with 2–3 prompts; and make one SUMMARY the final block. TOOLKIT, PITFALLS, and additional demonstration blocks are optional and should appear only when they serve this learner's difficulty. At least one practice prompt must require SHORT_TEXT output and at least one must use UNSEEN_TOPIC. Use fresh examples and contexts created for this tutorial. Do not locate, highlight, quote, or closely imitate the learner's Version 1, and do not reproduce a complete essay. Keep blueprint enums and all implementation vocabulary out of learner-facing titles, prose, examples, instructions, and reference reasoning.
+
+Teaching reference answers are for reveal-after-attempt only. A later practice paper will use different material, so do not write a complete essay or any future-paper answer.
+
+When the diagnosis context source is MIGRATED_LEGACY_FALLBACK: Do not claim that an unavailable diagnosis found a personal weakness. Teach the named skill as a careful general recovery topic and keep every learner-facing statement conditional on the visible task.
+
+Original IELTS question: ${cycle.question.prompt}
+Selected-skill diagnosis context: ${JSON.stringify(diagnosisContext)}
+Learner Version 1 for context only: ${(version1?.content ?? "").slice(0, 4_000)}`,
+      schemaName: "iwc_adaptive_teaching_article_v1",
+      schema: adaptiveTeachingModuleSchema as unknown as Record<
+        string,
+        unknown
+      >,
+      validate: (value): value is AdaptiveTeachingModule =>
+        validateAdaptiveTeachingModule(value, version1?.content),
+      maxOutputTokens: 8_000,
+    });
+    const paper = await adapter.generateStructured<PracticePaperContent>({
+      model: model(job),
+      idempotencyKey: `${job.id}:paper`,
+      system: PROMPT_REGISTRY.exercise_generation.system,
+      input: `Create only a 60-minute focused practice paper. It must train exactly the private bilingual core ability below, but use different English material from the tutorial. Do not quote, copy, or closely paraphrase the tutorial's reference answers.
+
+Private core ability in Chinese: ${teaching.value.blueprint.coreAbilityZh}
+Private core ability in English: ${teaching.value.blueprint.coreAbilityEn}
+
+Both objectiveZh and objectiveEn must contain their corresponding core ability verbatim. The paper has exactly 8 questions in this exact order:
+1–2 FOUNDATION: one clear recognition/diagnosis question and one short explanation question;
+3–4 REPAIR: repair or rewrite two flawed excerpts without changing their intended meaning;
+5–6 GENERATION: write original sentences in two genuinely different contexts;
+7–8 INTEGRATION: write and improve an IELTS-style paragraph using the target naturally.
+
+The suggested minutes across all 8 questions must total exactly 60. Every question must be answerable without feedback from another question. Before the learner answers, state in Chinese exactly what to produce, how many sentences or words, all required ideas, and all restrictions. publicCriteria are protected evaluator data and are not displayed as a separate learner-facing rubric. Each criterion descriptionZh must repeat the visible instruction verbatim and must not add or paraphrase another requirement. Prefer one criterion with weight 100. A criterion label must be a short human-facing phrase, never an ID. Choice questions need 3–4 unambiguous options and acceptedAnswers containing only option keys. Open questions must have empty options and acceptedAnswers. Use plain Chinese instructions and English writing material. Avoid vague wording such as 'demonstrate the target', 'complete the chain', 'meaning branch', or 'according to the slots'. Do not mention internal software concepts.
+
+All eight English prompts must be substantively different. REPAIR questions must include the exact flawed source sentence. The public criterion weights for each question must total 100. Reject trivia, meta-questions about grammar labels, and instructions that require the learner to guess intended content.
+
+Original IELTS question: ${cycle.question.prompt}`,
+      schemaName: "iwc_timed_practice_paper_v3",
+      schema: timedPracticePaperSchema as unknown as Record<string, unknown>,
+      validate: validateTimedPracticePaper,
+      maxOutputTokens: 8_000,
+    });
+    const value = {
+      teachingModule: teaching.value,
+      paper: paper.value,
+    } satisfies FocusedLearningPackage;
+    if (!validateFocusedLearningPackage(value, version1?.content)) {
+      throw Object.assign(
+        new Error(
+          "The compatible provider returned an invalid focused package.",
+        ),
+        { code: "INVALID_RESPONSE" },
+      );
+    }
+    return {
+      value,
+      model: paper.model,
+      ...(paper.responseId === undefined
+        ? {}
+        : { responseId: paper.responseId }),
+      usage: {
+        inputTokens: teaching.usage.inputTokens + paper.usage.inputTokens,
+        outputTokens: teaching.usage.outputTokens + paper.usage.outputTokens,
+        totalTokens: teaching.usage.totalTokens + paper.usage.totalTokens,
+      },
+      ...(paper.rawFinishReason === undefined
+        ? {}
+        : { rawFinishReason: paper.rawFinishReason }),
+    };
+  };
+  const result =
+    adapter.kind === "compatible"
+      ? await generateCompatiblePackage()
+      : await adapter.generateStructured<FocusedLearningPackage>({
+          model: model(job),
+          idempotencyKey: job.id,
+          system: PROMPT_REGISTRY.exercise_generation.system,
+          input: `Create one complete focused-learning package for the learner. First generate a self-contained adaptive teaching article, then create the 60-minute practice paper. The diagnosed top-level priority is ${canonicalSkillId}; narrow it to one observable micro-skill rather than covering every issue in the essay.
 
 Plan teachingModule.blueprint before writing any learner-facing sections. Choose exactly one difficultyType from the evidence: CONCEPT_GAP, RECOGNISES_BUT_CANNOT_REVISE, REVISES_BUT_CANNOT_GENERATE, SAME_CONTEXT_ONLY, or UNSTABLE_CONTROL. Set one precise bilingual coreAbility and completion standard. Use empty strings when no prerequisite or supporting ability is genuinely needed, and never add more than one of either. selectedBlockKinds must contain each actual block kind exactly once.
 
@@ -1187,17 +1281,20 @@ When the diagnosis context source is MIGRATED_LEGACY_FALLBACK: Do not claim that
 Original IELTS question: ${cycle.question.prompt}
 Selected-skill diagnosis context: ${JSON.stringify(diagnosisContext)}
 Learner Version 1 for context only: ${(version1?.content ?? "").slice(0, 4_000)}`,
-    schemaName: "iwc_focused_learning_package_v4",
-    schema: focusedLearningPackageSchema as unknown as Record<string, unknown>,
-    validate: (value): value is FocusedLearningPackage =>
-      typeof value === "object" &&
-      value !== null &&
-      validateFocusedLearningPackage(
-        value as FocusedLearningPackage,
-        version1?.content,
-      ),
-    maxOutputTokens: 16_000,
-  });
+          schemaName: "iwc_focused_learning_package_v4",
+          schema: focusedLearningPackageSchema as unknown as Record<
+            string,
+            unknown
+          >,
+          validate: (value): value is FocusedLearningPackage =>
+            typeof value === "object" &&
+            value !== null &&
+            validateFocusedLearningPackage(
+              value as FocusedLearningPackage,
+              version1?.content,
+            ),
+          maxOutputTokens: 16_000,
+        });
   const planId = legacyPlan?.id ?? newDomainId();
   const objectiveId = newDomainId();
   const paperContent = {

@@ -121,6 +121,14 @@ export function normalizeProviderError(
       ...optionalStatus,
     };
   }
+  if (code === "INVALID_RESPONSE") {
+    return {
+      code: "INVALID_RESPONSE",
+      safeMessage: "The provider returned an invalid structured response.",
+      retryable: false,
+      ...optionalStatus,
+    };
+  }
   if (status === 400 || status === 404 || status === 422) {
     return {
       code: "UNKNOWN",

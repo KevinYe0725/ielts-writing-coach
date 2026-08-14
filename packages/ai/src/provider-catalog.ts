@@ -42,6 +42,7 @@ export interface ProviderPreset {
   configurableBaseUrl: boolean;
   authHeader: "authorization" | "api-key";
   thinkingMode?: "disabled" | "enabled";
+  jsonObjectMode?: boolean;
   docsUrl: string | null;
   compatibilityNoteZh: string;
   compatibilityNoteEn: string;
@@ -113,6 +114,7 @@ export const providerCatalog: readonly ProviderPreset[] = [
     baseUrl: "https://api.deepseek.com",
     defaultModel: "deepseek-v4-flash",
     thinkingMode: "disabled",
+    jsonObjectMode: true,
     apiKeyPlaceholder: "sk-…",
     docsUrl: "https://api-docs.deepseek.com/",
     compatibilityNoteZh: "使用 DeepSeek 官方 OpenAI 兼容入口。",
@@ -416,6 +418,7 @@ export function resolveProviderPreset(input: {
   baseUrl?: string;
   authHeader: "authorization" | "api-key";
   thinkingMode?: "disabled" | "enabled";
+  jsonObjectMode?: boolean;
 } {
   const preset = getProviderPreset(input.vendor);
   const requested = input.baseUrl?.trim() || undefined;
@@ -430,6 +433,9 @@ export function resolveProviderPreset(input: {
     ...(preset.thinkingMode === undefined
       ? {}
       : { thinkingMode: preset.thinkingMode }),
+    ...(preset.jsonObjectMode === undefined
+      ? {}
+      : { jsonObjectMode: preset.jsonObjectMode }),
   };
 }
 
@@ -453,6 +459,9 @@ export function providerCredentialsForPreset(input: {
       ...(resolved.thinkingMode === undefined
         ? {}
         : { thinkingMode: resolved.thinkingMode }),
+      ...(resolved.jsonObjectMode === undefined
+        ? {}
+        : { jsonObjectMode: resolved.jsonObjectMode }),
       ...(input.validationModel === undefined
         ? {}
         : { validationModel: input.validationModel }),

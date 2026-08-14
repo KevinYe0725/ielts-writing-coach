@@ -51,6 +51,7 @@ export class CompatibleAdapter implements AIProviderAdapter {
   readonly #authHeader: "authorization" | "api-key";
   readonly #validationModel: string | undefined;
   readonly #thinkingMode: "disabled" | "enabled" | undefined;
+  readonly #jsonObjectMode: boolean;
 
   constructor(options: {
     apiKey?: string;
@@ -60,6 +61,7 @@ export class CompatibleAdapter implements AIProviderAdapter {
     authHeader?: "authorization" | "api-key";
     validationModel?: string;
     thinkingMode?: "disabled" | "enabled";
+    jsonObjectMode?: boolean;
   }) {
     this.#apiKey = options.apiKey;
     this.#baseUrl = options.baseUrl;
@@ -68,6 +70,7 @@ export class CompatibleAdapter implements AIProviderAdapter {
     this.#authHeader = options.authHeader ?? "authorization";
     this.#validationModel = options.validationModel;
     this.#thinkingMode = options.thinkingMode;
+    this.#jsonObjectMode = options.jsonObjectMode ?? false;
   }
 
   #endpoint(path: "models" | "chat/completions"): string {
@@ -203,6 +206,7 @@ export class CompatibleAdapter implements AIProviderAdapter {
     request: TextGenerationRequest,
     extraSystem?: string,
     idempotencySuffix = "text",
+    structured = false,
   ): Promise<GenerationResult<string>> {
     const messages = [
       ...(request.system || extraSystem
@@ -239,6 +243,9 @@ export class CompatibleAdapter implements AIProviderAdapter {
         ...(this.#thinkingMode === undefined
           ? {}
           : { thinking: { type: this.#thinkingMode } }),
+        ...(structured && this.#jsonObjectMode
+          ? { response_format: { type: "json_object" } }
+          : {}),
       }),
     });
     const rawBody = await response.text();
@@ -288,6 +295,7 @@ export class CompatibleAdapter implements AIProviderAdapter {
       request,
       schemaInstruction,
       "structured-initial",
+      true,
     );
     let parsed: unknown;
     try {
@@ -304,11 +312,15 @@ export class CompatibleAdapter implements AIProviderAdapter {
       },
       schemaInstruction,
       "structured-repair",
+      true,
     );
     const repairedValue = extractJsonValue(repaired.value);
     if (!request.validate(repairedValue)) {
-      throw new Error(
-        "The compatible provider failed structured validation after one repair attempt.",
+      throw Object.assign(
+        new Error(
+          "The compatible provider failed structured validation after one repair attempt.",
+        ),
+        { code: "INVALID_RESPONSE" },
       );
     }
     return {

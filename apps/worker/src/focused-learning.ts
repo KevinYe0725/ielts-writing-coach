@@ -4,11 +4,19 @@ import Ajv2020, {
 } from "ajv/dist/2020.js";
 
 import {
+  validateAdaptiveTeachingModule as validateAdaptiveTeachingModulePedagogy,
   validateFocusedLearningPackage as validateFocusedLearningPedagogy,
+  validatePracticePaperContent,
+  type AdaptiveTeachingModule,
   type FocusedLearningPackage,
+  type PracticePaperContent,
   type TeachingPracticePrompt,
 } from "./learning";
-import { focusedLearningPackageSchema } from "./schemas";
+import {
+  adaptiveTeachingModuleSchema,
+  focusedLearningPackageSchema,
+  timedPracticePaperSchema,
+} from "./schemas";
 
 export type {
   AdaptiveTeachingModule,
@@ -26,6 +34,31 @@ const ajv = new Ajv2020({ allErrors: true, strict: true });
 const validateFocusedLearningShape = ajv.compile<FocusedLearningPackage>(
   focusedLearningPackageSchema as AnySchemaObject,
 ) as ValidateFunction<FocusedLearningPackage>;
+const validateAdaptiveTeachingModuleShape = ajv.compile<AdaptiveTeachingModule>(
+  adaptiveTeachingModuleSchema as AnySchemaObject,
+) as ValidateFunction<AdaptiveTeachingModule>;
+const validateTimedPracticePaperShape = ajv.compile<PracticePaperContent>(
+  timedPracticePaperSchema as AnySchemaObject,
+) as ValidateFunction<PracticePaperContent>;
+
+export function validateAdaptiveTeachingModule(
+  value: unknown,
+  version1Essay?: string,
+): value is AdaptiveTeachingModule {
+  return (
+    validateAdaptiveTeachingModuleShape(value) &&
+    validateAdaptiveTeachingModulePedagogy(value, version1Essay)
+  );
+}
+
+export function validateTimedPracticePaper(
+  value: unknown,
+): value is PracticePaperContent {
+  return (
+    validateTimedPracticePaperShape(value) &&
+    validatePracticePaperContent(value)
+  );
+}
 
 /** Applies the provider schema and the cross-field pedagogical gates together. */
 export function validateFocusedLearningPackage(

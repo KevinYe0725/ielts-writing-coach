@@ -10,6 +10,8 @@ export interface ProviderCredentials {
   validationModel?: string;
   /** Server-owned preset option for providers with a hybrid reasoning mode. */
   thinkingMode?: "disabled" | "enabled";
+  /** Server-owned option for compatible providers that support JSON-object mode. */
+  jsonObjectMode?: boolean;
 }
 
 export interface ModelDescriptor {

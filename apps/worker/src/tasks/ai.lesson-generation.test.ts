@@ -1,6 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { MockAdapter } from "@iwc/ai";
 import { lessonPlan } from "@iwc/db";
+
+import {
+  validateFocusedLearningPackage,
+  type FocusedLearningPackage,
+} from "../learning";
+import { focusedLearningPackageSchema } from "../schemas";
 
 const lessonState = vi.hoisted(() => ({
   issues: [] as Array<{
@@ -18,6 +25,11 @@ const lessonState = vi.hoisted(() => ({
     overviewEn: "Argument development is the highest-priority weakness.",
   } as Record<string, string>,
   generatedInput: "",
+  generatedSchemaNames: [] as string[],
+  generatedIdempotencyKeys: [] as Array<string | undefined>,
+  adapterKind: "mock" as "compatible" | "mock",
+  paperFailure: undefined as unknown,
+  package: undefined as FocusedLearningPackage | undefined,
   failure: undefined as unknown,
   adapterFailure: undefined as unknown,
   protectedReference: {
@@ -47,18 +59,36 @@ vi.mock("../runtime", () => {
   };
   return {
     adapterForJob: vi.fn(async () => ({
-      generateStructured: vi.fn(async (request: { input: string }) => {
-        if (lessonState.adapterFailure) throw lessonState.adapterFailure;
-        lessonState.generatedInput = request.input;
-        return {
-          value: {
-            teachingModule: { format: "ADAPTIVE_ARTICLE_V1" },
-            paper: { items: [] },
-          },
-          model: "mock-deterministic-v1",
-          usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
-        };
-      }),
+      kind: lessonState.adapterKind,
+      generateStructured: vi.fn(
+        async (request: {
+          input: string;
+          schemaName: string;
+          idempotencyKey?: string;
+        }) => {
+          if (lessonState.adapterFailure) throw lessonState.adapterFailure;
+          lessonState.generatedSchemaNames.push(request.schemaName);
+          lessonState.generatedIdempotencyKeys.push(request.idempotencyKey);
+          if (
+            lessonState.paperFailure &&
+            request.schemaName === "iwc_timed_practice_paper_v3"
+          )
+            throw lessonState.paperFailure;
+          lessonState.generatedInput = request.input;
+          const packageValue = lessonState.package;
+          if (!packageValue) throw new Error("Test package was not prepared.");
+          return {
+            value:
+              request.schemaName === "iwc_adaptive_teaching_article_v1"
+                ? packageValue.teachingModule
+                : request.schemaName === "iwc_timed_practice_paper_v3"
+                  ? packageValue.paper
+                  : packageValue,
+            model: "mock-deterministic-v1",
+            usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+          };
+        },
+      ),
     })),
     claimAIJob: vi.fn(async () => ({
       id: "job-lesson-generation",
@@ -142,9 +172,31 @@ async function generateLesson(): Promise<void> {
   } as never);
 }
 
+async function validFocusedPackage(): Promise<FocusedLearningPackage> {
+  const version1 =
+    "Schools can prepare young people for important adult decisions.";
+  const adapter = new MockAdapter();
+  const result = await adapter.generateStructured<FocusedLearningPackage>({
+    model: "mock-deterministic-v1",
+    input: `Create the focused learning package. Learner Version 1 for context only: ${version1}`,
+    schemaName: "iwc_focused_learning_package_v4",
+    schema: focusedLearningPackageSchema as unknown as Record<string, unknown>,
+    validate: (value): value is FocusedLearningPackage =>
+      typeof value === "object" &&
+      value !== null &&
+      validateFocusedLearningPackage(value as FocusedLearningPackage, version1),
+  });
+  return result.value;
+}
+
 describe("adaptive lesson generation evidence", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     lessonState.generatedInput = "";
+    lessonState.generatedSchemaNames = [];
+    lessonState.generatedIdempotencyKeys = [];
+    lessonState.adapterKind = "mock";
+    lessonState.paperFailure = undefined;
+    lessonState.package = await validFocusedPackage();
     lessonState.failure = undefined;
     lessonState.issues = [];
     lessonState.adapterFailure = undefined;
@@ -312,6 +364,40 @@ describe("adaptive lesson generation evidence", () => {
     await generateLesson();
 
     expect(lessonState.failure).toBeInstanceOf(Error);
+    expect(lessonState.updated).toEqual([]);
+    expect(lessonState.inserted).toEqual([]);
+  });
+
+  it("uses separately validated article and paper requests for compatible providers", async () => {
+    lessonState.adapterKind = "compatible";
+
+    await generateLesson();
+
+    expect(lessonState.failure).toBeUndefined();
+    expect(lessonState.generatedSchemaNames).toEqual([
+      "iwc_adaptive_teaching_article_v1",
+      "iwc_timed_practice_paper_v3",
+    ]);
+    expect(lessonState.generatedIdempotencyKeys).toEqual([
+      "job-lesson-generation:teaching",
+      "job-lesson-generation:paper",
+    ]);
+    expect(lessonState.inserted.some(({ table }) => table === lessonPlan)).toBe(
+      true,
+    );
+  });
+
+  it("does not mutate lesson data when compatible paper generation fails", async () => {
+    lessonState.adapterKind = "compatible";
+    lessonState.paperFailure = new Error("invalid structured response");
+
+    await generateLesson();
+
+    expect(lessonState.failure).toBeInstanceOf(Error);
+    expect(lessonState.generatedSchemaNames).toEqual([
+      "iwc_adaptive_teaching_article_v1",
+      "iwc_timed_practice_paper_v3",
+    ]);
     expect(lessonState.updated).toEqual([]);
     expect(lessonState.inserted).toEqual([]);
   });

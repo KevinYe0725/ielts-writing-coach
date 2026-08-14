@@ -667,15 +667,14 @@ function sameUniqueKinds(
   );
 }
 
-/** Keeps the adaptive tutorial and timed paper aligned and pedagogically useful. */
-export function validateFocusedLearningPackage(
-  value: FocusedLearningPackage,
+/** Validates a focused teaching article before a compatible provider generates
+ * its separate paper. Cross-package answer isolation remains a final check. */
+export function validateAdaptiveTeachingModule(
+  teaching: AdaptiveTeachingModule,
   version1Essay?: string,
 ): boolean {
-  const teaching = value.teachingModule;
   if (
     teaching.format !== "ADAPTIVE_ARTICLE_V1" ||
-    !validatePracticePaperContent(value.paper) ||
     !validBilingualCopy(teaching.titleZh, teaching.titleEn, 6) ||
     !validBilingualCopy(teaching.introductionZh, teaching.introductionEn, 12) ||
     teaching.estimatedMinutes < 10 ||
@@ -691,24 +690,6 @@ export function validateFocusedLearningPackage(
       teaching.blueprint.completionStandardZh,
       teaching.blueprint.completionStandardEn,
       10,
-    ) ||
-    !substantive(value.paper.objectiveZh, 12) ||
-    !substantive(value.paper.objectiveEn, 12)
-  )
-    return false;
-
-  const normalizedTargetZh = normalizedInstructionText(
-    teaching.blueprint.coreAbilityZh,
-  );
-  const normalizedTargetEn = normalizedInstructionText(
-    teaching.blueprint.coreAbilityEn,
-  );
-  if (
-    !normalizedInstructionText(value.paper.objectiveZh).includes(
-      normalizedTargetZh,
-    ) ||
-    !normalizedInstructionText(value.paper.objectiveEn).includes(
-      normalizedTargetEn,
     )
   )
     return false;
@@ -758,9 +739,42 @@ export function validateFocusedLearningPackage(
   if (
     hasInternalVocabulary(learnerFacingFields) ||
     containsOversizedLearnerFacingField(learnerFacingFields) ||
-    leaksFuturePaperAnswer(learnerFacingFields, value.paper) ||
     (substantive(version1Essay, 1) &&
       hasLongExactWordOverlap(version1Essay, learnerFacingFields))
+  )
+    return false;
+
+  return true;
+}
+
+/** Keeps the adaptive tutorial and timed paper aligned and pedagogically useful. */
+export function validateFocusedLearningPackage(
+  value: FocusedLearningPackage,
+  version1Essay?: string,
+): boolean {
+  const teaching = value.teachingModule;
+  if (
+    !validateAdaptiveTeachingModule(teaching, version1Essay) ||
+    !validatePracticePaperContent(value.paper) ||
+    !substantive(value.paper.objectiveZh, 12) ||
+    !substantive(value.paper.objectiveEn, 12)
+  )
+    return false;
+
+  const normalizedTargetZh = normalizedInstructionText(
+    teaching.blueprint.coreAbilityZh,
+  );
+  const normalizedTargetEn = normalizedInstructionText(
+    teaching.blueprint.coreAbilityEn,
+  );
+  if (
+    !normalizedInstructionText(value.paper.objectiveZh).includes(
+      normalizedTargetZh,
+    ) ||
+    !normalizedInstructionText(value.paper.objectiveEn).includes(
+      normalizedTargetEn,
+    ) ||
+    leaksFuturePaperAnswer(learnerFacingTeachingStrings(teaching), value.paper)
   )
     return false;
 
