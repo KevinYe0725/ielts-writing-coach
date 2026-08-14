@@ -7,15 +7,6 @@ const owner = {
   password: "compose-e2e-owner-password-2026",
 } as const;
 
-const developedSentence =
-  "Primary-school pupils face less academic pressure when language lessons use short, interactive activities instead of heavy homework.";
-
-const developedParagraph = Array.from(
-  { length: 4 },
-  () =>
-    "Regular classroom practice helps pupils use new language patterns accurately because each short task connects meaning, form, and a clear result.",
-).join(" ");
-
 async function setupOrResetIsolatedInstance(
   page: import("@playwright/test").Page,
 ): Promise<void> {
@@ -134,56 +125,6 @@ async function waitForLessonAction(
   };
 }
 
-async function answerCurrentLessonItem(
-  page: import("@playwright/test").Page,
-): Promise<void> {
-  const card = page.locator(".exercise-card");
-  const submitButton = card.getByRole("button", {
-    name: /^(?:提交|再次提交)$/u,
-  });
-  await expect(submitButton).toBeVisible({ timeout: 10_000 });
-  const spotlight = card.locator(".spotlight-picker button");
-  const mappings = card.locator(".expression-map select");
-  const choices = card.getByRole("radio");
-  const answer = card.getByLabel("你的英文答案");
-
-  if ((await spotlight.count()) > 0) {
-    for (let index = 0; index < (await spotlight.count()); index += 1) {
-      await spotlight.nth(index).click();
-    }
-  } else if ((await mappings.count()) > 0) {
-    for (let index = 0; index < (await mappings.count()); index += 1) {
-      await mappings.nth(index).selectOption({ index: index + 1 });
-    }
-  } else if ((await choices.count()) > 0) {
-    await choices.first().locator("..").click();
-  } else {
-    const selfChecks = card.locator(".self-check-list input[type=checkbox]");
-    if ((await selfChecks.count()) > 0) {
-      for (let index = 0; index < (await selfChecks.count()); index += 1) {
-        await selfChecks.nth(index).check();
-      }
-      await expect(answer).not.toHaveValue("", { timeout: 10_000 });
-      const baseline = await answer.inputValue();
-      await answer.fill(
-        `${baseline.trim()} This final sentence makes the causal result clearer.`,
-      );
-    } else if ((await card.getByText(/80–120/u).count()) > 0) {
-      await answer.fill(developedParagraph);
-    } else {
-      await answer.fill(developedSentence);
-    }
-  }
-
-  await submitButton.click();
-  await expect(
-    card.locator(".answer-feedback").filter({
-      hasText:
-        /仅演示|已记录|答案已封存|本组统一反馈|准确|答案与本题公开的确定性答案规则一致/u,
-    }),
-  ).toBeVisible({ timeout: 90_000 });
-}
-
 test("the production Compose image opens setup in a real browser", async ({
   page,
   request,
@@ -229,7 +170,7 @@ test("the production Compose image opens setup in a real browser", async ({
   );
 });
 
-test("the production image completes the real PostgreSQL and Mock-provider learning path", async ({
+test("the production image creates focused teaching and its complete practice paper", async ({
   page,
 }) => {
   test.skip(
@@ -271,32 +212,26 @@ test("the production image completes the real PostgreSQL and Mock-provider learn
     timeout: 90_000,
   });
   await expect(
-    page.getByRole("heading", { name: "先看最影响分数的三件事" }),
+    page.getByRole("heading", { name: "对照原文，把每一处问题改明白" }),
   ).toBeVisible({ timeout: 90_000 });
-  await expect(page.getByText("Mock 演示 · 未评价语言")).toBeVisible();
+  await expect(page.getByText("示例报告 · 未评价语言")).toBeVisible();
 
   const lesson = await waitForLessonAction(page);
   await page.goto(
     `/lesson?cycle=${encodeURIComponent(lesson.cycleId)}&lesson=${encodeURIComponent(lesson.lessonId)}`,
   );
 
-  for (let itemIndex = 0; itemIndex < 10; itemIndex += 1) {
-    await expect(page.locator(".exercise-card")).toBeVisible({
-      timeout: 90_000,
-    });
-    await answerCurrentLessonItem(page);
-    const complete = page.getByRole("button", { name: "完成本课" });
-    if (await complete.isVisible()) {
-      await complete.click();
-      break;
-    }
-    await page.getByRole("button", { name: "继续", exact: true }).click();
-  }
-
+  await expect(page.locator("article[data-teaching-article]")).toBeVisible({
+    timeout: 90_000,
+  });
   await expect(
-    page.getByRole("heading", { name: "你已完成核心路径" }),
-  ).toBeVisible({ timeout: 90_000 });
-  await expect(page.getByText("仅完成练习", { exact: true })).toBeVisible();
-  await expect(page.getByText(/不会把能力标记为 applied/u)).toBeVisible();
-  await expect(page.getByText("未安排证据重写", { exact: true })).toBeVisible();
+    page.getByRole("link", { name: "开始60分钟训练卷" }),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "开始60分钟训练卷" }).click();
+  await expect(page).toHaveURL(
+    /\/lesson\/paper\?cycle=[0-9a-f-]+&lesson=[0-9a-f-]+$/u,
+  );
+  await expect(page.locator(".practice-paper-question")).toHaveCount(8, {
+    timeout: 90_000,
+  });
 });
