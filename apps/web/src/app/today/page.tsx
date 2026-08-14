@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   ArrowRight,
@@ -69,7 +69,6 @@ function optionLabel<T extends string>(
 
 export default function TodayPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { locale, text, messages } = useLocale();
   const loader = useCallback(() => learningClient.getToday(), []);
   const { data, error, loading, retry } = useDemoResource(loader);
@@ -84,12 +83,18 @@ export default function TodayPage() {
   const [customTrack, setCustomTrack] = useState<
     "academic" | "general_training"
   >("academic");
+  const [startingNewEssay, setStartingNewEssay] = useState(false);
+  useEffect(() => {
+    setStartingNewEssay(
+      new URLSearchParams(window.location.search).get("new-essay") === "1",
+    );
+  }, []);
   useEffect(() => {
     if (data) saveLearningDestinations(data.navigation);
   }, [data]);
 
   const needsQuestion =
-    searchParams.get("new-essay") === "1" ||
+    startingNewEssay ||
     data?.nextTask.id === "question-bank" ||
     data?.nextTask.href.startsWith("/today?mixed-review=1");
   useEffect(() => {
