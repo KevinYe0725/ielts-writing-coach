@@ -4,6 +4,7 @@ import {
   LearningClientError,
   type ApiProblemDetails,
 } from "./errors";
+import { NEXT_ACTION_KINDS } from "@iwc/learning-core";
 import {
   projectTeachingPracticeResponse,
   unavailableTeachingPracticeResponse,
@@ -21,6 +22,8 @@ import type {
   CustomQuestionInput,
   CycleExportOption,
   CycleBundleImportResult,
+  EssayWorkspaceData,
+  EssayWorkspaceItem,
   FeedbackData,
   FeedbackIssue,
   FocusedTeachingData,
@@ -325,6 +328,40 @@ interface TodayWire {
     reason?: string;
   };
   queue?: Array<{ cycle_id: string; due_at: string | null; kind: string }>;
+}
+
+interface WireEssayWorkspaceAction extends JsonRecord {
+  due_at?: string | null;
+  entity_id?: string;
+  kind?: string;
+  overdue?: boolean;
+  reason?: string;
+}
+
+interface WireEssayWorkspaceResources extends JsonRecord {
+  comparison_available?: boolean;
+  cycle_id?: string;
+  feedback_available?: boolean;
+  lesson_id?: string | null;
+  rewrite_task_id?: string | null;
+  transfer_task_id?: string | null;
+  writing_available?: boolean;
+}
+
+interface WireEssayWorkspaceItem extends JsonRecord {
+  id?: string;
+  next_action?: WireEssayWorkspaceAction;
+  prompt?: string;
+  resources?: WireEssayWorkspaceResources;
+  status?: string;
+  topic?: string;
+  updated_at?: string;
+}
+
+interface EssayWorkspaceWire extends JsonRecord {
+  active_count?: number;
+  active_limit?: number;
+  essays?: WireEssayWorkspaceItem[];
 }
 
 interface CycleWire {
@@ -760,6 +797,126 @@ function actionIdentityHref(
     searchParams.set("task", entityId);
   const query = searchParams.toString();
   return query.length > 0 ? `${pathname}?${query}` : pathname;
+}
+
+function invalidEssayWorkspace(): never {
+  throw new LearningClientError(
+    "The server did not return a usable essay workspace.",
+    { code: "INVALID_RESPONSE" },
+  );
+}
+
+function validInstant(value: unknown): value is string {
+  return typeof value === "string" && Number.isFinite(Date.parse(value));
+}
+
+function mapEssayWorkspaceItem(
+  item: WireEssayWorkspaceItem,
+): EssayWorkspaceItem {
+  const action = item.next_action;
+  const resources = item.resources;
+  const actionKind = action?.kind;
+  const actionEntityId = action?.entity_id;
+  if (
+    !item.id ||
+    !item.prompt ||
+    !item.topic ||
+    !item.status ||
+    !validInstant(item.updated_at) ||
+    !action ||
+    typeof actionKind !== "string" ||
+    !NEXT_ACTION_KINDS.includes(
+      actionKind as (typeof NEXT_ACTION_KINDS)[number],
+    ) ||
+    typeof actionEntityId !== "string" ||
+    actionEntityId.length === 0 ||
+    typeof action.reason !== "string" ||
+    !(action.due_at === null || validInstant(action.due_at)) ||
+    typeof action.overdue !== "boolean" ||
+    !resources ||
+    resources.cycle_id !== item.id ||
+    typeof resources.writing_available !== "boolean" ||
+    typeof resources.feedback_available !== "boolean" ||
+    !(
+      resources.lesson_id === null || typeof resources.lesson_id === "string"
+    ) ||
+    !(
+      resources.rewrite_task_id === null ||
+      typeof resources.rewrite_task_id === "string"
+    ) ||
+    typeof resources.comparison_available !== "boolean" ||
+    !(
+      resources.transfer_task_id === null ||
+      typeof resources.transfer_task_id === "string"
+    )
+  ) {
+    return invalidEssayWorkspace();
+  }
+  const presentation = actionPresentation(actionKind);
+  return {
+    id: item.id,
+    prompt: item.prompt,
+    topic: item.topic,
+    status: item.status,
+    updatedAt: item.updated_at,
+    nextAction: {
+      kind: actionKind,
+      entityId: actionEntityId,
+      reason: action.reason,
+      dueAt: action.due_at ?? null,
+      overdue: action.overdue,
+    },
+    nextTask: {
+      id: actionEntityId,
+      kind: presentation.taskKind,
+      eyebrowZh: presentation.eyebrowZh,
+      eyebrowEn: presentation.eyebrowEn,
+      titleZh: presentation.titleZh,
+      titleEn: presentation.titleEn,
+      descriptionZh: presentation.descriptionZh,
+      descriptionEn: presentation.descriptionEn,
+      durationMinutes: presentation.durationMinutes,
+      href: actionIdentityHref(
+        actionKind,
+        presentation.href,
+        item.id,
+        actionEntityId,
+      ),
+      actionZh: presentation.actionZh,
+      actionEn: presentation.actionEn,
+      dueLabelZh: formatDue(action.due_at, "zh"),
+      dueLabelEn: formatDue(action.due_at, "en"),
+    },
+    resources: {
+      cycleId: resources.cycle_id,
+      writingAvailable: resources.writing_available,
+      feedbackAvailable: resources.feedback_available,
+      lessonId: resources.lesson_id ?? null,
+      rewriteTaskId: resources.rewrite_task_id ?? null,
+      comparisonAvailable: resources.comparison_available,
+      transferTaskId: resources.transfer_task_id ?? null,
+    },
+  };
+}
+
+function mapEssayWorkspace(value: EssayWorkspaceWire): EssayWorkspaceData {
+  const activeCount = value.active_count;
+  if (
+    typeof activeCount !== "number" ||
+    !Number.isInteger(activeCount) ||
+    activeCount < 0 ||
+    activeCount > 8 ||
+    value.active_limit !== 8 ||
+    !Array.isArray(value.essays) ||
+    value.essays.length !== activeCount
+  ) {
+    return invalidEssayWorkspace();
+  }
+  return {
+    activeCount,
+    activeLimit: 8,
+    essays: value.essays.map(mapEssayWorkspaceItem),
+  };
 }
 
 function mapTimeline(status: string): TimelineStep[] {
@@ -1768,6 +1925,11 @@ export class HttpLearningClient implements LearningClient {
         repeatedErrorReduction: growth?.independentNonRecurrenceRate ?? null,
       },
     };
+  }
+
+  async getEssayWorkspace(): Promise<EssayWorkspaceData> {
+    const { data } = await this.request<EssayWorkspaceWire>("/essays");
+    return mapEssayWorkspace(data);
   }
 
   async getQuestions(): Promise<QuestionOption[]> {

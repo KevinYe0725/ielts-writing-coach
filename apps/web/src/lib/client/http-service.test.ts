@@ -1301,6 +1301,127 @@ describe("HttpLearningClient protocol", () => {
     });
   });
 
+  it("loads each active essay with its own authoritative action and rejects malformed workspace items", async () => {
+    const validFetcher = vi.fn<typeof fetch>(async (input) => {
+      if (!String(input).endsWith("/essays"))
+        throw new Error(`Unexpected URL: ${input}`);
+      return jsonResponse({
+        active_count: 2,
+        active_limit: 8,
+        essays: [
+          {
+            id: "cycle-one",
+            prompt: "Should schools teach practical decision-making?",
+            topic: "education",
+            status: "ATTEMPT_1_ACTIVE",
+            updated_at: "2026-08-14T13:00:00.000Z",
+            next_action: {
+              kind: "CONTINUE_ATTEMPT_1",
+              entity_id: "cycle-one",
+              reason: "Resume the saved first draft.",
+              due_at: null,
+              overdue: false,
+            },
+            resources: {
+              cycle_id: "cycle-one",
+              writing_available: true,
+              feedback_available: false,
+              lesson_id: null,
+              rewrite_task_id: null,
+              comparison_available: false,
+              transfer_task_id: null,
+            },
+          },
+          {
+            id: "cycle-two",
+            prompt: "Should digital devices replace printed books?",
+            topic: "technology",
+            status: "QUESTION_READY",
+            updated_at: "2026-08-14T12:00:00.000Z",
+            next_action: {
+              kind: "START_ATTEMPT_1",
+              entity_id: "cycle-two",
+              reason: "The first timed draft is ready.",
+              due_at: null,
+              overdue: false,
+            },
+            resources: {
+              cycle_id: "cycle-two",
+              writing_available: false,
+              feedback_available: false,
+              lesson_id: null,
+              rewrite_task_id: null,
+              comparison_available: false,
+              transfer_task_id: null,
+            },
+          },
+        ],
+      });
+    });
+    const validClient = new HttpLearningClient({
+      baseUrl: "https://coach.test/api/v1",
+      fetch: validFetcher,
+      origin: "https://coach.test",
+    });
+
+    await expect(validClient.getEssayWorkspace()).resolves.toMatchObject({
+      activeCount: 2,
+      activeLimit: 8,
+      essays: [
+        { id: "cycle-one", resources: { cycleId: "cycle-one" } },
+        { id: "cycle-two", resources: { cycleId: "cycle-two" } },
+      ],
+    });
+
+    const malformedClient = new HttpLearningClient({
+      baseUrl: "https://coach.test/api/v1",
+      fetch: async () =>
+        jsonResponse({ active_count: 1, active_limit: 8, essays: [{}] }),
+      origin: "https://coach.test",
+    });
+    await expect(malformedClient.getEssayWorkspace()).rejects.toMatchObject({
+      code: "INVALID_RESPONSE",
+    });
+  });
+
+  it("keeps Demo drafts separate when two essays are open", async () => {
+    const previousWindow = Object.getOwnPropertyDescriptor(
+      globalThis,
+      "window",
+    );
+    const values = new Map<string, string>();
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: {
+        localStorage: {
+          getItem: (key: string) => values.get(key) ?? null,
+          removeItem: (key: string) => values.delete(key),
+          setItem: (key: string, value: string) => values.set(key, value),
+        },
+        setTimeout: globalThis.setTimeout,
+      },
+    });
+    try {
+      const client = new MockLearningClient();
+      const first = await client.getAttempt(1, "cycle-demo");
+      const second = await client.getAttempt(1, "cycle-demo-second");
+
+      await client.saveDraft(first.id, "First essay stays here.");
+      await client.saveDraft(second.id, "Second essay stays here.");
+
+      await expect(client.getAttempt(1, "cycle-demo")).resolves.toMatchObject({
+        draft: "First essay stays here.",
+      });
+      await expect(
+        client.getAttempt(1, "cycle-demo-second"),
+      ).resolves.toMatchObject({ draft: "Second essay stays here." });
+    } finally {
+      if (previousWindow)
+        Object.defineProperty(globalThis, "window", previousWindow);
+      else Reflect.deleteProperty(globalThis, "window");
+    }
+  });
+
   it("uses authoritative growth metrics on Today and preserves unavailable values as unknown", async () => {
     const fetcher = vi.fn<typeof fetch>(async (input) => {
       const url = String(input);

@@ -10,6 +10,7 @@ import type {
   CustomQuestionInput,
   CycleExportOption,
   CycleBundleImportResult,
+  EssayWorkspaceData,
   FeedbackData,
   FocusedTeachingData,
   GrowthData,
@@ -80,6 +81,21 @@ const countWords = (value: string): number =>
 const removeStorage = (key: string): void => {
   if (canUseStorage()) window.localStorage.removeItem(key);
 };
+
+function demoDraftStorageKey(version: 1 | 2, cycleId: string): string {
+  const base = version === 1 ? STORAGE_KEYS.draftV1 : STORAGE_KEYS.draftV2;
+  return cycleId === "cycle-demo" ? base : `${base}:${cycleId}`;
+}
+
+function demoAttemptId(version: 1 | 2, cycleId: string): string {
+  const base = version === 1 ? "attempt-v1" : "attempt-v2";
+  return cycleId === "cycle-demo" ? base : `${base}:${cycleId}`;
+}
+
+function cycleIdFromDemoAttempt(attemptId: string): string {
+  const separator = attemptId.indexOf(":");
+  return separator < 0 ? "cycle-demo" : attemptId.slice(separator + 1);
+}
 
 const teachingPracticeResponseKey = (lessonId: string, promptId: string) =>
   `${lessonId}:${promptId}`;
@@ -1444,6 +1460,97 @@ export class MockLearningClient implements LearningClient {
     };
   }
 
+  async getEssayWorkspace(): Promise<EssayWorkspaceData> {
+    await delay();
+    return {
+      activeCount: 2,
+      activeLimit: 8,
+      essays: [
+        {
+          id: "cycle-demo",
+          prompt: `${writingPrompt.question} ${writingPrompt.instruction}`,
+          topic: "education",
+          status: "ATTEMPT_1_ACTIVE",
+          updatedAt: "2026-08-14T13:00:00.000Z",
+          nextAction: {
+            kind: "CONTINUE_ATTEMPT_1",
+            entityId: "cycle-demo",
+            reason: "Resume the saved first draft.",
+            dueAt: null,
+            overdue: false,
+          },
+          nextTask: {
+            id: "cycle-demo",
+            kind: "first-attempt",
+            eyebrowZh: "正在写作",
+            eyebrowEn: "Writing in progress",
+            titleZh: "继续第一篇作文",
+            titleEn: "Continue your first essay",
+            descriptionZh: "草稿与计时已保留，可以随时继续。",
+            descriptionEn:
+              "Your draft and timer are saved and ready to resume.",
+            durationMinutes: 40,
+            href: "/write?cycle=cycle-demo",
+            actionZh: "继续写作",
+            actionEn: "Continue writing",
+            dueLabelZh: "随时继续",
+            dueLabelEn: "Resume any time",
+          },
+          resources: {
+            cycleId: "cycle-demo",
+            writingAvailable: true,
+            feedbackAvailable: true,
+            lessonId: "lesson-collocation-perspective",
+            rewriteTaskId: "rewrite-primary-language",
+            comparisonAvailable: false,
+            transferTaskId: "transfer-task",
+          },
+        },
+        {
+          id: "cycle-demo-second",
+          prompt:
+            "Some people think governments should spend more money on public transport than on building new roads. To what extent do you agree or disagree?",
+          topic: "urban_transport",
+          status: "QUESTION_READY",
+          updatedAt: "2026-08-14T12:00:00.000Z",
+          nextAction: {
+            kind: "START_ATTEMPT_1",
+            entityId: "cycle-demo-second",
+            reason: "The first timed draft is ready.",
+            dueAt: null,
+            overdue: false,
+          },
+          nextTask: {
+            id: "cycle-demo-second",
+            kind: "first-attempt",
+            eyebrowZh: "新作文已准备好",
+            eyebrowEn: "New essay ready",
+            titleZh: "开始第二篇作文",
+            titleEn: "Start your second essay",
+            descriptionZh: "这篇作文尚未开始，不会影响其他正在进行的文章。",
+            descriptionEn:
+              "This essay has not started and does not affect your other work.",
+            durationMinutes: 40,
+            href: "/write?cycle=cycle-demo-second",
+            actionZh: "开始写作",
+            actionEn: "Start writing",
+            dueLabelZh: "随时开始",
+            dueLabelEn: "Ready when you are",
+          },
+          resources: {
+            cycleId: "cycle-demo-second",
+            writingAvailable: false,
+            feedbackAvailable: false,
+            lessonId: null,
+            rewriteTaskId: null,
+            comparisonAvailable: false,
+            transferTaskId: null,
+          },
+        },
+      ],
+    };
+  }
+
   async getQuestions(): Promise<QuestionOption[]> {
     await delay();
     return [
@@ -1485,13 +1592,15 @@ export class MockLearningClient implements LearningClient {
 
   async getAttempt(version: 1 | 2, cycleId: string): Promise<AttemptData> {
     await delay();
-    const key = version === 1 ? STORAGE_KEYS.draftV1 : STORAGE_KEYS.draftV2;
+    const key = demoDraftStorageKey(version, cycleId);
     return {
-      id: version === 1 ? "attempt-v1" : "attempt-v2",
+      id: demoAttemptId(version, cycleId),
       version,
       prompt: writingPrompt,
       durationSeconds: 40 * 60,
-      draft: readStorage(key) ?? (version === 1 ? defaultEssay : ""),
+      draft:
+        readStorage(key) ??
+        (version === 1 && cycleId === "cycle-demo" ? defaultEssay : ""),
       startedAt: "2026-08-13T12:00:00.000Z",
       autosaveKey: key,
       cycleId,
@@ -1499,9 +1608,8 @@ export class MockLearningClient implements LearningClient {
   }
 
   async saveDraft(attemptId: string, draft: string): Promise<void> {
-    const key = attemptId.includes("v2")
-      ? STORAGE_KEYS.draftV2
-      : STORAGE_KEYS.draftV1;
+    const version = attemptId.includes("v2") ? 2 : 1;
+    const key = demoDraftStorageKey(version, cycleIdFromDemoAttempt(attemptId));
     writeStorage(key, draft);
   }
 

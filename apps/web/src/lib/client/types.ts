@@ -66,6 +66,41 @@ export interface TodayData {
   };
 }
 
+export interface EssayWorkspaceResources {
+  cycleId: string;
+  writingAvailable: boolean;
+  feedbackAvailable: boolean;
+  lessonId: string | null;
+  rewriteTaskId: string | null;
+  comparisonAvailable: boolean;
+  transferTaskId: string | null;
+}
+
+export interface EssayWorkspaceAction {
+  kind: string;
+  entityId: string;
+  reason: string;
+  dueAt: string | null;
+  overdue: boolean;
+}
+
+export interface EssayWorkspaceItem {
+  id: string;
+  prompt: string;
+  topic: string;
+  status: string;
+  updatedAt: string;
+  nextAction: EssayWorkspaceAction;
+  nextTask: NextTask;
+  resources: EssayWorkspaceResources;
+}
+
+export interface EssayWorkspaceData {
+  activeCount: number;
+  activeLimit: 8;
+  essays: EssayWorkspaceItem[];
+}
+
 export interface AttemptSubmission {
   feedbackReady: boolean;
   jobId: string | null;
@@ -946,6 +981,7 @@ export interface ConnectionProbe {
 
 export interface LearningClient {
   getToday(): Promise<TodayData>;
+  getEssayWorkspace(): Promise<EssayWorkspaceData>;
   getQuestions(): Promise<QuestionOption[]>;
   createCustomQuestion(input: CustomQuestionInput): Promise<QuestionOption>;
   startTrainingCycle(questionId: string): Promise<string>;
