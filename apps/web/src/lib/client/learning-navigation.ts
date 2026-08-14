@@ -120,6 +120,16 @@ export function saveLearningDestinations(
   window.dispatchEvent(new Event("iwc:learning-navigation"));
 }
 
+export function clearLearningDestinations(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.removeItem(NAVIGATION_STORAGE_KEY);
+  } catch {
+    // Storage can be disabled; the notification still refreshes this tab.
+  }
+  window.dispatchEvent(new Event("iwc:learning-navigation"));
+}
+
 export function mergeLearningDestinations(
   update: Partial<LearningDestinations>,
 ): LearningDestinations {
