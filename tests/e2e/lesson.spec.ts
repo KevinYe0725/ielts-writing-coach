@@ -98,6 +98,10 @@ type HttpTeachingScenario = {
 
 const httpAnswer = "Employees can protect longer periods for demanding work.";
 
+function demoPractice(page: Page, prompt: string): Locator {
+  return page.locator("[data-teaching-practice]").filter({ hasText: prompt });
+}
+
 const personalizedAnalysis = {
   kind: "PERSONALIZED_ATOMS_V1",
   strengths: [
@@ -754,9 +758,14 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
     page,
   }) => {
     await page.goto(lessonUrl);
-    const practices = page.locator("[data-teaching-practice]");
-    const first = practices.first();
-    const second = practices.nth(1);
+    const first = demoPractice(
+      page,
+      "Flexible schedules can improve employee productivity because …",
+    );
+    const second = demoPractice(
+      page,
+      "Explain how charging households for excess waste could reduce landfill use.",
+    );
     await expect(first.locator("textarea")).toBeVisible();
     await expect(second.locator("textarea")).toBeVisible();
     await expect(first.locator("[data-teaching-answer-review]")).toHaveCount(0);
@@ -805,7 +814,10 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
     expect(axe.violations).toEqual([]);
 
     await page.reload();
-    const restored = page.locator("[data-teaching-practice]").first();
+    const restored = demoPractice(
+      page,
+      "Flexible schedules can improve employee productivity because …",
+    );
     await expect(
       restored.locator("[data-teaching-answer-review]"),
     ).toBeVisible();
@@ -865,7 +877,10 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
   }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(lessonUrl);
-    const prompt = page.locator("[data-teaching-practice]").first();
+    const prompt = demoPractice(
+      page,
+      "Flexible schedules can improve employee productivity because …",
+    );
     await prompt.locator("textarea").fill(httpAnswer);
     await prompt.locator("[data-teaching-practice-submit]").click();
     await expect(
@@ -935,7 +950,10 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
     });
     await page.clock.install();
     await page.goto(lessonUrl);
-    const prompt = page.locator("[data-teaching-practice]").first();
+    const prompt = demoPractice(
+      page,
+      "Flexible schedules can improve employee productivity because …",
+    );
     await expect(
       prompt.locator('[data-teaching-analysis][data-state="pending"]'),
     ).toBeVisible();

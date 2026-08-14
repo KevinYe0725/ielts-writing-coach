@@ -68,7 +68,6 @@ test.describe("deterministic setup and Today experience", () => {
     page,
   }) => {
     await page.goto("/today");
-    await page.waitForLoadState("networkidle");
     const taskPrompt = "Closed-book rewrite: early language learning";
 
     const header =
