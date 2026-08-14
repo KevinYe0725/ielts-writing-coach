@@ -96,4 +96,45 @@ test.describe("desktop learning workspace", () => {
       await page.evaluate(() => document.documentElement.scrollWidth),
     ).toBeLessThanOrEqual(390);
   });
+
+  test("keeps multiple essays available through the workspace and sidebar", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto("/today");
+
+    await page.getByRole("link", { name: "我的作文" }).click();
+    await expect(page).toHaveURL(/\/essays$/);
+    await expect(page.getByRole("heading", { name: "我的作文" })).toBeVisible();
+
+    const workspace = page.locator("[data-essay-workspace]");
+    await expect(workspace).toBeVisible();
+    await expect(workspace.locator("[data-essay-card]")).toHaveCount(2);
+    await expect(
+      workspace
+        .locator("[data-essay-card]")
+        .filter({ hasText: "继续第一篇作文" })
+        .getByRole("link", { name: "继续写作" }),
+    ).toHaveAttribute("href", "/write?cycle=cycle-demo");
+    await expect(
+      workspace
+        .locator("[data-essay-card]")
+        .filter({ hasText: "开始第二篇作文" })
+        .getByRole("link", { name: "开始写作" }),
+    ).toHaveAttribute("href", "/write?cycle=cycle-demo-second");
+    await expect(
+      workspace.getByRole("link", { name: "开始新作文" }),
+    ).toHaveAttribute("href", "/today?new-essay=1");
+
+    await workspace.getByRole("link", { name: "开始新作文" }).click();
+    await expect(page).toHaveURL(/\/today\?new-essay=1$/);
+    await expect(
+      page.getByRole("heading", { name: "先选一道题" }),
+    ).toBeVisible();
+
+    await page.goto("/today");
+    await expect(
+      page.locator('[data-essay-workspace="compact"]'),
+    ).toBeVisible();
+  });
 });

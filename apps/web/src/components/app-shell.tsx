@@ -39,6 +39,7 @@ import {
 
 const navItems = [
   { href: "/today", key: "today", icon: Home },
+  { href: "/essays", key: "essays", icon: BookOpenCheck },
   { href: "/write", key: "write", icon: PenLine },
   { href: "/feedback", key: "feedback", icon: ClipboardCheck },
   { href: "/lesson", key: "lesson", icon: BrainCircuit },
@@ -168,7 +169,8 @@ function Navigation({ compact = false }: { compact?: boolean }) {
           const active =
             pathname === item.href ||
             (item.href === "/lesson" && pathname.startsWith("/lesson/"));
-          const destination = destinations[item.key];
+          const destination =
+            item.key === "essays" ? item.href : destinations[item.key];
           if (!destination) {
             return (
               <span

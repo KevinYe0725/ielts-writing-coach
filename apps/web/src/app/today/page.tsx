@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   AlertTriangle,
   ArrowRight,
@@ -28,6 +28,7 @@ import {
   Skeleton,
 } from "@/components/ui";
 import { useDemoResource } from "@/components/use-demo-resource";
+import { EssayWorkspace } from "@/components/essay-workspace";
 import { cn } from "@/components/utils";
 import { learningClient } from "@/lib/client";
 import type { QuestionOption, QuestionTopic, QuestionType } from "@/lib/client";
@@ -68,6 +69,7 @@ function optionLabel<T extends string>(
 
 export default function TodayPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { locale, text, messages } = useLocale();
   const loader = useCallback(() => learningClient.getToday(), []);
   const { data, error, loading, retry } = useDemoResource(loader);
@@ -87,6 +89,7 @@ export default function TodayPage() {
   }, [data]);
 
   const needsQuestion =
+    searchParams.get("new-essay") === "1" ||
     data?.nextTask.id === "question-bank" ||
     data?.nextTask.href.startsWith("/today?mixed-review=1");
   useEffect(() => {
@@ -443,6 +446,8 @@ export default function TodayPage() {
           </Card>
         </section>
       ) : null}
+
+      <EssayWorkspace compact />
 
       <SectionHeader
         title={text("本篇训练闭环", "This learning loop")}

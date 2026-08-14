@@ -1,0 +1,200 @@
+.workspace,
+.compact {
+  min-width: 0;
+}
+
+.statusLine {
+  display: flex;
+  padding: 10px 0 18px;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.limitCopy {
+  color: var(--amber);
+  font-weight: 650;
+  text-align: right;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.card {
+  display: flex;
+  min-width: 0;
+  padding: 20px;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.cardTopline,
+.compactHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cardTopline > span:last-child {
+  color: var(--ink-faint);
+  font-size: 0.78rem;
+}
+
+.prompt {
+  display: -webkit-box;
+  min-height: 4.5em;
+  margin: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-family: var(--font-serif);
+  font-size: 1.02rem;
+  line-height: 1.55;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.nextStep {
+  display: grid;
+  padding: 12px;
+  background: var(--surface-muted);
+  border: 1px solid #e7ebf0;
+  border-radius: var(--radius-sm);
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+}
+
+.nextIcon {
+  display: inline-grid;
+  width: 31px;
+  height: 31px;
+  color: var(--blue);
+  background: var(--blue-soft);
+  border-radius: 50%;
+  place-items: center;
+}
+
+.nextStep strong {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 0.92rem;
+}
+
+.nextStep p {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: var(--ink-soft);
+  font-size: 0.84rem;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.card > .button {
+  align-self: flex-start;
+  margin-top: auto;
+}
+
+.empty,
+.loadError {
+  display: flex;
+  max-width: 660px;
+  padding: 24px;
+  color: var(--ink-soft);
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.empty svg {
+  flex: 0 0 auto;
+  color: var(--blue);
+}
+
+.empty h2,
+.loadError h1 {
+  margin-bottom: 5px;
+  color: var(--ink);
+}
+
+.empty p,
+.loadError p {
+  margin: 0;
+}
+
+.loadError {
+  display: block;
+}
+
+.loadError .button {
+  margin-top: 15px;
+}
+
+.compact {
+  padding: 22px 0 8px;
+}
+
+.compactHeading {
+  margin-bottom: 10px;
+}
+
+.compactHeading h2 {
+  margin-bottom: 0;
+}
+
+.compactHeading :global(.eyebrow) {
+  margin-bottom: 2px;
+}
+
+.compact .statusLine {
+  padding-top: 0;
+}
+
+.compact .grid {
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+}
+
+.compact .card {
+  padding: 16px;
+  gap: 12px;
+}
+
+.compact .prompt {
+  min-height: 3.1em;
+  font-size: 0.94rem;
+  -webkit-line-clamp: 2;
+}
+
+.compact .nextStep {
+  padding: 10px;
+}
+
+.compactLoading {
+  display: flex;
+  padding: 22px 0 8px;
+  color: var(--ink-soft);
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 760px) {
+  .grid,
+  .compact .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .statusLine {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .limitCopy {
+    text-align: left;
+  }
+}

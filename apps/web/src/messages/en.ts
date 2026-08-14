@@ -5,6 +5,7 @@ export const en = {
   brandTagline: "Turn every recurring error into a reusable skill",
   nav: {
     today: "Today",
+    essays: "My essays",
     write: "Writing room",
     feedback: "Feedback",
     lesson: "Focused learning",

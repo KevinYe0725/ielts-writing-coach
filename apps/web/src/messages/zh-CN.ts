@@ -3,6 +3,7 @@ export interface Messages {
   brandTagline: string;
   nav: {
     today: string;
+    essays: string;
     write: string;
     feedback: string;
     lesson: string;
@@ -30,6 +31,7 @@ export const zhCN = {
   brandTagline: "把每次错误变成下一次能力",
   nav: {
     today: "今天",
+    essays: "我的作文",
     write: "写作室",
     feedback: "批改报告",
     lesson: "专项提升",
