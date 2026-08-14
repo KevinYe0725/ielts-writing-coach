@@ -20,6 +20,7 @@ import {
 
 import {
   enqueueAIJob,
+  recoverFailedFocusedGeneration,
   requeueFailedAIJob,
   resolveAIJobRoute,
   resumeBlockedAIJobsForProvider,
@@ -243,6 +244,133 @@ integration("single-item AI job retry", () => {
       beforeAttempt?.contractAttempts,
     );
     expect(afterEvaluations).toEqual(beforeEvaluations);
+  });
+});
+
+integration("focused-generation recovery", () => {
+  const database = createDatabase(process.env.DATABASE_URL!);
+  const suffix = newDomainId();
+  const userId = `focused-recovery-${suffix}`;
+  const providerId = newDomainId();
+  const routeId = newDomainId();
+  const failedJobId = newDomainId();
+
+  beforeAll(async () => {
+    await database.db.insert(user).values({
+      id: userId,
+      name: "Focused recovery test",
+      email: `${userId}@example.test`,
+      role: "owner",
+    });
+    await database.db.insert(providerConnection).values({
+      id: providerId,
+      ownerId: userId,
+      name: "Focused recovery mock",
+      kind: "mock",
+      secretMode: "encrypted",
+    });
+    await database.db.insert(modelRoute).values({
+      id: routeId,
+      ownerId: userId,
+      taskKind: "exercise_generation",
+      providerConnectionId: providerId,
+      model: "mock-deterministic-v1",
+      routeVersion: 3,
+    });
+    await database.db.insert(aiJob).values({
+      id: failedJobId,
+      ownerId: userId,
+      taskKind: "exercise_generation",
+      status: "FAILED",
+      protectedReference: {
+        attemptId: newDomainId(),
+        assessmentId: newDomainId(),
+        cycleId: newDomainId(),
+        skillId: "collocation_perspective",
+      },
+      versionSnapshot: {
+        model: "obsolete-model",
+        providerKind: "compatible",
+        providerConnectionId: "obsolete-provider",
+        manualRetryCount: "2",
+      },
+      idempotencyKey: `focused-failed:${suffix}`,
+      graphileJobKey: `ai-job:${failedJobId}:manual:2`,
+      attemptCount: 5,
+      lastErrorCode: "INVALID_RESPONSE",
+      lastErrorSafeMessage: "The practice material could not be prepared.",
+    });
+  });
+
+  afterAll(async () => {
+    const jobs = await database.db.query.aiJob.findMany({
+      columns: { graphileJobKey: true },
+      where: eq(aiJob.ownerId, userId),
+    });
+    for (const job of jobs) {
+      if (job.graphileJobKey) {
+        await database.db.execute(
+          sql`select graphile_worker.remove_job(${job.graphileJobKey})`,
+        );
+      }
+    }
+    await database.db.delete(user).where(eq(user.id, userId));
+    await database.pool.end();
+  });
+
+  it("creates one fresh recovery job without mutating an exhausted failed job", async () => {
+    const first = await database.db.transaction(async (transaction) => {
+      const [failed] = await transaction
+        .select()
+        .from(aiJob)
+        .where(eq(aiJob.id, failedJobId))
+        .for("update");
+      return recoverFailedFocusedGeneration(transaction, failed!);
+    });
+    const second = await database.db.transaction(async (transaction) => {
+      const [failed] = await transaction
+        .select()
+        .from(aiJob)
+        .where(eq(aiJob.id, failedJobId))
+        .for("update");
+      return recoverFailedFocusedGeneration(transaction, failed!);
+    });
+
+    const failed = await database.db.query.aiJob.findFirst({
+      where: eq(aiJob.id, failedJobId),
+    });
+    const recovery = await database.db.query.aiJob.findFirst({
+      where: eq(aiJob.id, first.id),
+    });
+    const jobs = await database.db.query.aiJob.findMany({
+      where: eq(aiJob.ownerId, userId),
+    });
+
+    expect(first).toMatchObject({ status: "QUEUED" });
+    expect(first.id).not.toBe(failedJobId);
+    expect(second).toEqual(first);
+    expect(jobs).toHaveLength(2);
+    expect(failed).toMatchObject({
+      status: "FAILED",
+      versionSnapshot: { manualRetryCount: "2" },
+      lastErrorCode: "INVALID_RESPONSE",
+    });
+    expect(recovery).toMatchObject({
+      ownerId: userId,
+      taskKind: "exercise_generation",
+      status: "QUEUED",
+      providerConnectionId: providerId,
+      modelRouteId: routeId,
+      protectedReference: {
+        recoveryOfJobId: failedJobId,
+        recoveryOrdinal: "1",
+        skillId: "collocation_perspective",
+      },
+      versionSnapshot: {
+        model: "mock-deterministic-v1",
+        providerKind: "mock",
+      },
+    });
   });
 });
 

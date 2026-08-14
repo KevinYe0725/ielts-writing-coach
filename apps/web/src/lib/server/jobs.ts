@@ -212,6 +212,77 @@ export async function requeueFailedAIJob(
   };
 }
 
+/**
+ * A failed focused-generation job is a durable audit record.  Do not reset it
+ * in place: a provider or package-shape change can make its frozen request
+ * unrecoverable even after the learner fixes their connection.  Instead, make
+ * one fresh child job from the same protected learning references and resolve
+ * the learner's currently configured route.
+ */
+export async function recoverFailedFocusedGeneration(
+  transaction: DatabaseTransaction,
+  failedJob: typeof aiJob.$inferSelect,
+): Promise<{
+  id: string;
+  status: (typeof aiJob.$inferSelect)["status"];
+  location: string;
+}> {
+  if (
+    failedJob.taskKind !== "exercise_generation" ||
+    failedJob.status !== "FAILED"
+  ) {
+    throw Object.assign(
+      new Error("Only a failed focused practice generation can be recovered."),
+      { code: "FOCUSED_GENERATION_RECOVERY_NOT_AVAILABLE" },
+    );
+  }
+
+  const recoveryReference = sql`${aiJob.protectedReference}->>'recoveryOfJobId' = ${failedJob.id}`;
+  const activeRecovery = await transaction.query.aiJob.findFirst({
+    where: and(
+      eq(aiJob.ownerId, failedJob.ownerId),
+      eq(aiJob.taskKind, "exercise_generation"),
+      recoveryReference,
+      inArray(aiJob.status, [
+        "WAITING_FOR_CONSENT",
+        "QUEUED",
+        "LEASED",
+        "RUNNING",
+        "RETRY_SCHEDULED",
+      ]),
+    ),
+  });
+  if (activeRecovery) {
+    return {
+      id: activeRecovery.id,
+      status: activeRecovery.status,
+      location: `/api/v1/ai-jobs/${activeRecovery.id}`,
+    };
+  }
+
+  const earlierRecoveries = await transaction
+    .select({ id: aiJob.id })
+    .from(aiJob)
+    .where(
+      and(
+        eq(aiJob.ownerId, failedJob.ownerId),
+        eq(aiJob.taskKind, "exercise_generation"),
+        recoveryReference,
+      ),
+    );
+  const recovery = await enqueueAIJob(transaction, {
+    ownerId: failedJob.ownerId,
+    taskKind: "exercise_generation",
+    protectedReference: {
+      ...failedJob.protectedReference,
+      recoveryOfJobId: failedJob.id,
+      recoveryOrdinal: String(earlierRecoveries.length + 1),
+    },
+    idempotencyKey: `focused-generation-recovery:${failedJob.id}:${earlierRecoveries.length + 1}`,
+  });
+  return recovery;
+}
+
 export async function enqueueAIJob(
   transaction: DatabaseTransaction,
   input: {

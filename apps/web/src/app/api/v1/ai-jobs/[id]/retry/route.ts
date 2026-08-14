@@ -3,7 +3,10 @@ import { and, eq } from "drizzle-orm";
 import { aiJob } from "@iwc/db";
 
 import { getServerContext } from "@/lib/server/context";
-import { requeueFailedAIJob } from "@/lib/server/jobs";
+import {
+  recoverFailedFocusedGeneration,
+  requeueFailedAIJob,
+} from "@/lib/server/jobs";
 import { ApiProblem, apiRoute } from "@/lib/server/problem";
 import {
   emptyObjectSchema,
@@ -64,6 +67,9 @@ export const POST = apiRoute(
           });
         }
         try {
+          if (job.taskKind === "exercise_generation") {
+            return await recoverFailedFocusedGeneration(transaction, job);
+          }
           return await requeueFailedAIJob(transaction, job);
         } catch (error) {
           const code =
