@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+import { expectBasicAccessibility } from "./support";
+
 async function signedInSession(page: import("@playwright/test").Page) {
   await page.route("**/api/v1/auth/get-session", async (route) => {
     await route.fulfill({
@@ -35,6 +37,7 @@ test.describe("account controls", () => {
     await expect(
       page.getByRole("heading", { name: /账户与安全|account and security/i }),
     ).toBeVisible();
+    await expectBasicAccessibility(page);
     await expect(
       page
         .locator("[aria-labelledby='signed-in-account']")
@@ -81,7 +84,11 @@ test.describe("account controls", () => {
 
   test("opens from the sidebar, restores focus after Escape, and signs out", async ({
     page,
-  }) => {
+  }, testInfo) => {
+    test.skip(
+      testInfo.project.name === "mobile",
+      "The mobile menu has its own account-control flow.",
+    );
     await signedInSession(page);
     await page.route("**/api/v1/auth/sign-out", async (route) => {
       await route.fulfill({
