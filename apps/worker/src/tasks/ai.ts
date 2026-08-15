@@ -560,7 +560,7 @@ async function analyzeTeachingPractice(
       >,
       validate: (value): value is TeachingPracticeAnalysisJudgment =>
         validateTeachingPracticeAnalysis(value),
-      maxOutputTokens: 1_600,
+      maxOutputTokens: 16_000,
       timeoutMs: INTERACTIVE_GENERATION_TIMEOUT_MS,
     });
   const providerIsMock = job.versionSnapshot.providerKind === "mock";
@@ -692,7 +692,7 @@ async function ensureVersion2Assessment(input: {
         return false;
       }
     },
-    maxOutputTokens: 2_500,
+    maxOutputTokens: 25_000,
     timeoutMs: STANDARD_GENERATION_TIMEOUT_MS,
   });
   const overallConfidence =
@@ -888,7 +888,7 @@ async function assessEssay(
         return false;
       }
     },
-    maxOutputTokens: 2_500,
+    maxOutputTokens: 25_000,
     timeoutMs: STANDARD_GENERATION_TIMEOUT_MS,
   });
   const overallConfidence =
@@ -1011,7 +1011,7 @@ async function classifyIssues(
           return false;
         }
       }),
-    maxOutputTokens: 4_000,
+    maxOutputTokens: 40_000,
     timeoutMs: STANDARD_GENERATION_TIMEOUT_MS,
   });
   let issues = exactIssueSpans(attempt.content, result.value.issues);
@@ -1230,7 +1230,7 @@ Learner Version 1 for context only: ${(version1?.content ?? "").slice(0, 4_000)}
       >,
       validate: (value): value is AdaptiveTeachingModule =>
         validateAdaptiveTeachingModule(value, version1?.content),
-      maxOutputTokens: 8_000,
+      maxOutputTokens: 80_000,
       timeoutMs: LONG_GENERATION_TIMEOUT_MS,
     });
     const paper = await adapter.generateStructured<PracticePaperContent>({
@@ -1256,7 +1256,7 @@ Original IELTS question: ${cycle.question.prompt}`,
       schemaName: "iwc_timed_practice_paper_v3",
       schema: timedPracticePaperSchema as unknown as Record<string, unknown>,
       validate: validateTimedPracticePaper,
-      maxOutputTokens: 8_000,
+      maxOutputTokens: 80_000,
       timeoutMs: LONG_GENERATION_TIMEOUT_MS,
     });
     const value = {
@@ -1338,7 +1338,7 @@ Learner Version 1 for context only: ${(version1?.content ?? "").slice(0, 4_000)}
             value as FocusedLearningPackage,
             version1?.content,
           ),
-        maxOutputTokens: 16_000,
+        maxOutputTokens: 160_000,
         timeoutMs: LONG_GENERATION_TIMEOUT_MS,
       });
     } catch {
@@ -1552,7 +1552,7 @@ async function evaluateExercise(
       Array.isArray(
         (value as { userAnswerEvidence?: unknown }).userAnswerEvidence,
       ),
-    maxOutputTokens: 1_000,
+    maxOutputTokens: 10_000,
     timeoutMs: INTERACTIVE_GENERATION_TIMEOUT_MS,
   });
   const providerIsMock = job.versionSnapshot.providerKind === "mock";
@@ -1874,7 +1874,7 @@ Learner answers submitted together: ${JSON.stringify(answers)}`,
       value !== null &&
       typeof (value as { totalScore?: unknown }).totalScore === "number" &&
       Array.isArray((value as { itemResults?: unknown }).itemResults),
-    maxOutputTokens: 8_000,
+    maxOutputTokens: 80_000,
     timeoutMs: LONG_GENERATION_TIMEOUT_MS,
   });
   const sanitized = sanitizePracticePaperJudgment({
@@ -1993,7 +1993,7 @@ async function compareVersions(
         (value as { coreIssueSpansV2?: unknown }).coreIssueSpansV2,
       ) &&
       typeof (value as { modelEssay?: unknown }).modelEssay === "string",
-    maxOutputTokens: 2_000,
+    maxOutputTokens: 20_000,
     timeoutMs: STANDARD_GENERATION_TIMEOUT_MS,
   });
   const verifiedV1Spans = verifyComparisonIssueSpans(
@@ -2313,7 +2313,7 @@ async function evaluateTransfer(
       Array.isArray(
         (value as { userAnswerEvidence?: unknown }).userAnswerEvidence,
       ),
-    maxOutputTokens: 1_500,
+    maxOutputTokens: 15_000,
     timeoutMs: STANDARD_GENERATION_TIMEOUT_MS,
   });
   const providerKind = job.versionSnapshot.providerKind ?? "unknown";
