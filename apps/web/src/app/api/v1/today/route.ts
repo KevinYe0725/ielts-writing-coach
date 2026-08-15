@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNull, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 
 import { getUniqueNextAction, type NextAction } from "@iwc/learning-core";
 import {
@@ -134,18 +134,28 @@ export const GET = apiRoute(async (request) => {
       left.cycle.id.localeCompare(right.cycle.id),
   );
   const [selected, ...queue] = candidates;
-  const pendingJobKind =
-    selected?.action.kind === "WAIT_FOR_ASSESSMENT"
-      ? "ielts_assessment"
-      : selected?.action.kind === "WAIT_FOR_COMPARISON"
-        ? "version_comparison"
-        : null;
+  // Any job in the cycle's scoring chain that is not making progress — still
+  // waiting for consent, failed, or blocked — is surfaced so the learner sees
+  // an actionable state instead of an endless "waiting" card. This covers
+  // issue classification and focused-package generation failures, not just
+  // the terminal assessment/comparison jobs.
+  const chainTaskKinds = [
+    "ielts_assessment",
+    "issue_classification",
+    "exercise_generation",
+    "version_comparison",
+  ];
   const pendingJob =
-    selected && pendingJobKind
+    selected != null
       ? await db.query.aiJob.findFirst({
           where: and(
             eq(aiJob.ownerId, actor.id),
-            eq(aiJob.taskKind, pendingJobKind),
+            inArray(aiJob.taskKind, chainTaskKinds),
+            inArray(aiJob.status, [
+              "WAITING_FOR_CONSENT",
+              "FAILED",
+              "AI_BLOCKED",
+            ]),
             sql`${aiJob.protectedReference}->>'cycleId' = ${selected.cycle.id}`,
           ),
           orderBy: [desc(aiJob.createdAt)],

@@ -42,6 +42,7 @@ import type {
   LessonStage,
   ModelRouteSetting,
   NextTask,
+  PendingAiJob,
   QuestionOption,
   QuestionTopic,
   QuestionType,
@@ -51,6 +52,7 @@ import type {
   SystemStatus,
   TaskKind,
   TimelineStep,
+  TodayData,
   TransferResponseInput,
   TransferSubmission,
   TransferTaskData,
@@ -322,6 +324,11 @@ interface WireCycle extends JsonRecord {
     valid?: boolean;
   } | null;
   lessonGenerationRetry?: {
+    code?: string;
+    jobId?: string;
+    safeMessage?: string;
+  } | null;
+  issueClassificationRetry?: {
     code?: string;
     jobId?: string;
     safeMessage?: string;
@@ -611,8 +618,8 @@ function mapTransferTask(task: WireTransferTask): TransferTaskData {
 }
 
 /**
- * A submitted essay whose scoring job is terminal-but-not-succeeded needs an
- * explicit action; silently "waiting" would never produce feedback.
+ * A cycle whose scoring-chain job is terminal-but-not-succeeded needs an
+ * explicit action; silently "waiting" would never make progress.
  */
 function blockedJobPresentation(pendingJob: {
   errorCode: string | null;
@@ -620,10 +627,14 @@ function blockedJobPresentation(pendingJob: {
   status: string;
   taskKind: string;
 }): ReturnType<typeof actionPresentation> {
-  const assessment = pendingJob.taskKind === "ielts_assessment";
+  const nouns: Record<string, { zh: string; en: string }> = {
+    ielts_assessment: { zh: "批改", en: "feedback" },
+    issue_classification: { zh: "问题归类", en: "issue classification" },
+    exercise_generation: { zh: "专项训练", en: "focused practice" },
+    version_comparison: { zh: "对比分析", en: "comparison" },
+  };
+  const noun = nouns[pendingJob.taskKind] ?? { zh: "AI 任务", en: "AI task" };
   const blocked = pendingJob.status === "AI_BLOCKED";
-  const zhNoun = assessment ? "批改" : "对比分析";
-  const enNoun = assessment ? "feedback" : "comparison";
   const zhReason = pendingJob.errorSafeMessage
     ? `上次失败原因：${pendingJob.errorSafeMessage}`
     : "上次运行未能完成。";
@@ -634,16 +645,16 @@ function blockedJobPresentation(pendingJob: {
     taskKind: "feedback",
     href: "/today",
     durationMinutes: 0,
-    eyebrowZh: blocked ? "AI 连接需要修复" : `${zhNoun}未完成`,
-    eyebrowEn: blocked ? "AI connection needs repair" : `${enNoun} incomplete`,
-    titleZh: blocked ? "修复 AI 连接后自动继续" : `重试${zhNoun}`,
+    eyebrowZh: blocked ? "AI 连接需要修复" : `${noun.zh}未完成`,
+    eyebrowEn: blocked ? "AI connection needs repair" : `${noun.en} incomplete`,
+    titleZh: blocked ? "修复 AI 连接后自动继续" : `重试${noun.zh}`,
     titleEn: blocked
       ? "Repair the AI connection to continue"
-      : `Retry ${enNoun}`,
+      : `Retry ${noun.en}`,
     descriptionZh: `${zhReason}${blocked ? "更新或更换 AI 密钥后，等待中的任务会自动恢复。" : ""}`,
     descriptionEn: `${enReason}${blocked ? " Waiting jobs resume automatically after the AI key is updated or replaced." : ""}`,
-    actionZh: blocked ? "检查 AI 连接" : `重试${zhNoun}`,
-    actionEn: blocked ? "Review AI connection" : `Retry ${enNoun}`,
+    actionZh: blocked ? "检查 AI 连接" : `重试${noun.zh}`,
+    actionEn: blocked ? "Review AI connection" : `Retry ${noun.en}`,
   };
 }
 
@@ -1953,12 +1964,24 @@ export class HttpLearningClient implements LearningClient {
           errorSafeMessage: pendingJobWire.error_safe_message ?? null,
         }
       : null;
-    const waitingBlocked =
+    const waitingKinds = new Set([
+      "WAIT_FOR_ASSESSMENT",
+      "WAIT_FOR_COMPARISON",
+      "WAIT_FOR_LESSON",
+    ]);
+    const blocked =
       pendingJob !== null &&
       (pendingJob.status === "FAILED" || pendingJob.status === "AI_BLOCKED");
+    const waitingBlocked = blocked && waitingKinds.has(wire.next_action.kind);
     const presentation = waitingBlocked
-      ? blockedJobPresentation(pendingJob)
+      ? blockedJobPresentation(pendingJob!)
       : actionPresentation(wire.next_action.kind);
+    const blockedJobNotice = blocked && !waitingBlocked ? pendingJob : null;
+    const pendingJobAction: TodayData["pendingJobAction"] = waitingBlocked
+      ? pendingJob!.status === "AI_BLOCKED"
+        ? "review-connection"
+        : "retry"
+      : "none";
     const task: NextTask = {
       id: wire.next_action.entityId,
       kind: presentation.taskKind,
@@ -1999,6 +2022,8 @@ export class HttpLearningClient implements LearningClient {
         : ("missing" as const),
       nextTask: task,
       pendingJob,
+      pendingJobAction,
+      blockedJobNotice,
       navigation,
       cycleTitle: wire.cycle?.question?.prompt ?? "IELTS Writing Task 2",
       timeline: mapTimeline(wire.cycle?.status ?? "QUESTION_READY"),
@@ -2317,6 +2342,17 @@ export class HttpLearningClient implements LearningClient {
             safeMessage:
               cycle.lessonGenerationRetry.safeMessage ??
               "The focused lesson module could not be generated.",
+          }
+        : null,
+      issueClassificationRetry: cycle.issueClassificationRetry?.jobId
+        ? {
+            jobId: cycle.issueClassificationRetry.jobId,
+            code:
+              cycle.issueClassificationRetry.code ??
+              "ISSUE_CLASSIFICATION_FAILED",
+            safeMessage:
+              cycle.issueClassificationRetry.safeMessage ??
+              "The issue classification could not be completed.",
           }
         : null,
     };
@@ -3884,6 +3920,8 @@ export class HttpLearningClient implements LearningClient {
           "Open setup with the one-time token supplied by your self-hosted instance.",
           { status: 401, code: "SETUP_TOKEN_REQUIRED" },
         );
+      // The tested AI connection is saved atomically with the owner account;
+      // a provider failure rolls the whole setup back for a clean retry.
       await this.request("/setup", {
         body: {
           email: input.email,
@@ -3893,10 +3931,34 @@ export class HttpLearningClient implements LearningClient {
           password: input.password,
           setup_token: setupToken,
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          ...(input.configureAi === false || !input.providerVendor
+            ? {}
+            : {
+                provider: {
+                  api_key: input.apiKey || undefined,
+                  base_url: input.baseUrl || undefined,
+                  kind: input.provider,
+                  vendor: input.providerVendor,
+                  model: input.model,
+                  secret_mode:
+                    input.secretSource === "session"
+                      ? "session_only"
+                      : "encrypted",
+                },
+              }),
         },
         idempotent: true,
         method: "POST",
       });
+      await this.request("/auth/sign-in/email", {
+        body: {
+          email: input.email,
+          password: input.password,
+          rememberMe: true,
+        },
+        method: "POST",
+      });
+      return;
     }
     await this.request("/auth/sign-in/email", {
       body: {

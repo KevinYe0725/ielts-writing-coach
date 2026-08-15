@@ -315,6 +315,52 @@ export default function TodayPage() {
         </div>
       ) : null}
 
+      {data.blockedJobNotice ? (
+        <div className="status-banner status-banner-warning" role="status">
+          <CloudOff aria-hidden="true" size={21} />
+          <div>
+            <strong>
+              {text(
+                "前一步已完成，但后续 AI 任务没有跑完",
+                "The previous step finished, but a follow-up AI task did not",
+              )}
+            </strong>
+            <p>
+              {data.blockedJobNotice.errorSafeMessage
+                ? `${data.blockedJobNotice.errorSafeMessage} `
+                : ""}
+              {data.blockedJobNotice.status === "AI_BLOCKED"
+                ? text(
+                    "更新或更换 AI 密钥后任务会自动恢复。",
+                    "Tasks resume automatically after the AI key is updated or replaced.",
+                  )
+                : text(
+                    "点击重试即可继续；已经完成的批改不会受影响。",
+                    "Retry to continue; the completed feedback is unaffected.",
+                  )}
+            </p>
+            {retryError ? <p role="alert">{retryError}</p> : null}
+          </div>
+          {data.blockedJobNotice.status === "AI_BLOCKED" ? (
+            <ActionLink href="/settings" size="sm">
+              {text("检查 AI 连接", "Review AI connection")}
+            </ActionLink>
+          ) : (
+            <Button
+              disabled={retryingJob}
+              onClick={() => void retryPendingJob()}
+              size="sm"
+            >
+              {retryingJob ? (
+                <LoaderCircle aria-hidden="true" className="spin" size={17} />
+              ) : (
+                text("重试", "Retry")
+              )}
+            </Button>
+          )}
+        </div>
+      ) : null}
+
       {retryError ? (
         <p className="inline-probe error" role="alert">
           {retryError}
@@ -361,7 +407,7 @@ export default function TodayPage() {
               )}
               {text("用这道题开始", "Start with this question")}
             </Button>
-          ) : data.pendingJob?.status === "FAILED" ? (
+          ) : data.pendingJobAction === "retry" ? (
             <Button
               disabled={retryingJob}
               onClick={() => void retryPendingJob()}
@@ -374,7 +420,7 @@ export default function TodayPage() {
               )}
               {text(task.actionZh, task.actionEn)}
             </Button>
-          ) : data.pendingJob?.status === "AI_BLOCKED" ? (
+          ) : data.pendingJobAction === "review-connection" ? (
             <ActionLink href="/settings" size="lg">
               {text("检查 AI 连接", "Review AI connection")}
             </ActionLink>

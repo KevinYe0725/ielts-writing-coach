@@ -215,9 +215,21 @@ cmd_start() {
   printf '  Press Ctrl+C to stop the servers (PostgreSQL keeps running).\n'
   printf '  Stop PostgreSQL with: scripts/local-run.sh --stop\n\n'
 
-  trap 'warn "web + worker stopped; PostgreSQL still running (scripts/local-run.sh --stop to stop it)"; exit 130' INT
-  "$PNPM" dev
-  exit $?
+  # Run the worker WITHOUT file watching: a dev-mode restart would kill any
+  # in-flight essay grading or lesson generation. The web app keeps dev mode
+  # for fast page iteration.
+  "$PNPM" --filter @iwc/web dev &
+  WEB_PID=$!
+  "$PNPM" --filter @iwc/worker start:source &
+  WORKER_PID=$!
+  trap 'kill "$WEB_PID" "$WORKER_PID" 2>/dev/null; wait "$WEB_PID" "$WORKER_PID" 2>/dev/null; warn "web + worker stopped; PostgreSQL still running (scripts/local-run.sh --stop to stop it)"; exit 130' INT TERM
+  while kill -0 "$WEB_PID" 2>/dev/null && kill -0 "$WORKER_PID" 2>/dev/null; do
+    sleep 2
+  done
+  kill "$WEB_PID" "$WORKER_PID" 2>/dev/null
+  wait "$WEB_PID" "$WORKER_PID" 2>/dev/null
+  warn "web + worker stopped; PostgreSQL still running (scripts/local-run.sh --stop to stop it)"
+  exit 1
 }
 
 cmd_stop() {

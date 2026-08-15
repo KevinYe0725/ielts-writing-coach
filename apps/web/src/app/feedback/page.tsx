@@ -33,6 +33,7 @@ import {
   Badge,
   Button,
   Card,
+  LoadingButtonContent,
   PageHeader,
   Skeleton,
 } from "@/components/ui";
@@ -114,6 +115,8 @@ export default function FeedbackPage({
   const [locationMessage, setLocationMessage] = useState("");
   const [retryingGeneration, setRetryingGeneration] = useState(false);
   const [generationRetryError, setGenerationRetryError] = useState("");
+  const [retryingIssues, setRetryingIssues] = useState(false);
+  const [issueRetryError, setIssueRetryError] = useState("");
   const highlightRefs = useRef<Record<string, HTMLElement | null>>({});
   const cardRefs = useRef<Record<string, HTMLElement | null>>({});
 
@@ -274,6 +277,55 @@ export default function FeedbackPage({
           "Select a suggestion to locate its exact source, understand why it matters, and retain the transferable revision rule.",
         )}
       />
+
+      {data.issueClassificationRetry ? (
+        <div className="status-banner status-banner-warning" role="status">
+          <Info aria-hidden="true" size={21} />
+          <div>
+            <strong>
+              {text(
+                "批改已完成，但问题归类没有生成，报告细节不完整",
+                "Feedback is complete, but issue classification did not finish",
+              )}
+            </strong>
+            <p>
+              {text(
+                "分数与总体结论可用；逐句问题清单需要重新运行问题归类后才会出现。",
+                "The score and overall summary are available; the sentence-level issue list appears after issue classification is rerun.",
+              )}
+            </p>
+            {issueRetryError ? <p role="alert">{issueRetryError}</p> : null}
+          </div>
+          <Button
+            disabled={retryingIssues}
+            onClick={() => {
+              setRetryingIssues(true);
+              setIssueRetryError("");
+              void learningClient
+                .retryAiJob(data.issueClassificationRetry!.jobId)
+                .then(() => retry())
+                .catch((retryError) =>
+                  setIssueRetryError(
+                    retryError instanceof Error
+                      ? retryError.message
+                      : text(
+                          "问题归类仍未完成，请稍后再试。",
+                          "Issue classification is still unavailable. Try again later.",
+                        ),
+                  ),
+                )
+                .finally(() => setRetryingIssues(false));
+            }}
+            variant="secondary"
+          >
+            {retryingIssues ? (
+              <LoadingButtonContent label={text("正在重试…", "Retrying…")} />
+            ) : (
+              text("重试问题归类", "Retry issue classification")
+            )}
+          </Button>
+        </div>
+      ) : null}
 
       <Card className={styles.overviewCard}>
         <div className={styles.overallScore}>

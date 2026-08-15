@@ -1237,6 +1237,95 @@ describe("HttpLearningClient protocol", () => {
     }
   });
 
+  it("saves the tested AI connection atomically inside the initial setup", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({ setup_required: true }))
+      .mockResolvedValueOnce(jsonResponse({ setup_complete: true }))
+      .mockResolvedValueOnce(jsonResponse({ redirect: false }));
+    const client = new HttpLearningClient({
+      baseUrl: "https://coach.test/api/v1",
+      fetch: fetcher,
+      origin: "https://coach.test",
+    });
+
+    await client.completeBootstrap({
+      deploymentMode: "personal",
+      adminName: "Owner",
+      email: "owner@example.test",
+      password: "long-enough-password",
+      provider: "compatible",
+      providerVendor: "deepseek",
+      baseUrl: "https://api.deepseek.com/v1",
+      apiKey: "sk-secret-test-key",
+      model: "deepseek-v4-flash",
+      secretSource: "encrypted",
+      setupToken: "opaque-setup-token-1234567890",
+      configureAi: true,
+    });
+
+    const urls = fetcher.mock.calls.map((call) => String(call[0]));
+    const setupCall = fetcher.mock.calls.find((call) =>
+      String(call[0]).endsWith("/setup"),
+    );
+    expect(setupCall).toBeDefined();
+    expect(
+      JSON.parse(String(setupCall?.[1]?.body)) as Record<string, unknown>,
+    ).toMatchObject({
+      provider: {
+        api_key: "sk-secret-test-key",
+        base_url: "https://api.deepseek.com/v1",
+        kind: "compatible",
+        model: "deepseek-v4-flash",
+        secret_mode: "encrypted",
+        vendor: "deepseek",
+      },
+    });
+    // The provider and its routes live inside /setup now — no separate calls.
+    expect(
+      urls.filter(
+        (url) => url.endsWith("/providers") || url.endsWith("/model-routes"),
+      ),
+    ).toHaveLength(0);
+  });
+
+  it("omits the provider block when AI configuration is skipped", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({ setup_required: true }))
+      .mockResolvedValueOnce(jsonResponse({ setup_complete: true }))
+      .mockResolvedValueOnce(jsonResponse({ redirect: false }));
+    const client = new HttpLearningClient({
+      baseUrl: "https://coach.test/api/v1",
+      fetch: fetcher,
+      origin: "https://coach.test",
+    });
+
+    await client.completeBootstrap({
+      deploymentMode: "personal",
+      adminName: "Owner",
+      email: "owner@example.test",
+      password: "long-enough-password",
+      provider: "openai",
+      providerVendor: "openai",
+      baseUrl: "https://api.openai.com/v1",
+      apiKey: "",
+      model: "gpt-5-mini",
+      secretSource: "encrypted",
+      setupToken: "opaque-setup-token-1234567890",
+      configureAi: false,
+    });
+
+    const setupCall = fetcher.mock.calls.find((call) =>
+      String(call[0]).endsWith("/setup"),
+    );
+    const body = JSON.parse(String(setupCall?.[1]?.body)) as Record<
+      string,
+      unknown
+    >;
+    expect(body.provider).toBeUndefined();
+  });
+
   it("uses the same-origin mutation contract and an idempotency key", async () => {
     const fetcher = vi
       .fn<typeof fetch>()

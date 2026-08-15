@@ -26,6 +26,7 @@ const retryableTaskKinds = new Set([
   "open_sentence_evaluation",
   "paragraph_evaluation",
   "ielts_assessment",
+  "issue_classification",
   "version_comparison",
 ]);
 
@@ -65,7 +66,7 @@ export const POST = apiRoute(
             status: 409,
             code: "AI_JOB_RETRY_NOT_SUPPORTED",
             detail:
-              "Only a failed generated lesson module, exercise evaluation, essay assessment, or version comparison can be retried here.",
+              "Only a failed generated lesson module, exercise evaluation, essay assessment, issue classification, or version comparison can be retried here.",
           });
         }
         try {

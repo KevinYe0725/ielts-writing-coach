@@ -1,6 +1,7 @@
 import { count, eq } from "drizzle-orm";
 import { z } from "zod";
 
+import { providerVendorIds } from "@iwc/ai";
 import { digestOpaqueToken, tokenMatchesDigest } from "@iwc/auth";
 import {
   auditEvent,
@@ -12,6 +13,10 @@ import {
 
 import { getServerContext } from "@/lib/server/context";
 import { ApiProblem, apiRoute } from "@/lib/server/problem";
+import {
+  assignDefaultModelRoutes,
+  saveProviderConnection,
+} from "@/lib/server/provider-save";
 import { ianaTimezoneSchema, parseJsonBody } from "@/lib/server/request";
 import { enforceRateLimit, protectMutation } from "@/lib/server/security";
 
@@ -24,6 +29,19 @@ const setupSchema = z
     deployment_mode: z.enum(["personal", "shared"]).default("personal"),
     locale: z.enum(["zh-CN", "en"]).default("zh-CN"),
     timezone: ianaTimezoneSchema.default("UTC"),
+    // The wizard's tested AI connection is saved atomically with the owner
+    // account: a provider failure rolls the whole setup back instead of
+    // leaving a silently unconfigured instance behind.
+    provider: z
+      .object({
+        vendor: z.enum(providerVendorIds).optional(),
+        kind: z.enum(["openai", "compatible", "mock"]).optional(),
+        base_url: z.url().optional(),
+        api_key: z.string().max(2_000).optional(),
+        model: z.string().trim().min(1).max(200),
+        secret_mode: z.enum(["encrypted", "session_only"]).default("encrypted"),
+      })
+      .optional(),
   })
   .strict();
 
@@ -35,7 +53,7 @@ export const POST = apiRoute(async (request) => {
     windowSeconds: 15 * 60,
   });
   const payload = await parseJsonBody(request, setupSchema, {
-    maximumBytes: 4 * 1_024,
+    maximumBytes: 16 * 1_024,
   });
   const { db, auth, environment } = getServerContext();
   if (!auth || !environment.SETUP_TOKEN) {
@@ -85,6 +103,20 @@ export const POST = apiRoute(async (request) => {
       headers: new Headers({ origin: environment.APP_URL }),
     });
     createdUserId = created.user.id;
+    if (payload.provider?.vendor || payload.provider?.kind) {
+      const saved = await saveProviderConnection(db, created.user.id, {
+        vendor: payload.provider.vendor,
+        kind: payload.provider.kind,
+        baseUrl: payload.provider.base_url,
+        apiKey: payload.provider.api_key,
+        model: payload.provider.model,
+        secretMode: payload.provider.secret_mode,
+      });
+      await assignDefaultModelRoutes(db, created.user.id, {
+        providerConnectionId: saved.provider.id,
+        model: payload.provider.model,
+      });
+    }
     await db.transaction(async (transaction) => {
       await transaction
         .update(user)

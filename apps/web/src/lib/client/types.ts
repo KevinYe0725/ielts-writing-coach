@@ -65,6 +65,16 @@ export interface TodayData {
   aiState: AiConnectionState;
   nextTask: NextTask;
   pendingJob: PendingAiJob | null;
+  /**
+   * What the next-task card should do about the pending job: replace its
+   * action with a retry, a link to the AI settings, or keep the normal link.
+   */
+  pendingJobAction: "none" | "retry" | "review-connection";
+  /**
+   * A failed/blocked chain job that does not replace the primary card action
+   * (e.g. the feedback report is still the next step); surfaced as a banner.
+   */
+  blockedJobNotice: PendingAiJob | null;
   navigation: import("./learning-navigation").LearningDestinations;
   cycleTitle: string;
   timeline: TimelineStep[];
@@ -249,6 +259,11 @@ export interface FeedbackData {
   lessonScheduledLabelZh: string;
   lessonScheduledLabelEn: string;
   lessonGenerationRetry: {
+    jobId: string;
+    code: string;
+    safeMessage: string;
+  } | null;
+  issueClassificationRetry: {
     jobId: string;
     code: string;
     safeMessage: string;

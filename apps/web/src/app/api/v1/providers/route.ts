@@ -1,24 +1,14 @@
 import { desc, inArray } from "drizzle-orm";
 import { z } from "zod";
 
-import {
-  encryptProviderSecret,
-  parseMasterKey,
-  providerVendorIds,
-} from "@iwc/ai";
-import { localModelAllowlist, sessionOnlyProviderAllowed } from "@iwc/config";
-import { auditEvent, newDomainId, providerConnection, user } from "@iwc/db";
+import { providerVendorIds } from "@iwc/ai";
+import { providerConnection, user } from "@iwc/db";
 
 import { getServerContext } from "@/lib/server/context";
-import { ApiProblem, apiRoute } from "@/lib/server/problem";
-import {
-  probeProviderConnection,
-  providerNeedsApiKey,
-  resolveProviderConfig,
-} from "@/lib/server/provider-config";
+import { apiRoute } from "@/lib/server/problem";
+import { saveProviderConnection } from "@/lib/server/provider-save";
 import { parseJsonBody } from "@/lib/server/request";
 import { requireRole, requireSession } from "@/lib/server/session";
-import { setSessionProviderSecret } from "@/lib/server/session-secrets";
 import {
   completeIdempotentResponse,
   enforceRateLimit,
@@ -112,7 +102,7 @@ export const POST = apiRoute(async (request) => {
   const payload = await parseJsonBody(request, providerSchema, {
     maximumBytes: 16 * 1_024,
   });
-  const { db, environment } = getServerContext();
+  const { db } = getServerContext();
   const reservation = await reserveIdempotencyKey(
     db,
     actor.id,
@@ -121,111 +111,16 @@ export const POST = apiRoute(async (request) => {
   );
   if (reservation.replay) return reservation.replay;
   try {
-    const resolved = resolveProviderConfig({
+    const responseBody = await saveProviderConnection(db, actor.id, {
       vendor: payload.vendor,
       kind: payload.kind,
       baseUrl: payload.base_url,
       apiKey: payload.api_key,
       model: payload.test_model,
-      localBaseUrlAllowlist: localModelAllowlist(environment),
-    });
-    if (providerNeedsApiKey(resolved.vendor) && !payload.api_key) {
-      throw new ApiProblem({
-        title: "API key required",
-        status: 422,
-        code: "API_KEY_REQUIRED",
-        detail: "Supply an API key. It is submitted only to this instance.",
-      });
-    }
-    if (
-      payload.secret_mode === "session_only" &&
-      (!sessionOnlyProviderAllowed(environment) ||
-        (
-          await db.query.instanceConfiguration.findFirst({
-            columns: { deploymentMode: true },
-          })
-        )?.deploymentMode === "shared")
-    ) {
-      throw new ApiProblem({
-        title: "Session-only unavailable",
-        status: 422,
-        code: "SESSION_ONLY_UNAVAILABLE",
-        detail:
-          "Session-only keys require personal mode, one Web replica, and the embedded executor.",
-      });
-    }
-    const probe = await probeProviderConnection(resolved, {
-      localBaseUrlAllowlist: localModelAllowlist(environment),
-      model: payload.test_model,
-    });
-    const id = newDomainId();
-    const encrypted =
-      payload.secret_mode === "encrypted" && payload.api_key
-        ? (() => {
-            if (!environment.APP_ENCRYPTION_KEY) {
-              throw new ApiProblem({
-                title: "Encryption unavailable",
-                status: 503,
-                code: "ENCRYPTION_NOT_CONFIGURED",
-                detail: "APP_ENCRYPTION_KEY is required to save provider keys.",
-              });
-            }
-            return encryptProviderSecret(
-              payload.api_key,
-              parseMasterKey(environment.APP_ENCRYPTION_KEY),
-              environment.APP_ENCRYPTION_KEY_VERSION,
-              `provider:${actor.id}:${id}`,
-            );
-          })()
-        : undefined;
-    const connectionValues: typeof providerConnection.$inferInsert = {
-      id,
-      ownerId: actor.id,
-      name: resolved.preset.label,
-      kind: resolved.kind,
-      vendor: resolved.vendor,
-      ...(resolved.credentials.baseUrl === undefined
-        ? {}
-        : { baseUrl: resolved.credentials.baseUrl }),
       secretMode: payload.secret_mode,
-      ...(encrypted === undefined
-        ? {}
-        : {
-            secretCiphertext: encrypted.ciphertext,
-            secretNonce: encrypted.nonce,
-            keyVersion: encrypted.keyVersion,
-          }),
-      lastTestedAt: new Date(),
-      ...(probe.capabilities === undefined
-        ? {}
-        : { capabilities: { ...probe.capabilities } }),
-    };
-    const responseBody = {
-      provider: {
-        id,
-        name: resolved.preset.label,
-        kind: resolved.kind,
-        vendor: resolved.vendor,
-        base_url: resolved.credentials.baseUrl ?? null,
-        secret_mode: payload.secret_mode,
-        tested: true,
-        capabilities: probe.capabilities ?? null,
-      },
-    };
+      name: payload.name,
+    });
     await db.transaction(async (transaction) => {
-      await transaction.insert(providerConnection).values(connectionValues);
-      await transaction.insert(auditEvent).values({
-        actorId: actor.id,
-        action: "provider.create",
-        targetType: "provider_connection",
-        targetId: id,
-        result: "success",
-        metadata: {
-          kind: resolved.kind,
-          vendor: resolved.vendor,
-          secretMode: payload.secret_mode,
-        },
-      });
       await completeIdempotentResponse(
         transaction,
         actor.id,
@@ -234,12 +129,10 @@ export const POST = apiRoute(async (request) => {
         responseBody,
       );
     });
-    if (payload.secret_mode === "session_only" && payload.api_key)
-      setSessionProviderSecret(id, payload.api_key);
     return Response.json(responseBody, {
       status: 201,
       headers: {
-        location: `/api/v1/providers/${id}`,
+        location: `/api/v1/providers/${responseBody.provider.id}`,
         "cache-control": "no-store",
       },
     });

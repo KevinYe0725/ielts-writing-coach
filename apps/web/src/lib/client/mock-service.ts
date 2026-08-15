@@ -374,6 +374,7 @@ const feedback: FeedbackData = {
     },
   ],
   lessonGenerationRetry: null,
+  issueClassificationRetry: null,
   scores: [
     {
       criterion: "TR",
@@ -1272,6 +1273,8 @@ export class MockLearningClient implements LearningClient {
         greetingEn: "Good evening, Simon. There is only one thing to do today.",
         aiState: enabled ? "connected" : "missing",
         pendingJob: null,
+        pendingJobAction: "none",
+        blockedJobNotice: null,
         nextTask: {
           id: "continue-split-lesson",
           kind: "lesson",
@@ -1336,6 +1339,8 @@ export class MockLearningClient implements LearningClient {
       greetingEn: "Good evening, Simon. There is only one thing to do today.",
       aiState: enabled ? "connected" : "missing",
       pendingJob: null,
+      pendingJobAction: "none",
+      blockedJobNotice: null,
       nextTask: {
         id: practiceCompleted
           ? "new-cycle-after-practice"

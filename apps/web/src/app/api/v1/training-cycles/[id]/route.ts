@@ -11,47 +11,66 @@ export const GET = apiRoute(
     const actor = await requireSession(request);
     const { id } = await context.params;
     const { db } = getServerContext();
-    const [cycle, comparisonEvidence, failedLessonGenerationJob] =
-      await Promise.all([
-        db.query.trainingCycle.findFirst({
-          where: and(
-            eq(trainingCycle.id, id),
-            eq(trainingCycle.userId, actor.id),
-          ),
-          with: {
-            question: true,
-            writingAttempts: {
-              with: { assessment: { with: { issues: true } }, revisions: true },
-            },
-            lessonPlans: true,
-            rewriteTasks: true,
-            transferTasks: true,
+    const [
+      cycle,
+      comparisonEvidence,
+      failedLessonGenerationJob,
+      failedIssueClassificationJob,
+    ] = await Promise.all([
+      db.query.trainingCycle.findFirst({
+        where: and(
+          eq(trainingCycle.id, id),
+          eq(trainingCycle.userId, actor.id),
+        ),
+        with: {
+          question: true,
+          writingAttempts: {
+            with: { assessment: { with: { issues: true } }, revisions: true },
           },
-        }),
-        db.query.skillEvidenceEvent.findFirst({
-          where: and(
-            eq(skillEvidenceEvent.userId, actor.id),
-            eq(skillEvidenceEvent.cycleId, id),
-            eq(skillEvidenceEvent.evidenceStage, "DELAYED_REWRITE"),
-          ),
-          orderBy: [desc(skillEvidenceEvent.occurredAt)],
-        }),
-        db.query.aiJob.findFirst({
-          columns: {
-            id: true,
-            lastErrorCode: true,
-            lastErrorSafeMessage: true,
-            updatedAt: true,
-          },
-          where: and(
-            eq(aiJob.ownerId, actor.id),
-            eq(aiJob.taskKind, "exercise_generation"),
-            eq(aiJob.status, "FAILED"),
-            sql`${aiJob.protectedReference}->>'cycleId' = ${id}`,
-          ),
-          orderBy: [desc(aiJob.updatedAt), desc(aiJob.id)],
-        }),
-      ]);
+          lessonPlans: true,
+          rewriteTasks: true,
+          transferTasks: true,
+        },
+      }),
+      db.query.skillEvidenceEvent.findFirst({
+        where: and(
+          eq(skillEvidenceEvent.userId, actor.id),
+          eq(skillEvidenceEvent.cycleId, id),
+          eq(skillEvidenceEvent.evidenceStage, "DELAYED_REWRITE"),
+        ),
+        orderBy: [desc(skillEvidenceEvent.occurredAt)],
+      }),
+      db.query.aiJob.findFirst({
+        columns: {
+          id: true,
+          lastErrorCode: true,
+          lastErrorSafeMessage: true,
+          updatedAt: true,
+        },
+        where: and(
+          eq(aiJob.ownerId, actor.id),
+          eq(aiJob.taskKind, "exercise_generation"),
+          eq(aiJob.status, "FAILED"),
+          sql`${aiJob.protectedReference}->>'cycleId' = ${id}`,
+        ),
+        orderBy: [desc(aiJob.updatedAt), desc(aiJob.id)],
+      }),
+      db.query.aiJob.findFirst({
+        columns: {
+          id: true,
+          lastErrorCode: true,
+          lastErrorSafeMessage: true,
+          updatedAt: true,
+        },
+        where: and(
+          eq(aiJob.ownerId, actor.id),
+          eq(aiJob.taskKind, "issue_classification"),
+          eq(aiJob.status, "FAILED"),
+          sql`${aiJob.protectedReference}->>'cycleId' = ${id}`,
+        ),
+        orderBy: [desc(aiJob.updatedAt), desc(aiJob.id)],
+      }),
+    ]);
     if (!cycle)
       throw new ApiProblem({
         title: "Cycle not found",
@@ -73,6 +92,18 @@ export const GET = apiRoute(
                 failedLessonGenerationJob.lastErrorSafeMessage ??
                 "The focused lesson module could not be generated.",
               failedAt: failedLessonGenerationJob.updatedAt,
+            }
+          : null,
+        issueClassificationRetry: failedIssueClassificationJob
+          ? {
+              jobId: failedIssueClassificationJob.id,
+              code:
+                failedIssueClassificationJob.lastErrorCode ??
+                "ISSUE_CLASSIFICATION_FAILED",
+              safeMessage:
+                failedIssueClassificationJob.lastErrorSafeMessage ??
+                "The issue classification could not be completed.",
+              failedAt: failedIssueClassificationJob.updatedAt,
             }
           : null,
       },
