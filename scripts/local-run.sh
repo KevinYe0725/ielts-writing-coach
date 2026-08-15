@@ -115,7 +115,8 @@ pg_running() {
 
 load_secrets() { # shellcheck disable=SC1090
   . "$SECRETS"
-  export DATABASE_URL AUTH_SECRET APP_ENCRYPTION_KEY SETUP_TOKEN
+  export DATABASE_URL AUTH_SECRET APP_ENCRYPTION_KEY SETUP_TOKEN \
+    APP_URL TRUSTED_ORIGINS
 }
 
 write_secrets() {
@@ -126,8 +127,23 @@ DATABASE_URL=postgresql://iwc:$PG_PASSWORD@127.0.0.1:$DB_PORT/iwc
 AUTH_SECRET=$(openssl rand -base64 48 | tr -d '\n')
 APP_ENCRYPTION_KEY=$(openssl rand -base64 32 | tr -d '\n')
 SETUP_TOKEN=$(openssl rand -base64 24 | tr -d '\n')
+APP_URL=http://127.0.0.1:$APP_PORT
+TRUSTED_ORIGINS=http://127.0.0.1:$APP_PORT,http://localhost:$APP_PORT
 EOF
   chmod 600 "$SECRETS"
+}
+
+# Older .local-run state files predate APP_URL/TRUSTED_ORIGINS. Add the
+# defaults so browsers opened through localhost or 127.0.0.1 both pass the
+# trusted-origin check.
+ensure_origin_secrets() {
+  if ! grep -q '^APP_URL=' "$SECRETS" 2>/dev/null; then
+    printf 'APP_URL=http://127.0.0.1:%s\n' "$APP_PORT" >> "$SECRETS"
+  fi
+  if ! grep -q '^TRUSTED_ORIGINS=' "$SECRETS" 2>/dev/null; then
+    printf 'TRUSTED_ORIGINS=http://127.0.0.1:%s,http://localhost:%s\n' \
+      "$APP_PORT" "$APP_PORT" >> "$SECRETS"
+  fi
 }
 
 # --- setup ----------------------------------------------------------------
@@ -178,6 +194,8 @@ cmd_start() {
   resolve_pnpm
   resolve_pg
   ensure_postgres
+  ensure_origin_secrets
+  load_secrets
 
   export PATH="$NODE_DIR:$PATH"
   cd "$REPO_ROOT"

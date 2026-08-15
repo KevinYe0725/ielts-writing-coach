@@ -1,5 +1,9 @@
 import { createAuth } from "@iwc/auth";
-import { readServerEnvironment, type ServerEnvironment } from "@iwc/config";
+import {
+  readServerEnvironment,
+  trustedOrigins,
+  type ServerEnvironment,
+} from "@iwc/config";
 import { createDatabase, type Database } from "@iwc/db";
 import { MailService } from "@iwc/email";
 import type { Pool } from "pg";
@@ -38,7 +42,10 @@ export function getServerContext(): ServerContext {
         database: db,
         secret: environment.AUTH_SECRET,
         baseUrl: environment.APP_URL,
-        trustedOrigins: [new URL(environment.APP_URL).origin],
+        trustedOrigins: [
+          new URL(environment.APP_URL).origin,
+          ...trustedOrigins(environment),
+        ],
         sendResetPassword: async ({ user, url }) => {
           const delivery = await mail.send({
             to: user.email,

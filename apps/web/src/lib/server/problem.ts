@@ -1,5 +1,9 @@
 import { ZodError } from "zod";
 
+import { trustedOrigins } from "@iwc/config";
+
+import { getServerContext } from "./context";
+
 export interface ProblemDetails {
   type: string;
   title: string;
@@ -76,12 +80,18 @@ export function handleApiError(error: unknown, request: Request): Response {
   }
   const coded = error as { code?: string; message?: string };
   if (coded.code === "INVALID_ORIGIN") {
+    const { environment } = getServerContext();
+    const received = request.headers.get("origin") ?? "(missing)";
+    console.warn(
+      `[security] rejected mutation from untrusted origin ${received}; ` +
+        `trusted origins: ${[environment.APP_URL, ...trustedOrigins(environment)].join(", ")}`,
+    );
     return problemResponse({
       type: "https://ielts-writing-coach.dev/problems/invalid-origin",
       title: "Invalid origin",
       status: 403,
       code: "INVALID_ORIGIN",
-      detail: "The request origin is not trusted.",
+      detail: `The request origin is not trusted. Open the app through its configured URL (${environment.APP_URL}) or add your access origin to the TRUSTED_ORIGINS environment variable and restart.`,
       instance: new URL(request.url).pathname,
     });
   }

@@ -30,22 +30,23 @@ openssl rand -base64 32  # APP_ENCRYPTION_KEY: decodes to exactly 32 bytes
 openssl rand -base64 24  # SETUP_TOKEN
 ```
 
-| Variable                     | Web                      | Worker       | Notes                                                        |
-| ---------------------------- | ------------------------ | ------------ | ------------------------------------------------------------ |
-| `DATABASE_URL`               | required                 | required     | same PostgreSQL database                                     |
-| `APP_URL`                    | required                 | optional     | exact public HTTPS origin, with no extra path                |
-| `AUTH_SECRET`                | required                 | optional     | at least 32 characters; changing it invalidates sessions     |
-| `APP_ENCRYPTION_KEY`         | required                 | required     | identical Base64 32-byte value or 64-character hex value     |
-| `APP_ENCRYPTION_KEY_VERSION` | required                 | required     | normally `1`; changing the number does not rotate ciphertext |
-| `SETUP_TOKEN`                | required for first setup | no           | one-time owner-creation credential                           |
-| `DEPLOYMENT_MODE`            | required                 | recommended  | `personal` or `shared`                                       |
-| `WORKER_MODE`                | `standalone`             | `standalone` | cloud deployments use the separate Worker                    |
-| `PORT`                       | `3000`                   | no           | pins Web to the Railway HTTP proxy port                      |
-| `WEB_REPLICAS`               | required                 | no           | start with `1`                                               |
-| `TRUST_PROXY_HOPS`           | public deployments       | no           | sanitized ingress hops; `0` ignores all forwarding headers   |
-| `OPENAI_API_KEY`             | optional                 | optional     | required on both services only for environment-key routing   |
-| SMTP variables               | optional                 | no           | needed for emailed password-recovery links                   |
-| `TELEMETRY_ENABLED`          | recommended              | recommended  | defaults to `false`                                          |
+| Variable                     | Web                      | Worker       | Notes                                                               |
+| ---------------------------- | ------------------------ | ------------ | ------------------------------------------------------------------- |
+| `DATABASE_URL`               | required                 | required     | same PostgreSQL database                                            |
+| `APP_URL`                    | required                 | optional     | exact public HTTPS origin, with no extra path                       |
+| `AUTH_SECRET`                | required                 | optional     | at least 32 characters; changing it invalidates sessions            |
+| `APP_ENCRYPTION_KEY`         | required                 | required     | identical Base64 32-byte value or 64-character hex value            |
+| `APP_ENCRYPTION_KEY_VERSION` | required                 | required     | normally `1`; changing the number does not rotate ciphertext        |
+| `SETUP_TOKEN`                | required for first setup | no           | one-time owner-creation credential                                  |
+| `DEPLOYMENT_MODE`            | required                 | recommended  | `personal` or `shared`                                              |
+| `WORKER_MODE`                | `standalone`             | `standalone` | cloud deployments use the separate Worker                           |
+| `PORT`                       | `3000`                   | no           | pins Web to the Railway HTTP proxy port                             |
+| `WEB_REPLICAS`               | required                 | no           | start with `1`                                                      |
+| `TRUST_PROXY_HOPS`           | public deployments       | no           | sanitized ingress hops; `0` ignores all forwarding headers          |
+| `TRUSTED_ORIGINS`            | optional                 | no           | comma-separated extra browser origins, e.g. `https://coach.example` |
+| `OPENAI_API_KEY`             | optional                 | optional     | required on both services only for environment-key routing          |
+| SMTP variables               | optional                 | no           | needed for emailed password-recovery links                          |
+| `TELEMETRY_ENABLED`          | recommended              | recommended  | defaults to `false`                                                 |
 
 When a provider key is saved through the UI, Web encrypts it and Worker decrypts it. Different encryption keys therefore cause background AI jobs to fail. Do not change `APP_ENCRYPTION_KEY` after credentials are stored unless a supported re-encryption migration is available.
 

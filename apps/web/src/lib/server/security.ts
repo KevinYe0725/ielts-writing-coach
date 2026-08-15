@@ -4,6 +4,7 @@ import { isIP } from "node:net";
 import { and, eq, lte, sql } from "drizzle-orm";
 
 import { assertTrustedOrigin } from "@iwc/auth";
+import { trustedOrigins } from "@iwc/config";
 import { idempotencyRecord, rateLimitBucket, type Database } from "@iwc/db";
 
 import { ApiProblem } from "./problem";
@@ -11,7 +12,10 @@ import { getServerContext } from "./context";
 
 export function protectMutation(request: Request): void {
   const { environment } = getServerContext();
-  assertTrustedOrigin(request, [environment.APP_URL]);
+  assertTrustedOrigin(request, [
+    environment.APP_URL,
+    ...trustedOrigins(environment),
+  ]);
 }
 
 export function trustedRequestAddress(

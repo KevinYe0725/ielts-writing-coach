@@ -225,6 +225,8 @@ export DATABASE_URL='postgresql://iwc:iwc-local-only@127.0.0.1:5433/iwc'
 export AUTH_SECRET="$(openssl rand -base64 48)"
 export APP_ENCRYPTION_KEY="$(openssl rand -base64 32)"
 export SETUP_TOKEN="$(openssl rand -base64 24)"
+# Optional: extra browser origins allowed to call this instance
+export TRUSTED_ORIGINS='http://localhost:3000,http://127.0.0.1:3000'
 pnpm db:migrate
 pnpm db:seed
 pnpm dev

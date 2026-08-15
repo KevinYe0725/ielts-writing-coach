@@ -50,6 +50,7 @@ const serverEnvironmentSchema = z.object({
   OPENAI_API_KEY: optionalString,
   OPENAI_MODEL: optionalString,
   LOCAL_MODEL_BASE_URL_ALLOWLIST: optionalString,
+  TRUSTED_ORIGINS: optionalString,
   TELEMETRY_ENABLED: optionalBoolean.default(false),
 });
 
@@ -162,4 +163,31 @@ export function localModelAllowlist(environment: ServerEnvironment): string[] {
     .split(",")
     .map((entry) => entry.trim())
     .filter(Boolean);
+}
+
+/**
+ * Additional exact origins (beyond APP_URL) whose browsers may call this
+ * instance. Comma-separated, e.g. "http://localhost:3000,https://coach.example".
+ * Each entry must be a full http(s) origin; entries that do not parse are
+ * ignored rather than silently broadening trust.
+ */
+export function trustedOrigins(environment: ServerEnvironment): string[] {
+  const seen = new Set<string>();
+  const origins: string[] = [];
+  for (const entry of (environment.TRUSTED_ORIGINS ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean)) {
+    try {
+      const parsed = new URL(entry);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") continue;
+      const canonical = parsed.origin;
+      if (seen.has(canonical)) continue;
+      seen.add(canonical);
+      origins.push(canonical);
+    } catch {
+      continue;
+    }
+  }
+  return origins;
 }

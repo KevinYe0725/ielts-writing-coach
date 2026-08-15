@@ -4,6 +4,7 @@ import {
   inspectConfigurationReadiness,
   readServerEnvironment,
   sessionOnlyProviderAllowed,
+  trustedOrigins,
 } from "./index";
 
 describe("server environment", () => {
@@ -97,5 +98,21 @@ describe("server environment", () => {
       }),
     );
     expect(readiness.ready).toBe(true);
+  });
+
+  it("parses additional trusted origins and ignores malformed entries", () => {
+    const environment = readServerEnvironment({
+      APP_URL: "http://127.0.0.1:3000",
+      TRUSTED_ORIGINS:
+        "http://localhost:3000, https://coach.example.test,not-a-url, ftp://no.example, http://localhost:3000",
+    });
+    expect(trustedOrigins(environment)).toEqual([
+      "http://localhost:3000",
+      "https://coach.example.test",
+    ]);
+  });
+
+  it("returns no extra origins when TRUSTED_ORIGINS is unset", () => {
+    expect(trustedOrigins(readServerEnvironment({}))).toEqual([]);
   });
 });
