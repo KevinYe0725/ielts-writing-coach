@@ -50,12 +50,21 @@ export interface TimelineStep {
   dateLabel: string;
 }
 
+export interface PendingAiJob {
+  id: string;
+  status: string;
+  taskKind: string;
+  errorCode: string | null;
+  errorSafeMessage: string | null;
+}
+
 export interface TodayData {
   learnerName: string;
   greetingZh: string;
   greetingEn: string;
   aiState: AiConnectionState;
   nextTask: NextTask;
+  pendingJob: PendingAiJob | null;
   navigation: import("./learning-navigation").LearningDestinations;
   cycleTitle: string;
   timeline: TimelineStep[];
@@ -1036,6 +1045,7 @@ export interface LearningClient {
     itemId: string,
   ): Promise<LessonEvaluationResult>;
   retryLessonGeneration(jobId: string): Promise<void>;
+  retryAiJob(jobId: string): Promise<void>;
   skipLesson(lessonId: string): Promise<string>;
   completeLesson(
     lessonId: string,

@@ -83,6 +83,14 @@ function newEssaySnapshot() {
   return new URLSearchParams(window.location.search).get("new-essay") === "1";
 }
 
+function feedbackWaitingNoticeSnapshot() {
+  if (typeof window === "undefined") return false;
+  return (
+    new URLSearchParams(window.location.search).get("notice") ===
+    "feedback-waiting-ai"
+  );
+}
+
 export default function TodayPage() {
   const router = useRouter();
   const startingNewEssay = useSyncExternalStore(
@@ -90,6 +98,13 @@ export default function TodayPage() {
     newEssaySnapshot,
     () => false,
   );
+  const feedbackWaitingNotice = useSyncExternalStore(
+    subscribeToLocation,
+    feedbackWaitingNoticeSnapshot,
+    () => false,
+  );
+  const [retryingJob, setRetryingJob] = useState(false);
+  const [retryError, setRetryError] = useState<string | null>(null);
   const { locale, text, messages } = useLocale();
   const loader = useCallback(() => learningClient.getToday(), []);
   const { data, error, loading, retry } = useDemoResource(loader);
@@ -162,6 +177,25 @@ export default function TodayPage() {
       );
     } finally {
       setQuestionLoading(false);
+    }
+  };
+
+  const retryPendingJob = async () => {
+    if (!data?.pendingJob || retryingJob) return;
+    setRetryingJob(true);
+    setRetryError(null);
+    try {
+      await learningClient.retryAiJob(data.pendingJob.id);
+      retry();
+      window.history.replaceState({}, "", "/today");
+    } catch (error) {
+      setRetryError(
+        error instanceof Error
+          ? error.message
+          : "The job could not be retried.",
+      );
+    } finally {
+      setRetryingJob(false);
     }
   };
 
@@ -249,6 +283,44 @@ export default function TodayPage() {
         </div>
       ) : null}
 
+      {feedbackWaitingNotice &&
+      data.pendingJob &&
+      !["FAILED", "AI_BLOCKED"].includes(data.pendingJob.status) ? (
+        <div className="status-banner status-banner-warning" role="status">
+          <CloudOff aria-hidden="true" size={21} />
+          <div>
+            <strong>
+              {text(
+                "作文已提交并锁定，批改正在排队",
+                "Your essay is submitted and locked; feedback is queued",
+              )}
+            </strong>
+            <p>
+              {data.aiState === "connected"
+                ? text(
+                    "AI 连接正常，批改处理中；完成后今日计划会自动更新。",
+                    "The AI connection is healthy; feedback is processing and Today updates automatically.",
+                  )
+                : text(
+                    "批改需要先配置 AI 连接。在设置中保存可用的 AI 后，批改会自动开始，无需重写作文。",
+                    "Feedback starts automatically once a working AI connection is saved in Settings; you do not need to rewrite the essay.",
+                  )}
+            </p>
+          </div>
+          {data.aiState !== "connected" ? (
+            <ActionLink href="/settings" size="sm">
+              {text("配置 AI", "Configure AI")}
+            </ActionLink>
+          ) : null}
+        </div>
+      ) : null}
+
+      {retryError ? (
+        <p className="inline-probe error" role="alert">
+          {retryError}
+        </p>
+      ) : null}
+
       <Card className="next-task-card">
         <div className="next-task-accent" aria-hidden="true" />
         <div className="next-task-topline">
@@ -289,6 +361,23 @@ export default function TodayPage() {
               )}
               {text("用这道题开始", "Start with this question")}
             </Button>
+          ) : data.pendingJob?.status === "FAILED" ? (
+            <Button
+              disabled={retryingJob}
+              onClick={() => void retryPendingJob()}
+              size="lg"
+            >
+              {retryingJob ? (
+                <LoaderCircle aria-hidden="true" className="spin" size={17} />
+              ) : (
+                <Sparkles aria-hidden="true" size={17} />
+              )}
+              {text(task.actionZh, task.actionEn)}
+            </Button>
+          ) : data.pendingJob?.status === "AI_BLOCKED" ? (
+            <ActionLink href="/settings" size="lg">
+              {text("检查 AI 连接", "Review AI connection")}
+            </ActionLink>
           ) : (
             <ActionLink href={task.href} size="lg">
               {text(task.actionZh, task.actionEn)}

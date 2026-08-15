@@ -1,7 +1,13 @@
-import { and, asc, desc, eq, isNull, ne } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, ne, sql } from "drizzle-orm";
 
 import { getUniqueNextAction, type NextAction } from "@iwc/learning-core";
-import { lessonPlan, rewriteTask, trainingCycle, transferTask } from "@iwc/db";
+import {
+  aiJob,
+  lessonPlan,
+  rewriteTask,
+  trainingCycle,
+  transferTask,
+} from "@iwc/db";
 
 import { getServerContext } from "@/lib/server/context";
 import { apiRoute } from "@/lib/server/problem";
@@ -128,6 +134,23 @@ export const GET = apiRoute(async (request) => {
       left.cycle.id.localeCompare(right.cycle.id),
   );
   const [selected, ...queue] = candidates;
+  const pendingJobKind =
+    selected?.action.kind === "WAIT_FOR_ASSESSMENT"
+      ? "ielts_assessment"
+      : selected?.action.kind === "WAIT_FOR_COMPARISON"
+        ? "version_comparison"
+        : null;
+  const pendingJob =
+    selected && pendingJobKind
+      ? await db.query.aiJob.findFirst({
+          where: and(
+            eq(aiJob.ownerId, actor.id),
+            eq(aiJob.taskKind, pendingJobKind),
+            sql`${aiJob.protectedReference}->>'cycleId' = ${selected.cycle.id}`,
+          ),
+          orderBy: [desc(aiJob.createdAt)],
+        })
+      : null;
   return Response.json({
     next_action: selected?.action,
     cycle: selected
@@ -148,6 +171,17 @@ export const GET = apiRoute(async (request) => {
                 attempt.kind === "version_2" && attempt.assessment !== null,
             ),
             transfer_task_id: selected.cycle.transferTasks[0]?.id ?? null,
+            ...(pendingJob == null
+              ? { pending_job: null }
+              : {
+                  pending_job: {
+                    id: pendingJob.id,
+                    status: pendingJob.status,
+                    task_kind: pendingJob.taskKind,
+                    error_code: pendingJob.lastErrorCode,
+                    error_safe_message: pendingJob.lastErrorSafeMessage,
+                  },
+                }),
           },
         }
       : null,

@@ -1,11 +1,7 @@
 import { count } from "drizzle-orm";
 import { z } from "zod";
 
-import {
-  createProviderAdapter,
-  providerVendorIds,
-  validateProviderBaseUrl,
-} from "@iwc/ai";
+import { providerVendorIds } from "@iwc/ai";
 import { digestOpaqueToken, tokenMatchesDigest } from "@iwc/auth";
 import { localModelAllowlist } from "@iwc/config";
 import { instanceConfiguration, user } from "@iwc/db";
@@ -13,6 +9,7 @@ import { instanceConfiguration, user } from "@iwc/db";
 import { getServerContext } from "@/lib/server/context";
 import { ApiProblem, apiRoute } from "@/lib/server/problem";
 import {
+  probeProviderConnection,
   providerNeedsApiKey,
   resolveProviderConfig,
 } from "@/lib/server/provider-config";
@@ -84,25 +81,10 @@ export const POST = apiRoute(async (request) => {
       detail: "Testing a provider requires the complete API key.",
     });
   }
-  if (resolved.credentials.baseUrl) {
-    await validateProviderBaseUrl(
-      resolved.credentials.baseUrl,
-      localModelAllowlist(environment),
-    );
-  }
-  const adapter = createProviderAdapter(resolved.kind, resolved.credentials);
-  const validation = await adapter.validateConnection();
-  if (!validation.ok) {
-    throw new ApiProblem({
-      title: "Provider test failed",
-      status: 422,
-      code: "PROVIDER_TEST_FAILED",
-      detail: validation.safeMessage,
-    });
-  }
-  const capabilities = payload.model
-    ? await adapter.probeCapabilities(payload.model)
-    : undefined;
+  const { validation, capabilities } = await probeProviderConnection(resolved, {
+    localBaseUrlAllowlist: localModelAllowlist(environment),
+    model: payload.model,
+  });
   return Response.json(
     {
       ok: true,

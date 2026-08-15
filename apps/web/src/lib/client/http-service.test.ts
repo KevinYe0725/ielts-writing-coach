@@ -1474,6 +1474,97 @@ describe("HttpLearningClient protocol", () => {
     });
   });
 
+  it("surfaces a failed assessment job as an actionable retry task", async () => {
+    const fetcher = vi.fn<typeof fetch>(async (input) => {
+      const url = String(input);
+      if (url.endsWith("/today"))
+        return jsonResponse({
+          cycle: {
+            id: "cycle-1",
+            status: "ANALYZING",
+            question: { prompt: "Feedback pending identity" },
+            resources: {
+              pending_job: {
+                id: "job-1",
+                status: "FAILED",
+                task_kind: "ielts_assessment",
+                error_code: "INVALID_RESPONSE",
+                error_safe_message:
+                  "The provider returned an invalid structured response.",
+              },
+            },
+          },
+          next_action: {
+            kind: "WAIT_FOR_ASSESSMENT",
+            entityId: "cycle-1",
+            dueAt: null,
+          },
+        });
+      if (url.endsWith("/providers")) return jsonResponse({ providers: [] });
+      if (url.endsWith("/growth"))
+        return jsonResponse({ summary: { essays_completed: 1 } });
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+    const client = new HttpLearningClient({
+      baseUrl: "https://coach.test/api/v1",
+      fetch: fetcher,
+      origin: "https://coach.test",
+    });
+
+    await expect(client.getToday()).resolves.toMatchObject({
+      nextTask: {
+        titleZh: "重试批改",
+        descriptionEn: expect.stringContaining("Last failure"),
+      },
+      pendingJob: { id: "job-1", status: "FAILED" },
+    });
+  });
+
+  it("directs an AI-blocked assessment job to the AI settings", async () => {
+    const fetcher = vi.fn<typeof fetch>(async (input) => {
+      const url = String(input);
+      if (url.endsWith("/today"))
+        return jsonResponse({
+          cycle: {
+            id: "cycle-2",
+            status: "ANALYZING",
+            question: { prompt: "Blocked feedback identity" },
+            resources: {
+              pending_job: {
+                id: "job-2",
+                status: "AI_BLOCKED",
+                task_kind: "ielts_assessment",
+                error_code: "AUTHENTICATION",
+                error_safe_message: "The provider rejected the credentials.",
+              },
+            },
+          },
+          next_action: {
+            kind: "WAIT_FOR_ASSESSMENT",
+            entityId: "cycle-2",
+            dueAt: null,
+          },
+        });
+      if (url.endsWith("/providers")) return jsonResponse({ providers: [] });
+      if (url.endsWith("/growth"))
+        return jsonResponse({ summary: { essays_completed: 1 } });
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+    const client = new HttpLearningClient({
+      baseUrl: "https://coach.test/api/v1",
+      fetch: fetcher,
+      origin: "https://coach.test",
+    });
+
+    await expect(client.getToday()).resolves.toMatchObject({
+      nextTask: {
+        titleEn: "Repair the AI connection to continue",
+        actionEn: "Review AI connection",
+      },
+      pendingJob: { id: "job-2", status: "AI_BLOCKED" },
+    });
+  });
+
   it("maps authoritative missed-window actions and posts explicit reschedules", async () => {
     let todayCalls = 0;
     const fetcher = vi.fn<typeof fetch>(async (input, init) => {

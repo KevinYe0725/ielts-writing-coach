@@ -22,5 +22,7 @@ output/
 .vscode/
 .coach-ielts-writing/
 .local-run/
+.local-qa/
+apps/web/.local-qa/
 /backups/
 tmp/

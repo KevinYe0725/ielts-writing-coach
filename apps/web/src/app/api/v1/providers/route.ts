@@ -2,11 +2,9 @@ import { desc, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 import {
-  createProviderAdapter,
   encryptProviderSecret,
   parseMasterKey,
   providerVendorIds,
-  validateProviderBaseUrl,
 } from "@iwc/ai";
 import { localModelAllowlist, sessionOnlyProviderAllowed } from "@iwc/config";
 import { auditEvent, newDomainId, providerConnection, user } from "@iwc/db";
@@ -14,6 +12,7 @@ import { auditEvent, newDomainId, providerConnection, user } from "@iwc/db";
 import { getServerContext } from "@/lib/server/context";
 import { ApiProblem, apiRoute } from "@/lib/server/problem";
 import {
+  probeProviderConnection,
   providerNeedsApiKey,
   resolveProviderConfig,
 } from "@/lib/server/provider-config";
@@ -155,24 +154,10 @@ export const POST = apiRoute(async (request) => {
           "Session-only keys require personal mode, one Web replica, and the embedded executor.",
       });
     }
-    if (resolved.credentials.baseUrl)
-      await validateProviderBaseUrl(
-        resolved.credentials.baseUrl,
-        localModelAllowlist(environment),
-      );
-    const adapter = createProviderAdapter(resolved.kind, resolved.credentials);
-    const validation = await adapter.validateConnection();
-    if (!validation.ok) {
-      throw new ApiProblem({
-        title: "Provider test failed",
-        status: 422,
-        code: "PROVIDER_TEST_FAILED",
-        detail: validation.safeMessage,
-      });
-    }
-    const capabilities = payload.test_model
-      ? await adapter.probeCapabilities(payload.test_model)
-      : undefined;
+    const probe = await probeProviderConnection(resolved, {
+      localBaseUrlAllowlist: localModelAllowlist(environment),
+      model: payload.test_model,
+    });
     const id = newDomainId();
     const encrypted =
       payload.secret_mode === "encrypted" && payload.api_key
@@ -211,9 +196,9 @@ export const POST = apiRoute(async (request) => {
             keyVersion: encrypted.keyVersion,
           }),
       lastTestedAt: new Date(),
-      ...(capabilities === undefined
+      ...(probe.capabilities === undefined
         ? {}
-        : { capabilities: { ...capabilities } }),
+        : { capabilities: { ...probe.capabilities } }),
     };
     const responseBody = {
       provider: {
@@ -224,7 +209,7 @@ export const POST = apiRoute(async (request) => {
         base_url: resolved.credentials.baseUrl ?? null,
         secret_mode: payload.secret_mode,
         tested: true,
-        capabilities: capabilities ?? null,
+        capabilities: probe.capabilities ?? null,
       },
     };
     await db.transaction(async (transaction) => {

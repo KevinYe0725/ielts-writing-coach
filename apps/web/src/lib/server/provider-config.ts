@@ -1,9 +1,13 @@
 import {
+  createProviderAdapter,
   getProviderPreset,
   inferProviderVendor,
   isProviderVendor,
   providerCredentialsForPreset,
   providerPresetNeedsApiKey,
+  validateProviderBaseUrl,
+  type ConnectionValidation,
+  type ProviderCapabilities,
   type ProviderKind,
   type ProviderVendor,
 } from "@iwc/ai";
@@ -69,4 +73,88 @@ export function resolveProviderConfig(input: ProviderConfigInput) {
 
 export function providerNeedsApiKey(vendor: ProviderVendor): boolean {
   return providerPresetNeedsApiKey(vendor);
+}
+
+/**
+ * Validates the resolved provider credentials: base URL policy (SSRF checks),
+ * a fixed-sample connection probe, and an optional structured-output
+ * capability probe. Every provider-side failure — including DNS problems,
+ * refused credentials, timeouts, malformed responses, and blocked base URLs —
+ * is surfaced as a 422 problem so the learner sees an actionable message
+ * instead of an opaque 500.
+ */
+export async function probeProviderConnection(
+  resolved: ReturnType<typeof resolveProviderConfig>,
+  options: {
+    localBaseUrlAllowlist?: readonly string[];
+    model?: string | undefined;
+  },
+): Promise<{
+  validation: ConnectionValidation;
+  capabilities: ProviderCapabilities | undefined;
+}> {
+  if (resolved.credentials.baseUrl) {
+    try {
+      await validateProviderBaseUrl(
+        resolved.credentials.baseUrl,
+        options.localBaseUrlAllowlist ?? [],
+      );
+    } catch (error) {
+      throw new ApiProblem({
+        title: "Provider URL rejected",
+        status: 422,
+        code: "PROVIDER_BASE_URL_REJECTED",
+        detail: `${error instanceof Error ? error.message : "The provider base URL is not allowed."} To permit an exact local model URL, add it to the LOCAL_MODEL_BASE_URL_ALLOWLIST environment variable and restart.`,
+      });
+    }
+  }
+
+  let adapter: ReturnType<typeof createProviderAdapter>;
+  try {
+    adapter = createProviderAdapter(resolved.kind, resolved.credentials);
+  } catch (error) {
+    throw new ApiProblem({
+      title: "Provider configuration invalid",
+      status: 422,
+      code: "PROVIDER_CONFIGURATION_INVALID",
+      detail:
+        error instanceof Error
+          ? error.message
+          : "The provider configuration is invalid.",
+    });
+  }
+
+  let validation: ConnectionValidation;
+  try {
+    validation = await adapter.validateConnection();
+  } catch (error) {
+    validation = {
+      ok: false,
+      latencyMs: 0,
+      safeMessage: adapter.normalizeError(error).safeMessage,
+    };
+  }
+  if (!validation.ok) {
+    throw new ApiProblem({
+      title: "Provider test failed",
+      status: 422,
+      code: "PROVIDER_TEST_FAILED",
+      detail: validation.safeMessage,
+    });
+  }
+
+  let capabilities: ProviderCapabilities | undefined;
+  if (options.model) {
+    try {
+      capabilities = await adapter.probeCapabilities(options.model);
+    } catch (error) {
+      throw new ApiProblem({
+        title: "Provider test failed",
+        status: 422,
+        code: "PROVIDER_TEST_FAILED",
+        detail: adapter.normalizeError(error).safeMessage,
+      });
+    }
+  }
+  return { validation, capabilities };
 }

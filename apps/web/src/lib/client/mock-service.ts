@@ -1271,6 +1271,7 @@ export class MockLearningClient implements LearningClient {
         greetingZh: "晚上好，Simon。今天只做这一件事。",
         greetingEn: "Good evening, Simon. There is only one thing to do today.",
         aiState: enabled ? "connected" : "missing",
+        pendingJob: null,
         nextTask: {
           id: "continue-split-lesson",
           kind: "lesson",
@@ -1334,6 +1335,7 @@ export class MockLearningClient implements LearningClient {
       greetingZh: "晚上好，Simon。今天只做这一件事。",
       greetingEn: "Good evening, Simon. There is only one thing to do today.",
       aiState: enabled ? "connected" : "missing",
+      pendingJob: null,
       nextTask: {
         id: practiceCompleted
           ? "new-cycle-after-practice"
@@ -2067,6 +2069,10 @@ export class MockLearningClient implements LearningClient {
   async retryLessonGeneration(_jobId: string): Promise<void> {
     await delay(120);
     removeStorage(STORAGE_KEYS.lessonGenerationFailure);
+  }
+
+  async retryAiJob(_jobId: string): Promise<void> {
+    await delay(120);
   }
 
   async skipLesson(_lessonId: string): Promise<string> {

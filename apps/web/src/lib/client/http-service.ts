@@ -338,6 +338,13 @@ interface TodayWire {
       comparison_available?: boolean;
       feedback_available?: boolean;
       lesson_id?: string | null;
+      pending_job?: null | {
+        error_code?: string | null;
+        error_safe_message?: string | null;
+        id: string;
+        status: string;
+        task_kind: string;
+      };
       rewrite_task_id?: string | null;
       transfer_task_id?: string | null;
       writing_available?: boolean;
@@ -600,6 +607,43 @@ function mapTransferTask(task: WireTransferTask): TransferTaskData {
             "The transfer evaluation could not be completed.",
         }
       : null,
+  };
+}
+
+/**
+ * A submitted essay whose scoring job is terminal-but-not-succeeded needs an
+ * explicit action; silently "waiting" would never produce feedback.
+ */
+function blockedJobPresentation(pendingJob: {
+  errorCode: string | null;
+  errorSafeMessage: string | null;
+  status: string;
+  taskKind: string;
+}): ReturnType<typeof actionPresentation> {
+  const assessment = pendingJob.taskKind === "ielts_assessment";
+  const blocked = pendingJob.status === "AI_BLOCKED";
+  const zhNoun = assessment ? "批改" : "对比分析";
+  const enNoun = assessment ? "feedback" : "comparison";
+  const zhReason = pendingJob.errorSafeMessage
+    ? `上次失败原因：${pendingJob.errorSafeMessage}`
+    : "上次运行未能完成。";
+  const enReason = pendingJob.errorSafeMessage
+    ? `Last failure: ${pendingJob.errorSafeMessage}`
+    : "The last run did not finish.";
+  return {
+    taskKind: "feedback",
+    href: "/today",
+    durationMinutes: 0,
+    eyebrowZh: blocked ? "AI 连接需要修复" : `${zhNoun}未完成`,
+    eyebrowEn: blocked ? "AI connection needs repair" : `${enNoun} incomplete`,
+    titleZh: blocked ? "修复 AI 连接后自动继续" : `重试${zhNoun}`,
+    titleEn: blocked
+      ? "Repair the AI connection to continue"
+      : `Retry ${enNoun}`,
+    descriptionZh: `${zhReason}${blocked ? "更新或更换 AI 密钥后，等待中的任务会自动恢复。" : ""}`,
+    descriptionEn: `${enReason}${blocked ? " Waiting jobs resume automatically after the AI key is updated or replaced." : ""}`,
+    actionZh: blocked ? "检查 AI 连接" : `重试${zhNoun}`,
+    actionEn: blocked ? "Review AI connection" : `Retry ${enNoun}`,
   };
 }
 
@@ -1899,7 +1943,22 @@ export class HttpLearningClient implements LearningClient {
       this.getProviders().catch(() => []),
       this.getGrowth().catch(() => null),
     ]);
-    const presentation = actionPresentation(wire.next_action.kind);
+    const pendingJobWire = wire.cycle?.resources?.pending_job ?? null;
+    const pendingJob = pendingJobWire
+      ? {
+          id: pendingJobWire.id,
+          status: pendingJobWire.status,
+          taskKind: pendingJobWire.task_kind,
+          errorCode: pendingJobWire.error_code ?? null,
+          errorSafeMessage: pendingJobWire.error_safe_message ?? null,
+        }
+      : null;
+    const waitingBlocked =
+      pendingJob !== null &&
+      (pendingJob.status === "FAILED" || pendingJob.status === "AI_BLOCKED");
+    const presentation = waitingBlocked
+      ? blockedJobPresentation(pendingJob)
+      : actionPresentation(wire.next_action.kind);
     const task: NextTask = {
       id: wire.next_action.entityId,
       kind: presentation.taskKind,
@@ -1939,6 +1998,7 @@ export class HttpLearningClient implements LearningClient {
         ? ("connected" as const)
         : ("missing" as const),
       nextTask: task,
+      pendingJob,
       navigation,
       cycleTitle: wire.cycle?.question?.prompt ?? "IELTS Writing Task 2",
       timeline: mapTimeline(wire.cycle?.status ?? "QUESTION_READY"),
@@ -2933,6 +2993,24 @@ export class HttpLearningClient implements LearningClient {
       );
     }
     await this.waitForJob(data.job_id);
+  }
+
+  async retryAiJob(jobId: string): Promise<void> {
+    const { data } = await this.request<{
+      job_id?: string;
+      job_status?: string;
+    }>(`/ai-jobs/${encodeURIComponent(jobId)}/retry`, {
+      body: {},
+      idempotent: true,
+      method: "POST",
+    });
+    if (!data.job_id) {
+      throw new LearningClientError("The retry was not confirmed.", {
+        code: "AI_JOB_RETRY_NOT_CONFIRMED",
+      });
+    }
+    if (data.job_status && data.job_status !== "SUCCEEDED")
+      await this.waitForJob(data.job_id);
   }
 
   async skipLesson(lessonId: string): Promise<string> {
