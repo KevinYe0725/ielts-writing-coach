@@ -41,7 +41,7 @@ export const PROMPT_REGISTRY: Readonly<Record<AITaskKind, PromptDefinition>> = {
     rubricVersion: "iwc-task2-rubric-1.0.0",
     system: withKnowledge(
       "ielts_assessment",
-      "Estimate Task Response, Coherence and Cohesion, Lexical Resource, and Grammatical Range and Accuracy independently before calculating the overall estimate. Return a concise bilingual overall summary, one genuine strength, and evidence-linked paragraph feedback for every paragraph.",
+      "Estimate Task Response, Coherence and Cohesion, Lexical Resource, and Grammatical Range and Accuracy independently before calculating the overall estimate. Return a concise bilingual overall summary, one genuine strength, and evidence-linked paragraph feedback for every paragraph. For each paragraph, also provide revisionZh and revisionEn: a polished rewrite of that exact paragraph that fixes its diagnosed issues while keeping the learner's meaning and voice; do not add new ideas, change the paragraph's role, or merge it with another paragraph.",
     ),
   },
   issue_classification: {

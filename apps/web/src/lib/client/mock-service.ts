@@ -342,6 +342,10 @@ const feedback: FeedbackData = {
         "先写清儿童与成年人之间的同类比较，再补充“反复接触使语言模式变熟悉”这一中间过程。",
       actionEn:
         "Make the child–adult comparison parallel, then add the process by which exposure makes patterns familiar.",
+      revisionZh:
+        "First of all, children often absorb a new foreign language more easily than older learners. Because they meet new words and sentence patterns every day, these patterns become familiar through repeated contact, which helps them develop a natural language mindset.",
+      revisionEn:
+        "First of all, children often absorb a new foreign language more easily than older learners. Because they meet new words and sentence patterns every day, these patterns become familiar through repeated contact, which helps them develop a natural language mindset.",
     },
     {
       paragraphIndex: 2,
@@ -357,6 +361,10 @@ const feedback: FeedbackData = {
         "明确比较对象，并根据意思选择pupils face less pressure或the workload is lighter。",
       actionEn:
         "Name the comparison and choose either pupils face less pressure or the workload is lighter according to the intended meaning.",
+      revisionZh:
+        "On the other hand, pupils face less pressure in primary school than at later stages. With a lighter workload, they have more time to explore new cultures and take part in other activities.",
+      revisionEn:
+        "On the other hand, pupils face less pressure in primary school than at later stages. With a lighter workload, they have more time to explore new cultures and take part in other activities.",
     },
     {
       paragraphIndex: 3,
@@ -371,6 +379,10 @@ const feedback: FeedbackData = {
         "补充一条权衡标准，例如长期收益持续更久，而压力风险可通过课程设计控制。",
       actionEn:
         "Add a weighing criterion, such as lasting benefits versus manageable course-design risks.",
+      revisionZh:
+        "In conclusion, the advantages of learning a foreign language at primary school outweigh the disadvantages because the lasting benefits of early exposure persist well beyond school, while the pressure risk can be controlled through careful course design.",
+      revisionEn:
+        "In conclusion, the advantages of learning a foreign language at primary school outweigh the disadvantages because the lasting benefits of early exposure persist well beyond school, while the pressure risk can be controlled through careful course design.",
     },
   ],
   lessonGenerationRetry: null,

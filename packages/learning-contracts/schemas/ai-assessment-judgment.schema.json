@@ -14,7 +14,10 @@
     "criteria"
   ],
   "properties": {
-    "overallBand": { "$ref": "common.schema.json#/$defs/Band", "default": 6.0 },
+    "overallBand": {
+      "$ref": "common.schema.json#/$defs/Band",
+      "default": 6.0
+    },
     "overallSummaryZh": {
       "type": "string",
       "minLength": 1,
@@ -53,13 +56,21 @@
           "actionEn"
         ],
         "properties": {
-          "paragraphIndex": { "type": "integer", "minimum": 1, "default": 1 },
+          "paragraphIndex": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 1
+          },
           "excerpt": {
             "type": "string",
             "minLength": 1,
             "default": "Essay paragraph excerpt."
           },
-          "roleZh": { "type": "string", "minLength": 1, "default": "段落功能" },
+          "roleZh": {
+            "type": "string",
+            "minLength": 1,
+            "default": "段落功能"
+          },
           "roleEn": {
             "type": "string",
             "minLength": 1,
@@ -84,6 +95,18 @@
             "type": "string",
             "minLength": 1,
             "default": "Give one observable revision action."
+          },
+          "revisionZh": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A polished revision of this paragraph that fixes the diagnosed issues while keeping the learner's meaning and voice. Never adds new ideas.",
+            "default": "优化后的段落（保留原意与作者口吻）。"
+          },
+          "revisionEn": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A polished revision of this paragraph that fixes the diagnosed issues while keeping the learner's meaning and voice. Never adds new ideas.",
+            "default": "A polished revision of this paragraph that keeps the learner's meaning and voice."
           }
         }
       }
@@ -93,10 +116,18 @@
       "additionalProperties": false,
       "required": ["TR", "CC", "LR", "GRA"],
       "properties": {
-        "TR": { "$ref": "#/$defs/Criterion" },
-        "CC": { "$ref": "#/$defs/Criterion" },
-        "LR": { "$ref": "#/$defs/Criterion" },
-        "GRA": { "$ref": "#/$defs/Criterion" }
+        "TR": {
+          "$ref": "#/$defs/Criterion"
+        },
+        "CC": {
+          "$ref": "#/$defs/Criterion"
+        },
+        "LR": {
+          "$ref": "#/$defs/Criterion"
+        },
+        "GRA": {
+          "$ref": "#/$defs/Criterion"
+        }
       }
     }
   },
@@ -106,7 +137,10 @@
       "additionalProperties": false,
       "required": ["band", "confidence", "rationale"],
       "properties": {
-        "band": { "$ref": "common.schema.json#/$defs/Band", "default": 6.0 },
+        "band": {
+          "$ref": "common.schema.json#/$defs/Band",
+          "default": 6.0
+        },
         "confidence": {
           "$ref": "common.schema.json#/$defs/Confidence",
           "default": 0.85

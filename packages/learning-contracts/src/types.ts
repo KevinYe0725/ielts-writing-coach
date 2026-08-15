@@ -532,6 +532,9 @@ export interface AiAssessmentJudgment {
     readonly diagnosisEn: string;
     readonly actionZh: string;
     readonly actionEn: string;
+    /** Polished rewrite of this paragraph; optional to stay compatible with frozen judgments. */
+    readonly revisionZh?: string;
+    readonly revisionEn?: string;
   }[];
   readonly criteria: Readonly<
     Record<

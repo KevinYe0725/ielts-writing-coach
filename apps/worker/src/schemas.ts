@@ -61,6 +61,8 @@ export const assessmentJudgmentSchema = {
           "diagnosisEn",
           "actionZh",
           "actionEn",
+          "revisionZh",
+          "revisionEn",
         ],
         properties: {
           paragraphIndex: { type: "integer", minimum: 1 },
@@ -71,6 +73,18 @@ export const assessmentJudgmentSchema = {
           diagnosisEn: { type: "string", minLength: 1 },
           actionZh: { type: "string", minLength: 1 },
           actionEn: { type: "string", minLength: 1 },
+          revisionZh: {
+            type: "string",
+            minLength: 1,
+            description:
+              "A polished revision of this exact paragraph that fixes the diagnosed issues while keeping the learner's meaning and voice. Never adds new ideas.",
+          },
+          revisionEn: {
+            type: "string",
+            minLength: 1,
+            description:
+              "A polished revision of this exact paragraph that fixes the diagnosed issues while keeping the learner's meaning and voice. Never adds new ideas.",
+          },
         },
       },
     },

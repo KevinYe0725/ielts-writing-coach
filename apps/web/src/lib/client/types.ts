@@ -234,6 +234,9 @@ export interface ParagraphFeedback {
   diagnosisEn: string;
   actionZh: string;
   actionEn: string;
+  /** Polished AI rewrite of the paragraph; absent on older frozen judgments. */
+  revisionZh?: string;
+  revisionEn?: string;
 }
 
 export interface FeedbackData {

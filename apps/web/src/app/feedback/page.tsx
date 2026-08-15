@@ -591,9 +591,26 @@ export default function FeedbackPage({
                           </b>
                           <ChevronDown aria-hidden="true" size={15} />
                         </summary>
-                        <blockquote lang="en">
-                          {paragraphFeedback.excerpt}
-                        </blockquote>
+                        {paragraphFeedback.revisionZh ||
+                        paragraphFeedback.revisionEn ? (
+                          <div className={styles.paragraphRevision}>
+                            <p className="eyebrow">
+                              {text("AI 优化段", "Polished revision")}
+                            </p>
+                            <blockquote lang="en">
+                              {text(
+                                paragraphFeedback.revisionZh ??
+                                  paragraphFeedback.excerpt,
+                                paragraphFeedback.revisionEn ??
+                                  paragraphFeedback.excerpt,
+                              )}
+                            </blockquote>
+                          </div>
+                        ) : (
+                          <blockquote lang="en">
+                            {paragraphFeedback.excerpt}
+                          </blockquote>
+                        )}
                         <p>
                           {text(
                             paragraphFeedback.diagnosisZh,

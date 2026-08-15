@@ -300,6 +300,28 @@
   background: #fbfcfe;
 }
 
+.paragraphRevision {
+  margin: 0 12px 10px;
+}
+
+.paragraphReview .paragraphRevision .eyebrow {
+  margin: 0 0 4px;
+  color: var(--feedback-green);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.paragraphReview .paragraphRevision blockquote {
+  margin: 0;
+  padding: 11px 13px;
+  color: #274c3d;
+  background: #eef7f1;
+  border-left: 3px solid var(--feedback-green);
+  border-radius: 0 8px 8px 0;
+}
+
 .inlineParagraphReview blockquote {
   font-family: var(--font-serif);
   line-height: 1.6;
