@@ -1,11 +1,13 @@
 "use client";
 
 import {
+  Fragment,
   use,
   useCallback,
   useMemo,
   useRef,
   useState,
+  type ReactNode,
   type RefObject,
 } from "react";
 import { useRouter } from "next/navigation";
@@ -38,7 +40,11 @@ import {
   Skeleton,
 } from "@/components/ui";
 import { useDemoResource } from "@/components/use-demo-resource";
-import { LearningClientError, learningClient } from "@/lib/client";
+import {
+  LearningClientError,
+  learningClient,
+  type FeedbackData,
+} from "@/lib/client";
 import { buildFeedbackSegments } from "@/lib/client/feedback-annotations";
 import {
   learningRouteHref,
@@ -139,6 +145,78 @@ export default function FeedbackPage({
     [segments],
   );
 
+  /**
+   * Splits the immutable essay into its paragraphs (1-based, matching the AI
+   * paragraph feedback indices) together with their absolute offsets so the
+   * sentence-level highlights can be re-anchored per paragraph and each
+   * paragraph's diagnosis can sit directly below its own text.
+   */
+  const paragraphLayout = useMemo(() => {
+    const source = data?.originalEssay ?? "";
+    const chunks: Array<{
+      index: number;
+      text: string;
+      leading: string;
+      start: number;
+    }> = [];
+    let textOffset = 0;
+    let pendingLeading = "";
+    let paragraphIndex = 0;
+    for (const part of source.split(/(\n+)/u)) {
+      if (part === "") continue;
+      if (part.trim() === "") {
+        pendingLeading += part;
+        textOffset += part.length;
+        continue;
+      }
+      paragraphIndex += 1;
+      chunks.push({
+        index: paragraphIndex,
+        text: part,
+        leading: pendingLeading,
+        start: textOffset,
+      });
+      textOffset += part.length;
+      pendingLeading = "";
+    }
+    return { chunks, trailing: pendingLeading };
+  }, [data?.originalEssay]);
+
+  const paragraphFeedbackByIndex = useMemo(() => {
+    const map = new Map<number, FeedbackData["paragraphFeedback"][number]>();
+    for (const paragraph of data?.paragraphFeedback ?? []) {
+      map.set(paragraph.paragraphIndex, paragraph);
+    }
+    return map;
+  }, [data?.paragraphFeedback]);
+
+  const issueForSegment = useCallback(
+    (issueId: string) => issues.find((issue) => issue.id === issueId),
+    [issues],
+  );
+
+  const issuesInChunk = useCallback(
+    (chunk: { index: number; text: string; leading: string; start: number }) =>
+      issues
+        .filter((issue) => {
+          if (issue.startOffset !== null && issue.endOffset !== null) {
+            return (
+              issue.endOffset > chunk.start &&
+              issue.startOffset < chunk.start + chunk.text.length
+            );
+          }
+          return Boolean(issue.evidence && chunk.text.includes(issue.evidence));
+        })
+        .map((issue) => ({
+          ...issue,
+          startOffset:
+            issue.startOffset === null ? null : issue.startOffset - chunk.start,
+          endOffset:
+            issue.endOffset === null ? null : issue.endOffset - chunk.start,
+        })),
+    [issues],
+  );
+
   const announceIssue = useCallback(
     (issueId: string, destination: MobilePane) => {
       const issue = issues.find((candidate) => candidate.id === issueId);
@@ -199,6 +277,48 @@ export default function FeedbackPage({
       announceIssue(issueId, "suggestions");
     },
     [announceIssue, scrollToRef],
+  );
+
+  const renderSourceSegment = useCallback(
+    (segment: (typeof segments)[number], segmentIndex: number): ReactNode => {
+      if (segment.kind === "text") {
+        return <span key={`text-${segmentIndex}`}>{segment.text}</span>;
+      }
+      const issue = issueForSegment(segment.issueId);
+      return (
+        <mark
+          aria-label={text(
+            `查看“${issue?.titleZh ?? "这处问题"}”的修改建议`,
+            "Open the suggestion for this source text",
+          )}
+          aria-pressed={selectedIssueId === segment.issueId}
+          data-active={selectedIssueId === segment.issueId ? "true" : "false"}
+          data-annotation-kind={annotationKind(
+            issue?.issueType ?? "OPTIONAL_POLISH",
+            issue?.severity ?? "polish",
+          )}
+          data-feedback-highlight={segment.issueId}
+          data-issue-highlight={segment.issueId}
+          id={`feedback-highlight-${segment.issueId}`}
+          key={`${segment.issueId}-${segmentIndex}`}
+          onClick={() => activateFromHighlight(segment.issueId)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              activateFromHighlight(segment.issueId);
+            }
+          }}
+          ref={(node) => {
+            highlightRefs.current[segment.issueId] = node;
+          }}
+          role="button"
+          tabIndex={0}
+        >
+          {segment.text}
+        </mark>
+      );
+    },
+    [activateFromHighlight, issueForSegment, selectedIssueId, text],
   );
 
   if (loading || !data) {
@@ -442,81 +562,78 @@ export default function FeedbackPage({
           </div>
 
           <div className={styles.essay} data-feedback-essay lang="en">
-            {segments.map((segment, index) =>
-              segment.kind === "text" ? (
-                <span key={`text-${index}`}>{segment.text}</span>
-              ) : (
-                <mark
-                  aria-label={text(
-                    `查看“${
-                      data.issues.find((issue) => issue.id === segment.issueId)
-                        ?.titleZh ?? "这处问题"
-                    }”的修改建议`,
-                    "Open the suggestion for this source text",
+            {paragraphLayout.chunks.map((chunk) => {
+              const paragraphFeedback = paragraphFeedbackByIndex.get(
+                chunk.index,
+              );
+              const chunkSegments = buildFeedbackSegments(
+                chunk.text,
+                issuesInChunk(chunk),
+              );
+              return (
+                <Fragment key={`paragraph-${chunk.index}`}>
+                  {chunk.leading ? <span>{chunk.leading}</span> : null}
+                  {chunkSegments.map((segment, index) =>
+                    renderSourceSegment(segment, index),
                   )}
-                  aria-pressed={selectedIssueId === segment.issueId}
-                  data-active={
-                    selectedIssueId === segment.issueId ? "true" : "false"
-                  }
-                  data-annotation-kind={annotationKind(
-                    data.issues.find((issue) => issue.id === segment.issueId)
-                      ?.issueType ?? "OPTIONAL_POLISH",
-                    data.issues.find((issue) => issue.id === segment.issueId)
-                      ?.severity ?? "polish",
-                  )}
-                  data-feedback-highlight={segment.issueId}
-                  data-issue-highlight={segment.issueId}
-                  id={`feedback-highlight-${segment.issueId}`}
-                  key={`${segment.issueId}-${index}`}
-                  onClick={() => activateFromHighlight(segment.issueId)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      activateFromHighlight(segment.issueId);
-                    }
-                  }}
-                  ref={(node) => {
-                    highlightRefs.current[segment.issueId] = node;
-                  }}
-                  role="button"
-                  tabIndex={0}
-                >
-                  {segment.text}
-                </mark>
-              ),
-            )}
+                  {paragraphFeedback ? (
+                    <div
+                      className={`${styles.paragraphReview} ${styles.inlineParagraphReview}`}
+                    >
+                      <details>
+                        <summary>
+                          <span>{paragraphFeedback.paragraphIndex}</span>
+                          <b>
+                            {text(
+                              paragraphFeedback.roleZh,
+                              paragraphFeedback.roleEn,
+                            )}
+                          </b>
+                          <ChevronDown aria-hidden="true" size={15} />
+                        </summary>
+                        <blockquote lang="en">
+                          {paragraphFeedback.excerpt}
+                        </blockquote>
+                        <p>
+                          {text(
+                            paragraphFeedback.diagnosisZh,
+                            paragraphFeedback.diagnosisEn,
+                          )}
+                        </p>
+                        <div>
+                          <PenLine aria-hidden="true" size={15} />
+                          <span>
+                            <strong>
+                              {text("怎么改：", "Revision action: ")}
+                            </strong>
+                            {text(
+                              paragraphFeedback.actionZh,
+                              paragraphFeedback.actionEn,
+                            )}
+                          </span>
+                        </div>
+                      </details>
+                    </div>
+                  ) : null}
+                </Fragment>
+              );
+            })}
+            {paragraphLayout.trailing ? (
+              <span>{paragraphLayout.trailing}</span>
+            ) : null}
           </div>
 
-          <div className={styles.paragraphReview}>
-            <h3>{text("逐段诊断", "Paragraph review")}</h3>
-            {data.paragraphFeedback.length > 0 ? (
-              data.paragraphFeedback.map((paragraph) => (
-                <details key={paragraph.paragraphIndex}>
-                  <summary>
-                    <span>{paragraph.paragraphIndex}</span>
-                    <b>{text(paragraph.roleZh, paragraph.roleEn)}</b>
-                    <ChevronDown aria-hidden="true" size={15} />
-                  </summary>
-                  <blockquote lang="en">{paragraph.excerpt}</blockquote>
-                  <p>{text(paragraph.diagnosisZh, paragraph.diagnosisEn)}</p>
-                  <div>
-                    <PenLine aria-hidden="true" size={15} />
-                    <span>
-                      <strong>{text("怎么改：", "Revision action: ")}</strong>
-                      {text(paragraph.actionZh, paragraph.actionEn)}
-                    </span>
-                  </div>
-                </details>
-              ))
-            ) : (
+          {data.paragraphFeedback.length === 0 ? (
+            <div className={styles.paragraphReview}>
+              <h3>{text("逐段诊断", "Paragraph review")}</h3>
               <p className={styles.emptyCopy}>
                 {text(
                   "本轮暂未生成段落诊断。",
                   "Paragraph-level feedback is not available for this attempt.",
                 )}
               </p>
-            )}
-          </div>
+            </div>
+          ) : null}
         </section>
 
         <aside

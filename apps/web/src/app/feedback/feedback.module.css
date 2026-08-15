@@ -286,6 +286,31 @@
   border-top: 1px solid var(--feedback-line);
 }
 
+/* Paragraph diagnosis placed directly below its own paragraph in the
+   source essay. Reuses the paragraphReview card styling but sits inside the
+   essay flow so clicking it open keeps the analysis next to the text. */
+.inlineParagraphReview {
+  padding: 0;
+  background: transparent;
+  border-top: none;
+  margin: 14px 0 22px;
+}
+
+.inlineParagraphReview details {
+  background: #fbfcfe;
+}
+
+.inlineParagraphReview blockquote {
+  font-family: var(--font-serif);
+  line-height: 1.6;
+}
+
+.inlineParagraphReview details > p,
+.inlineParagraphReview details > div {
+  font-family: var(--font-sans, system-ui, sans-serif);
+  white-space: normal;
+}
+
 .paragraphReview > h3 {
   margin: 0 0 10px;
   font-size: 0.82rem;
