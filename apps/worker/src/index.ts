@@ -6,6 +6,7 @@ import {
   databaseContext,
   environment,
   recoverInterruptedJobs,
+  startInterruptedJobRecovery,
 } from "./runtime";
 import { startWorkerHeartbeat } from "./heartbeat";
 
@@ -15,6 +16,7 @@ const taskList: TaskList = {
 };
 
 await recoverInterruptedJobs();
+const recoverySweep = startInterruptedJobRecovery();
 
 const runner = await run({
   connectionString: environment.DATABASE_URL,
@@ -34,6 +36,7 @@ const heartbeat = await startWorkerHeartbeat(databaseContext.db, "standalone", {
 });
 
 const close = async () => {
+  recoverySweep.stop();
   await heartbeat.stop();
   await runner.stop();
   await databaseContext.pool.end();

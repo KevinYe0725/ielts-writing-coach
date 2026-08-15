@@ -37,6 +37,16 @@ import {
   transitionTransfer,
   transitionTrainingCycle,
 } from "@iwc/learning-core";
+
+/**
+ * Wall-clock budgets for provider generations. The transport default (60s)
+ * is right for short probes, but large documents on slower reasoning models
+ * legitimately need minutes; aborting them mid-stream made focused-practice
+ * generation impossible on such providers.
+ */
+const LONG_GENERATION_TIMEOUT_MS = 10 * 60_000; // full teaching + paper packages
+const STANDARD_GENERATION_TIMEOUT_MS = 5 * 60_000; // large single scoring documents
+const INTERACTIVE_GENERATION_TIMEOUT_MS = 3 * 60_000; // exercise and tutorial feedback
 import {
   aiJob,
   assessment,
@@ -551,6 +561,7 @@ async function analyzeTeachingPractice(
       validate: (value): value is TeachingPracticeAnalysisJudgment =>
         validateTeachingPracticeAnalysis(value),
       maxOutputTokens: 1_600,
+      timeoutMs: INTERACTIVE_GENERATION_TIMEOUT_MS,
     });
   const providerIsMock = job.versionSnapshot.providerKind === "mock";
   const presentation = providerIsMock
@@ -682,6 +693,7 @@ async function ensureVersion2Assessment(input: {
       }
     },
     maxOutputTokens: 2_500,
+    timeoutMs: STANDARD_GENERATION_TIMEOUT_MS,
   });
   const overallConfidence =
     Object.values(result.value.criteria).reduce(
@@ -877,6 +889,7 @@ async function assessEssay(
       }
     },
     maxOutputTokens: 2_500,
+    timeoutMs: STANDARD_GENERATION_TIMEOUT_MS,
   });
   const overallConfidence =
     Object.values(result.value.criteria).reduce(
@@ -999,6 +1012,7 @@ async function classifyIssues(
         }
       }),
     maxOutputTokens: 4_000,
+    timeoutMs: STANDARD_GENERATION_TIMEOUT_MS,
   });
   let issues = exactIssueSpans(attempt.content, result.value.issues);
   let usedSyntheticFallback = false;
@@ -1217,6 +1231,7 @@ Learner Version 1 for context only: ${(version1?.content ?? "").slice(0, 4_000)}
       validate: (value): value is AdaptiveTeachingModule =>
         validateAdaptiveTeachingModule(value, version1?.content),
       maxOutputTokens: 8_000,
+      timeoutMs: LONG_GENERATION_TIMEOUT_MS,
     });
     const paper = await adapter.generateStructured<PracticePaperContent>({
       model: model(job),
@@ -1242,6 +1257,7 @@ Original IELTS question: ${cycle.question.prompt}`,
       schema: timedPracticePaperSchema as unknown as Record<string, unknown>,
       validate: validateTimedPracticePaper,
       maxOutputTokens: 8_000,
+      timeoutMs: LONG_GENERATION_TIMEOUT_MS,
     });
     const value = {
       teachingModule: teaching.value,
@@ -1323,6 +1339,7 @@ Learner Version 1 for context only: ${(version1?.content ?? "").slice(0, 4_000)}
             version1?.content,
           ),
         maxOutputTokens: 16_000,
+        timeoutMs: LONG_GENERATION_TIMEOUT_MS,
       });
     } catch {
       return sourceOwnedRecoveryPackage();
@@ -1536,6 +1553,7 @@ async function evaluateExercise(
         (value as { userAnswerEvidence?: unknown }).userAnswerEvidence,
       ),
     maxOutputTokens: 1_000,
+    timeoutMs: INTERACTIVE_GENERATION_TIMEOUT_MS,
   });
   const providerIsMock = job.versionSnapshot.providerKind === "mock";
   const minimumConfidence =
@@ -1857,6 +1875,7 @@ Learner answers submitted together: ${JSON.stringify(answers)}`,
       typeof (value as { totalScore?: unknown }).totalScore === "number" &&
       Array.isArray((value as { itemResults?: unknown }).itemResults),
     maxOutputTokens: 8_000,
+    timeoutMs: LONG_GENERATION_TIMEOUT_MS,
   });
   const sanitized = sanitizePracticePaperJudgment({
     paper,
@@ -1975,6 +1994,7 @@ async function compareVersions(
       ) &&
       typeof (value as { modelEssay?: unknown }).modelEssay === "string",
     maxOutputTokens: 2_000,
+    timeoutMs: STANDARD_GENERATION_TIMEOUT_MS,
   });
   const verifiedV1Spans = verifyComparisonIssueSpans(
     version1.content,
@@ -2294,6 +2314,7 @@ async function evaluateTransfer(
         (value as { userAnswerEvidence?: unknown }).userAnswerEvidence,
       ),
     maxOutputTokens: 1_500,
+    timeoutMs: STANDARD_GENERATION_TIMEOUT_MS,
   });
   const providerKind = job.versionSnapshot.providerKind ?? "unknown";
   const verifiedJudgment = verifyTransferJudgmentEvidence(

@@ -37,8 +37,11 @@ interface ChatResponse {
 
 const PROVIDER_REQUEST_TIMEOUT_MS = 60_000;
 
-function boundedSignal(signal?: AbortSignal | null): AbortSignal {
-  const timeout = AbortSignal.timeout(PROVIDER_REQUEST_TIMEOUT_MS);
+function boundedSignal(
+  signal?: AbortSignal | null,
+  timeoutMs = PROVIDER_REQUEST_TIMEOUT_MS,
+): AbortSignal {
+  const timeout = AbortSignal.timeout(timeoutMs);
   return signal ? AbortSignal.any([signal, timeout]) : timeout;
 }
 
@@ -230,7 +233,7 @@ export class CompatibleAdapter implements AIProviderAdapter {
               "idempotency-key": `${request.idempotencyKey}:${idempotencySuffix}`,
             },
           }),
-      ...(request.signal === undefined ? {} : { signal: request.signal }),
+      signal: boundedSignal(request.signal, request.timeoutMs),
       body: JSON.stringify({
         model: request.model,
         messages,

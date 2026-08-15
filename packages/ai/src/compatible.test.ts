@@ -400,4 +400,38 @@ describe("CompatibleAdapter pinned provider requests", () => {
       await close(server);
     }
   });
+
+  it("honors a per-request timeout budget for long generations", async () => {
+    const server = createServer(() => {
+      // Never respond; only the request timeout can settle this call.
+    });
+    const port = await listen(server);
+    const baseUrl = `http://provider.test:${port}/v1`;
+    const adapter = new CompatibleAdapter({
+      baseUrl,
+      localBaseUrlAllowlist: [baseUrl],
+      addressResolver: async () => [{ address: "127.0.0.1", family: 4 }],
+    });
+
+    try {
+      const started = Date.now();
+      await expect(
+        adapter.generateText({
+          model: "slow-model",
+          input: "Generate a complete practice package.",
+          maxOutputTokens: 16_000,
+          timeoutMs: 300,
+        }),
+      ).rejects.toSatisfy((error: unknown) => {
+        expect(adapter.normalizeError(error)).toMatchObject({
+          code: "TIMEOUT",
+          retryable: true,
+        });
+        return true;
+      });
+      expect(Date.now() - started).toBeLessThan(5_000);
+    } finally {
+      await close(server);
+    }
+  });
 });

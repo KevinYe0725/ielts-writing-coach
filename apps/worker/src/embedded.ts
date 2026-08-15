@@ -6,6 +6,7 @@ import {
   databaseContext,
   environment,
   recoverInterruptedJobs,
+  startInterruptedJobRecovery,
 } from "./runtime";
 import { startWorkerHeartbeat } from "./heartbeat";
 
@@ -28,6 +29,7 @@ export function startEmbeddedWorker(): Promise<Runner> {
   }
   globalThis.__iwcEmbeddedWorker ??= (async () => {
     await recoverInterruptedJobs();
+    startInterruptedJobRecovery();
     const runner = await run({
       connectionString: environment.DATABASE_URL,
       concurrency: Math.max(1, Number(process.env.WORKER_CONCURRENCY ?? 2)),

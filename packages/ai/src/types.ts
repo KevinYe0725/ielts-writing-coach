@@ -45,6 +45,12 @@ export interface TextGenerationRequest {
   maxOutputTokens?: number;
   temperature?: number;
   signal?: AbortSignal;
+  /**
+   * Per-request wall-clock cap. The transport default keeps short probes
+   * snappy; long generations (e.g. an entire practice package) must opt into
+   * a larger budget so slower providers are not aborted mid-stream.
+   */
+  timeoutMs?: number;
 }
 
 export interface StructuredGenerationRequest<T> extends TextGenerationRequest {

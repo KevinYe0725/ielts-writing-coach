@@ -356,7 +356,11 @@ export async function markJobFailure(
 export async function recoverInterruptedJobs(): Promise<number> {
   const staleBefore = new Date(Date.now() - 15 * 60 * 1000);
   const staleJobs = await databaseContext.db
-    .select({ id: aiJob.id, providerConnectionId: aiJob.providerConnectionId })
+    .select({
+      id: aiJob.id,
+      graphileJobKey: aiJob.graphileJobKey,
+      providerConnectionId: aiJob.providerConnectionId,
+    })
     .from(aiJob)
     .where(
       and(
@@ -385,8 +389,39 @@ export async function recoverInterruptedJobs(): Promise<number> {
           : "The worker was interrupted; the idempotent job was scheduled again.",
       })
       .where(eq(aiJob.id, job.id));
+    if (!sessionOnly && job.graphileJobKey) {
+      // The crashed worker's queue lease survives the process for up to four
+      // hours inside Graphile itself. Release it explicitly so the shadow row
+      // above is picked up on the next poll instead of hours later.
+      await databaseContext.db.execute(
+        sql`update graphile_worker._private_jobs
+            set locked_at = null, locked_by = null, run_at = now()
+            where key = ${job.graphileJobKey} and locked_by is not null`,
+      );
+    }
   }
   return staleJobs.length;
+}
+
+/**
+ * Keeps the interrupted-job sweep running while the process lives. Startup
+ * still sweeps once synchronously; this timer covers crashes that happen
+ * after startup so no job waits for the next restart to resume.
+ */
+export function startInterruptedJobRecovery(intervalMs = 60_000): {
+  stop(): void;
+} {
+  const timer = setInterval(() => {
+    void recoverInterruptedJobs().catch((error: unknown) => {
+      console.error("Interrupted-job recovery sweep failed.", error);
+    });
+  }, intervalMs);
+  timer.unref();
+  return {
+    stop() {
+      clearInterval(timer);
+    },
+  };
 }
 
 export async function createChildJob(
