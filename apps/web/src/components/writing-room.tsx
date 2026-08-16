@@ -107,8 +107,10 @@ export function WritingRoom({
   const blindSnapshotPromise = useRef<Promise<void> | null>(null);
   const submitButtonRef = useRef<HTMLButtonElement | null>(null);
   const submitStarted = useRef(false);
+  const submittedRef = useRef(false);
   const latestDraft = useRef("");
   const localGeneration = useRef(0);
+  const autosaveTimer = useRef<number | null>(null);
   const [dirtyTick, setDirtyTick] = useState(0);
   const [rewriteGoals, setRewriteGoals] = useState<
     Array<{ en: string; zh: string }>
@@ -166,7 +168,7 @@ export function WritingRoom({
 
   const persistDraft = useCallback(
     async (value: string, generation: number) => {
-      if (!data) return;
+      if (!data || submittedRef.current) return;
       setSaveState("saving");
       setSyncError(null);
       try {
@@ -176,6 +178,18 @@ export function WritingRoom({
           await removeCachedWritingDraft(data.id);
         }
       } catch (error) {
+        if (
+          error instanceof LearningClientError &&
+          ["ATTEMPT_LOCKED", "ATTEMPT_NOT_ACTIVE"].includes(error.code)
+        ) {
+          // The attempt was just submitted and locked; the draft is safe.
+          // Stop autosaving instead of alarming the learner with a bogus
+          // "sync failed" banner at the end of the countdown.
+          submittedRef.current = true;
+          setSaveState("saved");
+          setSyncError(null);
+          return;
+        }
         setSaveState("unsaved");
         if (error instanceof DraftConflictError) setDraftConflict(error);
         else
@@ -192,10 +206,10 @@ export function WritingRoom({
   useEffect(() => {
     if (!data || !hydrated.current || dirtyTick === 0) return;
     const generation = localGeneration.current;
-    const timer = window.setTimeout(() => {
+    autosaveTimer.current = window.setTimeout(() => {
       void persistDraft(draft, generation);
     }, 650);
-    return () => window.clearTimeout(timer);
+    return () => window.clearTimeout(autosaveTimer.current ?? undefined);
   }, [data, dirtyTick, draft, persistDraft]);
 
   useEffect(() => {
@@ -260,6 +274,13 @@ export function WritingRoom({
     if (!data || submitStarted.current) return;
     submitStarted.current = true;
     setSubmitting(true);
+    // From here on the attempt is being sealed: cancel the pending autosave
+    // and stop the save loop so post-submission saves cannot 423 and flash a
+    // bogus "sync failed" banner while the grading job runs.
+    submittedRef.current = true;
+    if (autosaveTimer.current !== null)
+      window.clearTimeout(autosaveTimer.current);
+    setSyncError(null);
     try {
       if (mode === "rewrite") {
         await sealBlindDraft(data.id, draft);
@@ -278,7 +299,21 @@ export function WritingRoom({
       );
     } catch (error) {
       if (error instanceof DraftConflictError) setDraftConflict(error);
-      else
+      else if (
+        error instanceof LearningClientError &&
+        ["ATTEMPT_LOCKED", "ATTEMPT_ALREADY_SUBMITTED"].includes(error.code)
+      ) {
+        // A previous submission already locked this attempt (e.g. the
+        // deadline auto-submit raced a manual one). Treat it as success.
+        await removeCachedWritingDraft(data.id);
+        router.push(
+          mode === "rewrite"
+            ? learningRouteHref("/compare", {
+                cycleId: data.cycleId ?? cycleId,
+              })
+            : "/today?notice=feedback-waiting-ai",
+        );
+      } else
         setSyncError(
           error instanceof Error
             ? error.message
