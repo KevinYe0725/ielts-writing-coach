@@ -1644,8 +1644,10 @@ export class MockLearningClient implements LearningClient {
   async submitAttempt(
     attemptId: string,
     draft: string,
+    onSubmitted?: () => void,
   ): Promise<AttemptSubmission> {
     await this.saveDraft(attemptId, draft);
+    onSubmitted?.();
     await delay(240);
     return {
       feedbackReady: true,

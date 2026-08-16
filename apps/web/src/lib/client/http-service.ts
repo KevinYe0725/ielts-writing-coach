@@ -174,7 +174,9 @@ interface WireAttempt extends JsonRecord {
   durationSeconds?: number | null;
   id?: string;
   kind?: string;
+  lockedAt?: string | null;
   revision?: number;
+  submittedAt?: string | null;
   wordCount?: number;
 }
 
@@ -1830,6 +1832,12 @@ export class HttpLearningClient implements LearningClient {
       autosaveKey: `server:${attempt.id ?? version}`,
       revision: attempt.revision ?? 1,
       ...(attempt.cycleId ? { cycleId: attempt.cycleId } : {}),
+      ...(attempt.lockedAt
+        ? {
+            locked: true,
+            submittedAt: attempt.submittedAt ?? attempt.lockedAt,
+          }
+        : { locked: false, submittedAt: null }),
       selfCheckSnapshotSaved:
         attempt.draftBeforeSelfCheck !== null &&
         attempt.draftBeforeSelfCheck !== undefined,
@@ -2226,6 +2234,7 @@ export class HttpLearningClient implements LearningClient {
   async submitAttempt(
     attemptId: string,
     draft: string,
+    onSubmitted?: () => void,
   ): Promise<AttemptSubmission> {
     await this.saveDraft(attemptId, draft);
     const { data } = await this.request<{
@@ -2236,6 +2245,7 @@ export class HttpLearningClient implements LearningClient {
       idempotent: true,
       method: "POST",
     });
+    onSubmitted?.();
     if (
       data.job_id &&
       data.job_status !== "SUCCEEDED" &&

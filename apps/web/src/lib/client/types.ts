@@ -180,6 +180,9 @@ export interface AttemptData {
   cycleId?: string;
   /** True once the server has immutably sealed the blind Version 2 draft. */
   selfCheckSnapshotSaved?: boolean;
+  /** True when the attempt was already submitted and locked. */
+  locked?: boolean;
+  submittedAt?: string | null;
 }
 
 export interface BandScore {
@@ -1019,7 +1022,11 @@ export interface LearningClient {
     draft: string,
     phase: "before" | "after",
   ): Promise<void>;
-  submitAttempt(attemptId: string, draft: string): Promise<AttemptSubmission>;
+  submitAttempt(
+    attemptId: string,
+    draft: string,
+    onSubmitted?: () => void,
+  ): Promise<AttemptSubmission>;
   getFeedback(cycleId: string): Promise<FeedbackData>;
   getFocusedTeaching(
     cycleId: string,

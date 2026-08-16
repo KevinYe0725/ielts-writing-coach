@@ -1784,6 +1784,43 @@ h3 {
   color: #756690;
 }
 
+.locked-banner {
+  color: #1f6f46;
+  background: #eaf7ef;
+  border-color: #cfe7d8;
+}
+.locked-banner a {
+  margin-left: auto;
+}
+
+.writing-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 36px;
+  z-index: 80;
+  display: flex;
+  padding: 12px 22px;
+  color: #ffffff;
+  background: #1f6f46;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(15, 52, 34, 0.28);
+  align-items: center;
+  gap: 10px;
+  font-size: 0.86rem;
+  transform: translateX(-50%);
+  animation: writing-toast-in 0.22s ease-out;
+}
+@keyframes writing-toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 10px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
 .writing-layout {
   display: grid;
   min-height: calc(100vh - 130px);

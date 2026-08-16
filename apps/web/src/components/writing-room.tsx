@@ -89,6 +89,7 @@ export function WritingRoom({
     "saved",
   );
   const [submitting, setSubmitting] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
   const [rescheduling, setRescheduling] = useState(false);
   const [confirmSubmit, setConfirmSubmit] = useState(false);
   const [recoveryDraft, setRecoveryDraft] = useState<CachedWritingDraft | null>(
@@ -134,9 +135,15 @@ export function WritingRoom({
     const timeout = window.setTimeout(() => {
       setDraft(data.draft);
       latestDraft.current = data.draft;
-      deadlineAt.current = Date.now() + data.durationSeconds * 1000;
-      setRemaining(data.durationSeconds);
-      setActive(true);
+      if (data.locked) {
+        // Already submitted: no countdown, no editing, no auto-submit.
+        setRemaining(0);
+        setActive(false);
+      } else {
+        deadlineAt.current = Date.now() + data.durationSeconds * 1000;
+        setRemaining(data.durationSeconds);
+        setActive(true);
+      }
       if (mode === "rewrite") {
         setRewriteGoals((data as RewriteData).abstractGoals);
       }
@@ -168,7 +175,7 @@ export function WritingRoom({
 
   const persistDraft = useCallback(
     async (value: string, generation: number) => {
-      if (!data || submittedRef.current) return;
+      if (!data || submittedRef.current || data.locked) return;
       setSaveState("saving");
       setSyncError(null);
       try {
@@ -212,8 +219,11 @@ export function WritingRoom({
     return () => window.clearTimeout(autosaveTimer.current ?? undefined);
   }, [data, dirtyTick, draft, persistDraft]);
 
+  const locked = data?.locked === true;
+
   useEffect(() => {
     const handleKeys = (event: KeyboardEvent) => {
+      if (locked) return;
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
         event.preventDefault();
         if (data) void persistDraft(draft, localGeneration.current);
@@ -225,7 +235,7 @@ export function WritingRoom({
     };
     window.addEventListener("keydown", handleKeys);
     return () => window.removeEventListener("keydown", handleKeys);
-  }, [active, data, draft, persistDraft]);
+  }, [active, data, draft, locked, persistDraft]);
 
   const words = useMemo(() => countWords(draft), [draft]);
   const rewrite = mode === "rewrite" ? (data as RewriteData | null) : null;
@@ -286,8 +296,14 @@ export function WritingRoom({
         await sealBlindDraft(data.id, draft);
         await learningClient.saveSelfCheckSnapshot(data.id, draft, "after");
       }
-      const submission = await learningClient.submitAttempt(data.id, draft);
+      const submission = await learningClient.submitAttempt(
+        data.id,
+        draft,
+        () => setSubmitSuccess(true),
+      );
       await removeCachedWritingDraft(data.id);
+      // Let the success toast register before navigating away.
+      await new Promise((resolve) => window.setTimeout(resolve, 1200));
       if (!submission.feedbackReady) {
         router.push("/today?notice=feedback-waiting-ai");
         return;
@@ -390,7 +406,7 @@ export function WritingRoom({
   );
 
   useEffect(() => {
-    if (!active || remaining > 0 || !data) return;
+    if (!active || remaining > 0 || !data || data.locked) return;
     const timeout = window.setTimeout(() => {
       setConfirmSubmit(false);
       void submit();
@@ -509,6 +525,33 @@ export function WritingRoom({
         </div>
       ) : null}
 
+      {locked ? (
+        <div className="integrity-banner locked-banner" role="status">
+          <LockKeyhole aria-hidden="true" size={17} />
+          <span>
+            {text(
+              "这篇作文已提交并锁定，不能重复提交。",
+              "This essay has been submitted and locked; it cannot be submitted again.",
+            )}
+          </span>
+          <ActionLink
+            href={
+              mode === "rewrite"
+                ? learningRouteHref("/compare", {
+                    cycleId: data.cycleId ?? cycleId,
+                  })
+                : learningRouteHref("/feedback", {
+                    cycleId: data.cycleId ?? cycleId,
+                  })
+            }
+            size="sm"
+            variant="secondary"
+          >
+            {text("查看批改", "View feedback")}
+          </ActionLink>
+        </div>
+      ) : null}
+
       {syncError ? (
         <div className="integrity-banner" role="alert">
           <AlertCircle aria-hidden="true" size={17} />
@@ -519,6 +562,16 @@ export function WritingRoom({
             )}
           </span>
           <small>{syncError}</small>
+        </div>
+      ) : null}
+
+      {submitSuccess ? (
+        <div className="writing-toast" role="status">
+          <Check aria-hidden="true" size={17} />
+          {text(
+            "作文提交成功，正在生成批改…",
+            "Essay submitted; feedback is being prepared…",
+          )}
         </div>
       ) : null}
 
@@ -616,7 +669,7 @@ export function WritingRoom({
             autoCapitalize="sentences"
             autoCorrect="off"
             className="essay-editor"
-            disabled={!active}
+            disabled={!active || locked}
             id="essay-editor"
             lang="en"
             onChange={(event) => {
@@ -650,7 +703,7 @@ export function WritingRoom({
               )}
             </p>
             <Button
-              disabled={!active || submitting || words < 40}
+              disabled={!active || locked || submitting || words < 40}
               onClick={() => setConfirmSubmit(true)}
               ref={submitButtonRef}
             >
