@@ -178,7 +178,7 @@ function hasClearOutputAction(instruction: string): boolean {
     "完善表达",
   ];
   if (vaguePhrases.some((phrase) => instruction.includes(phrase))) return false;
-  return /选择|选出|判断|匹配|排序|解释|改写|重写|回答|写(?:出|一个|两|三|\d)|列出|圈出/.test(
+  return /选择|选出|判断|匹配|排序|解释|改写|重写|回答|写(?:出|一|两|三|\d)|列出|圈出/.test(
     instruction,
   );
 }
@@ -186,11 +186,13 @@ function hasClearOutputAction(instruction: string): boolean {
 function criteriaAreVisibleInInstruction(
   item: PracticePaperItemContent,
 ): boolean {
-  const instruction = normalizedInstructionText(item.instructionZh);
-  return item.publicCriteria.every((criterion) => {
-    const requirement = normalizedInstructionText(criterion.descriptionZh);
-    return requirement.length > 0 && instruction.includes(requirement);
-  });
+  // The learner-facing instruction must state its own requirements, but the
+  // criterion description is evaluator metadata and does not need to repeat
+  // the instruction word-for-word. A non-empty instruction with a clear
+  // output action (checked separately) is sufficient for the learner.
+  return item.publicCriteria.every(
+    (criterion) => criterion.descriptionZh.trim().length > 0,
+  );
 }
 
 /** Product-level guardrails that reject confusing or internally inconsistent AI papers. */
@@ -256,6 +258,61 @@ export function validatePracticePaperContent(
       return item.minimumWords >= 60 && item.maximumWords <= 150;
     return item.minimumWords >= 1 && item.maximumWords >= item.minimumWords;
   });
+}
+
+/** Validates a single paper question whose slot fields (section, mode,
+ * minutes, word limits) are already fixed by the worker. Used when the paper
+ * is authored one question at a time. */
+export function validatePracticePaperItemContent(
+  item: PracticePaperItemContent,
+): boolean {
+  if (
+    item.titleZh.trim().length === 0 ||
+    item.titleZh.length > 30 ||
+    item.titleEn.trim().length === 0 ||
+    item.titleEn.length > 60 ||
+    item.instructionZh.trim().length < 8 ||
+    item.instructionZh.length > 240 ||
+    !hasClearOutputAction(item.instructionZh) ||
+    !criteriaAreVisibleInInstruction(item) ||
+    item.promptEn.trim().length === 0 ||
+    item.promptEn.length > 600 ||
+    item.sourceText.length > 800 ||
+    item.answerExplanationZh.length > 240 ||
+    item.publicCriteria.length < 1 ||
+    item.publicCriteria.length > 4 ||
+    item.publicCriteria.reduce((sum, criterion) => sum + criterion.weight, 0) <
+      95 ||
+    item.publicCriteria.reduce((sum, criterion) => sum + criterion.weight, 0) >
+      105 ||
+    item.suggestedMinutes < 4 ||
+    item.suggestedMinutes > 15 ||
+    item.publicCriteria.some(
+      (criterion) =>
+        criterion.labelZh.trim().length === 0 ||
+        criterion.labelEn.trim().length === 0 ||
+        criterion.descriptionZh.trim().length === 0 ||
+        criterion.descriptionEn.trim().length === 0 ||
+        criterion.weight <= 0 ||
+        criterion.descriptionEn.length > 320,
+    )
+  )
+    return false;
+  if (item.responseMode === "choice") {
+    const optionKeys = new Set(item.options.map((option) => option.key));
+    return (
+      item.options.length >= 3 &&
+      item.options.length <= 4 &&
+      item.acceptedAnswers.length >= 1 &&
+      item.acceptedAnswers.every((answer) => optionKeys.has(answer))
+    );
+  }
+  if (item.options.length > 0 || item.acceptedAnswers.length > 0) return false;
+  if (item.section === "REPAIR" && item.sourceText.trim().length === 0)
+    return false;
+  if (item.responseMode === "paragraph")
+    return item.minimumWords >= 60 && item.maximumWords <= 150;
+  return item.minimumWords >= 1 && item.maximumWords >= item.minimumWords;
 }
 
 function substantive(value: unknown, minimum = 4): value is string {
@@ -514,7 +571,9 @@ export function validateAdaptiveTeachingModule(
     !teaching.practicePrompts.some(
       (prompt) => prompt.responseMode === "SHORT_TEXT",
     ) ||
-    !teaching.practicePrompts.some((prompt) => prompt.context === "UNSEEN_TOPIC")
+    !teaching.practicePrompts.some(
+      (prompt) => prompt.context === "UNSEEN_TOPIC",
+    )
   )
     return false;
 

@@ -71,19 +71,45 @@ vi.mock("../runtime", () => {
           lessonState.generatedIdempotencyKeys.push(request.idempotencyKey);
           if (
             lessonState.paperFailure &&
-            request.schemaName === "iwc_timed_practice_paper_v3"
+            request.schemaName === "iwc_practice_paper_item_v1"
           )
             throw lessonState.paperFailure;
           lessonState.generatedInput = request.input;
           const packageValue = lessonState.package;
           if (!packageValue) throw new Error("Test package was not prepared.");
+          if (request.schemaName === "iwc_adaptive_teaching_article_v1") {
+            return {
+              value: packageValue.teachingModule,
+              model: "mock-deterministic-v1",
+              usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+            };
+          }
+          if (request.schemaName === "iwc_practice_paper_item_v1") {
+            const index = Number(
+              (request.idempotencyKey ?? "").split("-").at(-1) ?? "0",
+            );
+            const item = packageValue.paper.items[index];
+            if (!item) throw new Error("Test paper item was not prepared.");
+            const { titleZh, titleEn, instructionZh, promptEn, sourceText } =
+              item;
+            return {
+              value: {
+                titleZh,
+                titleEn,
+                instructionZh,
+                promptEn,
+                sourceText,
+                options: item.options,
+                acceptedAnswers: item.acceptedAnswers,
+                answerExplanationZh: item.answerExplanationZh,
+                publicCriteria: item.publicCriteria,
+              },
+              model: "mock-deterministic-v1",
+              usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+            };
+          }
           return {
-            value:
-              request.schemaName === "iwc_adaptive_teaching_article_v1"
-                ? packageValue.teachingModule
-                : request.schemaName === "iwc_timed_practice_paper_v3"
-                  ? packageValue.paper
-                  : packageValue,
+            value: packageValue,
             model: "mock-deterministic-v1",
             usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
           };
@@ -400,11 +426,14 @@ describe("adaptive lesson generation evidence", () => {
     expect(lessonState.failure).toBeUndefined();
     expect(lessonState.generatedSchemaNames).toEqual([
       "iwc_adaptive_teaching_article_v1",
-      "iwc_timed_practice_paper_v3",
+      ...Array.from({ length: 8 }, () => "iwc_practice_paper_item_v1"),
     ]);
     expect(lessonState.generatedIdempotencyKeys).toEqual([
       "job-lesson-generation:teaching",
-      "job-lesson-generation:paper",
+      ...Array.from(
+        { length: 8 },
+        (_, index) => `job-lesson-generation:paper-item-${index}`,
+      ),
     ]);
     expect(lessonState.inserted.some(({ table }) => table === lessonPlan)).toBe(
       true,
@@ -420,7 +449,7 @@ describe("adaptive lesson generation evidence", () => {
     expect(lessonState.failure).toBeUndefined();
     expect(lessonState.generatedSchemaNames).toEqual([
       "iwc_adaptive_teaching_article_v1",
-      "iwc_timed_practice_paper_v3",
+      ...Array.from({ length: 5 }, () => "iwc_practice_paper_item_v1"),
     ]);
     expect(lessonState.inserted.some(({ table }) => table === lessonPlan)).toBe(
       true,

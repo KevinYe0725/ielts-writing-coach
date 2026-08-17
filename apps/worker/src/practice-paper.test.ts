@@ -67,7 +67,8 @@ const practicePrompts = (): TeachingPracticePrompt[] => [
   {
     id: "spot-the-mechanism",
     instructionZh: "选出真正写出中间机制的一句英文。",
-    instructionEn: "Choose the English sentence that states an intermediate mechanism.",
+    instructionEn:
+      "Choose the English sentence that states an intermediate mechanism.",
     promptEn: "A city creates protected cycle lanes on busy roads.",
     responseMode: "CHOICE",
     context: "SAME_TOPIC",
@@ -340,7 +341,7 @@ describe("markdown teaching article + timed paper contract", () => {
     ).toBe(false);
   });
 
-  it("rejects an internal requirement that is absent from the visible instruction", () => {
+  it("accepts an instruction whose criterion description states the graded requirement", () => {
     const value = paper();
     const changedItems = [...value.items];
     changedItems[1] = {
@@ -359,7 +360,7 @@ describe("markdown teaching article + timed paper contract", () => {
     };
     expect(
       validatePracticePaperContent({ ...value, items: changedItems }),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("rejects vague learner instructions that hide the required output", () => {

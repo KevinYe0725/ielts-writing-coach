@@ -438,6 +438,60 @@ export const practicePaperContentSchema = {
   properties: practicePaperProperties,
 } as const;
 
+/**
+ * Content-only contract for one paper question. The surrounding slot
+ * (section, responseMode, suggestedMinutes, minimumWords, maximumWords) is
+ * decided by the worker, so the provider only authors the learner-facing
+ * content and the grading metadata.
+ */
+export const practicePaperItemContentSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "titleZh",
+    "titleEn",
+    "instructionZh",
+    "promptEn",
+    "sourceText",
+    "options",
+    "acceptedAnswers",
+    "answerExplanationZh",
+    "publicCriteria",
+  ],
+  properties: {
+    titleZh: { type: "string", minLength: 2, maxLength: 30 },
+    titleEn: { type: "string", minLength: 2, maxLength: 60 },
+    instructionZh: { type: "string", minLength: 8, maxLength: 240 },
+    promptEn: { type: "string", minLength: 4, maxLength: 600 },
+    sourceText: { type: "string", maxLength: 800 },
+    options: {
+      type: "array",
+      maxItems: 4,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["key", "labelEn"],
+        properties: {
+          key: { type: "string", minLength: 1, maxLength: 20 },
+          labelEn: { type: "string", minLength: 1, maxLength: 240 },
+        },
+      },
+    },
+    acceptedAnswers: {
+      type: "array",
+      maxItems: 4,
+      items: { type: "string", minLength: 1, maxLength: 20 },
+    },
+    answerExplanationZh: { type: "string", minLength: 8, maxLength: 240 },
+    publicCriteria: {
+      type: "array",
+      minItems: 1,
+      maxItems: 4,
+      items: paperCriterion,
+    },
+  },
+} as const;
+
 const teachingPracticePromptSchema = {
   type: "object",
   additionalProperties: false,
@@ -519,7 +573,8 @@ export const focusedLearningPackageSchema = {
           type: "string",
           minLength: 40,
           maxLength: 2_000,
-          default: "Mock introduction with enough length to satisfy validation.",
+          default:
+            "Mock introduction with enough length to satisfy validation.",
         },
         estimatedMinutes: { type: "integer", minimum: 15, maximum: 35 },
         coreAbilityZh: { type: "string", minLength: 4, maxLength: 40 },

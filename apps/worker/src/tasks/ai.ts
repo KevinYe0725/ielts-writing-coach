@@ -86,7 +86,7 @@ import {
   focusedLearningPackageSchema,
   issueBatchSchema,
   practicePaperEvaluationSchema,
-  timedPracticePaperSchema,
+  practicePaperItemContentSchema,
   teachingPracticeAnalysisSchema,
   transferEvaluationSchema,
 } from "../schemas";
@@ -117,6 +117,7 @@ import {
   type VersionScoreSet,
   sanitizePracticePaperJudgment,
   validateFocusedLearningPackage,
+  validatePracticePaperItemContent,
 } from "../learning";
 import { buildMixedReviewObservation } from "../mixed-review";
 
@@ -1218,11 +1219,16 @@ async function generateLesson(
     GenerationResult<FocusedLearningPackage>
   > => {
     const adapter = await adapterForJob(job);
-    const teaching = await adapter.generateStructured<AdaptiveTeachingModule>({
-      model: model(job),
-      idempotencyKey: `${job.id}:teaching`,
-      system: PROMPT_REGISTRY.exercise_generation.system,
-      input: `Create only a self-contained adaptive teaching article for the learner. The diagnosed top-level priority is ${canonicalSkillId}; narrow it to one observable micro-skill rather than covering every issue in the essay.
+    let teaching: GenerationResult<AdaptiveTeachingModule> | null = null;
+    let teachingError: unknown;
+    for (let attempt = 1; attempt <= 5; attempt += 1) {
+      try {
+        const generated =
+          await adapter.generateStructured<AdaptiveTeachingModule>({
+            model: model(job),
+            idempotencyKey: `${job.id}:teaching`,
+            system: PROMPT_REGISTRY.exercise_generation.system,
+            input: `Create only a self-contained adaptive teaching article for the learner. The diagnosed top-level priority is ${canonicalSkillId}; narrow it to one observable micro-skill rather than covering every issue in the essay.
 
 Write the article body as Markdown. Return ADAPTIVE_ARTICLE_V1 with:
 - titleZh / titleEn: a short bilingual title.
@@ -1241,42 +1247,190 @@ Selected-skill diagnosis context: ${JSON.stringify(diagnosisContext)}
 Teaching resource for this priority (use it for planning; do not expose these labels):
 ${focusedTeachingProfileFor(canonicalSkillId)}
 Learner Version 1 for context only: ${(version1?.content ?? "").slice(0, 4_000)}`,
-      schemaName: "iwc_adaptive_teaching_article_v1",
-      schema: adaptiveTeachingModuleSchema as unknown as Record<
-        string,
-        unknown
-      >,
-      validate: (value): value is AdaptiveTeachingModule =>
-        validateAdaptiveTeachingModule(value, version1?.content),
-      maxOutputTokens: 80_000,
-      timeoutMs: LONG_GENERATION_TIMEOUT_MS,
-    });
-    const paper = await adapter.generateStructured<PracticePaperContent>({
-      model: model(job),
-      idempotencyKey: `${job.id}:paper`,
-      system: PROMPT_REGISTRY.exercise_generation.system,
-      input: `Create only a 60-minute focused practice paper. It must train exactly the private bilingual core ability below, but use different English material from the tutorial. Do not quote, copy, or closely paraphrase the tutorial's reference answers.
+            schemaName: "iwc_adaptive_teaching_article_v1",
+            schema: adaptiveTeachingModuleSchema as unknown as Record<
+              string,
+              unknown
+            >,
+            validate: (value): value is AdaptiveTeachingModule =>
+              validateAdaptiveTeachingModule(value, version1?.content),
+            maxOutputTokens: 80_000,
+            timeoutMs: LONG_GENERATION_TIMEOUT_MS,
+          });
+        if (
+          validateAdaptiveTeachingModule(generated.value, version1?.content)
+        ) {
+          teaching = generated;
+          break;
+        }
+        teachingError = new Error(
+          "The teaching article failed content validation.",
+        );
+      } catch (error) {
+        teachingError = error;
+      }
+    }
+    if (!teaching) {
+      throw teachingError instanceof Error
+        ? teachingError
+        : new Error("The teaching article failed after 5 attempts.");
+    }
+    const paperSections = [
+      "FOUNDATION",
+      "FOUNDATION",
+      "REPAIR",
+      "REPAIR",
+      "GENERATION",
+      "GENERATION",
+      "INTEGRATION",
+      "INTEGRATION",
+    ] as const;
+    const paperModes = [
+      "choice",
+      "short_text",
+      "sentence",
+      "sentence",
+      "sentence",
+      "sentence",
+      "paragraph",
+      "paragraph",
+    ] as const;
+    const paperMinutes = [5, 5, 7, 7, 8, 8, 10, 10];
+    const paperMinWords = [1, 20, 8, 8, 25, 25, 80, 80];
+    const paperMaxWords = [1, 35, 40, 40, 45, 45, 120, 120];
+    const sectionRoleZh: Record<string, string> = {
+      FOUNDATION: "识别/诊断或简短解释",
+      REPAIR: "改写或修复有缺陷的表达，保持原意",
+      GENERATION: "在全新语境中原创句子",
+      INTEGRATION: "写并改进一段雅思风格段落",
+    };
 
-Private core ability in Chinese: ${teaching.value.coreAbilityZh}
-Private core ability in English: ${teaching.value.coreAbilityEn}
+    let paperUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+    const paperItems: PracticePaperContent["items"][number][] = [];
+    type PaperItemContentInput = {
+      titleZh: string;
+      titleEn: string;
+      instructionZh: string;
+      promptEn: string;
+      sourceText: string;
+      options: PracticePaperContent["items"][number]["options"];
+      acceptedAnswers: PracticePaperContent["items"][number]["acceptedAnswers"];
+      answerExplanationZh: string;
+      publicCriteria: PracticePaperContent["items"][number]["publicCriteria"];
+    };
+    for (let index = 0; index < 8; index += 1) {
+      const section = paperSections[index]!;
+      const responseMode = paperModes[index]!;
+      const minutes = paperMinutes[index]!;
+      const minWords = paperMinWords[index]!;
+      const maxWords = paperMaxWords[index]!;
+      const isChoice = responseMode === "choice";
 
-Both objectiveZh and objectiveEn must contain their corresponding core ability verbatim. The paper has exactly 8 questions in this exact order:
-1–2 FOUNDATION: one clear recognition/diagnosis question and one short explanation question;
-3–4 REPAIR: repair or rewrite two flawed excerpts without changing their intended meaning;
-5–6 GENERATION: write original sentences in two genuinely different contexts;
-7–8 INTEGRATION: write and improve an IELTS-style paragraph using the target naturally.
+      let lastError: unknown;
+      let generatedItem: PracticePaperContent["items"][number] | null = null;
+      for (let attempt = 1; attempt <= 5; attempt += 1) {
+        try {
+          const generated =
+            await adapter.generateStructured<PaperItemContentInput>({
+              model: model(job),
+              idempotencyKey: `${job.id}:paper-item-${index}`,
+              system: PROMPT_REGISTRY.exercise_generation.system,
+              input: `Create only question ${index + 1} of 8 for a 60-minute focused practice paper. It trains exactly this private bilingual core ability, using different English material from the tutorial.
 
-The suggested minutes across all 8 questions must total exactly 60. Every question must be answerable without feedback from another question. Before the learner answers, state in Chinese exactly what to produce, how many sentences or words, all required ideas, and all restrictions. instructionZh must begin with a concrete output verb such as 选择, 判断, 解释, 改写, 重写, 写出, 列出, or 圈出 — never vague phrasing like '按要求作答' or '完成下面的表达'. publicCriteria are protected evaluator data and are not displayed as a separate learner-facing rubric. Each criterion descriptionZh must be a word-for-word copy of the full instructionZh (identical text) and must not add or paraphrase another requirement. Prefer one criterion with weight 100. A criterion label must be a short human-facing phrase, never an ID. Choice questions need 3–4 unambiguous options and acceptedAnswers containing only option keys. Open questions must have empty options and acceptedAnswers. Use plain Chinese instructions and English writing material. Avoid vague wording such as 'demonstrate the target', 'complete the chain', 'meaning branch', or 'according to the slots'. Do not mention internal software concepts.
+Private core ability (zh): ${teaching.value.coreAbilityZh}
+Private core ability (en): ${teaching.value.coreAbilityEn}
 
-All eight English prompts must be substantively different. REPAIR questions must include the exact flawed source sentence. The public criterion weights for each question must total 100. Reject trivia, meta-questions about grammar labels, and instructions that require the learner to guess intended content.
+This is a ${section} question (${sectionRoleZh[section]}), responseMode "${responseMode}", suggestedMinutes ${minutes}, minimumWords ${minWords}, maximumWords ${maxWords}.${
+                isChoice
+                  ? " It is multiple-choice: write 3–4 unambiguous options and acceptedAnswers containing only the chosen option key."
+                  : " It is open-ended: leave options and acceptedAnswers empty arrays."
+              }${
+                section === "REPAIR"
+                  ? " Include the exact flawed source sentence in sourceText."
+                  : " Keep sourceText an empty string."
+              }
+
+Before the learner answers, state in Chinese exactly what to produce, how many sentences or words, all required ideas, and all restrictions. instructionZh must begin with a concrete output verb such as 选择, 判断, 解释, 改写, 重写, 写出, 列出, or 圈出 — never vague phrasing like '按要求作答' or '完成下面的表达'. Each criterion descriptionZh must be a word-for-word copy of the full instructionZh. Prefer one criterion with weight 100. Reject trivia and meta-questions about grammar labels.
 
 Original IELTS question: ${cycle.question.prompt}`,
-      schemaName: "iwc_timed_practice_paper_v3",
-      schema: timedPracticePaperSchema as unknown as Record<string, unknown>,
-      validate: validateTimedPracticePaper,
-      maxOutputTokens: 80_000,
-      timeoutMs: LONG_GENERATION_TIMEOUT_MS,
-    });
+              schemaName: "iwc_practice_paper_item_v1",
+              schema: practicePaperItemContentSchema as unknown as Record<
+                string,
+                unknown
+              >,
+              validate: (value): value is PaperItemContentInput =>
+                typeof value === "object" && value !== null,
+              maxOutputTokens: 20_000,
+              timeoutMs: STANDARD_GENERATION_TIMEOUT_MS,
+            });
+          paperUsage = {
+            inputTokens: paperUsage.inputTokens + generated.usage.inputTokens,
+            outputTokens:
+              paperUsage.outputTokens + generated.usage.outputTokens,
+            totalTokens: paperUsage.totalTokens + generated.usage.totalTokens,
+          };
+          const item: PracticePaperContent["items"][number] = {
+            section,
+            responseMode,
+            suggestedMinutes: minutes,
+            minimumWords: minWords,
+            maximumWords: maxWords,
+            titleZh: generated.value.titleZh,
+            titleEn: generated.value.titleEn,
+            instructionZh: generated.value.instructionZh,
+            promptEn: generated.value.promptEn,
+            sourceText: generated.value.sourceText,
+            options: generated.value.options,
+            acceptedAnswers: generated.value.acceptedAnswers,
+            answerExplanationZh: generated.value.answerExplanationZh,
+            publicCriteria: generated.value.publicCriteria,
+          };
+          if (validatePracticePaperItemContent(item)) {
+            generatedItem = item;
+            break;
+          }
+          lastError = new Error(
+            `Paper question ${index + 1} failed content validation.`,
+          );
+        } catch (error) {
+          lastError = error;
+        }
+      }
+      if (!generatedItem) {
+        throw lastError instanceof Error
+          ? lastError
+          : new Error(`Paper question ${index + 1} failed after 5 attempts.`);
+      }
+      paperItems.push(generatedItem);
+    }
+
+    const paper: GenerationResult<PracticePaperContent> = {
+      value: {
+        titleZh: "专项能力训练卷",
+        titleEn: "Focused ability practice paper",
+        objectiveZh: `${teaching.value.coreAbilityZh}，并在不同语境中独立完成表达。`,
+        objectiveEn: `${teaching.value.coreAbilityEn} in independent writing across different contexts.`,
+        instructionsZh: [
+          "限时60分钟，按顺序完成八道题。",
+          "先独立作答，交卷前不查看答案。",
+          "每题都按题面中可见的要求完成。",
+        ],
+        instructionsEn: [
+          "Work for 60 minutes and complete all eight questions in order.",
+          "Answer independently before submitting the full paper.",
+          "Follow every visible requirement in each question.",
+        ],
+        items: paperItems,
+      },
+      model: model(job),
+      usage: paperUsage,
+    };
+    if (!validateTimedPracticePaper(paper.value)) {
+      throw Object.assign(
+        new Error("The per-question paper assembly is invalid."),
+        { code: "INVALID_RESPONSE" },
+      );
+    }
     const value = {
       teachingModule: teaching.value,
       paper: paper.value,
