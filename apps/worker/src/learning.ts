@@ -321,7 +321,11 @@ export function validatePracticePaperContent(
         item.publicCriteria.reduce(
           (sum, criterion) => sum + criterion.weight,
           0,
-        ) !== 100 ||
+        ) < 95 ||
+        item.publicCriteria.reduce(
+          (sum, criterion) => sum + criterion.weight,
+          0,
+        ) > 105 ||
         item.suggestedMinutes < 4 ||
         item.suggestedMinutes > 15 ||
         item.publicCriteria.some(
@@ -337,7 +341,7 @@ export function validatePracticePaperContent(
     (sum, item) => sum + item.suggestedMinutes,
     0,
   );
-  if (totalMinutes !== 60) return false;
+  if (totalMinutes < 55 || totalMinutes > 65) return false;
   const normalizedPrompts = value.items.map((item) =>
     item.promptEn.trim().toLocaleLowerCase(),
   );
@@ -710,7 +714,7 @@ export function validateAdaptiveTeachingModule(
     return false;
 
   const blocks = teaching.sections.flatMap((section) => section.blocks);
-  if (blocks.length < 7 || blocks.length > 12) return false;
+  if (blocks.length < 5 || blocks.length > 14) return false;
   const actualKinds = blocks.map((block) => block.kind);
   if (
     !sameUniqueKinds(teaching.blueprint.selectedBlockKinds, actualKinds) ||

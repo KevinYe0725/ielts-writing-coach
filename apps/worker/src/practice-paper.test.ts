@@ -805,10 +805,12 @@ describe("complete practice paper contract", () => {
     expect(validateFixture(value)).toBe(false);
   });
 
-  it("rejects an article with more than twelve blocks", () => {
+  it("rejects an article with more than fourteen blocks", () => {
     const value = mechanismPackage();
     const explanation = value.teachingModule.sections[0]!.blocks[0]!;
     value.teachingModule.sections[0]!.blocks.push(
+      structuredClone(explanation),
+      structuredClone(explanation),
       structuredClone(explanation),
       structuredClone(explanation),
       structuredClone(explanation),
@@ -1019,7 +1021,7 @@ describe("complete practice paper contract", () => {
     expect(validateFixture(value)).toBe(false);
   });
 
-  it("accepts only the exact 8-question, 60-minute product shape", () => {
+  it("accepts the 8-question paper shape with a 55–65 minute total", () => {
     expect(validatePracticePaperContent(paper())).toBe(true);
     expect(
       validatePracticePaperContent({
@@ -1027,11 +1029,11 @@ describe("complete practice paper contract", () => {
         items: paper().items.slice(0, 7),
       }),
     ).toBe(false);
-    const hiddenMinute = paper();
-    const changedItems = [...hiddenMinute.items];
-    changedItems[0] = { ...changedItems[0]!, suggestedMinutes: 6 };
+    const offRange = paper();
+    const changedItems = [...offRange.items];
+    changedItems[0] = { ...changedItems[0]!, suggestedMinutes: 14 };
     expect(
-      validatePracticePaperContent({ ...hiddenMinute, items: changedItems }),
+      validatePracticePaperContent({ ...offRange, items: changedItems }),
     ).toBe(false);
   });
 

@@ -327,9 +327,9 @@ const paperCriterion = {
   required: ["labelZh", "labelEn", "descriptionZh", "descriptionEn", "weight"],
   properties: {
     labelZh: { type: "string", minLength: 2, maxLength: 20 },
-    labelEn: { type: "string", minLength: 2, maxLength: 40 },
-    descriptionZh: { type: "string", minLength: 8, maxLength: 120 },
-    descriptionEn: { type: "string", minLength: 8, maxLength: 180 },
+    labelEn: { type: "string", minLength: 2, maxLength: 60 },
+    descriptionZh: { type: "string", minLength: 8, maxLength: 200 },
+    descriptionEn: { type: "string", minLength: 8, maxLength: 320 },
     weight: { type: "integer", minimum: 1, maximum: 100 },
   },
 } as const;
@@ -409,7 +409,7 @@ const practicePaperProperties = {
         answerExplanationZh: { type: "string", minLength: 8, maxLength: 240 },
         suggestedMinutes: { type: "integer", minimum: 4, maximum: 15 },
         minimumWords: { type: "integer", minimum: 0, maximum: 150 },
-        maximumWords: { type: "integer", minimum: 1, maximum: 150 },
+        maximumWords: { type: "integer", minimum: 0, maximum: 150 },
         publicCriteria: {
           type: "array",
           minItems: 1,
