@@ -660,9 +660,11 @@ function sameUniqueKinds(
 ): boolean {
   const selected = new Set(selectedKinds);
   const actual = new Set(actualKinds);
+  // The blueprint is private planning metadata; require the plan to be
+  // non-duplicated and to actually appear in the article, but tolerate the
+  // model writing an extra block (e.g. adding PITFALLS) it did not list.
   return (
     selected.size === selectedKinds.length &&
-    selected.size === actual.size &&
     [...selected].every((kind) => actual.has(kind))
   );
 }
