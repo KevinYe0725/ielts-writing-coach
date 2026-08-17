@@ -390,14 +390,7 @@ export default function SettingsPage() {
     <>
       <PageHeader
         eyebrow={text("个人与实例设置", "Personal & instance settings")}
-        title={text(
-          "保持默认简单，需要时再展开",
-          "Simple by default, advanced when needed",
-        )}
-        description={text(
-          "学习者偏好与管理员运维设置分开；个人模式下它们集中在同一处。",
-          "Learner preferences and administrator operations are separated; personal mode keeps them together here.",
-        )}
+        title={text("设置", "Settings")}
       />
       <div className="settings-layout">
         <nav

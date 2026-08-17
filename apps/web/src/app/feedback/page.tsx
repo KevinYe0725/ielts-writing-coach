@@ -392,10 +392,6 @@ export default function FeedbackPage({
           "对照原文，把每一处问题改明白",
           "Correct each issue against your original essay",
         )}
-        description={text(
-          "点击右侧建议即可回到对应原句；先理解为什么，再记住可以迁移到下一篇的改法。",
-          "Select a suggestion to locate its exact source, understand why it matters, and retain the transferable revision rule.",
-        )}
       />
 
       {data.issueClassificationRetry ? (
