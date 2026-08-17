@@ -42,12 +42,7 @@ describe("teaching-practice analysis boundaries", () => {
     const paperContent = {
       teachingModule: {
         format: "ADAPTIVE_ARTICLE_V1",
-        sections: [
-          {
-            anchor: "practice",
-            blocks: [{ kind: "PRACTICE", prompts: [tutorialPrompt] }],
-          },
-        ],
+        practicePrompts: [tutorialPrompt],
       },
       paper: { items: [{ ...tutorialPrompt, promptEn: "private timed item" }] },
     };

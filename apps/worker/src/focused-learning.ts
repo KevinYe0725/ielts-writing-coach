@@ -23,11 +23,8 @@ export type {
   FocusedLearningPackage,
   PracticePaperContent,
   PracticePaperItemContent,
-  TeachingBlock,
-  TeachingBlockKind,
-  TeachingBlueprint,
   TeachingPracticePrompt,
-  TeachingSection,
+  TeachingSectionMarkdown,
 } from "./learning";
 
 const ajv = new Ajv2020({ allErrors: true, strict: true });
@@ -177,20 +174,12 @@ export function findTeachingPrompt(
   const module = asRecord(content?.teachingModule);
   if (
     module?.format !== "ADAPTIVE_ARTICLE_V1" ||
-    !Array.isArray(module.sections)
+    !Array.isArray(module.practicePrompts)
   )
     return null;
-  for (const sectionValue of module.sections) {
-    const section = asRecord(sectionValue);
-    if (!section || !Array.isArray(section.blocks)) continue;
-    for (const blockValue of section.blocks) {
-      const block = asRecord(blockValue);
-      if (block?.kind !== "PRACTICE" || !Array.isArray(block.prompts)) continue;
-      for (const prompt of block.prompts) {
-        if (asRecord(prompt)?.id !== promptId) continue;
-        return projectCanonicalTeachingPrompt(prompt);
-      }
-    }
+  for (const prompt of module.practicePrompts) {
+    if (asRecord(prompt)?.id !== promptId) continue;
+    return projectCanonicalTeachingPrompt(prompt);
   }
   return null;
 }

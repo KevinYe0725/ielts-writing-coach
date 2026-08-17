@@ -525,201 +525,82 @@ export const mechanismChainTeachingFixture: FocusedTeachingData = {
   format: "ADAPTIVE_ARTICLE_V1",
   titleZh: "别让论证从原因直接跳到结果",
   titleEn: "Build the missing link in a causal argument",
-  introductionZh:
+  introductionMarkdown:
     "这篇教程集中训练一件事：把中间发生的过程说清楚，让读者能够跟上你的推理。",
-  introductionEn:
-    "This tutorial focuses on making the missing process in a causal argument visible.",
   estimatedMinutes: 28,
   sections: [
     {
-      anchor: "see-the-missing-link",
       titleZh: "看见被跳过的一步",
       titleEn: "See the missing link",
-      blocks: [
-        {
-          kind: "EXPLANATION",
-          titleZh: "机制不是重复原因",
-          titleEn: "A mechanism is not a repeated cause",
-          paragraphsZh: [
-            "原因告诉读者起点，结果告诉读者终点，机制说明变化如何从起点走到终点。只有补出中间发生的变化，论证才真正向前推进。",
-          ],
-          paragraphsEn: [
-            "A cause supplies the starting condition; a mechanism shows what changes before the result appears.",
-          ],
-          keyPointZh: "机制句必须增加一个新的中间步骤。",
-          keyPointEn: "A mechanism must add a new intermediate step.",
-        },
-        {
-          kind: "CONTRAST",
-          titleZh: "同一个观点，差在哪里",
-          titleEn: "The same claim with and without a mechanism",
-          weakExampleEn:
-            "Remote work is flexible, so employees are more productive.",
-          strongExampleEn:
-            "Remote work removes many daily interruptions, allowing employees to protect longer periods for concentrated tasks and therefore complete demanding work more efficiently.",
-          differenceZh:
-            "较强的句子补上了“减少打断”和“保留专注时间”两个可理解步骤，而不是只重复远程办公有好处。",
-          differenceEn:
-            "The stronger version adds fewer interruptions and longer periods of concentration as the missing process.",
-        },
-      ],
+      markdown:
+        "原因告诉读者起点，结果告诉读者终点，机制说明变化如何从起点走到终点。只有补出中间发生的变化，论证才真正向前推进。\n\n**核心判断**：机制句必须增加一个新的中间步骤。\n\n对比下面两个表达：\n\n- 较弱：Remote work is flexible, so employees are more productive.\n- 较强：Remote work removes many daily interruptions, allowing employees to protect longer periods for concentrated tasks and therefore complete demanding work more efficiently.\n\n较强的句子补上了“减少打断”和“保留专注时间”两个可理解步骤，而不是只重复远程办公有好处。",
     },
     {
-      anchor: "build-one-step-at-a-time",
       titleZh: "从一个问题推出机制",
       titleEn: "Build the mechanism one step at a time",
-      blocks: [
-        {
-          kind: "REASONING",
-          titleZh: "把抽象好处推成可观察结果",
-          titleEn: "Reason from an abstract benefit to an observable result",
-          scenarioZh: "城市增加独立自行车道为什么可以改善通勤？",
-          scenarioEn: "Why can additional cycle lanes improve commuting?",
-          steps: [
-            {
-              thinkingZh: "先找到直接变化：骑行者不必与汽车争抢道路空间。",
-              thinkingEn:
-                "Identify the immediate change: cyclists no longer compete with cars for the same road space.",
-            },
-            {
-              thinkingZh: "再追问行为会怎样改变：更多人愿意在短途通勤时骑车。",
-              thinkingEn:
-                "Ask what behavior changes: more people are willing to cycle on short commutes.",
-            },
-            {
-              thinkingZh: "最后落到可以观察的结果：繁忙道路上的汽车压力下降。",
-              thinkingEn:
-                "Finish with an observable result: fewer cars place pressure on busy roads.",
-            },
-          ],
-          resultEn:
-            "Separated cycle lanes make short journeys feel safer, which encourages commuters to replace some car trips and reduces pressure on busy roads.",
-          takeawayZh: "用“直接变化→行为变化→可观察结果”检查链条。",
-          takeawayEn:
-            "Check for an immediate change, a behavior change, and an observable result.",
-        },
-        {
-          kind: "TOOLKIT",
-          titleZh: "用连接词显示已经想清楚的关系",
-          titleEn: "Use links to show a reasoned relationship",
-          tools: [
-            {
-              expressionEn: "This means that …",
-              functionZh: "解释一个具体变化带来的下一步影响。",
-              functionEn: "Explain the next effect of a concrete change.",
-              conditionZh: "前一句已经写出具体变化，再说明它导致什么。",
-              conditionEn: "Use it after a concrete change has been named.",
-              cautionZh: "不要用它连接两个空泛的积极判断。",
-              cautionEn: "Do not use it to connect two vague positive claims.",
-              exampleEn:
-                "Regular feedback identifies small gaps early. This means that learners can address them before the gaps become habits.",
-            },
-          ],
-        },
-        {
-          kind: "PITFALLS",
-          titleZh: "别把积极评价当成解释",
-          titleEn: "Do not mistake a positive label for an explanation",
-          items: [
-            {
-              patternEn:
-                "Exercise improves concentration because it is healthy.",
-              problemZh: "healthy没有说明身体活动怎样影响课堂注意力。",
-              problemEn:
-                "Healthy does not explain how physical activity affects attention in class.",
-              betterEn:
-                "Regular exercise can improve sleep quality, leaving students better able to concentrate during demanding lessons.",
-            },
-          ],
-        },
-      ],
+      markdown:
+        "城市增加独立自行车道为什么可以改善通勤？\n\n1. 先找到直接变化：骑行者不必与汽车争抢道路空间。\n2. 再追问行为会怎样改变：更多人愿意在短途通勤时骑车。\n3. 最后落到可以观察的结果：繁忙道路上的汽车压力下降。\n\n> Separated cycle lanes make short journeys feel safer, which encourages commuters to replace some car trips and reduces pressure on busy roads.\n\n**写前检查**：用 This means that 连接“具体变化→下一步影响”，不要用它连接两个空泛的积极判断。\n\n**常见误区**：把积极评价当成解释。*Exercise improves concentration because it is healthy.* 没有说明身体活动怎样影响课堂注意力。",
     },
     {
-      anchor: "try-and-check",
       titleZh: "换一个话题验证方法",
       titleEn: "Transfer the method to a new topic",
-      blocks: [
-        {
-          kind: "PRACTICE",
-          titleZh: "先辨别，再完成两次主动生成",
-          titleEn: "Recognise once, then generate two missing mechanisms",
-          prompts: [
-            {
-              id: "spot-the-mechanism",
-              instructionZh: "选出真正写出中间机制的一句英文。",
-              instructionEn:
-                "Choose the English sentence that states an intermediate mechanism.",
-              promptEn: "A city creates protected cycle lanes on busy roads.",
-              responseMode: "CHOICE",
-              context: "SAME_TOPIC",
-              optionsEn: [
-                "Cycle lanes are beneficial for cities.",
-                "Protected lanes reduce perceived danger, so more commuters feel able to cycle regularly.",
-                "Many cities have busy roads.",
-              ],
-              referenceAnswerEn:
-                "Protected lanes reduce perceived danger, so more commuters feel able to cycle regularly.",
-              referenceReasoningZh:
-                "它说明了道路设计先改变风险感受，再改变通勤选择。",
-              referenceReasoningEn:
-                "It shows infrastructure changing perceived risk before it changes commuter choices.",
-            },
-            {
-              id: "workplace-mechanism",
-              instructionZh: "用一句英文补出灵活工作与生产力之间的中间机制。",
-              instructionEn:
-                "Write one English sentence that supplies the mechanism between flexible work and productivity.",
-              promptEn:
-                "Flexible schedules can improve employee productivity because …",
-              responseMode: "SHORT_TEXT",
-              context: "SAME_TOPIC",
-              optionsEn: [],
-              referenceAnswerEn:
-                "Employees can reserve their most demanding tasks for the hours when they concentrate best.",
-              referenceReasoningZh:
-                "参考答案说明了灵活时间如何改变任务安排，而不只是再次声称生产力会上升。",
-              referenceReasoningEn:
-                "The reference explains how flexible time changes task scheduling rather than repeating the outcome.",
-            },
-            {
-              id: "environment-transfer",
-              instructionZh: "换到环境话题，用两句英文写出一条新的机制链。",
-              instructionEn:
-                "Move to an environmental topic and write a new two-sentence mechanism chain.",
-              promptEn:
-                "Explain how charging households for excess waste could reduce landfill use.",
-              responseMode: "SHORT_TEXT",
-              context: "UNSEEN_TOPIC",
-              optionsEn: [],
-              referenceAnswerEn:
-                "A direct charge makes unnecessary disposal more expensive. Households therefore have a reason to reuse products and separate recyclable material.",
-              referenceReasoningZh:
-                "价格变化先影响家庭选择，再影响进入填埋场的废物量。",
-              referenceReasoningEn:
-                "The price change affects choices before it changes the amount of landfill waste.",
-            },
-          ],
-        },
-        {
-          kind: "SUMMARY",
-          titleZh: "下次写作只检查这三件事",
-          titleEn: "Three checks for your next essay",
-          rulesZh: [
-            "原因和结果之间是否出现了新的中间步骤？",
-            "中间步骤是否回答了影响如何发生？",
-            "结果是否具体到可以被观察？",
-          ],
-          rulesEn: [
-            "Add a new intermediate step between cause and result.",
-            "Make the step answer how the change happens.",
-            "Finish with a result that could be observed.",
-          ],
-          selfCheckZh:
-            "删掉中间句后，推理是否几乎没有变？如果是，它可能只在重复。",
-          selfCheckEn:
-            "If removing the middle sentence changes almost nothing, it may only repeat the claim.",
-        },
+      markdown:
+        "下次写作只检查这三件事：\n\n1. 原因和结果之间是否出现了新的中间步骤？\n2. 中间步骤是否回答了影响如何发生？\n3. 结果是否具体到可以被观察？\n\n**自检**：删掉中间句后，推理是否几乎没有变？如果是，它可能只在重复。",
+    },
+  ],
+  practicePrompts: [
+    {
+      id: "spot-the-mechanism",
+      instructionZh: "选出真正写出中间机制的一句英文。",
+      instructionEn:
+        "Choose the English sentence that states an intermediate mechanism.",
+      promptEn: "A city creates protected cycle lanes on busy roads.",
+      responseMode: "CHOICE",
+      context: "SAME_TOPIC",
+      optionsEn: [
+        "Cycle lanes are beneficial for cities.",
+        "Protected lanes reduce perceived danger, so more commuters feel able to cycle regularly.",
+        "Many cities have busy roads.",
       ],
+      referenceAnswerEn:
+        "Protected lanes reduce perceived danger, so more commuters feel able to cycle regularly.",
+      referenceReasoningZh: "它说明了道路设计先改变风险感受，再改变通勤选择。",
+      referenceReasoningEn:
+        "It shows infrastructure changing perceived risk before it changes commuter choices.",
+    },
+    {
+      id: "workplace-mechanism",
+      instructionZh: "用一句英文补出灵活工作与生产力之间的中间机制。",
+      instructionEn:
+        "Write one English sentence that supplies the mechanism between flexible work and productivity.",
+      promptEn:
+        "Flexible schedules can improve employee productivity because …",
+      responseMode: "SHORT_TEXT",
+      context: "SAME_TOPIC",
+      optionsEn: [],
+      referenceAnswerEn:
+        "Employees can reserve their most demanding tasks for the hours when they concentrate best.",
+      referenceReasoningZh:
+        "参考答案说明了灵活时间如何改变任务安排，而不只是再次声称生产力会上升。",
+      referenceReasoningEn:
+        "The reference explains how flexible time changes task scheduling rather than repeating the outcome.",
+    },
+    {
+      id: "environment-transfer",
+      instructionZh: "换到环境话题，用两句英文写出一条新的机制链。",
+      instructionEn:
+        "Move to an environmental topic and write a new two-sentence mechanism chain.",
+      promptEn:
+        "Explain how charging households for excess waste could reduce landfill use.",
+      responseMode: "SHORT_TEXT",
+      context: "UNSEEN_TOPIC",
+      optionsEn: [],
+      referenceAnswerEn:
+        "A direct charge makes unnecessary disposal more expensive. Households therefore have a reason to reuse products and separate recyclable material.",
+      referenceReasoningZh:
+        "价格变化先影响家庭选择，再影响进入填埋场的废物量。",
+      referenceReasoningEn:
+        "The price change affects choices before it changes the amount of landfill waste.",
     },
   ],
 };
@@ -730,164 +611,71 @@ export const collocationControlTeachingFixture: FocusedTeachingData = {
   format: "ADAPTIVE_ARTICLE_V1",
   titleZh: "搭配不是正确单词的随意相加",
   titleEn: "Collocation is more than combining correct words",
-  introductionZh:
+  introductionMarkdown:
     "这篇教程训练你先辨别语境中的关系，再从看似正确的候选表达中做出稳定选择。",
-  introductionEn:
-    "This tutorial trains a context-first method for choosing among plausible expressions.",
   estimatedMinutes: 14,
   sections: [
     {
-      anchor: "choose-by-relationship",
       titleZh: "先判断关系，再选择词组",
       titleEn: "Choose by relationship, not translation",
-      blocks: [
-        {
-          kind: "EXPLANATION",
-          titleZh: "自然搭配同时受意义和语境限制",
-          titleEn: "Natural collocation depends on meaning and context",
-          paragraphsZh: [
-            "两个词分别正确，不代表它们组合后就是英语使用者在这个语境中的常见选择。稳定的选择来自对主语、动作和受影响对象之间关系的判断。",
-          ],
-          paragraphsEn: [
-            "Two individually correct words do not automatically form the usual expression for a particular relationship.",
-          ],
-          keyPointZh: "先问这个动词通常由什么主语对什么宾语使用。",
-          keyPointEn:
-            "Check which subjects and objects usually participate in the expression.",
-        },
-        {
-          kind: "TOOLKIT",
-          titleZh: "用使用条件而不是中文释义记搭配",
-          titleEn: "Store expressions with their usage conditions",
-          tools: [
-            {
-              expressionEn: "pose a risk to",
-              functionZh: "说明某事物带来潜在危害",
-              functionEn: "State that something creates a potential danger",
-              conditionZh: "主语是危险来源，宾语是受到影响的对象。",
-              conditionEn:
-                "The subject is the source of danger and the object is exposed to it.",
-              cautionZh: "不要仅仅因为某人感到担忧，就让人作这个短语的主语。",
-              cautionEn:
-                "Do not use a person as the subject merely because that person feels worried.",
-              exampleEn:
-                "Untreated industrial waste poses a serious risk to river ecosystems.",
-            },
-            {
-              expressionEn: "have an influence on",
-              functionZh: "说明一个因素对另一事物产生影响",
-              functionEn: "State that one factor affects another",
-              conditionZh: "主语是影响来源，on后面接被影响的对象。",
-              conditionEn:
-                "The subject is the source of influence and the object follows on.",
-              cautionZh: "不能写成make an influence on。",
-              cautionEn: "Do not write make an influence on.",
-              exampleEn:
-                "Housing costs have a substantial influence on where young adults choose to live.",
-            },
-          ],
-        },
-        {
-          kind: "PITFALLS",
-          titleZh: "两种会让选择失稳的捷径",
-          titleEn: "Two shortcuts that make choices unstable",
-          items: [
-            {
-              patternEn: "learn knowledge",
-              problemZh: "只根据中文“学知识”逐词翻译，没有检查常见动宾关系。",
-              problemEn:
-                "It follows a word-for-word translation instead of the usual verb–object relationship.",
-              betterEn: "acquire knowledge",
-            },
-            {
-              patternEn: "a heavy improvement",
-              problemZh: "看到“大幅”就直接选择heavy，而没有检查固定组合。",
-              problemEn:
-                "It chooses heavy from a dictionary meaning rather than an established combination.",
-              betterEn: "a substantial improvement",
-            },
-          ],
-        },
-        {
-          kind: "CONTRAST",
-          titleZh: "相似词并不承担相同关系",
-          titleEn: "Similar words do not express the same relationship",
-          weakExampleEn:
-            "The policy makes a strong influence on household spending.",
-          strongExampleEn:
-            "The policy has a substantial influence on household spending.",
-          differenceZh:
-            "make与influence不构成这个含义下的常见动宾组合；have an influence on才是稳定选择。",
-          differenceEn:
-            "Have an influence on is the established verb–noun pattern for this meaning.",
-        },
-      ],
+      markdown:
+        "两个词分别正确，不代表它们组合后就是英语使用者在这个语境中的常见选择。\n\n**核心判断**：先问这个动词通常由什么主语对什么宾语使用。\n\n- *pose a risk to*：说明某事物带来潜在危害；主语是危险来源，宾语是受到影响的对象。\n  - Untreated industrial waste poses a serious risk to river ecosystems.\n- *have an influence on*：说明一个因素对另一事物产生影响；不能写成 make an influence on。\n  - Housing costs have a substantial influence on where young adults choose to live.\n\n**常见误区**：只按中文逐词翻译。*learn knowledge* 应为 *acquire knowledge*；*a heavy improvement* 应为 *a substantial improvement*。",
     },
     {
-      anchor: "decide-in-new-contexts",
       titleZh: "在新语境中做出选择",
       titleEn: "Decide in new contexts",
-      blocks: [
-        {
-          kind: "PRACTICE",
-          titleZh: "先辨别，再独立生成",
-          titleEn: "Recognise once, then generate independently",
-          prompts: [
-            {
-              id: "risk-choice",
-              instructionZh: "选出能表示潜在危害的自然搭配。",
-              instructionEn:
-                "Choose the natural expression for creating a potential danger.",
-              promptEn:
-                "Air pollution may ___ a serious risk to children's health.",
-              responseMode: "CHOICE",
-              context: "SAME_TOPIC",
-              optionsEn: ["pose", "perform", "produce"],
-              referenceAnswerEn: "pose",
-              referenceReasoningZh:
-                "pose a risk to表示危险来源对暴露对象带来潜在危害。",
-              referenceReasoningEn:
-                "Pose a risk to expresses a source of potential danger affecting an exposed object.",
-            },
-            {
-              id: "health-transfer",
-              instructionZh: "在新的健康话题中，用一个自然搭配写一句完整英文。",
-              instructionEn:
-                "Write one complete English sentence with a natural collocation in a new health topic.",
-              promptEn:
-                "Explain one effect of prolonged sleep deprivation on workers.",
-              responseMode: "SHORT_TEXT",
-              context: "UNSEEN_TOPIC",
-              optionsEn: [],
-              referenceAnswerEn:
-                "Prolonged sleep deprivation can seriously impair workers' ability to make safe decisions.",
-              referenceReasoningZh:
-                "impair someone's ability to do something清晰表示某因素削弱一种能力。",
-              referenceReasoningEn:
-                "Impair someone's ability to do something expresses a reduction in capability.",
-            },
-          ],
-        },
-        {
-          kind: "SUMMARY",
-          titleZh: "用三个问题管住搭配选择",
-          titleEn: "Control collocation choices with three questions",
-          rulesZh: [
-            "这个表达通常由什么主语发出？",
-            "它通常作用于什么对象？",
-            "例句中的关系和当前语境相同吗？",
-          ],
-          rulesEn: [
-            "Identify the usual subject.",
-            "Identify the usual object.",
-            "Match the example's relationship to the present context.",
-          ],
-          selfCheckZh:
-            "我能说明这个搭配在本句中为什么自然，而不是只说“以前见过”吗？",
-          selfCheckEn:
-            "Can I explain why this combination fits the relationship rather than only recall seeing it?",
-        },
-      ],
+      markdown:
+        "用三个问题管住搭配选择：\n\n1. 这个表达通常由什么主语发出？\n2. 它通常作用于什么对象？\n3. 例句中的关系和当前语境相同吗？\n\n**自检**：我能说明这个搭配在本句中为什么自然，而不是只说“以前见过”吗？",
+    },
+  ],
+  practicePrompts: [
+    {
+      id: "risk-choice",
+      instructionZh: "选出能表示潜在危害的自然搭配。",
+      instructionEn:
+        "Choose the natural expression for creating a potential danger.",
+      promptEn: "Air pollution may ___ a serious risk to children's health.",
+      responseMode: "CHOICE",
+      context: "SAME_TOPIC",
+      optionsEn: ["pose", "perform", "produce"],
+      referenceAnswerEn: "pose",
+      referenceReasoningZh:
+        "pose a risk to表示危险来源对暴露对象带来潜在危害。",
+      referenceReasoningEn:
+        "Pose a risk to expresses a source of potential danger affecting an exposed object.",
+    },
+    {
+      id: "health-transfer",
+      instructionZh: "在新的健康话题中，用一个自然搭配写一句完整英文。",
+      instructionEn:
+        "Write one complete English sentence with a natural collocation in a new health topic.",
+      promptEn: "Explain one effect of prolonged sleep deprivation on workers.",
+      responseMode: "SHORT_TEXT",
+      context: "UNSEEN_TOPIC",
+      optionsEn: [],
+      referenceAnswerEn:
+        "Prolonged sleep deprivation can seriously impair workers' ability to make safe decisions.",
+      referenceReasoningZh:
+        "impair someone's ability to do something清晰表示某因素削弱一种能力。",
+      referenceReasoningEn:
+        "Impair someone's ability to do something expresses a reduction in capability.",
+    },
+    {
+      id: "policy-transfer",
+      instructionZh: "在政策语境中，用一个自然搭配写一句完整英文。",
+      instructionEn:
+        "Write one complete English sentence with a natural collocation in a policy context.",
+      promptEn:
+        "Explain how stricter safety rules can reduce a risk in factories.",
+      responseMode: "SHORT_TEXT",
+      context: "UNSEEN_TOPIC",
+      optionsEn: [],
+      referenceAnswerEn:
+        "Stricter safety rules can reduce the risk of avoidable injuries in factories.",
+      referenceReasoningZh:
+        "reduce the risk of清晰表达政策降低某种后果的关系。",
+      referenceReasoningEn:
+        "Reduce the risk of expresses a policy lowering the likelihood of a consequence.",
     },
   ],
 };

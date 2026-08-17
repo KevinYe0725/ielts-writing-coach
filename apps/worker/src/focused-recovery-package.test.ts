@@ -15,9 +15,7 @@ describe("source-owned focused recovery packages", () => {
       const lesson = focusedRecoveryLessonFor(skillId);
       const value = sourceOwnedFocusedRecoveryPackage(skillId);
 
-      expect(value.teachingModule.blueprint.coreAbilityZh).toBe(
-        lesson.coreAbilityZh,
-      );
+      expect(value.teachingModule.coreAbilityZh).toBe(lesson.coreAbilityZh);
       expect(value.paper.objectiveZh).toContain(lesson.coreAbilityZh);
       expect(value.paper.items).toHaveLength(8);
       expect(

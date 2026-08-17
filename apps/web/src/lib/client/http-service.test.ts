@@ -141,120 +141,56 @@ const adaptiveTeachingPayload: Omit<FocusedTeachingData, "id" | "cycleId"> = {
   format: "ADAPTIVE_ARTICLE_V1",
   titleZh: "把因果论证中间的一步讲清楚",
   titleEn: "Make the missing step in causal reasoning visible",
-  introductionZh:
+  introductionMarkdown:
     "这篇教程集中训练如何解释一个原因经过什么过程产生可观察的结果。",
-  introductionEn:
-    "This tutorial focuses on showing how a cause produces an observable result.",
   estimatedMinutes: 16,
   sections: [
     {
-      anchor: "understand-the-link",
       titleZh: "先理解什么是机制",
       titleEn: "Understand the mechanism",
-      blocks: [
-        {
-          kind: "EXPLANATION",
-          titleZh: "机制连接起点与终点",
-          titleEn: "A mechanism connects the start and the result",
-          paragraphsZh: [
-            "原因说明起点，结果说明终点，而机制说明中间发生了什么变化。",
-          ],
-          paragraphsEn: [
-            "A cause gives the starting condition, while a mechanism shows what changes before the result appears.",
-          ],
-          keyPointZh: "有效的机制会增加一个新的中间步骤。",
-          keyPointEn: "An effective mechanism adds a new intermediate step.",
-        },
-        {
-          kind: "REASONING",
-          titleZh: "从直接变化推出最终影响",
-          titleEn: "Reason from an immediate change to a final effect",
-          scenarioZh: "为什么独立自行车道可以改善通勤？",
-          scenarioEn: "Why can separated cycle lanes improve commuting?",
-          steps: [
-            {
-              thinkingZh: "先找直接变化：骑行者不再与汽车争抢道路空间。",
-              thinkingEn:
-                "Find the immediate change: cyclists no longer compete with cars for the same space.",
-            },
-            {
-              thinkingZh: "再找行为变化：更多人愿意骑车完成短途通勤。",
-              thinkingEn:
-                "Find the behavior change: more people are willing to cycle on short journeys.",
-            },
-          ],
-          resultEn:
-            "Separated lanes make short journeys feel safer, encouraging some commuters to replace car trips and reducing pressure on busy roads.",
-          takeawayZh: "依次检查直接变化、行为变化和可观察结果。",
-          takeawayEn:
-            "Check the immediate change, behavior change, and observable result.",
-        },
-      ],
+      markdown:
+        "原因说明起点，结果说明终点，而机制说明中间发生了什么变化。有效的机制会增加一个新的中间步骤。\n\n1. 先找直接变化：骑行者不再与汽车争抢道路空间。\n2. 再找行为变化：更多人愿意骑车完成短途通勤。\n\n> Separated lanes make short journeys feel safer, encouraging some commuters to replace car trips and reducing pressure on busy roads.",
     },
     {
-      anchor: "apply-the-method",
       titleZh: "换一个话题应用",
       titleEn: "Apply the method in a new topic",
-      blocks: [
-        {
-          kind: "PRACTICE",
-          titleZh: "主动补出中间机制",
-          titleEn: "Generate the missing mechanism",
-          prompts: [
-            {
-              id: "workplace-link",
-              instructionZh: "用一句英文补出灵活工作与生产力之间的机制。",
-              instructionEn:
-                "Write one sentence that links flexible work to productivity.",
-              promptEn:
-                "Flexible schedules can improve employee productivity because …",
-              responseMode: "SHORT_TEXT",
-              context: "SAME_TOPIC",
-              optionsEn: [],
-              referenceAnswerEn:
-                "Employees can reserve demanding tasks for the hours when they concentrate best.",
-              referenceReasoningZh: "参考答案说明灵活时间如何改变任务安排。",
-              referenceReasoningEn:
-                "The reference shows how flexible time changes task scheduling.",
-            },
-            {
-              id: "waste-transfer",
-              instructionZh: "在环境话题中写出一条两句的机制链。",
-              instructionEn:
-                "Write a two-sentence mechanism chain for an environmental topic.",
-              promptEn:
-                "Explain how charging households for excess waste could reduce landfill use.",
-              responseMode: "SHORT_TEXT",
-              context: "UNSEEN_TOPIC",
-              optionsEn: [],
-              referenceAnswerEn:
-                "A direct charge makes unnecessary disposal more expensive. Households therefore have a reason to reuse products and separate recyclable material.",
-              referenceReasoningZh:
-                "价格变化先影响家庭选择，再影响进入填埋场的废物量。",
-              referenceReasoningEn:
-                "The price change affects household choices before it changes landfill waste.",
-            },
-          ],
-        },
-        {
-          kind: "SUMMARY",
-          titleZh: "写作时只检查三件事",
-          titleEn: "Three checks for the next essay",
-          rulesZh: [
-            "原因和结果之间增加新的中间步骤。",
-            "让中间步骤回答影响如何发生。",
-            "以可以观察的具体结果收束。",
-          ],
-          rulesEn: [
-            "Add a new intermediate step.",
-            "Make it explain how the effect happens.",
-            "Finish with an observable result.",
-          ],
-          selfCheckZh: "删掉中间句后推理是否几乎没有变化？",
-          selfCheckEn:
-            "If the middle sentence disappears, does the reasoning remain almost unchanged?",
-        },
-      ],
+      markdown:
+        "写作时只检查三件事：\n\n1. 原因和结果之间增加新的中间步骤。\n2. 让中间步骤回答影响如何发生。\n3. 以可以观察的具体结果收束。",
+    },
+  ],
+  practicePrompts: [
+    {
+      id: "workplace-link",
+      instructionZh: "用一句英文补出灵活工作与生产力之间的机制。",
+      instructionEn:
+        "Write one sentence that links flexible work to productivity.",
+      promptEn:
+        "Flexible schedules can improve employee productivity because …",
+      responseMode: "SHORT_TEXT",
+      context: "SAME_TOPIC",
+      optionsEn: [],
+      referenceAnswerEn:
+        "Employees can reserve demanding tasks for the hours when they concentrate best.",
+      referenceReasoningZh: "参考答案说明灵活时间如何改变任务安排。",
+      referenceReasoningEn:
+        "The reference shows how flexible time changes task scheduling.",
+    },
+    {
+      id: "waste-transfer",
+      instructionZh: "在环境话题中写出一条两句的机制链。",
+      instructionEn:
+        "Write a two-sentence mechanism chain for an environmental topic.",
+      promptEn:
+        "Explain how charging households for excess waste could reduce landfill use.",
+      responseMode: "SHORT_TEXT",
+      context: "UNSEEN_TOPIC",
+      optionsEn: [],
+      referenceAnswerEn:
+        "A direct charge makes unnecessary disposal more expensive. Households therefore have a reason to reuse products and separate recyclable material.",
+      referenceReasoningZh:
+        "价格变化先影响家庭选择，再影响进入填埋场的废物量。",
+      referenceReasoningEn:
+        "The price change affects household choices before it changes landfill waste.",
     },
   ],
 };
@@ -1102,8 +1038,8 @@ describe("HttpLearningClient protocol", () => {
       format: "ADAPTIVE_ARTICLE_V1",
       titleZh: "把因果论证中间的一步讲清楚",
       sections: [
-        { anchor: "understand-the-link" },
-        { anchor: "apply-the-method" },
+        { titleZh: "先理解什么是机制" },
+        { titleZh: "换一个话题应用" },
       ],
     });
     expect(fetcher).toHaveBeenCalledTimes(2);
@@ -1142,10 +1078,10 @@ describe("HttpLearningClient protocol", () => {
         id: "lesson-demo",
         cycleId: "cycle-demo",
       });
-      expect(teaching.sections.map((section) => section.anchor)).toEqual([
-        "see-the-missing-link",
-        "build-one-step-at-a-time",
-        "try-and-check",
+      expect(teaching.sections.map((section) => section.titleZh)).toEqual([
+        "看见被跳过的一步",
+        "从一个问题推出机制",
+        "换一个话题验证方法",
       ]);
       expect(teaching).not.toHaveProperty("currentPattern");
       expect(teaching).not.toHaveProperty("knowledgeCards");
@@ -1159,30 +1095,9 @@ describe("HttpLearningClient protocol", () => {
   });
 
   it("provides a structurally different fixture without adding fixed chapters", () => {
-    const blockKinds = (teaching: FocusedTeachingData) =>
-      teaching.sections.flatMap((section) =>
-        section.blocks.map((block) => block.kind),
-      );
-
     expect(mechanismChainTeachingFixture.sections).toHaveLength(3);
     expect(collocationControlTeachingFixture.sections).toHaveLength(2);
-    expect(blockKinds(mechanismChainTeachingFixture)).toEqual([
-      "EXPLANATION",
-      "CONTRAST",
-      "REASONING",
-      "TOOLKIT",
-      "PITFALLS",
-      "PRACTICE",
-      "SUMMARY",
-    ]);
-    expect(blockKinds(collocationControlTeachingFixture)).toEqual([
-      "EXPLANATION",
-      "TOOLKIT",
-      "PITFALLS",
-      "CONTRAST",
-      "PRACTICE",
-      "SUMMARY",
-    ]);
+    expect(mechanismChainTeachingFixture.practicePrompts).toHaveLength(3);
     expect(
       collocationControlTeachingFixture.sections.map(
         (section) => section.titleZh,

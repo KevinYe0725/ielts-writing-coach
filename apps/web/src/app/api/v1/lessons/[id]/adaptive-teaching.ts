@@ -4,31 +4,12 @@ import {
   type FocusedLearningPackage,
   type PracticePaperContent,
   type PracticePaperItemContent,
-  type TeachingBlock,
-  type TeachingBlockKind,
-  type TeachingBlueprint,
   type TeachingPracticePrompt,
-  type TeachingSection,
+  type TeachingSectionMarkdown,
 } from "@iwc/worker/focused-learning";
 
 type UnknownRecord = Record<string, unknown>;
 
-const teachingBlockKinds = new Set<TeachingBlockKind>([
-  "EXPLANATION",
-  "CONTRAST",
-  "REASONING",
-  "TOOLKIT",
-  "PITFALLS",
-  "PRACTICE",
-  "SUMMARY",
-]);
-const difficultyTypes = new Set([
-  "CONCEPT_GAP",
-  "RECOGNISES_BUT_CANNOT_REVISE",
-  "REVISES_BUT_CANNOT_GENERATE",
-  "SAME_CONTEXT_ONLY",
-  "UNSTABLE_CONTROL",
-]);
 const paperSections = new Set([
   "FOUNDATION",
   "REPAIR",
@@ -116,226 +97,17 @@ function projectTeachingPrompt(value: unknown): TeachingPracticePrompt | null {
   };
 }
 
-function projectTeachingBlock(value: unknown): TeachingBlock | null {
-  const block = asRecord(value);
-  if (!block) return null;
-  const kind = asString(block.kind);
-  const titleZh = asString(block.titleZh);
-  const titleEn = asString(block.titleEn);
-  if (
-    kind === null ||
-    !teachingBlockKinds.has(kind as TeachingBlockKind) ||
-    titleZh === null ||
-    titleEn === null
-  )
-    return null;
-  switch (kind) {
-    case "EXPLANATION": {
-      const paragraphsZh = asStringArray(block.paragraphsZh);
-      const paragraphsEn = asStringArray(block.paragraphsEn);
-      const keyPointZh = asString(block.keyPointZh);
-      const keyPointEn = asString(block.keyPointEn);
-      return paragraphsZh &&
-        paragraphsEn &&
-        keyPointZh !== null &&
-        keyPointEn !== null
-        ? {
-            kind,
-            titleZh,
-            titleEn,
-            paragraphsZh,
-            paragraphsEn,
-            keyPointZh,
-            keyPointEn,
-          }
-        : null;
-    }
-    case "CONTRAST": {
-      const weakExampleEn = asString(block.weakExampleEn);
-      const strongExampleEn = asString(block.strongExampleEn);
-      const differenceZh = asString(block.differenceZh);
-      const differenceEn = asString(block.differenceEn);
-      return weakExampleEn !== null &&
-        strongExampleEn !== null &&
-        differenceZh !== null &&
-        differenceEn !== null
-        ? {
-            kind,
-            titleZh,
-            titleEn,
-            weakExampleEn,
-            strongExampleEn,
-            differenceZh,
-            differenceEn,
-          }
-        : null;
-    }
-    case "REASONING": {
-      const scenarioZh = asString(block.scenarioZh);
-      const scenarioEn = asString(block.scenarioEn);
-      const steps = projectArray(block.steps, (value) => {
-        const step = asRecord(value);
-        const thinkingZh = asString(step?.thinkingZh);
-        const thinkingEn = asString(step?.thinkingEn);
-        return step && thinkingZh !== null && thinkingEn !== null
-          ? { thinkingZh, thinkingEn }
-          : null;
-      });
-      const resultEn = asString(block.resultEn);
-      const takeawayZh = asString(block.takeawayZh);
-      const takeawayEn = asString(block.takeawayEn);
-      return scenarioZh !== null &&
-        scenarioEn !== null &&
-        steps !== null &&
-        resultEn !== null &&
-        takeawayZh !== null &&
-        takeawayEn !== null
-        ? {
-            kind,
-            titleZh,
-            titleEn,
-            scenarioZh,
-            scenarioEn,
-            steps,
-            resultEn,
-            takeawayZh,
-            takeawayEn,
-          }
-        : null;
-    }
-    case "TOOLKIT": {
-      const tools = projectArray(block.tools, (value) => {
-        const tool = asRecord(value);
-        if (!tool) return null;
-        const expressionEn = asString(tool.expressionEn);
-        const functionZh = asString(tool.functionZh);
-        const functionEn = asString(tool.functionEn);
-        const conditionZh = asString(tool.conditionZh);
-        const conditionEn = asString(tool.conditionEn);
-        const cautionZh = asString(tool.cautionZh);
-        const cautionEn = asString(tool.cautionEn);
-        const exampleEn = asString(tool.exampleEn);
-        return expressionEn !== null &&
-          functionZh !== null &&
-          functionEn !== null &&
-          conditionZh !== null &&
-          conditionEn !== null &&
-          cautionZh !== null &&
-          cautionEn !== null &&
-          exampleEn !== null
-          ? {
-              expressionEn,
-              functionZh,
-              functionEn,
-              conditionZh,
-              conditionEn,
-              cautionZh,
-              cautionEn,
-              exampleEn,
-            }
-          : null;
-      });
-      return tools ? { kind, titleZh, titleEn, tools } : null;
-    }
-    case "PITFALLS": {
-      const items = projectArray(block.items, (value) => {
-        const item = asRecord(value);
-        if (!item) return null;
-        const patternEn = asString(item.patternEn);
-        const problemZh = asString(item.problemZh);
-        const problemEn = asString(item.problemEn);
-        const betterEn = asString(item.betterEn);
-        return patternEn !== null &&
-          problemZh !== null &&
-          problemEn !== null &&
-          betterEn !== null
-          ? { patternEn, problemZh, problemEn, betterEn }
-          : null;
-      });
-      return items ? { kind, titleZh, titleEn, items } : null;
-    }
-    case "PRACTICE": {
-      const prompts = projectArray(block.prompts, projectTeachingPrompt);
-      return prompts ? { kind, titleZh, titleEn, prompts } : null;
-    }
-    case "SUMMARY": {
-      const rulesZh = asStringArray(block.rulesZh);
-      const rulesEn = asStringArray(block.rulesEn);
-      const selfCheckZh = asString(block.selfCheckZh);
-      const selfCheckEn = asString(block.selfCheckEn);
-      return rulesZh && rulesEn && selfCheckZh !== null && selfCheckEn !== null
-        ? {
-            kind,
-            titleZh,
-            titleEn,
-            rulesZh,
-            rulesEn,
-            selfCheckZh,
-            selfCheckEn,
-          }
-        : null;
-    }
-  }
-  return null;
-}
-
-function projectTeachingSection(value: unknown): TeachingSection | null {
+function projectTeachingSectionMarkdown(
+  value: unknown,
+): TeachingSectionMarkdown | null {
   const section = asRecord(value);
   if (!section) return null;
-  const anchor = asString(section.anchor);
   const titleZh = asString(section.titleZh);
   const titleEn = asString(section.titleEn);
-  const blocks = projectArray(section.blocks, projectTeachingBlock);
-  return anchor !== null &&
-    titleZh !== null &&
-    titleEn !== null &&
-    blocks !== null
-    ? { anchor, titleZh, titleEn, blocks }
+  const markdown = asString(section.markdown);
+  return titleZh !== null && titleEn !== null && markdown !== null
+    ? { titleZh, titleEn, markdown }
     : null;
-}
-
-function projectTeachingBlueprint(value: unknown): TeachingBlueprint | null {
-  const blueprint = asRecord(value);
-  if (!blueprint) return null;
-  const coreAbilityZh = asString(blueprint.coreAbilityZh);
-  const coreAbilityEn = asString(blueprint.coreAbilityEn);
-  const difficultyType = asString(blueprint.difficultyType);
-  const completionStandardZh = asString(blueprint.completionStandardZh);
-  const completionStandardEn = asString(blueprint.completionStandardEn);
-  const prerequisiteAbilityZh = asString(blueprint.prerequisiteAbilityZh);
-  const prerequisiteAbilityEn = asString(blueprint.prerequisiteAbilityEn);
-  const supportingAbilityZh = asString(blueprint.supportingAbilityZh);
-  const supportingAbilityEn = asString(blueprint.supportingAbilityEn);
-  const selectedBlockKinds = asStringArray(blueprint.selectedBlockKinds);
-  if (
-    coreAbilityZh === null ||
-    coreAbilityEn === null ||
-    difficultyType === null ||
-    !difficultyTypes.has(difficultyType) ||
-    completionStandardZh === null ||
-    completionStandardEn === null ||
-    prerequisiteAbilityZh === null ||
-    prerequisiteAbilityEn === null ||
-    supportingAbilityZh === null ||
-    supportingAbilityEn === null ||
-    selectedBlockKinds === null ||
-    !selectedBlockKinds.every((kind) =>
-      teachingBlockKinds.has(kind as TeachingBlockKind),
-    )
-  )
-    return null;
-  return {
-    coreAbilityZh,
-    coreAbilityEn,
-    difficultyType: difficultyType as TeachingBlueprint["difficultyType"],
-    completionStandardZh,
-    completionStandardEn,
-    prerequisiteAbilityZh,
-    prerequisiteAbilityEn,
-    supportingAbilityZh,
-    supportingAbilityEn,
-    selectedBlockKinds: selectedBlockKinds as TeachingBlockKind[],
-  };
 }
 
 function projectTeachingModule(value: unknown): AdaptiveTeachingModule | null {
@@ -343,27 +115,36 @@ function projectTeachingModule(value: unknown): AdaptiveTeachingModule | null {
   if (!module || module.format !== "ADAPTIVE_ARTICLE_V1") return null;
   const titleZh = asString(module.titleZh);
   const titleEn = asString(module.titleEn);
-  const introductionZh = asString(module.introductionZh);
-  const introductionEn = asString(module.introductionEn);
+  const introductionMarkdown = asString(module.introductionMarkdown);
   const estimatedMinutes = asInteger(module.estimatedMinutes);
-  const blueprint = projectTeachingBlueprint(module.blueprint);
-  const sections = projectArray(module.sections, projectTeachingSection);
+  const coreAbilityZh = asString(module.coreAbilityZh);
+  const coreAbilityEn = asString(module.coreAbilityEn);
+  const sections = projectArray(
+    module.sections,
+    projectTeachingSectionMarkdown,
+  );
+  const practicePrompts = projectArray(
+    module.practicePrompts,
+    projectTeachingPrompt,
+  );
   return titleZh !== null &&
     titleEn !== null &&
-    introductionZh !== null &&
-    introductionEn !== null &&
+    introductionMarkdown !== null &&
     estimatedMinutes !== null &&
-    blueprint !== null &&
-    sections !== null
+    coreAbilityZh !== null &&
+    coreAbilityEn !== null &&
+    sections !== null &&
+    practicePrompts !== null
     ? {
         format: module.format,
         titleZh,
         titleEn,
-        introductionZh,
-        introductionEn,
+        introductionMarkdown,
         estimatedMinutes,
-        blueprint,
+        coreAbilityZh,
+        coreAbilityEn,
         sections,
+        practicePrompts,
       }
     : null;
 }
@@ -499,9 +280,9 @@ export function learnerFacingTeachingArticle(
     format: module.format,
     titleZh: module.titleZh,
     titleEn: module.titleEn,
-    introductionZh: module.introductionZh,
-    introductionEn: module.introductionEn,
+    introductionMarkdown: module.introductionMarkdown,
     estimatedMinutes: module.estimatedMinutes,
     sections: module.sections,
+    practicePrompts: module.practicePrompts,
   };
 }

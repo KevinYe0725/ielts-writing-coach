@@ -123,43 +123,27 @@ function canonicalPaperContent(): Record<string, unknown> {
   return {
     teachingModule: {
       format: "ADAPTIVE_ARTICLE_V1",
-      blueprint: {
-        coreAbilityZh: "解释原因如何通过中间机制产生具体结果",
-        coreAbilityEn:
-          "Explain how a cause produces a concrete result through a mechanism",
-        completionStandardZh: "独立写出原因、机制和具体结果。",
-        completionStandardEn:
-          "Independently state a cause, mechanism, and concrete result.",
-        privatePlanningNote: "PRIVATE_BLUEPRINT_SENTINEL",
-      },
-      sections: [
+      coreAbilityZh: "解释原因如何通过中间机制产生具体结果",
+      coreAbilityEn:
+        "Explain how a cause produces a concrete result through a mechanism",
+      practicePrompts: [
         {
-          anchor: "practice",
-          blocks: [
-            {
-              kind: "PRACTICE",
-              prompts: [
-                {
-                  id: "bike-lanes",
-                  instructionZh: "用英文解释自行车道如何改变通勤者的选择。",
-                  instructionEn:
-                    "Explain in English how protected bicycle lanes can change commuters' choices.",
-                  promptEn:
-                    "A city adds protected bicycle lanes to several busy roads.",
-                  responseMode: "SHORT_TEXT",
-                  context: "UNSEEN_TOPIC",
-                  optionsEn: [],
-                  referenceAnswerEn:
-                    "Protected lanes reduce perceived risk, which encourages more people to cycle.",
-                  referenceReasoningZh:
-                    "这只是一个可能路径：先降低风险感受，再改变通勤选择。",
-                  referenceReasoningEn:
-                    "This is one possible route: lower perceived risk before changing commuter choice.",
-                  privateTeacherNote: PRIVATE_PROMPT_SENTINEL,
-                },
-              ],
-            },
-          ],
+          id: "bike-lanes",
+          instructionZh: "用英文解释自行车道如何改变通勤者的选择。",
+          instructionEn:
+            "Explain in English how protected bicycle lanes can change commuters' choices.",
+          promptEn:
+            "A city adds protected bicycle lanes to several busy roads.",
+          responseMode: "SHORT_TEXT",
+          context: "UNSEEN_TOPIC",
+          optionsEn: [],
+          referenceAnswerEn:
+            "Protected lanes reduce perceived risk, which encourages more people to cycle.",
+          referenceReasoningZh:
+            "这只是一个可能路径：先降低风险感受，再改变通勤选择。",
+          referenceReasoningEn:
+            "This is one possible route: lower perceived risk before changing commuter choice.",
+          privateTeacherNote: PRIVATE_PROMPT_SENTINEL,
         },
       ],
     },
@@ -549,7 +533,7 @@ describe("teaching-practice typed analysis worker", () => {
   it("does not analyze or mutate when the canonical tutorial prompt is malformed", async () => {
     workerState.lessonPlan = {
       id: "lesson-1",
-      paperContent: { teachingModule: { sections: [] } },
+      paperContent: { teachingModule: { practicePrompts: [] } },
     };
 
     await run();

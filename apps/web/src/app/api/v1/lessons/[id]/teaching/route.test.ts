@@ -105,9 +105,8 @@ const lessonId = "0198a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b";
 
 async function adaptivePackage(): Promise<{
   teachingModule: Record<string, unknown> & {
-    sections: Array<{
-      blocks: Array<Record<string, unknown>>;
-    }>;
+    sections: Array<Record<string, unknown>>;
+    practicePrompts: Array<Record<string, unknown>>;
   };
   paper: Record<string, unknown>;
 }> {
@@ -120,9 +119,8 @@ async function adaptivePackage(): Promise<{
       value,
     ): value is {
       teachingModule: Record<string, unknown> & {
-        sections: Array<{
-          blocks: Array<Record<string, unknown>>;
-        }>;
+        sections: Array<Record<string, unknown>>;
+        practicePrompts: Array<Record<string, unknown>>;
       };
       paper: Record<string, unknown>;
     } => typeof value === "object" && value !== null,
@@ -203,17 +201,19 @@ describe("focused teaching adaptive article routes", () => {
       format: teaching.format,
       titleZh: teaching.titleZh,
       titleEn: teaching.titleEn,
-      introductionZh: teaching.introductionZh,
-      introductionEn: teaching.introductionEn,
+      introductionMarkdown: teaching.introductionMarkdown,
       estimatedMinutes: teaching.estimatedMinutes,
       sections: teaching.sections,
+      practicePrompts: teaching.practicePrompts,
     });
     expect(body.teaching).not.toHaveProperty("blueprint");
+    expect(body.teaching).not.toHaveProperty("coreAbilityZh");
+    expect(body.teaching).not.toHaveProperty("coreAbilityEn");
   });
 
   it("requires replacement when a block is missing its kind-specific teaching content", async () => {
     const focusedPackage = await adaptivePackage();
-    delete focusedPackage.teachingModule.sections[0]?.blocks[0]?.paragraphsEn;
+    delete focusedPackage.teachingModule.sections[0]?.markdown;
     routeState.lesson = {
       id: lessonId,
       cycle: { userId: routeState.actor.id },
@@ -231,9 +231,9 @@ describe("focused teaching adaptive article routes", () => {
     });
   });
 
-  it("never exposes a private nested field from a persisted teaching block", async () => {
+  it("never exposes a private nested field from a persisted teaching section", async () => {
     const focusedPackage = await adaptivePackage();
-    focusedPackage.teachingModule.sections[0]!.blocks[0]!.privateBlueprint = {
+    focusedPackage.teachingModule.sections[0]!.privateBlueprint = {
       marker: "sensitive-marker-947",
     };
     routeState.lesson = {
@@ -326,9 +326,9 @@ describe("focused teaching adaptive article routes", () => {
     });
   });
 
-  it("regenerates an adaptive-marked lesson when a block is structurally incomplete", async () => {
+  it("regenerates an adaptive-marked lesson when a section is structurally incomplete", async () => {
     const focusedPackage = await adaptivePackage();
-    delete focusedPackage.teachingModule.sections[0]?.blocks[0]?.paragraphsZh;
+    delete focusedPackage.teachingModule.sections[0]?.titleZh;
     routeState.lesson = {
       id: lessonId,
       cycleId: "cycle-1",

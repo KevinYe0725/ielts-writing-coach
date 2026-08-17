@@ -93,80 +93,6 @@ export interface PracticePaperContent {
   readonly items: readonly PracticePaperItemContent[];
 }
 
-export type TeachingDifficultyType =
-  | "CONCEPT_GAP"
-  | "RECOGNISES_BUT_CANNOT_REVISE"
-  | "REVISES_BUT_CANNOT_GENERATE"
-  | "SAME_CONTEXT_ONLY"
-  | "UNSTABLE_CONTROL";
-
-export type TeachingBlockKind =
-  | "EXPLANATION"
-  | "CONTRAST"
-  | "REASONING"
-  | "TOOLKIT"
-  | "PITFALLS"
-  | "PRACTICE"
-  | "SUMMARY";
-
-interface TeachingBlockBase {
-  readonly titleZh: string;
-  readonly titleEn: string;
-}
-
-export interface ExplanationTeachingBlock extends TeachingBlockBase {
-  readonly kind: "EXPLANATION";
-  readonly paragraphsZh: readonly string[];
-  readonly paragraphsEn: readonly string[];
-  readonly keyPointZh: string;
-  readonly keyPointEn: string;
-}
-
-export interface ContrastTeachingBlock extends TeachingBlockBase {
-  readonly kind: "CONTRAST";
-  readonly weakExampleEn: string;
-  readonly strongExampleEn: string;
-  readonly differenceZh: string;
-  readonly differenceEn: string;
-}
-
-export interface ReasoningTeachingBlock extends TeachingBlockBase {
-  readonly kind: "REASONING";
-  readonly scenarioZh: string;
-  readonly scenarioEn: string;
-  readonly steps: readonly {
-    readonly thinkingZh: string;
-    readonly thinkingEn: string;
-  }[];
-  readonly resultEn: string;
-  readonly takeawayZh: string;
-  readonly takeawayEn: string;
-}
-
-export interface ToolkitTeachingBlock extends TeachingBlockBase {
-  readonly kind: "TOOLKIT";
-  readonly tools: readonly {
-    readonly expressionEn: string;
-    readonly functionZh: string;
-    readonly functionEn: string;
-    readonly conditionZh: string;
-    readonly conditionEn: string;
-    readonly cautionZh: string;
-    readonly cautionEn: string;
-    readonly exampleEn: string;
-  }[];
-}
-
-export interface PitfallsTeachingBlock extends TeachingBlockBase {
-  readonly kind: "PITFALLS";
-  readonly items: readonly {
-    readonly patternEn: string;
-    readonly problemZh: string;
-    readonly problemEn: string;
-    readonly betterEn: string;
-  }[];
-}
-
 export interface TeachingPracticePrompt {
   readonly id: string;
   readonly instructionZh: string;
@@ -180,57 +106,22 @@ export interface TeachingPracticePrompt {
   readonly referenceReasoningEn: string;
 }
 
-export interface PracticeTeachingBlock extends TeachingBlockBase {
-  readonly kind: "PRACTICE";
-  readonly prompts: readonly TeachingPracticePrompt[];
-}
-
-export interface SummaryTeachingBlock extends TeachingBlockBase {
-  readonly kind: "SUMMARY";
-  readonly rulesZh: readonly string[];
-  readonly rulesEn: readonly string[];
-  readonly selfCheckZh: string;
-  readonly selfCheckEn: string;
-}
-
-export type TeachingBlock =
-  | ExplanationTeachingBlock
-  | ContrastTeachingBlock
-  | ReasoningTeachingBlock
-  | ToolkitTeachingBlock
-  | PitfallsTeachingBlock
-  | PracticeTeachingBlock
-  | SummaryTeachingBlock;
-
-export interface TeachingBlueprint {
-  readonly coreAbilityZh: string;
-  readonly coreAbilityEn: string;
-  readonly difficultyType: TeachingDifficultyType;
-  readonly completionStandardZh: string;
-  readonly completionStandardEn: string;
-  readonly prerequisiteAbilityZh: string;
-  readonly prerequisiteAbilityEn: string;
-  readonly supportingAbilityZh: string;
-  readonly supportingAbilityEn: string;
-  readonly selectedBlockKinds: readonly TeachingBlockKind[];
-}
-
-export interface TeachingSection {
-  readonly anchor: string;
+export interface TeachingSectionMarkdown {
   readonly titleZh: string;
   readonly titleEn: string;
-  readonly blocks: readonly TeachingBlock[];
+  readonly markdown: string;
 }
 
 export interface AdaptiveTeachingModule {
   readonly format: "ADAPTIVE_ARTICLE_V1";
   readonly titleZh: string;
   readonly titleEn: string;
-  readonly introductionZh: string;
-  readonly introductionEn: string;
+  readonly introductionMarkdown: string;
   readonly estimatedMinutes: number;
-  readonly blueprint: TeachingBlueprint;
-  readonly sections: readonly TeachingSection[];
+  readonly coreAbilityZh: string;
+  readonly coreAbilityEn: string;
+  readonly sections: readonly TeachingSectionMarkdown[];
+  readonly practicePrompts: readonly TeachingPracticePrompt[];
 }
 
 export interface FocusedLearningPackage {
@@ -379,103 +270,26 @@ function validBilingualCopy(
   return substantive(chinese, minimum) && substantive(english, minimum);
 }
 
-function validTeachingBlock(block: TeachingBlock): boolean {
-  if (!validBilingualCopy(block.titleZh, block.titleEn)) return false;
-  switch (block.kind) {
-    case "EXPLANATION":
-      return (
-        block.paragraphsZh.length >= 1 &&
-        block.paragraphsZh.length <= 4 &&
-        block.paragraphsEn.length >= 1 &&
-        block.paragraphsEn.length <= 4 &&
-        block.paragraphsZh.every((paragraph) => substantive(paragraph, 8)) &&
-        block.paragraphsEn.every((paragraph) => substantive(paragraph, 12)) &&
-        validBilingualCopy(block.keyPointZh, block.keyPointEn, 6)
-      );
-    case "CONTRAST":
-      return (
-        substantive(block.weakExampleEn, 8) &&
-        substantive(block.strongExampleEn, 8) &&
-        block.weakExampleEn.trim() !== block.strongExampleEn.trim() &&
-        validBilingualCopy(block.differenceZh, block.differenceEn, 8)
-      );
-    case "REASONING":
-      return (
-        validBilingualCopy(block.scenarioZh, block.scenarioEn, 6) &&
-        block.steps.length >= 2 &&
-        block.steps.length <= 5 &&
-        block.steps.every((step) =>
-          validBilingualCopy(step.thinkingZh, step.thinkingEn, 6),
-        ) &&
-        substantive(block.resultEn, 12) &&
-        validBilingualCopy(block.takeawayZh, block.takeawayEn, 6)
-      );
-    case "TOOLKIT":
-      return (
-        block.tools.length >= 1 &&
-        block.tools.length <= 6 &&
-        block.tools.every(
-          (tool) =>
-            substantive(tool.expressionEn, 2) &&
-            validBilingualCopy(tool.functionZh, tool.functionEn, 4) &&
-            validBilingualCopy(tool.conditionZh, tool.conditionEn, 6) &&
-            validBilingualCopy(tool.cautionZh, tool.cautionEn, 6) &&
-            substantive(tool.exampleEn, 8),
-        )
-      );
-    case "PITFALLS":
-      return (
-        block.items.length >= 1 &&
-        block.items.length <= 6 &&
-        block.items.every(
-          (item) =>
-            substantive(item.patternEn, 2) &&
-            validBilingualCopy(item.problemZh, item.problemEn, 6) &&
-            substantive(item.betterEn, 2),
-        )
-      );
-    case "PRACTICE": {
-      if (block.prompts.length < 3 || block.prompts.length > 4) return false;
-      const promptIds = new Set(block.prompts.map((prompt) => prompt.id));
-      return (
-        promptIds.size === block.prompts.length &&
-        block.prompts.every((prompt) => {
-          if (
-            !/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(prompt.id) ||
-            !validBilingualCopy(
-              prompt.instructionZh,
-              prompt.instructionEn,
-              6,
-            ) ||
-            !substantive(prompt.promptEn, 8) ||
-            !substantive(prompt.referenceAnswerEn, 2) ||
-            !validBilingualCopy(
-              prompt.referenceReasoningZh,
-              prompt.referenceReasoningEn,
-              6,
-            )
-          )
-            return false;
-          if (prompt.responseMode === "SHORT_TEXT")
-            return prompt.optionsEn.length === 0;
-          return (
-            prompt.optionsEn.length >= 2 &&
-            prompt.optionsEn.length <= 4 &&
-            prompt.optionsEn.includes(prompt.referenceAnswerEn)
-          );
-        })
-      );
-    }
-    case "SUMMARY":
-      return (
-        block.rulesZh.length >= 3 &&
-        block.rulesZh.length <= 5 &&
-        block.rulesEn.length === block.rulesZh.length &&
-        block.rulesZh.every((rule) => substantive(rule, 6)) &&
-        block.rulesEn.every((rule) => substantive(rule, 6)) &&
-        validBilingualCopy(block.selfCheckZh, block.selfCheckEn, 8)
-      );
-  }
+function validTeachingPracticePrompt(prompt: TeachingPracticePrompt): boolean {
+  if (
+    !/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(prompt.id) ||
+    !validBilingualCopy(prompt.instructionZh, prompt.instructionEn, 6) ||
+    !substantive(prompt.promptEn, 8) ||
+    !substantive(prompt.referenceAnswerEn, 2) ||
+    !validBilingualCopy(
+      prompt.referenceReasoningZh,
+      prompt.referenceReasoningEn,
+      6,
+    )
+  )
+    return false;
+  if (prompt.responseMode === "SHORT_TEXT")
+    return prompt.optionsEn.length === 0;
+  return (
+    prompt.optionsEn.length >= 2 &&
+    prompt.optionsEn.length <= 4 &&
+    prompt.optionsEn.includes(prompt.referenceAnswerEn)
+  );
 }
 
 function collectStrings(value: unknown, output: string[]): void {
@@ -535,10 +349,22 @@ function learnerFacingTeachingStrings(
   const strings: string[] = [
     teaching.titleZh,
     teaching.titleEn,
-    teaching.introductionZh,
-    teaching.introductionEn,
+    teaching.introductionMarkdown,
   ];
-  collectStrings(teaching.sections, strings);
+  for (const section of teaching.sections) {
+    strings.push(section.titleZh, section.titleEn, section.markdown);
+  }
+  for (const prompt of teaching.practicePrompts) {
+    strings.push(
+      prompt.instructionZh,
+      prompt.instructionEn,
+      prompt.promptEn,
+      ...prompt.optionsEn,
+      prompt.referenceAnswerEn,
+      prompt.referenceReasoningZh,
+      prompt.referenceReasoningEn,
+    );
+  }
   return strings;
 }
 
@@ -658,21 +484,6 @@ function hasInternalVocabulary(fields: readonly string[]): boolean {
   });
 }
 
-function sameUniqueKinds(
-  selectedKinds: readonly TeachingBlockKind[],
-  actualKinds: readonly TeachingBlockKind[],
-): boolean {
-  const selected = new Set(selectedKinds);
-  const actual = new Set(actualKinds);
-  // The blueprint is private planning metadata; require the plan to be
-  // non-duplicated and to actually appear in the article, but tolerate the
-  // model writing an extra block (e.g. adding PITFALLS) it did not list.
-  return (
-    selected.size === selectedKinds.length &&
-    [...selected].every((kind) => actual.has(kind))
-  );
-}
-
 /** Validates a focused teaching article before a compatible provider generates
  * its separate paper. Cross-package answer isolation remains a final check. */
 export function validateAdaptiveTeachingModule(
@@ -682,64 +493,29 @@ export function validateAdaptiveTeachingModule(
   if (
     teaching.format !== "ADAPTIVE_ARTICLE_V1" ||
     !validBilingualCopy(teaching.titleZh, teaching.titleEn, 6) ||
-    !validBilingualCopy(teaching.introductionZh, teaching.introductionEn, 12) ||
+    !substantive(teaching.introductionMarkdown, 40) ||
     teaching.estimatedMinutes < 15 ||
     teaching.estimatedMinutes > 35 ||
-    teaching.sections.length < 3 ||
+    teaching.sections.length < 2 ||
     teaching.sections.length > 6 ||
-    !validBilingualCopy(
-      teaching.blueprint.coreAbilityZh,
-      teaching.blueprint.coreAbilityEn,
-      6,
-    ) ||
-    !validBilingualCopy(
-      teaching.blueprint.completionStandardZh,
-      teaching.blueprint.completionStandardEn,
-      10,
-    )
-  )
-    return false;
-
-  const anchors = teaching.sections.map((section) => section.anchor);
-  if (
-    new Set(anchors).size !== anchors.length ||
-    anchors.some((anchor) => !/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(anchor)) ||
+    !validBilingualCopy(teaching.coreAbilityZh, teaching.coreAbilityEn, 4) ||
+    teaching.coreAbilityZh.length > 40 ||
+    teaching.coreAbilityEn.length > 160 ||
     teaching.sections.some(
       (section) =>
         !validBilingualCopy(section.titleZh, section.titleEn) ||
-        section.blocks.length === 0 ||
-        !section.blocks.every(validTeachingBlock),
-    )
+        !substantive(section.markdown, 40),
+    ) ||
+    teaching.practicePrompts.length < 3 ||
+    teaching.practicePrompts.length > 4 ||
+    new Set(teaching.practicePrompts.map((prompt) => prompt.id)).size !==
+      teaching.practicePrompts.length ||
+    !teaching.practicePrompts.every(validTeachingPracticePrompt) ||
+    !teaching.practicePrompts.some(
+      (prompt) => prompt.responseMode === "SHORT_TEXT",
+    ) ||
+    !teaching.practicePrompts.some((prompt) => prompt.context === "UNSEEN_TOPIC")
   )
-    return false;
-
-  const blocks = teaching.sections.flatMap((section) => section.blocks);
-  if (blocks.length < 5 || blocks.length > 14) return false;
-  const actualKinds = blocks.map((block) => block.kind);
-  if (
-    !sameUniqueKinds(teaching.blueprint.selectedBlockKinds, actualKinds) ||
-    !actualKinds.includes("EXPLANATION") ||
-    !actualKinds.some((kind) => kind === "CONTRAST" || kind === "REASONING") ||
-    !actualKinds.some((kind) => kind === "TOOLKIT" || kind === "PITFALLS")
-  )
-    return false;
-
-  const practicePrompts = blocks
-    .filter(
-      (block): block is PracticeTeachingBlock => block.kind === "PRACTICE",
-    )
-    .flatMap((block) => block.prompts);
-  if (
-    practicePrompts.length < 3 ||
-    !practicePrompts.some((prompt) => prompt.responseMode === "SHORT_TEXT") ||
-    !practicePrompts.some((prompt) => prompt.context === "UNSEEN_TOPIC")
-  )
-    return false;
-
-  const summaryIndexes = blocks.flatMap((block, index) =>
-    block.kind === "SUMMARY" ? [index] : [],
-  );
-  if (summaryIndexes.length !== 1 || summaryIndexes[0] !== blocks.length - 1)
     return false;
 
   const learnerFacingFields = learnerFacingTeachingStrings(teaching);
@@ -768,12 +544,8 @@ export function validateFocusedLearningPackage(
   )
     return false;
 
-  const normalizedTargetZh = normalizedInstructionText(
-    teaching.blueprint.coreAbilityZh,
-  );
-  const normalizedTargetEn = normalizedInstructionText(
-    teaching.blueprint.coreAbilityEn,
-  );
+  const normalizedTargetZh = normalizedInstructionText(teaching.coreAbilityZh);
+  const normalizedTargetEn = normalizedInstructionText(teaching.coreAbilityEn);
   if (
     !normalizedInstructionText(value.paper.objectiveZh).includes(
       normalizedTargetZh,

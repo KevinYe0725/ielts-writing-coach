@@ -4,21 +4,20 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
   BookOpenCheck,
-  Check,
   ChevronDown,
   Lightbulb,
-  Sparkles,
 } from "lucide-react";
+import Markdown from "react-markdown";
 
 import { useLocale } from "@/components/locale-provider";
 import { ActionLink, Button } from "@/components/ui";
 import { learningClient } from "@/lib/client";
 import type {
   FocusedTeachingData,
-  TeachingBlock,
   TeachingPracticeAnalysis,
   TeachingPracticePrompt,
   TeachingPracticeResponseData,
+  TeachingSectionMarkdown,
 } from "@/lib/client/types";
 
 import styles from "./page.module.css";
@@ -30,38 +29,6 @@ const ANALYSIS_REQUEST_TIMEOUT_MS = 2_000;
 const ANALYSIS_REQUEST_TIMED_OUT = Symbol("analysis-request-timed-out");
 const RESTORE_REQUEST_TIMEOUT_MS = 5_000;
 const RESTORE_REQUEST_TIMED_OUT = Symbol("restore-request-timed-out");
-
-function pairedParagraphs(
-  chinese: readonly string[],
-  english: readonly string[],
-  choose: (zh: string, en: string) => string,
-): string[] {
-  return Array.from(
-    { length: Math.max(chinese.length, english.length) },
-    (_, index) => choose(chinese[index] ?? "", english[index] ?? ""),
-  ).filter(Boolean);
-}
-
-function TeachingExample({
-  kind,
-  label,
-  children,
-}: {
-  kind: "weak" | "strong" | "result";
-  label: string;
-  children: string;
-}) {
-  return (
-    <figure
-      className={styles.example}
-      data-example-kind={kind}
-      data-teaching-example
-    >
-      <figcaption data-example-label>{label}</figcaption>
-      <blockquote lang="en">{children}</blockquote>
-    </figure>
-  );
-}
 
 type PracticeView = {
   readonly draft: string;
@@ -486,8 +453,16 @@ function PracticePrompt({
   );
 }
 
-function TeachingBlockView({
-  block,
+function MarkdownSection({ section }: { section: TeachingSectionMarkdown }) {
+  return (
+    <div className={styles.prose} data-teaching-prose>
+      <Markdown>{section.markdown}</Markdown>
+    </div>
+  );
+}
+
+function PracticePrompts({
+  practicePrompts,
   practiceViews,
   onPracticeDraft,
   onPracticeSubmit,
@@ -495,7 +470,7 @@ function TeachingBlockView({
   onRewriteDraft,
   onToggleRewrite,
 }: {
-  block: TeachingBlock;
+  practicePrompts: readonly TeachingPracticePrompt[];
   practiceViews: Readonly<Record<string, PracticeView>>;
   onPracticeDraft: (id: string, answer: string) => void;
   onPracticeSubmit: (prompt: TeachingPracticePrompt) => void;
@@ -504,185 +479,30 @@ function TeachingBlockView({
   onToggleRewrite: (id: string) => void;
 }) {
   const { text } = useLocale();
-  const title = text(block.titleZh, block.titleEn);
-
-  switch (block.kind) {
-    case "EXPLANATION":
-      return (
-        <div className={styles.proseBlock} data-teaching-block="EXPLANATION">
-          <h3>{title}</h3>
-          <div className={styles.prose} data-teaching-prose>
-            {pairedParagraphs(block.paragraphsZh, block.paragraphsEn, text).map(
-              (paragraph) => (
-                <p key={paragraph}>{paragraph}</p>
-              ),
-            )}
-          </div>
-          <aside
-            className={styles.keyPoint}
-            data-teaching-key-concept
-            role="note"
-          >
-            <Lightbulb aria-hidden="true" size={19} />
-            <div>
-              <span>{text("核心判断", "Key idea")}</span>
-              <p>{text(block.keyPointZh, block.keyPointEn)}</p>
-            </div>
-          </aside>
-        </div>
-      );
-
-    case "CONTRAST":
-      return (
-        <div className={styles.contrastBlock} data-teaching-block="CONTRAST">
-          <h3>{title}</h3>
-          <div className={styles.contrastExamples}>
-            <TeachingExample
-              kind="weak"
-              label={text("较弱写法", "Less effective")}
-            >
-              {block.weakExampleEn}
-            </TeachingExample>
-            <TeachingExample
-              kind="strong"
-              label={text("更合适写法", "More effective")}
-            >
-              {block.strongExampleEn}
-            </TeachingExample>
-          </div>
-          <p className={styles.blockConclusion} data-teaching-prose>
-            {text(block.differenceZh, block.differenceEn)}
-          </p>
-        </div>
-      );
-
-    case "REASONING":
-      return (
-        <div className={styles.reasoningBlock} data-teaching-block="REASONING">
-          <h3>{title}</h3>
-          <p className={styles.scenario}>
-            {text(block.scenarioZh, block.scenarioEn)}
-          </p>
-          <ol className={styles.reasoningSteps}>
-            {block.steps.map((step, index) => (
-              <li key={`${step.thinkingEn}-${index}`}>
-                <span aria-hidden="true">{index + 1}</span>
-                <p>{text(step.thinkingZh, step.thinkingEn)}</p>
-              </li>
-            ))}
-          </ol>
-          <TeachingExample
-            kind="result"
-            label={text("推理后的完整表达", "The completed reasoning")}
-          >
-            {block.resultEn}
-          </TeachingExample>
-          <p className={styles.takeaway} data-teaching-takeaway role="note">
-            {text(block.takeawayZh, block.takeawayEn)}
-          </p>
-        </div>
-      );
-
-    case "TOOLKIT":
-      return (
-        <div className={styles.toolkitBlock} data-teaching-block="TOOLKIT">
-          <h3>{title}</h3>
-          <div className={styles.toolList}>
-            {block.tools.map((tool) => (
-              <section key={tool.expressionEn}>
-                <code lang="en">{tool.expressionEn}</code>
-                <p>
-                  <strong>{text("它解决什么", "What it does")}</strong>
-                  {text(tool.functionZh, tool.functionEn)}
-                </p>
-                <p>
-                  <strong>{text("什么时候用", "When to use it")}</strong>
-                  {text(tool.conditionZh, tool.conditionEn)}
-                </p>
-                <p className={styles.caution}>
-                  <strong>{text("注意", "Watch out")}</strong>
-                  {text(tool.cautionZh, tool.cautionEn)}
-                </p>
-                <TeachingExample
-                  kind="result"
-                  label={text("完整例句", "Example")}
-                >
-                  {tool.exampleEn}
-                </TeachingExample>
-              </section>
-            ))}
-          </div>
-        </div>
-      );
-
-    case "PITFALLS":
-      return (
-        <div className={styles.pitfallsBlock} data-teaching-block="PITFALLS">
-          <h3>{title}</h3>
-          <div className={styles.pitfallList}>
-            {block.items.map((item) => (
-              <section key={item.patternEn}>
-                <code lang="en">{item.patternEn}</code>
-                <p>{text(item.problemZh, item.problemEn)}</p>
-                <div>
-                  <span>{text("更自然", "Better")}</span>
-                  <strong lang="en">{item.betterEn}</strong>
-                </div>
-              </section>
-            ))}
-          </div>
-        </div>
-      );
-
-    case "PRACTICE":
-      return (
-        <div className={styles.practiceBlock} data-teaching-block="PRACTICE">
-          <h3>{title}</h3>
-          <p className={styles.practiceLead}>
-            {text(
-              "先独立作答。提交后，你会立即看到自己的首次答案、另一种可行路径，以及针对这次表达的进一步讲解。",
-              "Answer independently. After submitting, compare your saved first answer with another viable path and a closer explanation of this attempt.",
-            )}
-          </p>
-          <div className={styles.practiceList}>
-            {block.prompts.map((prompt) => (
-              <PracticePrompt
-                key={prompt.id}
-                onDraft={(answer) => onPracticeDraft(prompt.id, answer)}
-                onRetry={() => onPracticeRetry(prompt)}
-                onRewriteDraft={(answer) => onRewriteDraft(prompt.id, answer)}
-                onSubmit={() => onPracticeSubmit(prompt)}
-                onToggleRewrite={() => onToggleRewrite(prompt.id)}
-                prompt={prompt}
-                view={practiceViews[prompt.id] ?? initialPracticeView()}
-              />
-            ))}
-          </div>
-        </div>
-      );
-
-    case "SUMMARY":
-      return (
-        <div className={styles.summaryBlock} data-teaching-block="SUMMARY">
-          <div className={styles.summaryHeading}>
-            <Sparkles aria-hidden="true" size={23} />
-            <h3>{title}</h3>
-          </div>
-          <ul>
-            {block.rulesZh.map((ruleZh, index) => (
-              <li key={ruleZh}>
-                <Check aria-hidden="true" size={17} />
-                <span>{text(ruleZh, block.rulesEn[index] ?? "")}</span>
-              </li>
-            ))}
-          </ul>
-          <p data-teaching-takeaway role="note">
-            <strong>{text("最后自问", "Final self-check")}</strong>
-            {text(block.selfCheckZh, block.selfCheckEn)}
-          </p>
-        </div>
-      );
-  }
+  return (
+    <div className={styles.practiceBlock} data-teaching-block="PRACTICE">
+      <p className={styles.practiceLead}>
+        {text(
+          "先独立作答。提交后，你会立即看到自己的首次答案、另一种可行路径，以及针对这次表达的进一步讲解。",
+          "Answer independently. After submitting, compare your saved first answer with another viable path and a closer explanation of this attempt.",
+        )}
+      </p>
+      <div className={styles.practiceList}>
+        {practicePrompts.map((prompt) => (
+          <PracticePrompt
+            key={prompt.id}
+            onDraft={(answer) => onPracticeDraft(prompt.id, answer)}
+            onRetry={() => onPracticeRetry(prompt)}
+            onRewriteDraft={(answer) => onRewriteDraft(prompt.id, answer)}
+            onSubmit={() => onPracticeSubmit(prompt)}
+            onToggleRewrite={() => onToggleRewrite(prompt.id)}
+            prompt={prompt}
+            view={practiceViews[prompt.id] ?? initialPracticeView()}
+          />
+        ))}
+      </div>
+    </div>
+  );
 }
 
 type TeachingArticleProps = {
@@ -698,13 +518,8 @@ function TeachingArticleContent({
 }: TeachingArticleProps) {
   const { text } = useLocale();
   const practicePrompts = useMemo(
-    () =>
-      data.sections.flatMap((section) =>
-        section.blocks.flatMap((block) =>
-          block.kind === "PRACTICE" ? block.prompts : [],
-        ),
-      ),
-    [data.sections],
+    () => [...data.practicePrompts],
+    [data.practicePrompts],
   );
   const practiceSignature = useMemo(
     () => practicePrompts.map((prompt) => prompt.id).join("|"),
@@ -722,11 +537,10 @@ function TeachingArticleContent({
   const restoreTimers = useRef<Record<string, number>>({});
   const mounted = useRef(true);
   const [contentsOpen, setContentsOpen] = useState(false);
-  const [activeAnchor, setActiveAnchor] = useState(
-    data.sections[0]?.anchor ?? "",
-  );
+  const sectionSlug = (index: number) => `section-${index + 1}`;
+  const [activeAnchor, setActiveAnchor] = useState(sectionSlug(0));
   const sectionSignature = useMemo(
-    () => data.sections.map((section) => section.anchor).join("|"),
+    () => data.sections.map((_, index) => sectionSlug(index)).join("|"),
     [data.sections],
   );
 
@@ -1079,7 +893,7 @@ function TeachingArticleContent({
 
   useEffect(() => {
     const sections = data.sections
-      .map((section) => document.getElementById(section.anchor))
+      .map((_, index) => document.getElementById(sectionSlug(index)))
       .filter((section): section is HTMLElement => Boolean(section));
     if (sections.length === 0 || !("IntersectionObserver" in window)) return;
 
@@ -1117,43 +931,47 @@ function TeachingArticleContent({
           </span>
         </div>
         <h1>{text(data.titleZh, data.titleEn)}</h1>
-        <p>{text(data.introductionZh, data.introductionEn)}</p>
+        <div className={styles.prose} data-teaching-prose>
+          <Markdown>{data.introductionMarkdown}</Markdown>
+        </div>
       </header>
 
       <div className={styles.readingLayout} data-teaching-layout>
         <div className={styles.articleBody} data-teaching-content>
-          {data.sections.map((section, sectionIndex) => (
-            <section
-              aria-labelledby={`${section.anchor}-heading`}
-              className={styles.articleSection}
-              data-teaching-section
-              id={section.anchor}
-              key={section.anchor}
-            >
-              <header className={styles.sectionHeading}>
-                <span aria-hidden="true">
-                  {String(sectionIndex + 1).padStart(2, "0")}
-                </span>
-                <h2 id={`${section.anchor}-heading`} tabIndex={-1}>
-                  {text(section.titleZh, section.titleEn)}
-                </h2>
-              </header>
-              <div className={styles.sectionBlocks}>
-                {section.blocks.map((block, blockIndex) => (
-                  <TeachingBlockView
-                    block={block}
-                    key={`${block.kind}-${block.titleEn}-${blockIndex}`}
-                    onPracticeDraft={updatePracticeDraft}
-                    onPracticeRetry={retryPractice}
-                    onPracticeSubmit={submitPractice}
-                    onRewriteDraft={updateRewriteDraft}
-                    onToggleRewrite={toggleRewrite}
-                    practiceViews={practiceViews}
-                  />
-                ))}
-              </div>
-            </section>
-          ))}
+          {data.sections.map((section, sectionIndex) => {
+            const slug = sectionSlug(sectionIndex);
+            return (
+              <section
+                aria-labelledby={`${slug}-heading`}
+                className={styles.articleSection}
+                data-teaching-section
+                id={slug}
+                key={slug}
+              >
+                <header className={styles.sectionHeading}>
+                  <span aria-hidden="true">
+                    {String(sectionIndex + 1).padStart(2, "0")}
+                  </span>
+                  <h2 id={`${slug}-heading`} tabIndex={-1}>
+                    {text(section.titleZh, section.titleEn)}
+                  </h2>
+                </header>
+                <div className={styles.sectionBlocks}>
+                  <MarkdownSection section={section} />
+                </div>
+              </section>
+            );
+          })}
+
+          <PracticePrompts
+            onPracticeDraft={updatePracticeDraft}
+            onPracticeRetry={retryPractice}
+            onPracticeSubmit={submitPractice}
+            onRewriteDraft={updateRewriteDraft}
+            onToggleRewrite={toggleRewrite}
+            practicePrompts={practicePrompts}
+            practiceViews={practiceViews}
+          />
 
           <footer className={styles.articleActions}>
             <div>
@@ -1204,60 +1022,62 @@ function TeachingArticleContent({
           >
             <p>{text("本文目录", "In this tutorial")}</p>
             <ol>
-              {data.sections.map((section, index) => (
-                <li key={section.anchor}>
-                  <a
-                    aria-current={
-                      activeAnchor === section.anchor ? "location" : undefined
-                    }
-                    href={`#${section.anchor}`}
-                    onClick={(event) => {
-                      event.preventDefault();
-                      const link = event.currentTarget;
-                      const disclosure = document.querySelector(
-                        "[data-teaching-toc-toggle]",
-                      );
-                      const usesDisclosure =
-                        disclosure instanceof HTMLElement &&
-                        window.getComputedStyle(disclosure).display !== "none";
-                      setActiveAnchor(section.anchor);
-                      setContentsOpen(false);
-                      window.history.replaceState(
-                        window.history.state,
-                        "",
-                        `#${section.anchor}`,
-                      );
-                      const focusDestination = () => {
-                        const heading = document.getElementById(
-                          `${section.anchor}-heading`,
+              {data.sections.map((section, index) => {
+                const slug = sectionSlug(index);
+                return (
+                  <li key={slug}>
+                    <a
+                      aria-current={
+                        activeAnchor === slug ? "location" : undefined
+                      }
+                      href={`#${slug}`}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        const link = event.currentTarget;
+                        const disclosure = document.querySelector(
+                          "[data-teaching-toc-toggle]",
                         );
-                        document
-                          .getElementById(section.anchor)
-                          ?.scrollIntoView({
+                        const usesDisclosure =
+                          disclosure instanceof HTMLElement &&
+                          window.getComputedStyle(disclosure).display !==
+                            "none";
+                        setActiveAnchor(slug);
+                        setContentsOpen(false);
+                        window.history.replaceState(
+                          window.history.state,
+                          "",
+                          `#${slug}`,
+                        );
+                        const focusDestination = () => {
+                          const heading = document.getElementById(
+                            `${slug}-heading`,
+                          );
+                          document.getElementById(slug)?.scrollIntoView({
                             behavior: "instant",
                             block: "start",
                           });
-                        heading?.focus({ preventScroll: true });
-                      };
-                      if (usesDisclosure) {
-                        window.requestAnimationFrame(() =>
-                          window.requestAnimationFrame(focusDestination),
-                        );
-                      } else {
-                        document
-                          .getElementById(section.anchor)
-                          ?.scrollIntoView({ block: "start" });
-                        link.focus({ preventScroll: true });
-                      }
-                    }}
-                  >
-                    <span aria-hidden="true">
-                      {String(index + 1).padStart(2, "0")}
-                    </span>
-                    {text(section.titleZh, section.titleEn)}
-                  </a>
-                </li>
-              ))}
+                          heading?.focus({ preventScroll: true });
+                        };
+                        if (usesDisclosure) {
+                          window.requestAnimationFrame(() =>
+                            window.requestAnimationFrame(focusDestination),
+                          );
+                        } else {
+                          document
+                            .getElementById(slug)
+                            ?.scrollIntoView({ block: "start" });
+                          link.focus({ preventScroll: true });
+                        }
+                      }}
+                    >
+                      <span aria-hidden="true">
+                        {String(index + 1).padStart(2, "0")}
+                      </span>
+                      {text(section.titleZh, section.titleEn)}
+                    </a>
+                  </li>
+                );
+              })}
             </ol>
           </nav>
         </div>

@@ -258,36 +258,18 @@ describe("deterministic Mock Provider", () => {
 
     expect(result.value.teachingModule).toMatchObject({
       format: "ADAPTIVE_ARTICLE_V1",
-      blueprint: {
-        difficultyType: expect.any(String),
-        selectedBlockKinds: expect.arrayContaining([
-          "EXPLANATION",
-          "PRACTICE",
-          "SUMMARY",
-        ]),
-      },
+      coreAbilityZh: expect.any(String),
+      coreAbilityEn: expect.any(String),
     });
     expect(result.value.teachingModule.sections.length).toBeGreaterThanOrEqual(
-      3,
+      2,
     );
     expect(result.value.teachingModule.estimatedMinutes).toBeGreaterThanOrEqual(
       25,
     );
-    const blockKinds = result.value.teachingModule.sections.flatMap((section) =>
-      section.blocks.map((block) => block.kind),
+    expect(result.value.teachingModule.practicePrompts.length).toBeGreaterThanOrEqual(
+      3,
     );
-    expect(blockKinds).toEqual(
-      expect.arrayContaining([
-        "EXPLANATION",
-        "CONTRAST",
-        "REASONING",
-        "TOOLKIT",
-        "PITFALLS",
-        "PRACTICE",
-        "SUMMARY",
-      ]),
-    );
-    expect(blockKinds).toHaveLength(7);
     expect(result.value.teachingModule).not.toHaveProperty("knowledgeCards");
     expect(result.value.teachingModule).not.toHaveProperty("expressionBank");
     expect(result.value.teachingModule).not.toHaveProperty("workedExample");
@@ -295,10 +277,10 @@ describe("deterministic Mock Provider", () => {
       "Children always have a better ability to absorb new knowledge than adults",
     );
     expect(result.value.paper.objectiveZh).toContain(
-      result.value.teachingModule.blueprint.coreAbilityZh,
+      result.value.teachingModule.coreAbilityZh,
     );
     expect(result.value.paper.objectiveEn).toContain(
-      result.value.teachingModule.blueprint.coreAbilityEn,
+      result.value.teachingModule.coreAbilityEn,
     );
     expect(result.value.paper.items).toHaveLength(8);
   });

@@ -276,73 +276,6 @@ export interface FeedbackData {
   } | null;
 }
 
-export type TeachingBlockKind =
-  | "EXPLANATION"
-  | "CONTRAST"
-  | "REASONING"
-  | "TOOLKIT"
-  | "PITFALLS"
-  | "PRACTICE"
-  | "SUMMARY";
-
-interface TeachingBlockBase {
-  readonly titleZh: string;
-  readonly titleEn: string;
-}
-
-export interface ExplanationTeachingBlock extends TeachingBlockBase {
-  readonly kind: "EXPLANATION";
-  readonly paragraphsZh: readonly string[];
-  readonly paragraphsEn: readonly string[];
-  readonly keyPointZh: string;
-  readonly keyPointEn: string;
-}
-
-export interface ContrastTeachingBlock extends TeachingBlockBase {
-  readonly kind: "CONTRAST";
-  readonly weakExampleEn: string;
-  readonly strongExampleEn: string;
-  readonly differenceZh: string;
-  readonly differenceEn: string;
-}
-
-export interface ReasoningTeachingBlock extends TeachingBlockBase {
-  readonly kind: "REASONING";
-  readonly scenarioZh: string;
-  readonly scenarioEn: string;
-  readonly steps: readonly {
-    readonly thinkingZh: string;
-    readonly thinkingEn: string;
-  }[];
-  readonly resultEn: string;
-  readonly takeawayZh: string;
-  readonly takeawayEn: string;
-}
-
-export interface ToolkitTeachingBlock extends TeachingBlockBase {
-  readonly kind: "TOOLKIT";
-  readonly tools: readonly {
-    readonly expressionEn: string;
-    readonly functionZh: string;
-    readonly functionEn: string;
-    readonly conditionZh: string;
-    readonly conditionEn: string;
-    readonly cautionZh: string;
-    readonly cautionEn: string;
-    readonly exampleEn: string;
-  }[];
-}
-
-export interface PitfallsTeachingBlock extends TeachingBlockBase {
-  readonly kind: "PITFALLS";
-  readonly items: readonly {
-    readonly patternEn: string;
-    readonly problemZh: string;
-    readonly problemEn: string;
-    readonly betterEn: string;
-  }[];
-}
-
 export interface TeachingPracticePrompt {
   readonly id: string;
   readonly instructionZh: string;
@@ -401,33 +334,10 @@ export interface TeachingPracticeResponseData {
   readonly analysis: TeachingPracticeAnalysis | null;
 }
 
-export interface PracticeTeachingBlock extends TeachingBlockBase {
-  readonly kind: "PRACTICE";
-  readonly prompts: readonly TeachingPracticePrompt[];
-}
-
-export interface SummaryTeachingBlock extends TeachingBlockBase {
-  readonly kind: "SUMMARY";
-  readonly rulesZh: readonly string[];
-  readonly rulesEn: readonly string[];
-  readonly selfCheckZh: string;
-  readonly selfCheckEn: string;
-}
-
-export type TeachingBlock =
-  | ExplanationTeachingBlock
-  | ContrastTeachingBlock
-  | ReasoningTeachingBlock
-  | ToolkitTeachingBlock
-  | PitfallsTeachingBlock
-  | PracticeTeachingBlock
-  | SummaryTeachingBlock;
-
-export interface TeachingSection {
-  readonly anchor: string;
+export interface TeachingSectionMarkdown {
   readonly titleZh: string;
   readonly titleEn: string;
-  readonly blocks: readonly TeachingBlock[];
+  readonly markdown: string;
 }
 
 export interface FocusedTeachingData {
@@ -436,10 +346,10 @@ export interface FocusedTeachingData {
   readonly format: "ADAPTIVE_ARTICLE_V1";
   readonly titleZh: string;
   readonly titleEn: string;
-  readonly introductionZh: string;
-  readonly introductionEn: string;
+  readonly introductionMarkdown: string;
   readonly estimatedMinutes: number;
-  readonly sections: readonly TeachingSection[];
+  readonly sections: readonly TeachingSectionMarkdown[];
+  readonly practicePrompts: readonly TeachingPracticePrompt[];
 }
 
 export type LessonStage =

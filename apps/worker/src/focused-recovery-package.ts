@@ -1,10 +1,6 @@
 import type { SkillId } from "@iwc/learning-contracts";
 
-import type {
-  FocusedLearningPackage,
-  PracticePaperContent,
-  TeachingBlueprint,
-} from "./learning";
+import type { FocusedLearningPackage, PracticePaperContent } from "./learning";
 
 export interface FocusedRecoveryLesson {
   readonly titleZh: string;
@@ -274,31 +270,6 @@ export function focusedRecoveryLessonFor(
   return lessons[skillId];
 }
 
-function blueprint(lesson: FocusedRecoveryLesson): TeachingBlueprint {
-  return {
-    coreAbilityZh: lesson.coreAbilityZh,
-    coreAbilityEn: lesson.coreAbilityEn,
-    difficultyType: "REVISES_BUT_CANNOT_GENERATE",
-    completionStandardZh: "能在两个陌生语境中独立使用本课方法完成清楚表达。",
-    completionStandardEn:
-      "Independently use this lesson method in two unfamiliar contexts.",
-    prerequisiteAbilityZh: "能读懂英文题目中的基本要求",
-    prerequisiteAbilityEn:
-      "Understand the basic requirement in an English prompt",
-    supportingAbilityZh: "用完整句表达一个具体意思",
-    supportingAbilityEn: "Express one specific idea in a complete sentence",
-    selectedBlockKinds: [
-      "EXPLANATION",
-      "CONTRAST",
-      "REASONING",
-      "TOOLKIT",
-      "PITFALLS",
-      "PRACTICE",
-      "SUMMARY",
-    ],
-  };
-}
-
 function paper(lesson: FocusedRecoveryLesson): PracticePaperContent {
   const sections = [
     "FOUNDATION",
@@ -413,187 +384,98 @@ export function sourceOwnedFocusedRecoveryPackage(
       format: "ADAPTIVE_ARTICLE_V1",
       titleZh: lesson.titleZh,
       titleEn: lesson.titleEn,
-      introductionZh: `本教程通过全新例子训练${lesson.coreAbilityZh}，并让你在陌生话题中独立使用。`,
-      introductionEn: `This tutorial uses new examples to help you ${lesson.coreAbilityEn.toLowerCase()}.`,
+      introductionMarkdown: `本教程通过全新例子训练${lesson.coreAbilityZh}，并在陌生话题中独立使用。教程先解释要做的表达决定，再通过对比、检查和练习把它变成可重复的方法。`,
       estimatedMinutes: 24,
-      blueprint: blueprint(lesson),
+      coreAbilityZh: lesson.coreAbilityZh,
+      coreAbilityEn: lesson.coreAbilityEn,
       sections: [
         {
-          anchor: "make-the-decision",
           titleZh: "先看清要做的表达决定",
           titleEn: "See the writing decision first",
-          blocks: [
-            {
-              kind: "EXPLANATION",
-              titleZh: "为什么这一步重要",
-              titleEn: "Why this step matters",
-              paragraphsZh: [lesson.explanationZh],
-              paragraphsEn: [lesson.explanationEn],
-              keyPointZh: lesson.decisionZh,
-              keyPointEn: lesson.decisionEn,
-            },
-            {
-              kind: "CONTRAST",
-              titleZh: "比较两个表达",
-              titleEn: "Compare two expressions",
-              weakExampleEn: lesson.weakExampleEn,
-              strongExampleEn: lesson.strongExampleEn,
-              differenceZh:
-                "更合适的表达把需要读者理解的关系和具体信息说得更清楚。",
-              differenceEn:
-                "The stronger version makes the relationship and needed detail clear to the reader.",
-            },
-          ],
+          markdown: `${lesson.explanationZh}
+
+**核心决定**：${lesson.decisionZh}
+
+对比下面的两个表达：
+
+- 较弱：${lesson.weakExampleEn}
+- 较强：${lesson.strongExampleEn}
+
+更强的版本把需要读者理解的关系和具体信息说得更清楚。`,
         },
         {
-          anchor: "use-a-repeatable-check",
           titleZh: "用一个可重复的检查方法",
           titleEn: "Use a repeatable check",
-          blocks: [
-            {
-              kind: "REASONING",
-              titleZh: "从题意走到完整句子",
-              titleEn: "Move from the task to a complete sentence",
-              scenarioZh: "面对一个新话题时，先决定句子必须让读者看见什么。",
-              scenarioEn:
-                "When you meet a new topic, first decide what the reader must be able to see.",
-              steps: [
-                {
-                  thinkingZh: "找出题目要求的核心关系。",
-                  thinkingEn: "Find the key relationship required by the task.",
-                },
-                {
-                  thinkingZh: "选择能把这个关系说清的具体表达。",
-                  thinkingEn:
-                    "Choose specific wording that makes this relationship clear.",
-                },
-              ],
-              resultEn:
-                "A clear sentence gives the reader one complete, checkable idea.",
-              takeawayZh: lesson.decisionZh,
-              takeawayEn: lesson.decisionEn,
-            },
-            {
-              kind: "TOOLKIT",
-              titleZh: "写前检查工具",
-              titleEn: "A tool for checking before you write",
-              tools: [
-                {
-                  expressionEn: "First check the relationship.",
-                  functionZh: "先确认句子要表达的关系。",
-                  functionEn:
-                    "Identify the relationship the sentence must express.",
-                  conditionZh: "在写出第一个英文词之前使用。",
-                  conditionEn:
-                    "Use it before drafting the first English words.",
-                  cautionZh: "不要只写一个积极或消极的空泛判断。",
-                  cautionEn:
-                    "Do not replace the relationship with a vague positive or negative judgement.",
-                  exampleEn: lesson.strongExampleEn,
-                },
-              ],
-            },
-            {
-              kind: "PITFALLS",
-              titleZh: "常见误区",
-              titleEn: "A common trap",
-              items: [
-                {
-                  patternEn: "A vague claim",
-                  problemZh: "只给出结论，读者看不到完成题意所需的信息。",
-                  problemEn:
-                    "A conclusion alone does not show the information needed to complete the task.",
-                  betterEn: lesson.strongExampleEn,
-                },
-              ],
-            },
-          ],
+          markdown: `面对一个新话题时，先决定句子必须让读者看见什么。
+
+1. 找出题目要求的核心关系。
+2. 选择能把这个关系说清的具体表达。
+
+**写前检查**：在写出第一个英文词之前，先确认句子要表达的关系；不要只写一个空泛判断。示例：${lesson.strongExampleEn}
+
+**常见误区**：只给出结论，读者看不到完成题意所需的信息。`,
         },
         {
-          anchor: "try-and-transfer",
-          titleZh: "先练习，再迁移到新话题",
-          titleEn: "Practise, then transfer to a new topic",
-          blocks: [
-            {
-              kind: "PRACTICE",
-              titleZh: "独立完成三次小练习",
-              titleEn: "Complete three short attempts independently",
-              prompts: [
-                {
-                  id: "notice-the-decision",
-                  instructionZh: "选择最清楚落实本课要求的一句英文表达。",
-                  instructionEn:
-                    "Choose the sentence that makes this lesson decision clearest.",
-                  promptEn: `Which option best applies the method to ${lesson.practiceContextEn}?`,
-                  responseMode: "CHOICE",
-                  context: "SAME_TOPIC",
-                  optionsEn: [
-                    "The topic is important for everyone.",
-                    "The sentence makes the required relationship clear through specific information.",
-                    "Many people have different opinions about the topic.",
-                  ],
-                  referenceAnswerEn:
-                    "The sentence makes the required relationship clear through specific information.",
-                  referenceReasoningZh:
-                    "它没有停在空泛判断，而是把读者需要理解的关系说清楚。",
-                  referenceReasoningEn:
-                    "It states the relationship the reader needs instead of stopping at a vague judgement.",
-                },
-                {
-                  id: "write-with-guidance",
-                  instructionZh:
-                    "用一句英文完成题目，并把本课的关键关系写清楚。",
-                  instructionEn:
-                    "Write one English sentence and make this lesson's key relationship clear.",
-                  promptEn: `Write about ${lesson.practiceContextEn} with one complete, specific idea.`,
-                  responseMode: "SHORT_TEXT",
-                  context: "SAME_TOPIC",
-                  optionsEn: [],
-                  referenceAnswerEn:
-                    "A complete answer makes the required relationship visible through one specific detail.",
-                  referenceReasoningZh:
-                    "参考写法展示一种路径，不是唯一正确表达。",
-                  referenceReasoningEn:
-                    "The reference shows one route rather than the only correct expression.",
-                },
-                {
-                  id: "transfer-to-new-topic",
-                  instructionZh:
-                    "换到陌生话题，用一至两句英文独立完成同一种表达决定。",
-                  instructionEn:
-                    "Transfer the same writing decision to a new topic in one or two English sentences.",
-                  promptEn: `Apply the method to ${lesson.transferContextEn} without copying the earlier examples.`,
-                  responseMode: "SHORT_TEXT",
-                  context: "UNSEEN_TOPIC",
-                  optionsEn: [],
-                  referenceAnswerEn:
-                    "A new answer should make the same relationship clear in different content.",
-                  referenceReasoningZh:
-                    "换题后仍能完成同一表达决定，才说明方法可以迁移。",
-                  referenceReasoningEn:
-                    "Using the same decision in new content shows that the method can transfer.",
-                },
-              ],
-            },
-            {
-              kind: "SUMMARY",
-              titleZh: "带进训练卷的三条规则",
-              titleEn: "Three rules to carry into the paper",
-              rulesZh: [
-                "先确认题目要求读者看见的关系。",
-                "用具体信息完成这个关系，而不是停在空泛判断。",
-                "换一个话题后，再检查方法是否仍然成立。",
-              ],
-              rulesEn: [
-                "Identify the relationship the task requires first.",
-                "Use specific information rather than a vague judgement.",
-                "Check whether the method still works in a new topic.",
-              ],
-              selfCheckZh: "遮住连接词后，我还能指出句子怎样完成题目要求吗？",
-              selfCheckEn:
-                "If I hide the linking words, can I still show how the sentence meets the task?",
-            },
+          titleZh: "带进训练卷的三条规则",
+          titleEn: "Three rules to carry into the paper",
+          markdown: `1. 先确认题目要求读者看见的关系。
+2. 用具体信息完成这个关系，而不是停在空泛判断。
+3. 换一个话题后，再检查方法是否仍然成立。
+
+**自检**：遮住连接词后，我还能指出句子怎样完成题目要求吗？`,
+        },
+      ],
+      practicePrompts: [
+        {
+          id: "notice-the-decision",
+          instructionZh: "选择最清楚落实本课要求的一句英文表达。",
+          instructionEn:
+            "Choose the sentence that makes this lesson decision clearest.",
+          promptEn: `Which option best applies the method to ${lesson.practiceContextEn}?`,
+          responseMode: "CHOICE",
+          context: "SAME_TOPIC",
+          optionsEn: [
+            "The topic is important for everyone.",
+            "The sentence makes the required relationship clear through specific information.",
+            "Many people have different opinions about the topic.",
           ],
+          referenceAnswerEn:
+            "The sentence makes the required relationship clear through specific information.",
+          referenceReasoningZh:
+            "它没有停在空泛判断，而是把读者需要理解的关系说清楚。",
+          referenceReasoningEn:
+            "It states the relationship the reader needs instead of stopping at a vague judgement.",
+        },
+        {
+          id: "write-with-guidance",
+          instructionZh: "用一句英文完成题目，并把本课的关键关系写清楚。",
+          instructionEn:
+            "Write one English sentence and make this lesson's key relationship clear.",
+          promptEn: `Write about ${lesson.practiceContextEn} with one complete, specific idea.`,
+          responseMode: "SHORT_TEXT",
+          context: "SAME_TOPIC",
+          optionsEn: [],
+          referenceAnswerEn:
+            "A complete answer makes the required relationship visible through one specific detail.",
+          referenceReasoningZh: "参考写法展示一种路径，不是唯一正确表达。",
+          referenceReasoningEn:
+            "The reference shows one route rather than the only correct expression.",
+        },
+        {
+          id: "transfer-to-new-topic",
+          instructionZh: "换到陌生话题，用一至两句英文独立完成同一种表达决定。",
+          instructionEn:
+            "Transfer the same writing decision to a new topic in one or two English sentences.",
+          promptEn: `Apply the method to ${lesson.transferContextEn} without copying the earlier examples.`,
+          responseMode: "SHORT_TEXT",
+          context: "UNSEEN_TOPIC",
+          optionsEn: [],
+          referenceAnswerEn:
+            "A new answer should make the same relationship clear in different content.",
+          referenceReasoningZh:
+            "换题后仍能完成同一表达决定，才说明方法可以迁移。",
+          referenceReasoningEn:
+            "Using the same decision in new content shows that the method can transfer.",
         },
       ],
     },

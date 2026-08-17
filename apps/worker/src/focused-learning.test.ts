@@ -25,11 +25,7 @@ function focusedContent(candidate: unknown) {
   return {
     teachingModule: {
       format: "ADAPTIVE_ARTICLE_V1",
-      sections: [
-        {
-          blocks: [{ kind: "PRACTICE", prompts: [candidate] }],
-        },
-      ],
+      practicePrompts: [candidate],
     },
     paper: {
       items: [

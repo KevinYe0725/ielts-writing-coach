@@ -207,13 +207,7 @@ describe.skipIf(!databaseUrl)(
         paperContent: {
           teachingModule: {
             format: "ADAPTIVE_ARTICLE_V1",
-            sections: [
-              {
-                blocks: [
-                  { kind: "PRACTICE", prompts: [shortPrompt, choicePrompt] },
-                ],
-              },
-            ],
+            practicePrompts: [shortPrompt, choicePrompt],
           },
         },
       });
