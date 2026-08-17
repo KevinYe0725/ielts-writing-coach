@@ -814,17 +814,39 @@ async function findUnfamiliarQuestion(input: {
   });
 }
 
-function exactIssueSpans(
+/**
+ * Accepts the provider's spans, and when an offset drifts by a character or
+ * two (common with LLM-produced offsets) re-anchors the issue to the single
+ * unambiguous occurrence of its excerpt in the essay. Ambiguous or missing
+ * excerpts are dropped rather than pointed at the wrong text.
+ */
+function anchorIssueSpans(
   essay: string,
   issues: readonly AiIssueJudgment[],
 ): AiIssueJudgment[] {
-  return issues.filter(
-    (issue) =>
-      issue.startOffset >= 0 &&
-      issue.endOffset > issue.startOffset &&
-      issue.endOffset <= essay.length &&
-      essay.slice(issue.startOffset, issue.endOffset) === issue.excerpt,
-  );
+  const anchored: AiIssueJudgment[] = [];
+  const usedSpans = new Set<string>();
+  for (const issue of issues) {
+    let start = issue.startOffset;
+    let end = issue.endOffset;
+    if (
+      start < 0 ||
+      end <= start ||
+      end > essay.length ||
+      essay.slice(start, end) !== issue.excerpt
+    ) {
+      if (!issue.excerpt) continue;
+      const first = essay.indexOf(issue.excerpt);
+      if (first < 0 || first !== essay.lastIndexOf(issue.excerpt)) continue;
+      start = first;
+      end = first + issue.excerpt.length;
+    }
+    const key = `${start}:${end}`;
+    if (usedSpans.has(key)) continue;
+    usedSpans.add(key);
+    anchored.push({ ...issue, startOffset: start, endOffset: end });
+  }
+  return anchored;
 }
 
 async function enqueueChild(
@@ -996,7 +1018,7 @@ async function classifyIssues(
     model: model(job),
     idempotencyKey: job.id,
     system: PROMPT_REGISTRY.issue_classification.system,
-    input: `Return the highest-value, non-overlapping issues. Character offsets use this exact immutable essay, starting at zero. Use the minimum exact span a learner can act on: for grammar, spelling, word form, collocation, and naturalness, do not include unaffected surrounding words; for missing logic, cohesion, or task development, use only enough context to locate where an addition belongs and explain that the learner needs to add content rather than replace the entire span. A phrase can be grammatical but unnatural; in particular, do not claim that "much + comparative" is ungrammatical.\n\n${attempt.content}`,
+    input: `Flag every sentence that is not yet excellent; do not skip minor polish, naturalness, or small grammar problems, and skip only sentences where nothing needs changing. Return non-overlapping issues. Character offsets use this exact immutable essay, starting at zero. Use the minimum exact span a learner can act on: for grammar, spelling, word form, collocation, and naturalness, do not include unaffected surrounding words; for missing logic, cohesion, or task development, use only enough context to locate where an addition belongs and explain that the learner needs to add content rather than replace the entire span. A phrase can be grammatical but unnatural; in particular, do not claim that "much + comparative" is ungrammatical.\n\n${attempt.content}`,
     schemaName: "iwc_ai_issue_batch_v1",
     schema: issueBatchSchema as unknown as Record<string, unknown>,
     validate: (value): value is { issues: AiIssueJudgment[] } =>
@@ -1014,7 +1036,7 @@ async function classifyIssues(
     maxOutputTokens: 40_000,
     timeoutMs: STANDARD_GENERATION_TIMEOUT_MS,
   });
-  let issues = exactIssueSpans(attempt.content, result.value.issues);
+  let issues = anchorIssueSpans(attempt.content, result.value.issues);
   let usedSyntheticFallback = false;
   if (issues.length === 0 && attempt.content.length > 0) {
     usedSyntheticFallback = true;

@@ -50,7 +50,7 @@ export const PROMPT_REGISTRY: Readonly<Record<AITaskKind, PromptDefinition>> = {
     rubricVersion: "iwc-skill-taxonomy-1.0.0",
     system: withKnowledge(
       "issue_classification",
-      "Map each high-value issue to exactly one of the supplied 13 skill IDs and return the smallest exact character span that can be checked against Version 1. Language problems must mark only the wording that should change. Missing logic or development must use the shortest surrounding context needed to show where content should be inserted, and must be described as an addition rather than a language error. For every issue, distinguish its learner-facing type, give a meaning-preserving corrected version, explain the problem in plain Chinese, teach one transferable knowledge point, and give a future self-check rule.",
+      "Map every issue that keeps a sentence from being excellent — grammar, spelling, word form, collocation, naturalness, missing logic, cohesion, and task development — to exactly one of the supplied 13 skill IDs and return the smallest exact character span that can be checked against Version 1. Do not skip minor polish or naturalness problems; a sentence is only clean when nothing about it needs changing. Language problems must mark only the wording that should change. Missing logic or development must use the shortest surrounding context needed to show where content should be inserted, and must be described as an addition rather than a language error. For every issue, distinguish its learner-facing type, give a meaning-preserving corrected version, explain the problem in plain Chinese, teach one transferable knowledge point, and give a future self-check rule.",
     ),
   },
   objective_prioritization: {
