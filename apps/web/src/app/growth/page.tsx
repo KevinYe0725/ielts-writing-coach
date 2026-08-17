@@ -187,13 +187,7 @@ export default function GrowthPage() {
         </Card>
       </div>
 
-      <SectionHeader
-        title={text("能力状态", "Skill states")}
-        description={text(
-          "状态可以因新证据升级，也可以标记为不稳定并安排复习。",
-          "New evidence can advance a state or mark it unstable and schedule review.",
-        )}
-      />
+      <SectionHeader title={text("能力状态", "Skill states")} />
       <div
         className="skill-table"
         role="table"

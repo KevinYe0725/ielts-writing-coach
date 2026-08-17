@@ -671,13 +671,6 @@ export default function TodayPage() {
       </div>
 
       <div className="quiet-footer">
-        <span>
-          <AlertTriangle aria-hidden="true" size={15} />
-          {text(
-            "不需要自己整理错误或安排重写日期。",
-            "No need to organise errors or schedule rewrites yourself.",
-          )}
-        </span>
         <Button onClick={retry} size="sm" variant="ghost">
           {text("刷新计划", "Refresh plan")}
           <ArrowRight aria-hidden="true" size={15} />

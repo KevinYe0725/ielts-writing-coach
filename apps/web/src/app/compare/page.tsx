@@ -230,13 +230,7 @@ export default function ComparePage({
         </div>
       </Card>
 
-      <SectionHeader
-        title={text("关键变化", "Key changes")}
-        description={text(
-          "只比较本轮训练目标，不用满屏红线制造噪音。",
-          "The comparison stays focused on this cycle’s targets rather than covering the page in red marks.",
-        )}
-      />
+      <SectionHeader title={text("关键变化", "Key changes")} />
       <div className="comparison-list">
         {data.points.map((point) => {
           const presentation = statePresentation[point.state];
