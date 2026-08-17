@@ -1150,7 +1150,7 @@ function mapIssue(issue: WireIssue, index: number): FeedbackIssue {
   );
   return {
     id: issue.id ?? `issue-${index + 1}`,
-    priority: Math.min(3, index + 1) as 1 | 2 | 3,
+    priority: index + 1,
     categoryZh: title.zh,
     categoryEn: title.en,
     titleZh: title.zh,
@@ -2272,7 +2272,19 @@ export class HttpLearningClient implements LearningClient {
         retryable: true,
       });
     const summary = record(assessment.summary);
-    const issues = (assessment.issues ?? []).map(mapIssue);
+    const issues = [...(assessment.issues ?? [])]
+      .sort((left, right) => {
+        const leftStart =
+          typeof left.startOffset === "number"
+            ? left.startOffset
+            : Number.MAX_SAFE_INTEGER;
+        const rightStart =
+          typeof right.startOffset === "number"
+            ? right.startOffset
+            : Number.MAX_SAFE_INTEGER;
+        return leftStart - rightStart;
+      })
+      .map(mapIssue);
     const targetSkillId = cycle.lessonPlans?.[0]?.coreSkillId;
     const targetIssueId =
       issues.find((issue) => issue.skillId === targetSkillId)?.id ?? null;

@@ -197,7 +197,8 @@ export interface BandScore {
 
 export interface FeedbackIssue {
   id: string;
-  priority: 1 | 2 | 3;
+  /** Sequential correction order, 1-based, following the essay reading order. */
+  priority: number;
   categoryZh: string;
   categoryEn: string;
   titleZh: string;
