@@ -449,7 +449,7 @@ describe("adaptive lesson generation evidence", () => {
     expect(lessonState.failure).toBeUndefined();
     expect(lessonState.generatedSchemaNames).toEqual([
       "iwc_adaptive_teaching_article_v1",
-      ...Array.from({ length: 5 }, () => "iwc_practice_paper_item_v1"),
+      ...Array.from({ length: 8 }, () => "iwc_practice_paper_item_v1"),
     ]);
     expect(lessonState.inserted.some(({ table }) => table === lessonPlan)).toBe(
       true,

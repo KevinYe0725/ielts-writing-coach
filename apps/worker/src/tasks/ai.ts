@@ -1221,7 +1221,7 @@ async function generateLesson(
     const adapter = await adapterForJob(job);
     let teaching: GenerationResult<AdaptiveTeachingModule> | null = null;
     let teachingError: unknown;
-    for (let attempt = 1; attempt <= 5; attempt += 1) {
+    for (let attempt = 1; attempt <= 8; attempt += 1) {
       try {
         const generated =
           await adapter.generateStructured<AdaptiveTeachingModule>({
@@ -1328,11 +1328,11 @@ Learner Version 1 for context only: ${(version1?.content ?? "").slice(0, 4_000)}
 
       let lastError: unknown;
       let generatedItem: PracticePaperContent["items"][number] | null = null;
-      for (let attempt = 1; attempt <= 5; attempt += 1) {
+      for (let attempt = 1; attempt <= 8; attempt += 1) {
         try {
           const generated =
             await adapter.generateStructured<PaperItemContentInput>({
-              model: model(job),
+              model: "deepseek-v4-flash",
               idempotencyKey: `${job.id}:paper-item-${index}`,
               system: PROMPT_REGISTRY.exercise_generation.system,
               input: `Create only question ${index + 1} of 8 for a 60-minute focused practice paper. It trains exactly this private bilingual core ability, using different English material from the tutorial.

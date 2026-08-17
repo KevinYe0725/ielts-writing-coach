@@ -328,8 +328,8 @@ const paperCriterion = {
   properties: {
     labelZh: { type: "string", minLength: 2, maxLength: 20 },
     labelEn: { type: "string", minLength: 2, maxLength: 60 },
-    descriptionZh: { type: "string", minLength: 8, maxLength: 200 },
-    descriptionEn: { type: "string", minLength: 8, maxLength: 320 },
+    descriptionZh: { type: "string", minLength: 8, maxLength: 300 },
+    descriptionEn: { type: "string", minLength: 8, maxLength: 420 },
     weight: { type: "integer", minimum: 1, maximum: 100 },
   },
 } as const;
@@ -380,9 +380,9 @@ const practicePaperProperties = {
           enum: ["FOUNDATION", "REPAIR", "GENERATION", "INTEGRATION"],
         },
         titleZh: { type: "string", minLength: 2, maxLength: 30 },
-        titleEn: { type: "string", minLength: 2, maxLength: 60 },
-        instructionZh: { type: "string", minLength: 8, maxLength: 240 },
-        promptEn: { type: "string", minLength: 4, maxLength: 600 },
+        titleEn: { type: "string", minLength: 2, maxLength: 100 },
+        instructionZh: { type: "string", minLength: 8, maxLength: 500 },
+        promptEn: { type: "string", minLength: 4, maxLength: 900 },
         sourceText: { type: "string", maxLength: 800 },
         responseMode: {
           type: "string",
@@ -406,7 +406,7 @@ const practicePaperProperties = {
           maxItems: 4,
           items: { type: "string", minLength: 1, maxLength: 20 },
         },
-        answerExplanationZh: { type: "string", minLength: 8, maxLength: 240 },
+        answerExplanationZh: { type: "string", minLength: 8, maxLength: 400 },
         suggestedMinutes: { type: "integer", minimum: 4, maximum: 15 },
         minimumWords: { type: "integer", minimum: 0, maximum: 150 },
         maximumWords: { type: "integer", minimum: 0, maximum: 150 },
@@ -460,9 +460,9 @@ export const practicePaperItemContentSchema = {
   ],
   properties: {
     titleZh: { type: "string", minLength: 2, maxLength: 30 },
-    titleEn: { type: "string", minLength: 2, maxLength: 60 },
-    instructionZh: { type: "string", minLength: 8, maxLength: 240 },
-    promptEn: { type: "string", minLength: 4, maxLength: 600 },
+    titleEn: { type: "string", minLength: 2, maxLength: 100 },
+    instructionZh: { type: "string", minLength: 8, maxLength: 500 },
+    promptEn: { type: "string", minLength: 4, maxLength: 900 },
     sourceText: { type: "string", maxLength: 800 },
     options: {
       type: "array",
@@ -482,7 +482,7 @@ export const practicePaperItemContentSchema = {
       maxItems: 4,
       items: { type: "string", minLength: 1, maxLength: 20 },
     },
-    answerExplanationZh: { type: "string", minLength: 8, maxLength: 240 },
+    answerExplanationZh: { type: "string", minLength: 8, maxLength: 400 },
     publicCriteria: {
       type: "array",
       minItems: 1,

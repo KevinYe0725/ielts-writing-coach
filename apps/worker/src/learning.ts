@@ -270,15 +270,15 @@ export function validatePracticePaperItemContent(
     item.titleZh.trim().length === 0 ||
     item.titleZh.length > 30 ||
     item.titleEn.trim().length === 0 ||
-    item.titleEn.length > 60 ||
+    item.titleEn.length > 100 ||
     item.instructionZh.trim().length < 8 ||
-    item.instructionZh.length > 240 ||
+    item.instructionZh.length > 500 ||
     !hasClearOutputAction(item.instructionZh) ||
     !criteriaAreVisibleInInstruction(item) ||
     item.promptEn.trim().length === 0 ||
-    item.promptEn.length > 600 ||
+    item.promptEn.length > 900 ||
     item.sourceText.length > 800 ||
-    item.answerExplanationZh.length > 240 ||
+    item.answerExplanationZh.length > 400 ||
     item.publicCriteria.length < 1 ||
     item.publicCriteria.length > 4 ||
     item.publicCriteria.reduce((sum, criterion) => sum + criterion.weight, 0) <
@@ -294,7 +294,7 @@ export function validatePracticePaperItemContent(
         criterion.descriptionZh.trim().length === 0 ||
         criterion.descriptionEn.trim().length === 0 ||
         criterion.weight <= 0 ||
-        criterion.descriptionEn.length > 320,
+        criterion.descriptionEn.length > 420,
     )
   )
     return false;
