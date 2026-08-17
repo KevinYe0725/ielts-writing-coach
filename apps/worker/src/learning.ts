@@ -287,7 +287,7 @@ function hasClearOutputAction(instruction: string): boolean {
     "完善表达",
   ];
   if (vaguePhrases.some((phrase) => instruction.includes(phrase))) return false;
-  return /选择|判断|匹配|排序|解释|改写|重写|写(?:出|一个|两|三|\d)|列出|圈出/.test(
+  return /选择|选出|判断|匹配|排序|解释|改写|重写|回答|写(?:出|一个|两|三|\d)|列出|圈出/.test(
     instruction,
   );
 }
