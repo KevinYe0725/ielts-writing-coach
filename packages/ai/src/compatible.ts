@@ -104,7 +104,10 @@ export class CompatibleAdapter implements AIProviderAdapter {
         method: init.method === "GET" ? "GET" : "POST",
         headers,
         ...(typeof init.body === "string" ? { body: init.body } : {}),
-        signal: boundedSignal(init.signal),
+        // Respect a caller-bounded signal (e.g. the per-request generation
+        // budget) instead of re-capping it at the default 60s. Only requests
+        // that arrive without any signal get the default bound.
+        signal: init.signal ?? boundedSignal(undefined),
       },
     );
     if (!response.ok) {

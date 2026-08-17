@@ -1025,7 +1025,7 @@ async function classifyIssues(
       typeof value === "object" &&
       value !== null &&
       Array.isArray((value as { issues?: unknown }).issues) &&
-      (value as { issues: unknown[] }).issues.every((issue) => {
+      (value as { issues: unknown[] }).issues.some((issue) => {
         try {
           assertContract("aiIssueJudgment", issue);
           return true;
@@ -1036,7 +1036,20 @@ async function classifyIssues(
     maxOutputTokens: 40_000,
     timeoutMs: STANDARD_GENERATION_TIMEOUT_MS,
   });
-  let issues = anchorIssueSpans(attempt.content, result.value.issues);
+  // A large batch can contain one malformed entry; keep the valid issues
+  // instead of discarding the whole classification for a single bad row.
+  const validIssues = result.value.issues.filter((issue) => {
+    try {
+      assertContract("aiIssueJudgment", issue);
+      return true;
+    } catch {
+      return false;
+    }
+  });
+  if (validIssues.length === 0) {
+    throw new Error("The provider returned no valid issue classifications.");
+  }
+  let issues = anchorIssueSpans(attempt.content, validIssues);
   let usedSyntheticFallback = false;
   if (issues.length === 0 && attempt.content.length > 0) {
     usedSyntheticFallback = true;
