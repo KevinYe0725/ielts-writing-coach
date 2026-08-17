@@ -153,6 +153,38 @@ describe("custom provider SSRF policy", () => {
     ).rejects.toThrow("did not resolve");
   });
 
+  it("re-anchors fake-IP proxy answers through an encrypted-DNS fallback", async () => {
+    const fallback = async () => [
+      { address: "43.242.198.77", family: 4 as const },
+    ];
+    const result = await validateProviderBaseUrl(
+      "https://api.deepseek.com",
+      [],
+      async () => [{ address: "198.18.0.221", family: 4 as const }],
+      fallback,
+    );
+    expect(result.resolvedAddresses).toEqual(["43.242.198.77"]);
+  });
+
+  it("keeps the original rejection when the encrypted-DNS fallback is empty or private", async () => {
+    await expect(
+      validateProviderBaseUrl(
+        "https://api.deepseek.com",
+        [],
+        async () => [{ address: "198.18.0.221", family: 4 as const }],
+        async () => [],
+      ),
+    ).rejects.toThrow("fake-IP");
+    await expect(
+      validateProviderBaseUrl(
+        "https://api.deepseek.com",
+        [],
+        async () => [{ address: "198.18.0.221", family: 4 as const }],
+        async () => [{ address: "10.0.0.8", family: 4 as const }],
+      ),
+    ).rejects.toThrow("fake-IP");
+  });
+
   it("deduplicates a validated resolution set", async () => {
     const result = await validateProviderBaseUrl(
       "https://provider.example/v1",

@@ -146,10 +146,59 @@ const systemAddressResolver: ProviderAddressResolver = async (hostname) => {
   });
 };
 
+/**
+ * Proxy tools with fake-IP mode answer every hostname with special-purpose
+ * ranges such as 198.18.0.0/15. When the system resolver only produces such
+ * addresses, re-resolve through a fixed encrypted-DNS endpoint and accept the
+ * result only when it is non-empty and exclusively public. The pinned
+ * connection still uses these validated addresses, so the SSRF guarantee is
+ * unchanged; if encrypted DNS is unreachable the original rejection stands.
+ */
+const DOH_FALLBACK_ENDPOINTS = [
+  "https://doh.pub/dns-query",
+  "https://dns.alidns.com/dns-query",
+];
+
+async function dohResolveFallback(
+  hostname: string,
+): Promise<ResolvedProviderAddress[]> {
+  for (const endpoint of DOH_FALLBACK_ENDPOINTS) {
+    for (const type of ["A", "AAAA"]) {
+      try {
+        const response = await fetch(
+          `${endpoint}?name=${encodeURIComponent(hostname)}&type=${type}`,
+          {
+            headers: { accept: "application/dns-json" },
+            signal: AbortSignal.timeout(4_000),
+          },
+        );
+        if (!response.ok) continue;
+        const body = (await response.json()) as {
+          Answer?: Array<{ type?: number; data?: string }>;
+        };
+        const records: ResolvedProviderAddress[] = [];
+        for (const entry of body.Answer ?? []) {
+          if (!entry.data) continue;
+          const family = isIP(entry.data);
+          if (family !== 4 && family !== 6) continue;
+          if (type === "A" && entry.type !== 1) continue;
+          if (type === "AAAA" && entry.type !== 28) continue;
+          records.push({ address: entry.data, family });
+        }
+        if (records.length > 0) return records;
+      } catch {
+        continue;
+      }
+    }
+  }
+  return [];
+}
+
 export async function validateProviderBaseUrl(
   value: string,
   exactLocalAllowlist: readonly string[] = [],
   resolveAddresses: ProviderAddressResolver = systemAddressResolver,
+  fallbackResolver: ProviderAddressResolver = dohResolveFallback,
 ): Promise<SafeBaseUrl> {
   const url = new URL(value);
   if (url.username || url.password)
@@ -174,7 +223,7 @@ export async function validateProviderBaseUrl(
     literalFamily === 4 || literalFamily === 6
       ? [{ address: hostname, family: literalFamily }]
       : await resolveAddresses(hostname);
-  const resolvedRecords = [
+  let resolvedRecords = [
     ...new Map(
       records.flatMap((record) => {
         const address = record.address.split("%")[0] ?? record.address;
@@ -210,9 +259,34 @@ export async function validateProviderBaseUrl(
     !allowlistedLocal &&
     resolvedRecords.some((record) => isPrivateAddress(record.address))
   ) {
-    throw new Error(
-      "The provider URL resolves to a private, loopback, link-local, metadata, or special-purpose address.",
-    );
+    // An explicit custom resolver owns its own answer; only the system
+    // resolver (or an explicitly injected fallback, used by tests) may be
+    // overridden through encrypted DNS.
+    const fallbackAllowed =
+      resolveAddresses === systemAddressResolver ||
+      fallbackResolver !== dohResolveFallback;
+    if (literalFamily === 4 || literalFamily === 6 || !fallbackAllowed) {
+      throw new Error(
+        "The provider URL resolves to a private, loopback, link-local, metadata, or special-purpose address.",
+      );
+    }
+    const fallbackRecords = await fallbackResolver(hostname);
+    if (
+      fallbackRecords.length === 0 ||
+      fallbackRecords.some((record) => isPrivateAddress(record.address))
+    ) {
+      throw new Error(
+        "The provider URL resolves to a private, loopback, link-local, metadata, or special-purpose address. If your proxy tool uses fake-IP mode, add a bypass or direct rule for this domain.",
+      );
+    }
+    resolvedRecords = [
+      ...new Map(
+        fallbackRecords.map((record) => [
+          `${record.family}:${record.address}`,
+          record,
+        ]),
+      ).values(),
+    ];
   }
 
   return {

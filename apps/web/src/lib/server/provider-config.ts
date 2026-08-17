@@ -100,11 +100,20 @@ export async function probeProviderConnection(
         options.localBaseUrlAllowlist ?? [],
       );
     } catch (error) {
+      const reason =
+        error instanceof Error
+          ? error.message
+          : "The provider base URL is not allowed.";
+      // The SSRF layer already explains fake-IP/proxy and private-address
+      // rejections. Only the local-model cases need the allowlist guidance.
+      const allowlistHint = /allowlist|HTTPS|https/i.test(reason)
+        ? " To permit an exact local model URL, add it to the LOCAL_MODEL_BASE_URL_ALLOWLIST environment variable and restart."
+        : "";
       throw new ApiProblem({
         title: "Provider URL rejected",
         status: 422,
         code: "PROVIDER_BASE_URL_REJECTED",
-        detail: `${error instanceof Error ? error.message : "The provider base URL is not allowed."} To permit an exact local model URL, add it to the LOCAL_MODEL_BASE_URL_ALLOWLIST environment variable and restart.`,
+        detail: `${reason}${allowlistHint}`,
       });
     }
   }
