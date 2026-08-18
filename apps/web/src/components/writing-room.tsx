@@ -47,6 +47,24 @@ function formatTime(seconds: number): string {
   return `${minutes}:${remainder}`;
 }
 
+function formatCountdown(milliseconds: number, chinese: boolean): string {
+  const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
+  const days = Math.floor(totalSeconds / 86_400);
+  const hours = Math.floor((totalSeconds % 86_400) / 3_600);
+  const minutes = Math.floor((totalSeconds % 3_600) / 60);
+  const seconds = totalSeconds % 60;
+  if (chinese) {
+    if (days > 0) return `${days}天${hours}小时`;
+    if (hours > 0) return `${hours}小时${minutes}分`;
+    if (minutes > 0) return `${minutes}分${seconds}秒`;
+    return `${seconds}秒`;
+  }
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  if (minutes > 0) return `${minutes}m ${seconds}s`;
+  return `${seconds}s`;
+}
+
 function countWords(value: string): number {
   const words = value.trim().match(/[\p{L}\p{N}’'-]+/gu);
   return words?.length ?? 0;
@@ -62,7 +80,7 @@ export function WritingRoom({
   taskId: string | null;
 }) {
   const router = useRouter();
-  const { text, messages } = useLocale();
+  const { text, messages, locale } = useLocale();
   const loader = useCallback(() => {
     if (!cycleId || (mode === "rewrite" && !taskId)) {
       return Promise.reject(
@@ -82,6 +100,34 @@ export function WritingRoom({
     loading,
     retry,
   } = useDemoResource<AttemptData | RewriteData>(loader);
+  const [rewriteCountdown, setRewriteCountdown] = useState<string | null>(null);
+  useEffect(() => {
+    const availableAt =
+      loadError instanceof LearningClientError &&
+      loadError.code === "REWRITE_LOCKED"
+        ? (loadError.details?.availableAt as string | undefined)
+        : undefined;
+    if (!availableAt) {
+      setRewriteCountdown(null);
+      return;
+    }
+    const target = Date.parse(availableAt);
+    if (!Number.isFinite(target)) {
+      setRewriteCountdown(null);
+      return;
+    }
+    const tick = () => {
+      const remaining = target - Date.now();
+      if (remaining <= 0) {
+        setRewriteCountdown(null);
+        return;
+      }
+      setRewriteCountdown(formatCountdown(remaining, locale === "zh-CN"));
+    };
+    tick();
+    const timer = window.setInterval(tick, 1_000);
+    return () => window.clearInterval(timer);
+  }, [loadError, locale]);
   const [draft, setDraft] = useState("");
   const [remaining, setRemaining] = useState(40 * 60);
   const [active, setActive] = useState(false);
@@ -433,13 +479,25 @@ export function WritingRoom({
 
   if (loading || !data) {
     if (loadError) {
+      const isRewriteLocked = rewriteCountdown !== null;
       return (
         <Card className="transfer-result-card">
           <AlertCircle aria-hidden="true" size={36} />
           <h1>
-            {text("无法打开这次写作", "This writing step cannot be opened")}
+            {isRewriteLocked
+              ? text("延迟重写尚未开放", "The delayed rewrite is not open yet")
+              : text("无法打开这次写作", "This writing step cannot be opened")}
           </h1>
-          <p>{loadError.message}</p>
+          {isRewriteLocked ? (
+            <p>
+              {text(
+                `为确保学习质量，延迟重写于${rewriteCountdown}后开放。`,
+                `To protect learning quality, the delayed rewrite opens in ${rewriteCountdown}.`,
+              )}
+            </p>
+          ) : (
+            <p>{loadError.message}</p>
+          )}
           {syncError ? <p role="alert">{syncError}</p> : null}
           <div className="completion-actions">
             {mode === "rewrite" &&

@@ -15,6 +15,7 @@ export class LearningClientError extends Error {
   readonly code: string;
   readonly retryable: boolean;
   readonly problem: ApiProblemDetails | undefined;
+  readonly details: Record<string, unknown> | undefined;
 
   constructor(
     message: string,
@@ -24,6 +25,7 @@ export class LearningClientError extends Error {
       retryable?: boolean;
       problem?: ApiProblemDetails;
       cause?: unknown;
+      details?: Record<string, unknown>;
     } = {},
   ) {
     super(message, { cause: options.cause });
@@ -33,6 +35,7 @@ export class LearningClientError extends Error {
     this.retryable =
       options.retryable ?? retryableStatuses.has(options.status ?? 0);
     this.problem = options.problem;
+    this.details = options.details;
   }
 }
 
