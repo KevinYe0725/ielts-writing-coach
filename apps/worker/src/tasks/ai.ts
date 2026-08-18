@@ -1273,7 +1273,7 @@ Learner Version 1 for context only: ${(version1?.content ?? "").slice(0, 4_000)}
     if (!teaching) {
       throw teachingError instanceof Error
         ? teachingError
-        : new Error("The teaching article failed after 5 attempts.");
+        : new Error("The teaching article failed after 8 attempts.");
     }
     const paperSections = [
       "FOUNDATION",
@@ -1399,7 +1399,7 @@ Original IELTS question: ${cycle.question.prompt}`,
       if (!generatedItem) {
         throw lastError instanceof Error
           ? lastError
-          : new Error(`Paper question ${index + 1} failed after 5 attempts.`);
+          : new Error(`Paper question ${index + 1} failed after 8 attempts.`);
       }
       paperItems.push(generatedItem);
     }

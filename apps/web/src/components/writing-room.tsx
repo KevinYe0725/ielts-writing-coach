@@ -360,8 +360,10 @@ export function WritingRoom({
         }),
       );
     } catch (error) {
-      if (error instanceof DraftConflictError) setDraftConflict(error);
-      else if (
+      if (error instanceof DraftConflictError) {
+        submittedRef.current = false;
+        setDraftConflict(error);
+      } else if (
         error instanceof LearningClientError &&
         ["ATTEMPT_LOCKED", "ATTEMPT_ALREADY_SUBMITTED"].includes(error.code)
       ) {
@@ -375,12 +377,16 @@ export function WritingRoom({
               })
             : "/today?notice=feedback-waiting-ai",
         );
-      } else
+      } else {
+        // The attempt is still editable: resume the autosave loop so the
+        // learner keeps syncing instead of silently losing drafts.
+        submittedRef.current = false;
         setSyncError(
           error instanceof Error
             ? error.message
             : "The essay could not be submitted.",
         );
+      }
     } finally {
       submitStarted.current = false;
       setSubmitting(false);
