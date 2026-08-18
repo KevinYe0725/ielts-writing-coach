@@ -267,17 +267,18 @@ export function validatePracticePaperItemContent(
   item: PracticePaperItemContent,
 ): boolean {
   if (
-    item.titleZh.trim().length === 0 ||
+    item.titleZh.trim().length < 2 ||
     item.titleZh.length > 30 ||
-    item.titleEn.trim().length === 0 ||
+    item.titleEn.trim().length < 2 ||
     item.titleEn.length > 100 ||
     item.instructionZh.trim().length < 8 ||
     item.instructionZh.length > 500 ||
     !hasClearOutputAction(item.instructionZh) ||
     !criteriaAreVisibleInInstruction(item) ||
-    item.promptEn.trim().length === 0 ||
+    item.promptEn.trim().length < 4 ||
     item.promptEn.length > 900 ||
     item.sourceText.length > 800 ||
+    item.answerExplanationZh.trim().length < 8 ||
     item.answerExplanationZh.length > 400 ||
     item.publicCriteria.length < 1 ||
     item.publicCriteria.length > 4 ||
@@ -289,10 +290,10 @@ export function validatePracticePaperItemContent(
     item.suggestedMinutes > 15 ||
     item.publicCriteria.some(
       (criterion) =>
-        criterion.labelZh.trim().length === 0 ||
-        criterion.labelEn.trim().length === 0 ||
-        criterion.descriptionZh.trim().length === 0 ||
-        criterion.descriptionEn.trim().length === 0 ||
+        criterion.labelZh.trim().length < 2 ||
+        criterion.labelEn.trim().length < 2 ||
+        criterion.descriptionZh.trim().length < 8 ||
+        criterion.descriptionEn.trim().length < 8 ||
         criterion.weight <= 0 ||
         criterion.descriptionEn.length > 420,
     )
