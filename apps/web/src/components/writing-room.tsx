@@ -479,26 +479,24 @@ export function WritingRoom({
 
   if (loading || !data) {
     if (loadError) {
-      const isRewriteLocked = rewriteCountdown !== null;
+      const isRewriteLocked =
+        loadError instanceof LearningClientError &&
+        loadError.code === "REWRITE_LOCKED";
       return (
         <Card className="transfer-result-card">
           <AlertCircle aria-hidden="true" size={36} />
-          <h1>
-            {isRewriteLocked
-              ? text("延迟重写尚未开放", "The delayed rewrite is not open yet")
-              : text("无法打开这次写作", "This writing step cannot be opened")}
-          </h1>
           {isRewriteLocked ? (
-            <p>
-              {text(
-                `为确保学习质量，延迟重写于${rewriteCountdown}后开放。`,
-                `To protect learning quality, the delayed rewrite opens in ${rewriteCountdown}.`,
-              )}
+            <p className="rewrite-locked-message">
+              {rewriteCountdown
+                ? `为确保学习质量，延迟重写于${rewriteCountdown}后开放。`
+                : "为确保学习质量，延迟重写即将开放。"}
             </p>
           ) : (
-            <p>{loadError.message}</p>
+            <>
+              <p>{loadError.message}</p>
+              {syncError ? <p role="alert">{syncError}</p> : null}
+            </>
           )}
-          {syncError ? <p role="alert">{syncError}</p> : null}
           <div className="completion-actions">
             {mode === "rewrite" &&
             loadError instanceof LearningClientError &&

@@ -4073,6 +4073,13 @@ h3 {
   color: var(--ink-soft);
 }
 
+.transfer-result-card .rewrite-locked-message {
+  font-size: 1.28rem;
+  font-weight: 600;
+  line-height: 1.7;
+  color: var(--ink);
+}
+
 .settings-layout {
   display: grid;
   grid-template-columns: 190px minmax(0, 1fr);
