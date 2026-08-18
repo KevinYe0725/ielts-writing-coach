@@ -48,8 +48,10 @@ function exactSourceSpan(
 
 /**
  * Splits an immutable Version 1 essay into display segments without changing a
- * character. Ambiguous, mismatched, or overlapping evidence is deliberately
- * left unmarked: a missing highlight is safer than pointing at the wrong text.
+ * character. Exact spans are kept; a smaller span nested inside a larger one
+ * is shown together with it (the larger span is split around it). Ambiguous
+ * evidence and partially-overlapping spans are deliberately left unmarked: a
+ * missing highlight is safer than pointing at the wrong text.
  */
 export function buildFeedbackSegments(
   essay: string,
@@ -60,23 +62,57 @@ export function buildFeedbackSegments(
     .filter(
       (annotation): annotation is ResolvedAnnotation => annotation !== null,
     )
-    .sort((left, right) => left.start - right.start || left.end - right.end);
+    // Longer spans first so an outer span is placed before its nested inner
+    // span, which then splits it instead of being dropped.
+    .sort((left, right) => left.start - right.start || right.end - left.end);
 
-  const accepted: ResolvedAnnotation[] = [];
-  let coveredUntil = 0;
+  if (annotations.length === 0) return [{ kind: "text", text: essay }];
 
-  for (const annotation of annotations) {
-    if (annotation.start < coveredUntil) continue;
-    accepted.push(annotation);
-    coveredUntil = annotation.end;
-  }
+  const placed: ResolvedAnnotation[] = [];
+  const place = (annotation: ResolvedAnnotation): void => {
+    for (const existing of placed) {
+      const overlaps =
+        annotation.start < existing.end && annotation.end > existing.start;
+      if (!overlaps) continue;
+      // A span fully contained inside an existing one is a nested highlight:
+      // split the outer span around it so both remain visible.
+      if (
+        annotation.start >= existing.start &&
+        annotation.end <= existing.end
+      ) {
+        const index = placed.indexOf(existing);
+        placed.splice(index, 1);
+        if (existing.start < annotation.start) {
+          placed.push({
+            end: annotation.start,
+            issueId: existing.issueId,
+            start: existing.start,
+          });
+        }
+        placed.push(annotation);
+        if (annotation.end < existing.end) {
+          placed.push({
+            end: existing.end,
+            issueId: existing.issueId,
+            start: annotation.end,
+          });
+        }
+        return;
+      }
+      // Partially overlapping spans are ambiguous; drop the later one.
+      return;
+    }
+    placed.push(annotation);
+  };
+  for (const annotation of annotations) place(annotation);
 
-  if (accepted.length === 0) return [{ kind: "text", text: essay }];
+  placed.sort(
+    (left, right) => left.start - right.start || left.end - right.end,
+  );
 
   const segments: FeedbackTextSegment[] = [];
   let cursor = 0;
-
-  for (const annotation of accepted) {
+  for (const annotation of placed) {
     if (annotation.start > cursor) {
       segments.push({
         kind: "text",
@@ -90,10 +126,8 @@ export function buildFeedbackSegments(
     });
     cursor = annotation.end;
   }
-
   if (cursor < essay.length) {
     segments.push({ kind: "text", text: essay.slice(cursor) });
   }
-
   return segments;
 }

@@ -92,4 +92,22 @@ describe("feedback essay annotations", () => {
       { kind: "text", text: "ghij" },
     ]);
   });
+
+  it("keeps a nested smaller issue inside a larger span by splitting the larger one", () => {
+    const essay = "In my opinion, the advantages out weight the disadvantages.";
+    expect(
+      buildFeedbackSegments(essay, [
+        issue("intro", essay, { startOffset: 0, endOffset: essay.length }),
+        issue("spelling", "out weight", { startOffset: 30, endOffset: 40 }),
+      ]),
+    ).toEqual([
+      {
+        issueId: "intro",
+        kind: "issue",
+        text: "In my opinion, the advantages ",
+      },
+      { issueId: "spelling", kind: "issue", text: "out weight" },
+      { issueId: "intro", kind: "issue", text: " the disadvantages." },
+    ]);
+  });
 });
