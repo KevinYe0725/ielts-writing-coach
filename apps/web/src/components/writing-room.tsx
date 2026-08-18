@@ -482,6 +482,9 @@ export function WritingRoom({
       const isRewriteLocked =
         loadError instanceof LearningClientError &&
         loadError.code === "REWRITE_LOCKED";
+      const isRewritePendingLesson =
+        loadError instanceof LearningClientError &&
+        loadError.code === "REWRITE_PENDING_LESSON";
       return (
         <Card className="transfer-result-card">
           <AlertCircle aria-hidden="true" size={36} />
@@ -490,6 +493,10 @@ export function WritingRoom({
               {rewriteCountdown
                 ? `为确保学习质量，延迟重写于${rewriteCountdown}后开放。`
                 : "为确保学习质量，延迟重写即将开放。"}
+            </p>
+          ) : isRewritePendingLesson ? (
+            <p className="rewrite-locked-message">
+              请先完成专项课程；完成后系统会安排 24 小时后的闭卷重写。
             </p>
           ) : (
             <>

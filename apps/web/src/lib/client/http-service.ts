@@ -3125,11 +3125,12 @@ export class HttpLearningClient implements LearningClient {
           attempt.id,
           result.response.headers.get("etag") ?? 'W/"1"',
         );
-    } else if (
-      task.status === "PLANNED" ||
-      task.status === "LOCKED" ||
-      task.status === "RESCHEDULED"
-    ) {
+    } else if (task.status === "PLANNED") {
+      throw new LearningClientError(
+        "The delayed rewrite is not scheduled until the lesson is completed.",
+        { status: 423, code: "REWRITE_PENDING_LESSON" },
+      );
+    } else if (task.status === "LOCKED" || task.status === "RESCHEDULED") {
       throw new LearningClientError(
         `The rewrite unlocks at ${availableAt || "the scheduled time"}.`,
         {
