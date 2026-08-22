@@ -41,6 +41,7 @@ import {
 } from "./teaching-practice-projection";
 
 const STORAGE_KEYS = {
+  adminStatusFixture: "iwc.demo.admin-status-fixture",
   ai: "iwc.demo.ai-enabled",
   draftV1: "iwc.demo.draft.v1",
   draftV2: "iwc.demo.draft.v2",
@@ -59,6 +60,24 @@ const STORAGE_KEYS = {
   transferResult: "iwc.demo.transfer-result",
   teachingPracticeResponses: "iwc.demo.teaching-practice-responses",
 } as const;
+
+type DemoAdminStatusFixture = {
+  access?: "forbidden";
+  actorRole?: "owner" | "admin";
+  mailState?: SystemStatus["mailState"];
+  migrationsCurrent?: boolean;
+};
+
+function readDemoAdminStatusFixture(): DemoAdminStatusFixture {
+  const stored = readStorage(STORAGE_KEYS.adminStatusFixture);
+  if (!stored) return {};
+  try {
+    const fixture = JSON.parse(stored) as DemoAdminStatusFixture;
+    return fixture && typeof fixture === "object" ? fixture : {};
+  } catch {
+    return {};
+  }
+}
 
 const delay = async (milliseconds = 160): Promise<void> => {
   await new Promise<void>((resolve) =>
@@ -2160,14 +2179,21 @@ export class MockLearningClient implements LearningClient {
 
   async getSystemStatus(): Promise<SystemStatus> {
     await delay();
+    const fixture = readDemoAdminStatusFixture();
+    if (fixture.access === "forbidden") {
+      throw new LearningClientError("Administrator access is required.", {
+        code: "FORBIDDEN",
+        status: 403,
+      });
+    }
     return {
-      actorRole: "owner",
+      actorRole: fixture.actorRole ?? "owner",
       version: "1.0.0",
       deploymentMode: getPreferences().deploymentMode,
       ai: aiEnabled() ? connectedAi : missingAi,
-      mailState: "ready",
+      mailState: fixture.mailState ?? "ready",
       databaseState: "healthy",
-      migrationsCurrent: true,
+      migrationsCurrent: fixture.migrationsCurrent ?? true,
       taskExecutorState: "healthy",
       queue: {
         waiting: aiEnabled() ? 2 : 5,

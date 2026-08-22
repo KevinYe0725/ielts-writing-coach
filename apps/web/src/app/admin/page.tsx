@@ -27,10 +27,12 @@ import {
 import { useDemoResource } from "@/components/use-demo-resource";
 import { learningClient } from "@/lib/client";
 
+import styles from "./admin.module.css";
+
 export default function AdminPage() {
   const { text } = useLocale();
   const loader = useCallback(() => learningClient.getSystemStatus(), []);
-  const { data, loading, retry } = useDemoResource(loader);
+  const { data, error, loading, retry } = useDemoResource(loader);
   const [recoveryEmail, setRecoveryEmail] = useState("");
   const [recoveryLink, setRecoveryLink] = useState<string | null>(null);
   const [recoveryError, setRecoveryError] = useState<string | null>(null);
@@ -38,10 +40,19 @@ export default function AdminPage() {
   const [showAudit, setShowAudit] = useState(false);
   const [testingSmtp, setTestingSmtp] = useState(false);
   const [smtpTestMessage, setSmtpTestMessage] = useState<string | null>(null);
-  if (loading || !data)
+  if (loading)
     return (
       <Skeleton label={text("正在检查系统状态…", "Checking system status…")} />
     );
+  if (error || !data) {
+    return (
+      <div className={styles.accessDenied} data-admin-access="denied">
+        <Skeleton
+          label={text("正在检查系统状态…", "Checking system status…")}
+        />
+      </div>
+    );
+  }
 
   const aiHealthy =
     data.ai.state === "connected" || data.ai.state === "compatibility";
@@ -114,7 +125,7 @@ export default function AdminPage() {
     }
   };
   return (
-    <>
+    <div className={styles.desk} data-admin-desk="operations">
       <PageHeader
         actions={
           <Button onClick={retry} variant="secondary">
@@ -207,7 +218,7 @@ export default function AdminPage() {
                 `${data.queue.waiting} jobs are waiting for AI configuration`,
               )}
             </strong>
-            <p>
+            <p data-admin-auxiliary>
               {text(
                 "修复后会沿用原 Job 与幂等键恢复；结果不会重复落库，支持幂等的供应商也可避免重复请求计费。",
                 "After repair, jobs resume with their original Job IDs and idempotency keys. Results are not stored twice, and providers that honor idempotency can also avoid duplicate request charges.",
@@ -268,7 +279,7 @@ export default function AdminPage() {
               <strong>{data.queue.failed}</strong>
             </div>
           </div>
-          <p className="panel-note">
+          <p className="panel-note" data-admin-auxiliary>
             {text(
               "批改、课程生成和开放题判分均使用独立幂等键。",
               "Feedback, lesson generation, and open-response evaluation each use independent idempotency keys.",
@@ -290,11 +301,15 @@ export default function AdminPage() {
           <div className="user-numbers">
             <div>
               <strong>{data.users.active}</strong>
-              <span>{text("活跃用户", "active users")}</span>
+              <span data-admin-auxiliary>
+                {text("活跃用户", "active users")}
+              </span>
             </div>
             <div>
               <strong>{data.users.invited}</strong>
-              <span>{text("待接受邀请", "pending invitation")}</span>
+              <span data-admin-auxiliary>
+                {text("待接受邀请", "pending invitation")}
+              </span>
             </div>
           </div>
           <div className="policy-row">
@@ -310,7 +325,7 @@ export default function AdminPage() {
 
       <SectionHeader title={text("隐私与运维", "Privacy & operations")} />
       <div className="operations-list">
-        {data.mailState === "missing" ? (
+        {data.mailState === "missing" && data.actorRole === "owner" ? (
           <Card>
             <span className="operation-icon blue">
               <Mail aria-hidden="true" size={19} />
@@ -322,7 +337,7 @@ export default function AdminPage() {
                   "Owner-assisted one-time recovery",
                 )}
               </strong>
-              <p>
+              <p data-admin-auxiliary>
                 {text(
                   "SMTP 未配置时，Owner 可生成一小时有效的单次恢复链接。链接仅在本次响应中显示。",
                   "Without SMTP, the Owner can create a single-use recovery link valid for one hour. It is shown only in this response.",
@@ -367,7 +382,7 @@ export default function AdminPage() {
             </span>
             <div>
               <strong>{text("现场测试 SMTP", "Test SMTP live")}</strong>
-              <p>
+              <p data-admin-auxiliary>
                 {smtpTestMessage ??
                   text(
                     "已配置不等于已送达；此测试会检查连接与认证，不发送学习提醒。",
@@ -388,7 +403,7 @@ export default function AdminPage() {
           </Card>
         ) : null}
         <Card>
-          <span className="operation-icon green">
+          <span className={styles.operationIconProtected}>
             <ShieldCheck aria-hidden="true" size={19} />
           </span>
           <div>
@@ -398,7 +413,7 @@ export default function AdminPage() {
                 "Administrator cannot read essay text",
               )}
             </strong>
-            <p>
+            <p data-admin-auxiliary>
               {text(
                 "排障访问需要学习者单独授权，并写入审计日志。",
                 "Troubleshooting access needs separate learner consent and is audited.",
@@ -408,14 +423,14 @@ export default function AdminPage() {
           <Badge tone="green">{text("已保护", "Protected")}</Badge>
         </Card>
         <Card>
-          <span className="operation-icon blue">
+          <span className={styles.operationIconStandard}>
             <HardDrive aria-hidden="true" size={19} />
           </span>
           <div>
             <strong>
               {text("可创建加密实例备份", "Encrypted instance backup")}
             </strong>
-            <p>
+            <p data-admin-auxiliary>
               {text(
                 "包含数据库、版本清单与口令加密密钥；恢复演练仍需由运维者完成。",
                 "Includes the database, version manifest, and passphrase-encrypted secrets; the operator must still test recovery.",
@@ -431,12 +446,12 @@ export default function AdminPage() {
           )}
         </Card>
         <Card>
-          <span className="operation-icon violet">
+          <span className={styles.operationIconAudit}>
             <Activity aria-hidden="true" size={19} />
           </span>
           <div>
             <strong>{text("审计事件", "Audit events")}</strong>
-            <p>
+            <p data-admin-auxiliary>
               {data.privacy.auditEvents}{" "}
               {text(
                 "条不含密钥的配置与权限事件",
@@ -465,7 +480,7 @@ export default function AdminPage() {
               <Badge tone="neutral">{data.privacy.recentAudit.length}</Badge>
             </div>
             {data.privacy.recentAudit.length === 0 ? (
-              <p className="panel-note">
+              <p className="panel-note" data-admin-auxiliary>
                 {text("暂无审计事件。", "No audit events yet.")}
               </p>
             ) : (
@@ -474,7 +489,7 @@ export default function AdminPage() {
                   <li key={event.id}>
                     <span>
                       <strong>{event.action}</strong>
-                      <small>
+                      <small data-admin-auxiliary>
                         {event.targetType}
                         {event.targetId ? ` · ${event.targetId}` : ""}
                       </small>
@@ -485,7 +500,7 @@ export default function AdminPage() {
                       >
                         {event.result}
                       </Badge>
-                      <time dateTime={event.occurredAt}>
+                      <time data-admin-auxiliary dateTime={event.occurredAt}>
                         {event.occurredAt
                           ? new Date(event.occurredAt).toLocaleString()
                           : "—"}
@@ -498,7 +513,7 @@ export default function AdminPage() {
           </Card>
         ) : null}
       </div>
-    </>
+    </div>
   );
 }
 
@@ -527,7 +542,7 @@ function HealthCard({
       <div>
         <span>{title}</span>
         <strong>{value}</strong>
-        <small>{detail}</small>
+        <small data-admin-auxiliary>{detail}</small>
       </div>
     </Card>
   );

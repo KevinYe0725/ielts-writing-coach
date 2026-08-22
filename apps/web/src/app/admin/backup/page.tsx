@@ -8,6 +8,8 @@ import { Button, Card, PageHeader, Skeleton } from "@/components/ui";
 import { useDemoResource } from "@/components/use-demo-resource";
 import { learningClient } from "@/lib/client";
 
+import styles from "./backup.module.css";
+
 function fileNameFromDisposition(value: string | null): string {
   return (
     value?.match(/filename="([^"]+)"/u)?.[1] ?? "ielts-writing-coach.iwc-backup"
@@ -22,10 +24,14 @@ export default function BackupPage() {
   const [confirmation, setConfirmation] = useState("");
   const [creating, setCreating] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [messageState, setMessageState] = useState<"error" | "success" | null>(
+    null,
+  );
 
   const createBackup = async () => {
     setCreating(true);
     setMessage(null);
+    setMessageState(null);
     try {
       const response = await fetch("/api/v1/admin/backups", {
         method: "POST",
@@ -79,12 +85,14 @@ export default function BackupPage() {
           "The fully encrypted instance backup and checksum were downloaded. Store its passphrase separately and verify the archive with the restore runbook.",
         ),
       );
+      setMessageState("success");
     } catch (error) {
       setMessage(
         error instanceof Error
           ? error.message
           : text("无法创建备份。", "The backup could not be created."),
       );
+      setMessageState("error");
     } finally {
       setCreating(false);
     }
@@ -99,7 +107,7 @@ export default function BackupPage() {
   }
   if (status.actorRole !== "owner") {
     return (
-      <>
+      <div className={styles.denied} data-backup-access="denied">
         <PageHeader
           eyebrow={text("仅 Owner 可执行", "Owner only")}
           title={text("创建实例备份", "Create instance backup")}
@@ -109,18 +117,18 @@ export default function BackupPage() {
           )}
         />
         <Card>
-          <p className="panel-note">
+          <p className="panel-note" data-admin-auxiliary>
             {text(
               "请由实例 Owner 执行此操作。",
               "Ask the instance owner to perform this operation.",
             )}
           </p>
         </Card>
-      </>
+      </div>
     );
   }
   return (
-    <>
+    <div className={styles.page} data-backup-desk="secure-export">
       <PageHeader
         eyebrow={text("仅 Owner 可执行", "Owner only")}
         title={text("创建实例备份", "Create instance backup")}
@@ -129,7 +137,7 @@ export default function BackupPage() {
           "Download a fully passphrase-encrypted PostgreSQL dump, version manifest, and instance secrets.",
         )}
       />
-      <Card className="admin-panel">
+      <Card className={styles.archiveCard}>
         <div className="card-title-row">
           <div>
             <p className="eyebrow">Portable recovery</p>
@@ -137,7 +145,7 @@ export default function BackupPage() {
           </div>
           <LockKeyhole aria-hidden="true" size={22} />
         </div>
-        <p className="panel-note">
+        <p className={styles.securityNote} data-admin-auxiliary>
           {text(
             "整个归档（包括作文）用下方口令加密；Provider 密钥在数据库中仍是密文，实例主密钥还会二次加密。SMTP、环境变量 Provider 凭据和 DATABASE_URL 不会进入归档。",
             "The complete archive, including essays, is encrypted with the passphrase below. Provider credentials remain database ciphertext and the instance key is encrypted again. SMTP credentials, environment-managed provider keys, and DATABASE_URL are omitted.",
@@ -154,6 +162,7 @@ export default function BackupPage() {
             <input
               autoComplete="new-password"
               id="backup-passphrase"
+              minLength={12}
               onChange={(event) => setPassphrase(event.target.value)}
               type="password"
               value={passphrase}
@@ -174,8 +183,14 @@ export default function BackupPage() {
             />
           </div>
         </div>
-        <div className="settings-savebar">
-          <span>
+        <p className={styles.downloadOrder} data-admin-auxiliary>
+          {text(
+            "成功时按顺序下载加密归档与同名 .sha256 校验文件。",
+            "On success, the encrypted archive downloads first, followed by its matching .sha256 checksum file.",
+          )}
+        </p>
+        <div className={styles.actionBar}>
+          <span data-admin-auxiliary>
             {text(
               "下载完成不等于备份已验证；请执行 CLI doctor/restore 演练。",
               "A download is not a verified backup; perform the CLI doctor/restore drill.",
@@ -188,6 +203,7 @@ export default function BackupPage() {
               confirmation !== "CREATE ENCRYPTED INSTANCE BACKUP"
             }
             onClick={() => void createBackup()}
+            variant="danger"
           >
             <Download aria-hidden="true" size={17} />
             {creating
@@ -196,11 +212,18 @@ export default function BackupPage() {
           </Button>
         </div>
         {message ? (
-          <p aria-live="polite" className="panel-note">
+          <p
+            aria-live="polite"
+            className={
+              messageState === "error" ? styles.errorMessage : styles.message
+            }
+            data-admin-auxiliary
+            data-backup-status={messageState ?? undefined}
+          >
             {message}
           </p>
         ) : null}
       </Card>
-    </>
+    </div>
   );
 }

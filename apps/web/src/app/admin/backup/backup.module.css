@@ -1,0 +1,158 @@
+.page {
+  display: grid;
+  width: min(840px, 100%);
+  padding-bottom: var(--desk-space-12);
+  margin: 0 auto;
+  color: var(--desk-ink);
+  gap: var(--desk-space-4);
+}
+
+.page :global(.page-header) {
+  margin-bottom: var(--desk-space-2);
+}
+
+.page :global(.page-header h1) {
+  font-size: clamp(2rem, 3.6vw, 2.8rem);
+  letter-spacing: -0.04em;
+}
+
+.archiveCard {
+  position: relative;
+  min-height: 0;
+  padding: var(--desk-space-6);
+  overflow: hidden;
+  background: var(--desk-paper);
+  border-color: color-mix(in srgb, var(--desk-error) 26%, transparent);
+  border-radius: var(--desk-radius-md);
+  box-shadow: none;
+}
+
+.archiveCard::before {
+  position: absolute;
+  width: 4px;
+  content: "";
+  background: var(--desk-error);
+  inset: 0 auto 0 0;
+}
+
+.archiveCard :global(.card-title-row > svg) {
+  color: var(--desk-error);
+}
+
+.securityNote {
+  max-width: 74ch;
+  margin: var(--desk-space-4) 0 var(--desk-space-6);
+  color: color-mix(in srgb, var(--desk-ink) 72%, transparent);
+  line-height: 1.7;
+}
+
+.archiveCard :global(.settings-fields) {
+  gap: var(--desk-space-4);
+}
+
+.archiveCard :global(.form-field label),
+.archiveCard :global(input),
+.archiveCard [data-admin-auxiliary] {
+  font-size: max(0.8rem, 12px);
+}
+
+.archiveCard :global(input) {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid color-mix(in srgb, var(--desk-ink) 24%, transparent);
+  border-radius: var(--desk-radius-sm);
+}
+
+.archiveCard :global(input:focus) {
+  border-color: var(--desk-blue);
+  outline: 3px solid color-mix(in srgb, var(--desk-blue) 20%, transparent);
+}
+
+.downloadOrder {
+  padding: var(--desk-space-3);
+  margin: var(--desk-space-4) 0 0;
+  color: var(--desk-evidence-muted);
+  background: color-mix(
+    in srgb,
+    var(--desk-evidence-muted) 7%,
+    var(--desk-paper)
+  );
+  border-left: 3px solid var(--desk-evidence-muted);
+  border-radius: var(--desk-radius-sm);
+  font-family: var(--desk-font-utility);
+}
+
+.actionBar {
+  display: flex;
+  padding: var(--desk-space-4);
+  margin-top: var(--desk-space-4);
+  background: color-mix(in srgb, var(--desk-error) 6%, var(--desk-paper));
+  border: 1px solid color-mix(in srgb, var(--desk-error) 20%, transparent);
+  border-radius: var(--desk-radius-sm);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--desk-space-4);
+}
+
+.actionBar > span {
+  max-width: 58ch;
+  color: color-mix(in srgb, var(--desk-ink) 70%, transparent);
+}
+
+.message,
+.errorMessage {
+  margin: var(--desk-space-4) 0 0;
+  line-height: 1.6;
+}
+
+.message {
+  color: var(--desk-evidence-muted);
+}
+
+.errorMessage {
+  color: var(--desk-error);
+}
+
+.denied {
+  display: grid;
+  width: min(840px, 100%);
+  margin: 0 auto;
+  gap: var(--desk-space-4);
+}
+
+.denied :global(.card) {
+  padding: var(--desk-space-4);
+  background: var(--desk-paper);
+  border-radius: var(--desk-radius-sm);
+  box-shadow: none;
+}
+
+.denied [data-admin-auxiliary] {
+  margin: 0;
+  font-size: max(0.8rem, 12px);
+}
+
+@media (max-width: 680px) {
+  .page {
+    padding-bottom: var(--desk-space-8);
+  }
+
+  .archiveCard {
+    padding: var(--desk-space-4);
+  }
+
+  .securityNote {
+    margin-bottom: var(--desk-space-4);
+  }
+
+  .actionBar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .actionBar :global(.button) {
+    width: 100%;
+  }
+}

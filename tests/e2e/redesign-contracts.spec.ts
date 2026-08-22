@@ -16,6 +16,8 @@ const routeMatrix = [
   ["/compare?cycle=cycle-demo", "workspace"],
   ["/transfer?cycle=cycle-demo&task=transfer-task", "workspace"],
   ["/growth", "reading"],
+  ["/admin", "focus"],
+  ["/admin/backup", "focus"],
   ["/lesson?cycle=cycle-demo&lesson=lesson-collocation-perspective", "reading"],
   [
     "/lesson/paper?cycle=cycle-demo&lesson=lesson-collocation-perspective",
