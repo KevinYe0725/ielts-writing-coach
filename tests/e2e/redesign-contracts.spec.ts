@@ -253,6 +253,46 @@ test.describe("annotation desk redesign contracts", () => {
     });
   }
 
+  test("practice paper keeps its focused input above the fixed submit bar at 390px", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(
+      "/lesson/paper?cycle=cycle-demo&lesson=lesson-collocation-perspective",
+    );
+
+    const navigation = page.locator("[data-paper-question-nav]");
+    const submitBar = page.locator(".practice-paper-submit");
+    await navigation.getByRole("link", { name: "8" }).click();
+    const focusedAnswer = page
+      .locator("#paper-question-demo-paper-question-8")
+      .getByRole("textbox");
+    await focusedAnswer.focus();
+    await expect(focusedAnswer).toBeFocused();
+    await expect(focusedAnswer).toBeInViewport();
+    await expect(submitBar).toHaveCSS("position", "fixed");
+
+    await expect
+      .poll(async () => {
+        const [answerBox, submitBox] = await Promise.all([
+          focusedAnswer.boundingBox(),
+          submitBar.boundingBox(),
+        ]);
+        if (!answerBox || !submitBox) return Number.POSITIVE_INFINITY;
+        return answerBox.y + answerBox.height - submitBox.y;
+      })
+      .toBeLessThanOrEqual(0);
+
+    for (const auxiliaryText of [
+      page.getByText("8题 · 60分钟", { exact: true }),
+      page.getByText(/题已作答/),
+      page.getByText(/交卷后才能查看整卷批改/),
+      page.locator(".practice-paper-answer > span").first(),
+    ]) {
+      await expectFontSizeAtLeast(auxiliaryText, 12);
+    }
+  });
+
   test("teaching keeps Chinese UI in Noto Sans and reserves Source Serif for English evidence", async ({
     page,
   }) => {

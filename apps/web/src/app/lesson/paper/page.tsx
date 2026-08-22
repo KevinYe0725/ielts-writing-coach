@@ -2,16 +2,10 @@
 
 import { use, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  CheckCircle2,
-  Clock3,
-  FileCheck2,
-  FileText,
-  LoaderCircle,
-  Send,
-} from "lucide-react";
+import { Clock3, FileCheck2, FileText, LoaderCircle, Send } from "lucide-react";
 
 import { useLocale } from "@/components/locale-provider";
+import { cn } from "@/components/utils";
 import {
   ActionLink,
   Badge,
@@ -34,8 +28,28 @@ import {
   type LearningSearchParams,
 } from "@/lib/client/learning-route";
 
+import styles from "./paper.module.css";
+
 function wordCount(value: string): number {
   return value.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function keepFocusedControlAboveSubmitBar(control: HTMLElement): void {
+  window.requestAnimationFrame(() => {
+    const submitBar = document.querySelector<HTMLElement>(
+      "[data-paper-submit-bar]",
+    );
+    if (!submitBar) return;
+
+    const visibleControl = control.closest("label") ?? control;
+    const controlRect = visibleControl.getBoundingClientRect();
+    const submitRect = submitBar.getBoundingClientRect();
+    const rootStyle = window.getComputedStyle(document.documentElement);
+    const safeGap =
+      Number.parseFloat(rootStyle.getPropertyValue("--desk-space-4")) || 16;
+    const overlap = controlRect.bottom + safeGap - submitRect.top;
+    if (overlap > 0) window.scrollBy({ top: overlap, behavior: "auto" });
+  });
 }
 
 function AnswerField({
@@ -51,17 +65,23 @@ function AnswerField({
 }) {
   if (question.responseMode === "choice") {
     return (
-      <fieldset className="practice-paper-options" disabled={disabled}>
+      <fieldset
+        className={cn("practice-paper-options", styles.options)}
+        disabled={disabled}
+      >
         <legend className="sr-only">{question.titleZh}</legend>
         {question.options.map((option) => (
           <label
-            className={answer === option.key ? "selected" : ""}
+            className={answer === option.key ? styles.selected : undefined}
             key={option.key}
           >
             <input
               checked={answer === option.key}
               name={question.id}
               onChange={() => onChange(option.key)}
+              onFocus={(event) =>
+                keepFocusedControlAboveSubmitBar(event.currentTarget)
+              }
               type="radio"
               value={option.key}
             />
@@ -74,12 +94,15 @@ function AnswerField({
   }
   const count = wordCount(answer);
   return (
-    <div className="practice-paper-answer">
+    <div className={cn("practice-paper-answer", styles.answer)}>
       <textarea
         aria-label={`${question.titleZh} answer`}
         disabled={disabled}
         lang="en"
         onChange={(event) => onChange(event.target.value)}
+        onFocus={(event) =>
+          keepFocusedControlAboveSubmitBar(event.currentTarget)
+        }
         placeholder="Write your answer here."
         rows={question.responseMode === "paragraph" ? 8 : 4}
         spellCheck={false}
@@ -204,7 +227,10 @@ export default function PracticePaperPage({
       ? learningRouteHref("/write", { cycleId })
       : "/write";
     return (
-      <Card className="practice-paper-replace" role="status">
+      <Card
+        className={cn("practice-paper-replace", styles.emptyState)}
+        role="status"
+      >
         <h1>
           {preparing
             ? text("正在为你准备专项训练卷", "Preparing your focused paper")
@@ -238,7 +264,7 @@ export default function PracticePaperPage({
 
   if (data.evaluationPending) {
     return (
-      <Card className="practice-paper-processing">
+      <Card className={cn("practice-paper-processing", styles.processingState)}>
         <LoaderCircle className="spin" aria-hidden="true" size={42} />
         <h1>
           {text("AI正在批改整张试卷", "AI is reviewing the complete paper")}
@@ -257,10 +283,15 @@ export default function PracticePaperPage({
   }
 
   return (
-    <div className="practice-paper-page">
+    <div className={cn("practice-paper-page", styles.page)}>
       <PageHeader
         actions={
-          <div className="practice-paper-header-actions">
+          <div
+            className={cn(
+              "practice-paper-header-actions",
+              styles.headerActions,
+            )}
+          >
             <ActionLink
               href={learningRouteHref("/lesson", {
                 cycleId: data.cycleId,
@@ -302,7 +333,7 @@ export default function PracticePaperPage({
               </Badge>
             ) : (
               <div
-                className="practice-paper-clock"
+                className={cn("practice-paper-clock", styles.clock)}
                 aria-label={text("剩余时间", "Time remaining")}
               >
                 <Clock3 aria-hidden="true" size={18} />
@@ -319,7 +350,7 @@ export default function PracticePaperPage({
       />
 
       {data.result ? (
-        <Card className="practice-paper-summary">
+        <Card className={cn("practice-paper-summary", styles.resultSummary)}>
           <div>
             <strong>{Math.round(data.result.totalScore)}</strong>
             <span>/ 100</span>
@@ -331,7 +362,9 @@ export default function PracticePaperPage({
           </div>
         </Card>
       ) : (
-        <Card className="practice-paper-instructions">
+        <Card
+          className={cn("practice-paper-instructions", styles.instructions)}
+        >
           <div>
             <strong>{text("8题 · 60分钟", "8 questions · 60 minutes")}</strong>
             <span>
@@ -347,91 +380,159 @@ export default function PracticePaperPage({
         </Card>
       )}
 
-      <div className="practice-paper-questions">
-        {data.questions.map((question) => {
-          const result = resultById.get(question.id);
-          const needsWork = result?.status !== "MEETS_STANDARD";
-          return (
-            <Card className="practice-paper-question" key={question.id}>
-              <header>
-                <div>
-                  <Badge
-                    tone={result ? (needsWork ? "amber" : "green") : "blue"}
+      <div className={styles.paperLayout}>
+        <nav
+          aria-label={text("试卷题目", "Paper questions")}
+          className={styles.questionNavigation}
+          data-paper-question-nav
+        >
+          <p>
+            <span>{text("试卷题目", "Questions")}</span>
+            <strong>
+              {answered}/{data.questions.length}
+            </strong>
+          </p>
+          <ol>
+            {data.questions.map((question, index) => {
+              const isAnswered = Boolean(answers[question.id]?.trim());
+              return (
+                <li key={question.id}>
+                  <a
+                    aria-label={text(
+                      `第 ${index + 1} 题${isAnswered ? "，已作答" : ""}`,
+                      `Question ${index + 1}${isAnswered ? ", answered" : ""}`,
+                    )}
+                    data-answered={isAnswered ? "true" : "false"}
+                    href={`#paper-question-${question.id}`}
+                    onClick={() => {
+                      document
+                        .getElementById(`paper-question-${question.id}`)
+                        ?.focus({ preventScroll: true });
+                    }}
                   >
-                    {result
-                      ? needsWork
-                        ? text("需要解析", "Needs review")
-                        : text("已达标", "Meets standard")
-                      : `${question.number}`}
-                  </Badge>
-                </div>
-                <span>
-                  <Clock3 aria-hidden="true" size={14} />
-                  {question.suggestedMinutes} {messages.common.minutes}
-                </span>
-              </header>
-              {!/^第\s*\d+\s*题$/u.test(question.titleZh) ? (
-                <h2>{text(question.titleZh, question.titleEn)}</h2>
-              ) : null}
-              <p className="practice-paper-instruction">
-                {question.instructionZh}
-              </p>
-              {question.sourceText ? (
-                <blockquote lang="en">{question.sourceText}</blockquote>
-              ) : null}
-              {question.promptEn !== question.sourceText ? (
-                <p className="practice-paper-prompt" lang="en">
-                  {question.promptEn}
+                    {index + 1}
+                  </a>
+                </li>
+              );
+            })}
+          </ol>
+        </nav>
+
+        <div
+          className={cn("practice-paper-questions", styles.questions)}
+          data-paper-sheet
+        >
+          {data.questions.map((question) => {
+            const result = resultById.get(question.id);
+            const needsWork = result?.status !== "MEETS_STANDARD";
+            const hasGenericTitle = /^第\s*\d+\s*题$/u.test(question.titleZh);
+            return (
+              <Card
+                className={cn("practice-paper-question", styles.question)}
+                data-paper-question-id={question.id}
+                id={`paper-question-${question.id}`}
+                key={question.id}
+                tabIndex={-1}
+              >
+                <header className={styles.questionHeader}>
+                  <div>
+                    <Badge
+                      tone={result ? (needsWork ? "amber" : "green") : "blue"}
+                    >
+                      {result
+                        ? needsWork
+                          ? text("需要解析", "Needs review")
+                          : text("已达标", "Meets standard")
+                        : `${question.number}`}
+                    </Badge>
+                    <span>{text("题", "Question")}</span>
+                  </div>
+                  <span>
+                    <Clock3 aria-hidden="true" size={14} />
+                    {question.suggestedMinutes} {messages.common.minutes}
+                  </span>
+                </header>
+                <h2 className={hasGenericTitle ? "sr-only" : undefined}>
+                  {text(question.titleZh, question.titleEn)}
+                </h2>
+                <p
+                  className={cn(
+                    "practice-paper-instruction",
+                    styles.instruction,
+                  )}
+                >
+                  {question.instructionZh}
                 </p>
-              ) : null}
-              <AnswerField
-                answer={answers[question.id] ?? ""}
-                disabled={Boolean(data.submittedAt) || timedOut}
-                onChange={(value) =>
-                  setAnswers((current) => ({
-                    ...current,
-                    [question.id]: value,
-                  }))
-                }
-                question={question}
-              />
-              {result && needsWork ? (
-                <div className="practice-paper-analysis">
-                  <h3>
-                    {text("这题为什么没有达标", "Why this answer needs work")}
-                  </h3>
-                  <p>{result.feedbackZh}</p>
-                  {result.problems.map((problem, index) => (
-                    <div key={`${question.id}-problem-${index}`}>
-                      <p>{problem.explanationZh}</p>
-                      {problem.evidence ? (
-                        <blockquote lang="en">{problem.evidence}</blockquote>
-                      ) : null}
-                    </div>
-                  ))}
-                  {result.improvedAnswerEn ? (
-                    <div className="practice-paper-example">
-                      <strong>{text("参考改法", "Improved version")}</strong>
-                      <p lang="en">{result.improvedAnswerEn}</p>
-                    </div>
-                  ) : null}
-                  <p>
-                    <b>{text("下一步：", "Next: ")}</b>
-                    {result.nextStepZh}
+                {question.sourceText ? (
+                  <blockquote lang="en">{question.sourceText}</blockquote>
+                ) : null}
+                {question.promptEn !== question.sourceText ? (
+                  <p
+                    className={cn("practice-paper-prompt", styles.prompt)}
+                    lang="en"
+                  >
+                    {question.promptEn}
                   </p>
-                </div>
-              ) : null}
-            </Card>
-          );
-        })}
+                ) : null}
+                <AnswerField
+                  answer={answers[question.id] ?? ""}
+                  disabled={Boolean(data.submittedAt) || timedOut}
+                  onChange={(value) =>
+                    setAnswers((current) => ({
+                      ...current,
+                      [question.id]: value,
+                    }))
+                  }
+                  question={question}
+                />
+                {result && needsWork ? (
+                  <div
+                    className={cn("practice-paper-analysis", styles.analysis)}
+                  >
+                    <h3>
+                      {text("这题为什么没有达标", "Why this answer needs work")}
+                    </h3>
+                    <p>{result.feedbackZh}</p>
+                    {result.problems.map((problem, index) => (
+                      <div key={`${question.id}-problem-${index}`}>
+                        <p>{problem.explanationZh}</p>
+                        {problem.evidence ? (
+                          <blockquote lang="en">{problem.evidence}</blockquote>
+                        ) : null}
+                      </div>
+                    ))}
+                    {result.improvedAnswerEn ? (
+                      <div
+                        className={cn("practice-paper-example", styles.example)}
+                      >
+                        <strong>{text("参考改法", "Improved version")}</strong>
+                        <p lang="en">{result.improvedAnswerEn}</p>
+                      </div>
+                    ) : null}
+                    <p>
+                      <b>{text("下一步：", "Next: ")}</b>
+                      {result.nextStepZh}
+                    </p>
+                  </div>
+                ) : null}
+              </Card>
+            );
+          })}
+        </div>
       </div>
 
       {submitError ? (
-        <p className="practice-paper-error" role="alert">
+        <p
+          className={cn("practice-paper-error", styles.submitError)}
+          role="alert"
+        >
           {submitError}
         </p>
       ) : null}
-      <footer className="practice-paper-submit">
+      <footer
+        className={cn("practice-paper-submit", styles.submitBar)}
+        data-paper-submit-bar
+      >
         {data.result ? (
           <>
             <div>

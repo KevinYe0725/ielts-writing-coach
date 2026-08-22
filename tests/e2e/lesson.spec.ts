@@ -86,9 +86,111 @@ type HttpTeachingScenario = {
   retry?: ResponseSource;
   restoreFailureStatus?: number;
   teachingNeedsRecovery?: boolean;
+  paperState?: "pending" | "result";
 };
 
 const httpAnswer = "Employees can protect longer periods for demanding work.";
+
+const httpPaperQuestions = Array.from({ length: 8 }, (_, index) => ({
+  id: `http-paper-question-${index + 1}`,
+  number: index + 1,
+  section:
+    index < 2
+      ? "FOUNDATION"
+      : index < 4
+        ? "REPAIR"
+        : index < 6
+          ? "GENERATION"
+          : "INTEGRATION",
+  titleZh: `第 ${index + 1} 题`,
+  titleEn: `Question ${index + 1}`,
+  instructionZh: "按题面要求完成本题，写清楚原因、作用过程和结果。",
+  promptEn: `Complete focused paper question ${index + 1}.`,
+  sourceText: index === 0 ? "A short source sentence." : "",
+  responseMode:
+    index === 0
+      ? "choice"
+      : index === 1
+        ? "short_text"
+        : index >= 6
+          ? "paragraph"
+          : "sentence",
+  options:
+    index === 0
+      ? [
+          { key: "A", labelEn: "A complete mechanism and result." },
+          { key: "B", labelEn: "An incomplete claim." },
+        ]
+      : [],
+  suggestedMinutes: index >= 6 ? 10 : 5,
+  minimumWords: index === 0 ? 1 : index >= 6 ? 80 : 10,
+  maximumWords: index === 0 ? 1 : index >= 6 ? 120 : 40,
+  publicCriteria: [],
+}));
+
+function httpPaperPayload(state: "pending" | "result") {
+  const result =
+    state === "result"
+      ? {
+          totalScore: 75,
+          summaryZh: "整卷已完成，只展开需要继续修改或暂时无法评分的题目。",
+          itemResults: httpPaperQuestions.map((question, index) => ({
+            itemId: question.id,
+            status:
+              index === 1
+                ? "NOT_SCORABLE"
+                : index === 2
+                  ? "NEEDS_WORK"
+                  : "MEETS_STANDARD",
+            score: index === 1 ? 0 : index === 2 ? 45 : 100,
+            feedbackZh:
+              index === 1
+                ? "这题暂时没有足够内容用于评分。"
+                : index === 2
+                  ? "这题还需要补出中间机制。"
+                  : "答案达到本题要求。",
+            strengthsZh: [],
+            problems:
+              index === 1 || index === 2
+                ? [
+                    {
+                      criterionLabelZh: "题意完成",
+                      explanationZh:
+                        index === 1
+                          ? "当前内容不足，不能形成可靠判断。"
+                          : "原因和结果之间缺少作用过程。",
+                      evidence: "",
+                    },
+                  ]
+                : [],
+            improvedAnswerEn:
+              index === 1 || index === 2
+                ? "A complete answer links the cause to a visible result through a clear mechanism."
+                : "",
+            nextStepZh:
+              index === 1 || index === 2 ? "补全答案后再次练习。" : "保持。",
+          })),
+        }
+      : null;
+  return {
+    paper: {
+      titleZh: "HTTP 专项训练卷",
+      titleEn: "HTTP focused practice paper",
+      objectiveZh: "在60分钟内连续完成八道题。",
+      objectiveEn: "Complete all eight questions in 60 minutes.",
+      instructionsZh: ["统一交卷。"],
+      instructionsEn: ["Submit once."],
+      items: httpPaperQuestions,
+    },
+    answers: Object.fromEntries(
+      httpPaperQuestions.map((question) => [question.id, ""]),
+    ),
+    result,
+    submitted_at: "2026-08-23T04:00:00.000Z",
+    evaluation_pending: state === "pending",
+    runtime: { started_at: "2026-08-23T03:00:00.000Z" },
+  };
+}
 
 function demoPractice(page: Page, prompt: string): Locator {
   return page.locator("[data-teaching-practice]").filter({ hasText: prompt });
@@ -198,6 +300,27 @@ async function installHttpTeachingApi(
       await route.fulfill({
         contentType: "application/json",
         body: JSON.stringify({ teaching: httpTeaching }),
+      });
+      return;
+    }
+    if (
+      url.pathname === "/api/v1/lessons/lesson-http/start" &&
+      request.method() === "POST"
+    ) {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ lesson_id: "lesson-http" }),
+      });
+      return;
+    }
+    if (
+      url.pathname === "/api/v1/lessons/lesson-http/paper" &&
+      request.method() === "GET" &&
+      scenario.paperState
+    ) {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify(httpPaperPayload(scenario.paperState)),
       });
       return;
     }
@@ -1000,6 +1123,63 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
     await expect(page.getByRole("button", { name: "交卷" })).toBeVisible();
   });
 
+  test("practice paper keeps all utilities and exposes eight question anchors", async ({
+    page,
+  }) => {
+    await page.goto(paperUrl);
+
+    const navigation = page.locator("[data-paper-question-nav]");
+    await expect(page.locator(".practice-paper-question")).toHaveCount(8);
+    await expect(
+      page.getByRole("link", { name: "返回专项教学" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "查看详细批改" }),
+    ).toBeVisible();
+    await expect(navigation.getByRole("link")).toHaveCount(8);
+
+    for (let questionNumber = 1; questionNumber <= 8; questionNumber += 1) {
+      const question = page.locator(
+        `#paper-question-demo-paper-question-${questionNumber}`,
+      );
+      await expect(question).toHaveClass(/practice-paper-question/);
+      await expect(
+        navigation.getByRole("link", { name: String(questionNumber) }),
+      ).toHaveAttribute(
+        "href",
+        `#paper-question-demo-paper-question-${questionNumber}`,
+      );
+    }
+
+    await expectBasicAccessibility(page);
+    const axe = await new AxeBuilder({ page })
+      .include(".practice-paper-page")
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+      .analyze();
+    expect(axe.violations).toEqual([]);
+  });
+
+  test("practice paper question navigation only scrolls and preserves the draft", async ({
+    page,
+  }) => {
+    await page.goto(paperUrl);
+    const answer = page.getByRole("textbox", { name: "第 2 题 answer" });
+    const draft =
+      "Early practice makes recurring sentence patterns familiar before the learner faces a demanding writing task.";
+    await answer.fill(draft);
+
+    await page
+      .locator("[data-paper-question-nav]")
+      .getByRole("link", { name: "8" })
+      .click();
+
+    await expect(page).toHaveURL(/#paper-question-demo-paper-question-8$/);
+    await expect(answer).toHaveValue(draft);
+    await expect(
+      page.locator("#paper-question-demo-paper-question-8"),
+    ).toBeInViewport();
+  });
+
   test("keeps the source report available and preserves the paper draft", async ({
     page,
   }) => {
@@ -1094,6 +1274,13 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
       page.getByRole("heading", { name: "这题为什么没有达标" }),
     ).toHaveCount(6);
     await expect(page.getByText("参考改法", { exact: true })).toHaveCount(6);
+    const submittedAnswers = await page.evaluate(() =>
+      JSON.parse(
+        window.localStorage.getItem("iwc:practice-paper-answers") ?? "{}",
+      ),
+    );
+    expect(Object.keys(submittedAnswers)).toHaveLength(8);
+    expect(submittedAnswers["demo-paper-question-8"]).toBe("");
   });
 
   test("locks editing at the time limit but retains an incomplete sheet for submission", async ({
@@ -1105,13 +1292,36 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
         "iwc:practice-paper-started",
         new Date(Date.now() - 3_601_000).toISOString(),
       );
+      window.localStorage.setItem(
+        "iwc:practice-paper:lesson-collocation-perspective",
+        JSON.stringify({
+          "demo-paper-question-2": "A retained answer at the deadline.",
+        }),
+      );
     });
     await page.goto(paperUrl);
 
-    await expect(page.getByRole("textbox").first()).toBeDisabled();
+    const retainedAnswer = page.getByRole("textbox", {
+      name: "第 2 题 answer",
+    });
+    await expect(retainedAnswer).toBeDisabled();
+    await expect(retainedAnswer).toHaveValue(
+      "A retained answer at the deadline.",
+    );
     await expect(
       page.getByRole("button", { name: "时间到，交卷" }),
     ).toBeEnabled();
+    await page.getByRole("button", { name: "时间到，交卷" }).click();
+    const submittedAnswers = await page.evaluate(() =>
+      JSON.parse(
+        window.localStorage.getItem("iwc:practice-paper-answers") ?? "{}",
+      ),
+    );
+    expect(Object.keys(submittedAnswers)).toHaveLength(8);
+    expect(submittedAnswers["demo-paper-question-1"]).toBe("");
+    expect(submittedAnswers["demo-paper-question-2"]).toBe(
+      "A retained answer at the deadline.",
+    );
   });
 });
 
@@ -1120,6 +1330,45 @@ test.describe("tutorial answer analysis over the public HTTP contract", () => {
     deterministicDemo,
     "Run with NEXT_PUBLIC_DEMO_MODE=false and an HTTP-mode web server.",
   );
+
+  test("practice paper pending evaluation keeps the explicit progress check", async ({
+    page,
+  }) => {
+    await installHttpTeachingApi(page, {
+      restore: null,
+      paperState: "pending",
+    });
+
+    await page.goto(httpPaperUrl);
+    await expect(
+      page.getByRole("heading", { name: "AI正在批改整张试卷" }),
+    ).toBeVisible();
+    const checkProgress = page.getByRole("button", { name: "查看是否完成" });
+    await expect(checkProgress).toBeVisible();
+    await checkProgress.click();
+    await expect(checkProgress).toBeVisible();
+  });
+
+  test("practice paper result expands only needs-work and not-scorable answers", async ({
+    page,
+  }) => {
+    await installHttpTeachingApi(page, {
+      restore: null,
+      paperState: "result",
+    });
+
+    await page.goto(httpPaperUrl);
+    await expect(page.getByText("已达标", { exact: true })).toHaveCount(6);
+    await expect(page.getByText("需要解析", { exact: true })).toHaveCount(2);
+    await expect(
+      page.getByRole("heading", { name: "这题为什么没有达标" }),
+    ).toHaveCount(2);
+    await expect(
+      page.getByText("这题暂时没有足够内容用于评分。"),
+    ).toBeVisible();
+    await expect(page.getByText("这题还需要补出中间机制。")).toBeVisible();
+    await expect(page.getByRole("textbox").first()).toBeDisabled();
+  });
 
   test("automatically restores earlier focused teaching without a learner action", async ({
     page,
