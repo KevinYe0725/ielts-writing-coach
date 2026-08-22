@@ -29,7 +29,7 @@ export function Badge({
   className,
 }: {
   children: ReactNode;
-  tone?: "neutral" | "blue" | "green" | "amber" | "red" | "violet";
+  tone?: "neutral" | "blue" | "green" | "amber" | "red";
   className?: string;
 }) {
   return (

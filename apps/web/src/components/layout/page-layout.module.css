@@ -6,7 +6,7 @@
 
 .entry {
   display: flex;
-  width: min(100%, 560px);
+  width: min(100%, var(--desk-layout-entry-max));
   min-height: calc(100svh - (2 * var(--desk-space-8)));
   padding: var(--desk-space-12) var(--desk-space-6);
   flex-direction: column;
@@ -14,17 +14,17 @@
 }
 
 .focus {
-  width: min(100%, 1080px);
+  width: min(100%, var(--desk-layout-focus-max));
   padding: var(--desk-space-12) var(--desk-space-8);
 }
 
 .reading {
-  width: min(100%, 840px);
+  width: min(100%, var(--desk-layout-reading-max));
   padding: var(--desk-space-12) var(--desk-space-8);
 }
 
 .workspace {
-  width: min(100%, 1480px);
+  width: min(100%, var(--desk-layout-workspace-max));
   padding: var(--desk-space-8);
 }
 

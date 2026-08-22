@@ -30,7 +30,7 @@ select {
 
 ::selection {
   color: var(--desk-ink);
-  background: color-mix(in srgb, var(--desk-blue) 18%, white);
+  background: color-mix(in srgb, var(--desk-blue) 18%, var(--desk-paper));
 }
 
 :focus-visible {

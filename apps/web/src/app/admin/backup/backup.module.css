@@ -2,7 +2,7 @@
 :where(.page) :global(.form-grid) {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
+  gap: var(--desk-space-4);
 }
 :where(.page) :global(.form-field-wide) {
   grid-column: 1 / -1;
@@ -32,7 +32,7 @@
 }
 
 .page :global(.page-header h1) {
-  font-size: clamp(2rem, 3.6vw, 2.8rem);
+  font-size: var(--desk-type-page-title);
   letter-spacing: -0.04em;
 }
 
@@ -73,7 +73,7 @@
 .archiveCard :global(.form-field label),
 .archiveCard :global(:is(input, select, textarea)),
 .archiveCard [data-admin-auxiliary] {
-  font-size: max(0.8rem, 12px);
+  font-size: var(--desk-type-meta);
 }
 
 .archiveCard :global(:is(input, select, textarea)) {
@@ -151,7 +151,7 @@
 
 .denied [data-admin-auxiliary] {
   margin: 0;
-  font-size: max(0.8rem, 12px);
+  font-size: var(--desk-type-meta);
 }
 
 @media (max-width: 680px) {

@@ -68,7 +68,7 @@ export default function JoinPage() {
         className={`setup-panel setup-panel-narrow ${styles.panel}`}
       >
         <div className="setup-heading">
-          <Badge tone="violet">
+          <Badge tone="blue">
             <UserPlus aria-hidden="true" size={13} />
             {text("一次性邀请", "One-time invitation")}
           </Badge>

@@ -1,4 +1,5 @@
 :root {
+  /* Approved base palette. Derived colors below must resolve from these roles. */
   --desk-ink: #172033;
   --desk-paper: #fcfbf8;
   --desk-canvas: #eef1f5;
@@ -6,7 +7,51 @@
   --desk-green: #2f6d5a;
   --desk-amber: #7c531b;
   --desk-error: #b4474c;
-  --desk-evidence-muted: #667085;
+  --desk-evidence-muted: color-mix(
+    in srgb,
+    var(--desk-ink) 64%,
+    var(--desk-canvas)
+  );
+  --desk-ink-muted: color-mix(in srgb, var(--desk-ink) 72%, var(--desk-canvas));
+  --desk-line: color-mix(in srgb, var(--desk-ink) 14%, transparent);
+  --desk-line-strong: color-mix(in srgb, var(--desk-ink) 24%, transparent);
+  --desk-blue-soft: color-mix(in srgb, var(--desk-blue) 11%, var(--desk-paper));
+  --desk-green-soft: color-mix(
+    in srgb,
+    var(--desk-green) 10%,
+    var(--desk-paper)
+  );
+  --desk-amber-soft: color-mix(
+    in srgb,
+    var(--desk-amber) 11%,
+    var(--desk-paper)
+  );
+  --desk-error-soft: color-mix(
+    in srgb,
+    var(--desk-error) 10%,
+    var(--desk-paper)
+  );
+
+  /* Typography roles. The 12px auxiliary role is the absolute visible floor. */
+  --desk-type-auxiliary: 12px;
+  --desk-type-meta: 13px;
+  --desk-type-label: 14px;
+  --desk-type-body: 16px;
+  --desk-type-reading: 17px;
+  --desk-type-subheading: 20px;
+  --desk-type-section-title: clamp(24px, 3vw, 28px);
+  --desk-type-page-title: clamp(30px, 4vw, 40px);
+  --desk-weight-regular: 400;
+  --desk-weight-medium: 500;
+  --desk-weight-reading-semibold: 600;
+  --desk-weight-emphasis: 650;
+  --desk-weight-bold: 700;
+  --desk-leading-compact: 1.2;
+  --desk-leading-body: 1.7;
+  --desk-leading-reading: 1.82;
+  --desk-leading-essay: 1.9;
+
+  /* Approved spacing scale: 4, 8, 12, 16, 24, 32, 48, 64, 80. */
   --desk-space-1: 4px;
   --desk-space-2: 8px;
   --desk-space-3: 12px;
@@ -14,7 +59,30 @@
   --desk-space-6: 24px;
   --desk-space-8: 32px;
   --desk-space-12: 48px;
+  --desk-space-16: 64px;
+  --desk-space-20: 80px;
+
+  /* Approved shape and elevation roles. */
   --desk-radius-sm: 6px;
   --desk-radius-md: 10px;
   --desk-radius-lg: 16px;
+  --desk-radius-pill: 999px;
+  --desk-radius-round: 50%;
+  --desk-shadow-flat: none;
+  --desk-shadow-floating: 0 18px 52px
+    color-mix(in srgb, var(--desk-ink) 16%, transparent);
+
+  /* Named layout constants from the approved Focus/Reading/Workspace system. */
+  --desk-layout-sidebar: 232px;
+  --desk-layout-mobile-header: 64px;
+  --desk-layout-entry-max: 560px;
+  --desk-layout-focus-max: 1120px;
+  --desk-layout-reading-max: 1160px;
+  --desk-layout-reading-copy: 760px;
+  --desk-layout-reading-aside: 220px;
+  --desk-layout-workspace-max: 1440px;
+  --desk-layout-writing-base: 1180px;
+  --desk-layout-writing-max: 1320px;
+  --desk-layout-paper-max: 980px;
+  --desk-layout-fixed-action-safe: 112px;
 }

@@ -2,7 +2,7 @@
   position: relative;
   width: min(820px, 100%);
   margin: 0 auto;
-  padding: 18px 0 72px;
+  padding: var(--desk-space-4) 0 var(--desk-space-16);
 }
 
 .page::before {
@@ -17,45 +17,45 @@
 }
 
 .loading {
-  padding: 84px 24px;
+  padding: var(--desk-space-20) var(--desk-space-6);
   color: var(--ink-faint);
   text-align: center;
 }
 
 .page :global(.badge) {
-  font-size: max(0.8rem, 12px);
+  font-size: var(--desk-type-meta);
 }
 
 .page :global(.text-input),
 .page :global(.select-input),
 .page :global(.button:not(.button-sm)) {
-  font-size: 15px;
+  font-size: var(--desk-type-body);
 }
 
 .heading {
   max-width: 620px;
-  margin-bottom: 38px;
+  margin-bottom: var(--desk-space-8);
 }
 
 .heading h1 {
-  margin: 13px 0 9px;
+  margin: var(--desk-space-3) 0 var(--desk-space-2);
   color: var(--ink);
   font-family: var(--font-serif), Georgia, serif;
-  font-size: clamp(2rem, 4vw, 2.7rem);
+  font-size: var(--desk-type-page-title);
   letter-spacing: -0.035em;
 }
 
 .heading p,
 .sectionHeading p {
   margin: 0;
-  color: var(--ink-muted);
+  color: var(--desk-ink-muted);
   line-height: 1.7;
 }
 
 .section {
   position: relative;
-  padding-left: 52px;
-  margin-top: 30px;
+  padding-left: var(--desk-space-12);
+  margin-top: var(--desk-space-8);
 }
 
 .section::before {
@@ -67,52 +67,52 @@
   content: "";
   background: var(--surface);
   border: 2px solid var(--blue);
-  border-radius: 50%;
+  border-radius: var(--desk-radius-round);
 }
 
 .sectionHeading {
   display: flex;
-  margin-bottom: 13px;
+  margin-bottom: var(--desk-space-3);
   color: var(--blue);
   align-items: flex-start;
-  gap: 11px;
+  gap: var(--desk-space-3);
 }
 
 .sectionHeading h2 {
-  margin: 0 0 3px;
+  margin: 0 0 var(--desk-space-1);
   color: var(--ink);
-  font-size: 1.08rem;
+  font-size: var(--desk-type-reading);
 }
 
 .sectionHeading p {
-  font-size: 0.88rem;
+  font-size: var(--desk-type-body);
 }
 
 .identityCard {
   display: flex;
-  padding: 18px;
+  padding: var(--desk-space-4);
   align-items: center;
-  gap: 13px;
+  gap: var(--desk-space-3);
   border-color: var(--line-strong);
-  border-radius: var(--radius-sm);
-  box-shadow: 7px 7px 0 var(--surface-blue);
+  border-radius: var(--desk-radius-sm);
+  box-shadow: none;
 }
 
 .identityInitial {
   display: grid;
   width: 43px;
   height: 43px;
-  color: #fff;
-  background: #243954;
-  border-radius: 13px;
-  font-weight: 750;
+  color: var(--desk-paper);
+  background: var(--desk-ink);
+  border-radius: var(--desk-radius-lg);
+  font-weight: var(--desk-weight-bold);
   place-items: center;
 }
 
 .identityCard div {
   display: grid;
   min-width: 0;
-  gap: 3px;
+  gap: var(--desk-space-1);
 }
 
 .identityCard strong {
@@ -124,46 +124,46 @@
 
 .identityCard span:not(.identityInitial) {
   color: var(--ink-faint);
-  font-size: 0.79rem;
+  font-size: var(--desk-type-meta);
 }
 
 .formCard {
-  padding: 20px;
+  padding: var(--desk-space-4);
   border-color: var(--line-strong);
-  border-radius: var(--radius-sm);
+  border-radius: var(--desk-radius-sm);
 }
 
 .form {
   display: grid;
-  gap: 17px;
+  gap: var(--desk-space-4);
 }
 
 .mismatch,
 .error,
 .success {
-  margin: -8px 0 0;
-  font-size: max(0.82rem, 12px);
+  margin: calc(-1 * var(--desk-space-2)) 0 0;
+  font-size: var(--desk-type-label);
   line-height: 1.55;
 }
 
 .mismatch,
 .error {
-  color: #9d3d31;
+  color: var(--desk-error);
 }
 
 .success {
-  color: #176b54;
+  color: var(--desk-green);
 }
 
 .actions {
   display: flex;
-  margin-top: 3px;
+  margin-top: var(--desk-space-1);
   justify-content: flex-end;
 }
 
 @media (max-width: 700px) {
   .page {
-    padding: 5px 0 48px;
+    padding: var(--desk-space-1) 0 var(--desk-space-12);
   }
 
   .page::before {
@@ -171,7 +171,7 @@
   }
 
   .section {
-    padding-left: 24px;
+    padding-left: var(--desk-space-6);
   }
 
   .section::before {
@@ -179,11 +179,11 @@
   }
 
   .heading {
-    margin-bottom: 30px;
+    margin-bottom: var(--desk-space-8);
   }
 
   .formCard {
-    padding: 16px;
+    padding: var(--desk-space-4);
   }
 
   .actions :global(button) {

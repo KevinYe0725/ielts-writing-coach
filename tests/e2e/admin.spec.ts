@@ -5,6 +5,7 @@ import {
   deterministicDemo,
   expectBasicAccessibility,
   expectNoHorizontalOverflow,
+  expectVisibleTextFloor,
   resetDemoState,
 } from "./support";
 
@@ -414,6 +415,10 @@ test.describe("secure administration surfaces", () => {
         await page.goto(path);
         await expectNoHorizontalOverflow(page);
         await expectBasicAccessibility(page);
+        await expectVisibleTextFloor(
+          page.getByRole("main"),
+          `${path} at ${viewport.label}`,
+        );
         const axe = await new AxeBuilder({ page }).analyze();
         expect(axe.violations).toEqual([]);
 

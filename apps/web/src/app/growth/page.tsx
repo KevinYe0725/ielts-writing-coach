@@ -65,21 +65,7 @@ export default function GrowthPage() {
       transferred: { zh: "已迁移", en: "Transferred", tone: "green" as const },
     };
     if (!demoMode) return states[state];
-    return {
-      zh:
-        state === "retained"
-          ? "保留级别未评价"
-          : state === "transferred"
-            ? "迁移级别未评价"
-            : `${states[state].zh} · 演示未授予`,
-      en:
-        state === "retained"
-          ? "Retention level not evaluated"
-          : state === "transferred"
-            ? "Transfer level not evaluated"
-            : `${states[state].en} · not awarded in Demo`,
-      tone: "neutral" as const,
-    };
+    return { zh: "未评价", en: "Not evaluated", tone: "neutral" as const };
   };
   const displayedScores = demoMode ? [] : data.weeklyScores;
   const firstScore = displayedScores.at(0)?.score ?? null;
@@ -133,29 +119,49 @@ export default function GrowthPage() {
             return (
               <li data-growth-level={level} key={level}>
                 <EvidenceLink
-                  label={text(
-                    level === "diagnosed"
-                      ? "已有诊断，尚无应用证据"
-                      : level === "practicing"
-                        ? "正在改写，仍需独立作答"
-                        : level === "applied"
-                          ? "本轮临时通过，不等于掌握"
-                          : level === "retained"
-                            ? "延迟闭卷证据已验证"
-                            : "陌生话题证据已验证",
-                    level === "diagnosed"
-                      ? "Diagnosed; no application evidence yet"
-                      : level === "practicing"
-                        ? "In practice; independent use still needed"
-                        : level === "applied"
-                          ? "Applied this cycle; not mastery"
-                          : level === "retained"
-                            ? "Verified in a delayed closed-book check"
-                            : "Verified on an unfamiliar topic",
-                  )}
+                  label={
+                    demoMode
+                      ? text(
+                          "级别说明，不是学习证据",
+                          "Level definition only; not learner evidence",
+                        )
+                      : text(
+                          level === "diagnosed"
+                            ? "已有诊断，尚无应用证据"
+                            : level === "practicing"
+                              ? "正在改写，仍需独立作答"
+                              : level === "applied"
+                                ? "本轮临时通过，不等于掌握"
+                                : level === "retained"
+                                  ? "延迟闭卷证据已验证"
+                                  : "陌生话题证据已验证",
+                          level === "diagnosed"
+                            ? "Diagnosed; no application evidence yet"
+                            : level === "practicing"
+                              ? "In practice; independent use still needed"
+                              : level === "applied"
+                                ? "Applied this cycle; not mastery"
+                                : level === "retained"
+                                  ? "Verified in a delayed closed-book check"
+                                  : "Verified on an unfamiliar topic",
+                        )
+                  }
                   state={demoMode ? "unavailable" : growthEvidenceState[level]}
                 >
-                  {text(presentation.zh, presentation.en)}
+                  {demoMode
+                    ? text(
+                        level === "diagnosed"
+                          ? "诊断级别（未评价）"
+                          : level === "practicing"
+                            ? "练习级别（未评价）"
+                            : level === "applied"
+                              ? "应用级别（未评价）"
+                              : level === "retained"
+                                ? "保留级别（未评价）"
+                                : "迁移级别（未评价）",
+                        `${presentation.en} level (not evaluated)`,
+                      )
+                    : text(presentation.zh, presentation.en)}
                 </EvidenceLink>
               </li>
             );
@@ -186,7 +192,7 @@ export default function GrowthPage() {
           </div>
         </Card>
         <Card>
-          <span className="stat-icon violet">
+          <span className="stat-icon blue">
             <Target aria-hidden="true" size={19} />
           </span>
           <div>
@@ -336,12 +342,12 @@ export default function GrowthPage() {
                 <EvidenceLink
                   label={text(
                     demoMode
-                      ? "演示记录，不是有效证据"
+                      ? "演示无证据"
                       : skill.evidenceCount === 0
                         ? "证据不足"
                         : `${skill.evidenceCount} 条有效证据`,
                     demoMode
-                      ? "Demo record; not valid evidence"
+                      ? "Demo: no evidence"
                       : skill.evidenceCount === 0
                         ? "Insufficient evidence"
                         : `${skill.evidenceCount} valid evidence events`,

@@ -8,7 +8,7 @@
   display: flex;
   width: min(640px, 100%);
   padding: 0;
-  margin: 4px auto 32px;
+  margin: var(--desk-space-1) auto var(--desk-space-8);
   list-style: none;
   justify-content: space-between;
 }
@@ -20,7 +20,7 @@
   color: var(--ink-faint);
   align-items: center;
   flex-direction: column;
-  gap: 7px;
+  gap: var(--desk-space-2);
 }
 
 :where(.surface) :global(.setup-steps li:not(:last-child)::after) {
@@ -40,42 +40,42 @@
   display: grid;
   width: 30px;
   height: 30px;
-  background: #f5f7fa;
+  background: var(--desk-canvas);
   border: 1px solid var(--line-strong);
-  border-radius: 50%;
-  font-size: 0.74rem;
-  font-weight: 700;
+  border-radius: var(--desk-radius-round);
+  font-size: var(--desk-type-auxiliary);
+  font-weight: var(--desk-weight-bold);
   place-items: center;
 }
 
 :where(.surface) :global(.setup-steps li strong) {
-  font-size: 0.74rem;
-  font-weight: 650;
+  font-size: var(--desk-type-auxiliary);
+  font-weight: var(--desk-weight-emphasis);
 }
 :where(.surface) :global(.setup-steps li.current) {
   color: var(--blue-dark);
 }
 :where(.surface) :global(.setup-steps li.current > span) {
-  color: #fff;
+  color: var(--desk-paper);
   background: var(--blue);
   border-color: var(--blue);
-  box-shadow: 0 0 0 5px rgba(24, 89, 173, 0.1);
+  box-shadow: none;
 }
 :where(.surface) :global(.setup-steps li.done) {
   color: var(--green);
 }
 :where(.surface) :global(.setup-steps li.done > span) {
-  color: #fff;
+  color: var(--desk-paper);
   background: var(--green);
   border-color: var(--green);
 }
 
 :where(.surface) :global(.setup-panel) {
-  padding: clamp(24px, 4.4vw, 48px);
-  background: rgba(255, 255, 255, 0.96);
+  padding: clamp(var(--desk-space-6), 4.4vw, var(--desk-space-12));
+  background: color-mix(in srgb, var(--desk-paper) 96%, transparent);
   border: 1px solid var(--line);
-  border-radius: 22px;
-  box-shadow: var(--shadow-lg);
+  border-radius: var(--desk-radius-lg);
+  box-shadow: none;
 }
 
 :where(.surface) :global(.setup-panel-narrow) {
@@ -88,11 +88,11 @@
 }
 :where(.surface) :global(.setup-heading) {
   max-width: 700px;
-  margin: 0 auto 30px;
+  margin: 0 auto var(--desk-space-8);
   text-align: center;
 }
 :where(.surface) :global(.setup-heading h1) {
-  margin: 13px 0 9px;
+  margin: var(--desk-space-3) 0 var(--desk-space-2);
 }
 :where(.surface) :global(.setup-heading p) {
   max-width: 620px;
@@ -103,28 +103,28 @@
 :where(.surface) :global(.setup-choice-grid) {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 15px;
+  gap: var(--desk-space-4);
 }
 :where(.surface) :global(.setup-choice) {
   position: relative;
   display: flex;
   min-height: 152px;
-  padding: 21px;
+  padding: var(--desk-space-6);
   text-align: left;
-  background: #fff;
+  background: var(--desk-paper);
   border: 1px solid var(--line-strong);
-  border-radius: 15px;
+  border-radius: var(--desk-radius-lg);
   align-items: flex-start;
-  gap: 14px;
+  gap: var(--desk-space-3);
 }
 :where(.surface) :global(.setup-choice:hover) {
-  border-color: #8da8c8;
-  background: #fbfdff;
+  border-color: var(--desk-evidence-muted);
+  background: var(--desk-blue-soft);
 }
 :where(.surface) :global(.setup-choice.selected) {
   border-color: var(--blue);
-  background: #f5f9ff;
-  box-shadow: 0 0 0 3px rgba(24, 89, 173, 0.1);
+  background: var(--desk-blue-soft);
+  box-shadow: none;
 }
 :where(.surface) :global(.setup-choice-icon) {
   display: grid;
@@ -132,32 +132,32 @@
   height: 43px;
   color: var(--blue);
   background: var(--blue-soft);
-  border-radius: 12px;
+  border-radius: var(--desk-radius-lg);
   flex: none;
   place-items: center;
 }
 :where(.surface) :global(.setup-choice-copy) {
   display: flex;
   color: var(--ink-soft);
-  font-size: 0.82rem;
+  font-size: var(--desk-type-label);
   flex: 1;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--desk-space-2);
 }
 :where(.surface) :global(.setup-choice-title) {
   display: flex;
   color: var(--ink);
   align-items: center;
-  gap: 8px;
+  gap: var(--desk-space-2);
 }
 :where(.surface) :global(.setup-choice-title strong) {
-  font-size: 0.98rem;
+  font-size: var(--desk-type-body);
 }
 :where(.surface) :global(.radio-dot) {
   width: 19px;
   height: 19px;
   border: 2px solid var(--line-strong);
-  border-radius: 50%;
+  border-radius: var(--desk-radius-round);
   flex: none;
 }
 :where(.surface) :global(.setup-choice.selected .radio-dot) {
@@ -167,13 +167,13 @@
 :where(.surface) :global(.privacy-note) {
   display: flex;
   max-width: 670px;
-  padding: 13px 15px;
-  margin: 18px auto 0;
-  color: #526477;
-  background: #f5f7f9;
-  border-radius: 11px;
+  padding: var(--desk-space-3) var(--desk-space-4);
+  margin: var(--desk-space-4) auto 0;
+  color: var(--desk-ink-muted);
+  background: var(--desk-canvas);
+  border-radius: var(--desk-radius-md);
   align-items: center;
-  gap: 10px;
+  gap: var(--desk-space-2);
 }
 :where(.surface) :global(.privacy-note svg) {
   color: var(--green);
@@ -181,12 +181,12 @@
 }
 :where(.surface) :global(.privacy-note p) {
   margin: 0;
-  font-size: 0.79rem;
+  font-size: var(--desk-type-meta);
 }
 
 :where(.surface) :global(.setup-footer) {
   display: flex;
-  margin-top: 30px;
+  margin-top: var(--desk-space-8);
   justify-content: flex-end;
 }
 :where(.surface) :global(.setup-footer.split) {
@@ -194,16 +194,16 @@
 }
 :where(.surface) :global(.setup-footer-actions) {
   display: flex;
-  gap: 8px;
+  gap: var(--desk-space-2);
 }
 :where(.surface) :global(.setup-form-card) {
-  padding: clamp(18px, 3vw, 28px);
+  padding: clamp(var(--desk-space-4), 3vw, var(--desk-space-6));
   box-shadow: none;
 }
 :where(.surface) :global(.form-grid) {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
+  gap: var(--desk-space-4);
 }
 :where(.surface) :global(.form-field-wide) {
   grid-column: 1 / -1;
@@ -213,7 +213,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1.55fr) minmax(250px, 0.8fr);
   align-items: start;
-  gap: 18px;
+  gap: var(--desk-space-4);
 }
 :where(.surface) :global(.secret-input-wrap) {
   position: relative;
@@ -226,7 +226,7 @@
   color: var(--ink-faint);
 }
 :where(.surface) :global(.secret-input-wrap .text-input) {
-  padding-left: 38px;
+  padding-left: var(--desk-space-8);
 }
 
 :where(.surface) :global(.save-mode) {
@@ -234,22 +234,22 @@
   padding: 0;
   margin: 0;
   border: 0;
-  gap: 8px;
+  gap: var(--desk-space-2);
 }
 :where(.surface) :global(.save-mode legend) {
-  margin-bottom: 7px;
-  color: #33445a;
-  font-size: 0.8rem;
-  font-weight: 700;
+  margin-bottom: var(--desk-space-2);
+  color: var(--desk-ink);
+  font-size: var(--desk-type-meta);
+  font-weight: var(--desk-weight-bold);
 }
 :where(.surface) :global(.save-mode label) {
   display: flex;
   min-height: 52px;
-  padding: 10px 12px;
+  padding: var(--desk-space-2) var(--desk-space-3);
   border: 1px solid var(--line);
-  border-radius: 9px;
+  border-radius: var(--desk-radius-md);
   align-items: center;
-  gap: 10px;
+  gap: var(--desk-space-2);
 }
 :where(.surface) :global(.save-mode input) {
   width: 17px;
@@ -261,55 +261,55 @@
   flex-direction: column;
 }
 :where(.surface) :global(.save-mode strong) {
-  font-size: 0.82rem;
+  font-size: var(--desk-type-label);
 }
 :where(.surface) :global(.save-mode small) {
   color: var(--ink-faint);
-  font-size: 0.72rem;
+  font-size: var(--desk-type-auxiliary);
 }
 :where(.surface) :global(.advanced-disclosure) {
-  margin-top: 18px;
-  padding-top: 14px;
+  margin-top: var(--desk-space-4);
+  padding-top: var(--desk-space-3);
   border-top: 1px solid var(--line);
 }
 :where(.surface) :global(.advanced-disclosure summary) {
   color: var(--blue-dark);
   cursor: pointer;
-  font-size: 0.8rem;
-  font-weight: 700;
+  font-size: var(--desk-type-meta);
+  font-weight: var(--desk-weight-bold);
 }
 :where(.surface) :global(.advanced-disclosure p) {
-  margin: 10px 0 0;
+  margin: var(--desk-space-2) 0 0;
   color: var(--ink-soft);
-  font-size: 0.78rem;
+  font-size: var(--desk-type-meta);
 }
 
 :where(.surface) :global(.probe-column) {
   display: grid;
-  gap: 12px;
+  gap: var(--desk-space-3);
 }
 :where(.surface) :global(.probe-card) {
   min-height: 310px;
-  padding: 19px;
+  padding: var(--desk-space-4);
   box-shadow: none;
 }
 :where(.surface) :global(.probe-header) {
   display: flex;
-  padding-bottom: 15px;
+  padding-bottom: var(--desk-space-4);
   border-bottom: 1px solid var(--line);
   align-items: center;
-  gap: 10px;
+  gap: var(--desk-space-2);
 }
 :where(.surface) :global(.probe-header > div) {
   display: flex;
   flex-direction: column;
 }
 :where(.surface) :global(.probe-header strong) {
-  font-size: 0.85rem;
+  font-size: var(--desk-type-label);
 }
 :where(.surface) :global(.probe-header span) {
   color: var(--ink-faint);
-  font-size: 0.7rem;
+  font-size: var(--desk-type-auxiliary);
 }
 :where(.surface) :global(.probe-icon) {
   display: grid;
@@ -317,7 +317,7 @@
   height: 37px;
   color: var(--blue);
   background: var(--blue-soft);
-  border-radius: 10px;
+  border-radius: var(--desk-radius-md);
   place-items: center;
 }
 :where(.surface) :global(.probe-placeholder) {
@@ -330,52 +330,52 @@
   flex-direction: column;
 }
 :where(.surface) :global(.probe-placeholder svg) {
-  margin-bottom: 10px;
-  color: #9aabba;
+  margin-bottom: var(--desk-space-2);
+  color: var(--desk-evidence-muted);
 }
 :where(.surface) :global(.probe-placeholder p) {
   max-width: 230px;
   margin: 0;
-  font-size: 0.78rem;
+  font-size: var(--desk-type-meta);
 }
 :where(.surface) :global(.probe-results) {
-  padding-top: 15px;
+  padding-top: var(--desk-space-4);
 }
 :where(.surface) :global(.probe-results > p) {
-  margin: 10px 0;
+  margin: var(--desk-space-2) 0;
   color: var(--ink-soft);
-  font-size: 0.77rem;
+  font-size: var(--desk-type-meta);
 }
 :where(.surface) :global(.probe-results ul) {
   padding: 0;
-  margin: 8px 0 0;
+  margin: var(--desk-space-2) 0 0;
   list-style: none;
 }
 :where(.surface) :global(.probe-results li) {
   display: flex;
   min-height: 32px;
-  padding: 6px 0;
-  border-bottom: 1px solid #edf0f3;
-  font-size: 0.74rem;
+  padding: var(--desk-space-1) 0;
+  border-bottom: 1px solid var(--desk-line);
+  font-size: var(--desk-type-auxiliary);
   justify-content: space-between;
-  gap: 10px;
+  gap: var(--desk-space-2);
 }
 :where(.surface) :global(.probe-results li span) {
   color: var(--ink-soft);
 }
 :where(.surface) :global(.cost-note) {
   display: flex;
-  padding: 11px 13px;
-  color: #715423;
+  padding: var(--desk-space-3) var(--desk-space-3);
+  color: var(--desk-amber);
   background: var(--amber-soft);
-  border-radius: 10px;
+  border-radius: var(--desk-radius-md);
   flex-direction: column;
 }
 :where(.surface) :global(.cost-note strong) {
-  font-size: 0.73rem;
+  font-size: var(--desk-type-auxiliary);
 }
 :where(.surface) :global(.cost-note span) {
-  font-size: 0.7rem;
+  font-size: var(--desk-type-auxiliary);
 }
 
 :where(.surface) :global(.setup-success) {
@@ -392,15 +392,15 @@
   display: grid;
   width: 78px;
   height: 78px;
-  margin-bottom: 18px;
+  margin-bottom: var(--desk-space-4);
   color: var(--green);
   background: var(--green-soft);
-  border: 8px solid #f1f8f5;
-  border-radius: 50%;
+  border: 8px solid var(--desk-green-soft);
+  border-radius: var(--desk-radius-round);
   place-items: center;
 }
 :where(.surface) :global(.setup-success h1) {
-  margin: 13px 0 9px;
+  margin: var(--desk-space-3) 0 var(--desk-space-2);
 }
 :where(.surface) :global(.setup-success > p) {
   max-width: 510px;
@@ -409,11 +409,11 @@
 :where(.surface) :global(.connection-success-card) {
   display: flex;
   width: min(480px, 100%);
-  padding: 14px;
-  margin: 12px 0 24px;
+  padding: var(--desk-space-3);
+  margin: var(--desk-space-3) 0 var(--desk-space-6);
   text-align: left;
   align-items: center;
-  gap: 11px;
+  gap: var(--desk-space-3);
   box-shadow: none;
 }
 :where(.surface) :global(.connection-success-card > span) {
@@ -422,7 +422,7 @@
   height: 36px;
   color: var(--blue);
   background: var(--blue-soft);
-  border-radius: 10px;
+  border-radius: var(--desk-radius-md);
   place-items: center;
 }
 :where(.surface) :global(.connection-success-card > div) {
@@ -431,11 +431,11 @@
   flex-direction: column;
 }
 :where(.surface) :global(.connection-success-card strong) {
-  font-size: 0.82rem;
+  font-size: var(--desk-type-label);
 }
 :where(.surface) :global(.connection-success-card small) {
   color: var(--ink-faint);
-  font-size: 0.7rem;
+  font-size: var(--desk-type-auxiliary);
 }
 @media (max-width: 760px) {
   :where(.surface) :global(.setup-choice-grid),
@@ -485,7 +485,8 @@
   position: relative;
   width: min(960px, 100%);
   min-height: calc(100dvh - 118px);
-  padding: clamp(28px, 6vw, 74px) clamp(18px, 4vw, 48px) 72px;
+  padding: clamp(var(--desk-space-6), 6vw, var(--desk-space-20))
+    clamp(var(--desk-space-4), 4vw, var(--desk-space-12)) var(--desk-space-16);
   margin: 0 auto;
 }
 
@@ -502,7 +503,7 @@
 
 .panel {
   position: relative;
-  padding-left: clamp(12px, 2vw, 30px);
+  padding-left: clamp(var(--desk-space-3), 2vw, var(--desk-space-8));
 }
 
 .panel::after {
@@ -514,14 +515,14 @@
   content: "";
   background: var(--surface);
   border: 2px solid var(--blue);
-  border-radius: 50%;
+  border-radius: var(--desk-radius-round);
 }
 
 .formCard,
 .stateCard {
   border-color: var(--line-strong);
-  border-radius: var(--radius-sm);
-  box-shadow: 8px 8px 0 var(--surface-blue);
+  border-radius: var(--desk-radius-sm);
+  box-shadow: none;
 }
 
 .stateCard {
@@ -531,11 +532,11 @@
 .stateCard p,
 .formCard p,
 .afterForm {
-  font-size: max(0.75rem, 12px);
+  font-size: var(--desk-type-auxiliary);
 }
 
 .afterForm {
-  margin: 22px 0 0;
+  margin: var(--desk-space-6) 0 0;
   text-align: center;
 }
 
@@ -563,19 +564,20 @@
 .surface :global(.connection-success-card small),
 .surface :global(.advanced-disclosure summary),
 .surface :global(.advanced-disclosure p) {
-  font-size: max(0.8rem, 12px);
+  font-size: var(--desk-type-meta);
 }
 
 .surface :global(.text-input),
 .surface :global(.select-input),
 .surface :global(.button:not(.button-sm)) {
-  font-size: 15px;
+  font-size: var(--desk-type-body);
 }
 
 @media (max-width: 700px) {
   .surface {
     min-height: calc(100dvh - 86px);
-    padding: 28px 10px 52px 26px;
+    padding: var(--desk-space-6) var(--desk-space-2) var(--desk-space-12)
+      var(--desk-space-6);
   }
 
   .surface::before {
@@ -585,7 +587,7 @@
   }
 
   .panel {
-    padding-left: 8px;
+    padding-left: var(--desk-space-2);
   }
 
   .panel::after {
@@ -594,7 +596,7 @@
 
   .formCard,
   .stateCard {
-    box-shadow: 5px 5px 0 var(--surface-blue);
+    box-shadow: none;
   }
 }
 

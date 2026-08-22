@@ -7,7 +7,7 @@
   align-items: baseline;
   gap: var(--desk-space-2);
   font-family: var(--desk-font-utility);
-  font-size: 12px;
+  font-size: var(--desk-type-auxiliary);
   font-variation-settings: "wght" 560;
   letter-spacing: 0.025em;
 }
@@ -21,7 +21,7 @@
 .subject {
   color: var(--desk-ink);
   font-family: var(--desk-font-body);
-  font-size: 0.875rem;
+  font-size: var(--desk-type-label);
   font-variation-settings: "wght" 560;
   letter-spacing: 0;
 }
@@ -42,7 +42,7 @@
   width: 5px;
   height: 5px;
   background: currentColor;
-  border-radius: 50%;
+  border-radius: var(--desk-radius-round);
   content: "";
 }
 

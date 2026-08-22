@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
-import { expectBasicAccessibility } from "./support";
+import { expectBasicAccessibility, expectVisibleTextFloor } from "./support";
 
 async function expectAllVisibleFontsAtLeast(
   locator: import("@playwright/test").Locator,
@@ -33,71 +33,6 @@ async function expectAllVisibleFontsAtLeast(
       { message: state },
     )
     .toEqual([]);
-}
-
-async function expectVisibleTextFloor(
-  root: import("@playwright/test").Locator,
-  state: string,
-) {
-  await expect(root).toBeVisible();
-  const violations = await root.evaluate((container) => {
-    const visible = (element: Element) => {
-      if (
-        element.closest(
-          "[aria-hidden='true'], .sr-only, input[type='hidden'], svg",
-        )
-      )
-        return false;
-      const style = window.getComputedStyle(element);
-      const rect = element.getBoundingClientRect();
-      return (
-        style.display !== "none" &&
-        style.visibility !== "hidden" &&
-        Number.parseFloat(style.opacity || "1") > 0 &&
-        rect.width > 0 &&
-        rect.height > 0
-      );
-    };
-    const candidates = Array.from(container.querySelectorAll("*"));
-    return candidates.flatMap((element) => {
-      if (!visible(element)) return [];
-      const explicitControl = element.matches(
-        "label, input, select, button, small, .badge, [role='tab'], progress, [role='progressbar']",
-      );
-      const ownText = Array.from(element.childNodes).some(
-        (node) =>
-          node.nodeType === Node.TEXT_NODE && Boolean(node.textContent?.trim()),
-      );
-      const hasVisibleTextChild = Array.from(element.children).some(
-        (child) => visible(child) && Boolean(child.textContent?.trim()),
-      );
-      if (!explicitControl && (!ownText || hasVisibleTextChild)) return [];
-
-      const fontSize = Number.parseFloat(
-        window.getComputedStyle(element).fontSize,
-      );
-      if (fontSize >= 12) return [];
-      const field = element as HTMLInputElement;
-      const text =
-        field.labels?.[0]?.textContent?.trim() ||
-        element.getAttribute("aria-label") ||
-        field.placeholder ||
-        element.textContent?.trim() ||
-        element.tagName.toLowerCase();
-      return [
-        {
-          fontSize,
-          selector: `${element.tagName.toLowerCase()}${element.className ? `.${String(element.className).trim().replace(/\s+/g, ".")}` : ""}`,
-          text: text.slice(0, 80),
-        },
-      ];
-    });
-  });
-
-  expect(
-    violations,
-    `${state}: ${JSON.stringify(violations, null, 2)}`,
-  ).toEqual([]);
 }
 
 async function expectAxeRoute(
@@ -421,6 +356,7 @@ test.describe("account controls", () => {
 
       await signedInSession(page);
       await page.goto("/settings");
+      await expect(page.locator("[data-settings-desk='focus']")).toBeVisible();
       await expectVisibleTextFloor(
         page.getByRole("main"),
         "/settings learning",
@@ -464,6 +400,7 @@ test.describe("account controls", () => {
       await expectVisibleTextFloor(page.getByRole("main"), "/settings data");
 
       await page.goto("/account");
+      await expect(page.locator("[data-account-desk='focus']")).toBeVisible();
       await expectVisibleTextFloor(page.getByRole("main"), "/account");
     });
 

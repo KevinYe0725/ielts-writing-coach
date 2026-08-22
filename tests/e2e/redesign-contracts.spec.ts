@@ -5,6 +5,7 @@ import {
   expectBasicAccessibility,
   expectNoHorizontalOverflow,
   expectPageLayout,
+  expectVisibleTextFloor,
   resetDemoState,
 } from "./support";
 
@@ -22,6 +23,35 @@ const routeMatrix = [
   [
     "/lesson/paper?cycle=cycle-demo&lesson=lesson-collocation-perspective",
     "workspace",
+  ],
+] as const;
+
+const visibleTextMatrix = [
+  ["Shell", "/today", "[data-app-shell]"],
+  ["Today", "/today", "[data-today-desk='focus']"],
+  [
+    "Compare",
+    "/compare?cycle=cycle-demo",
+    "[data-evidence-record='comparison']",
+  ],
+  ["Growth", "/growth", "[data-evidence-record='growth']"],
+  [
+    "Paper",
+    "/lesson/paper?cycle=cycle-demo&lesson=lesson-collocation-perspective",
+    "[data-paper-sheet]",
+  ],
+  ["Feedback", "/feedback?cycle=cycle-demo", "[data-feedback-workbench]"],
+  ["Entry", "/signin", "[data-entry-surface='signin']"],
+  ["Settings", "/settings", "[data-settings-desk='focus']"],
+  [
+    "Lesson",
+    "/lesson?cycle=cycle-demo&lesson=lesson-collocation-perspective",
+    "[data-teaching-article]",
+  ],
+  [
+    "Transfer",
+    "/transfer?cycle=cycle-demo&task=transfer-task",
+    "[data-evidence-record='transfer']",
   ],
 ] as const;
 
@@ -72,6 +102,25 @@ test.describe("annotation desk redesign contracts", () => {
       "focus",
     );
   });
+
+  for (const viewport of [
+    { label: "desktop", width: 1440, height: 960 },
+    { label: "390px", width: 390, height: 844 },
+  ]) {
+    test(`all learner-visible auxiliary text meets the 12px floor at ${viewport.label}`, async ({
+      page,
+    }) => {
+      test.setTimeout(120_000);
+      await page.setViewportSize(viewport);
+
+      for (const [surface, route, selector] of visibleTextMatrix) {
+        await page.goto(route);
+        const root = page.locator(selector);
+        await expect(root, `${surface} ready state`).toBeVisible();
+        await expectVisibleTextFloor(root, `${surface} at ${viewport.label}`);
+      }
+    });
+  }
 
   test("keeps frozen hooks attached while modules own their visual surfaces", async ({
     page,
@@ -567,11 +616,11 @@ test.describe("annotation desk redesign contracts", () => {
     await page.goto("/growth");
 
     for (const [status, label, evidenceState] of [
-      ["diagnosed", "已诊断", "unavailable"],
-      ["practicing", "练习中", "revision"],
-      ["applied", "临时通过", "active"],
-      ["retained", "已保持", "verified"],
-      ["transferred", "已迁移", "verified"],
+      ["diagnosed", "诊断级别（未评价）", "unavailable"],
+      ["practicing", "练习级别（未评价）", "unavailable"],
+      ["applied", "应用级别（未评价）", "unavailable"],
+      ["retained", "保留级别（未评价）", "unavailable"],
+      ["transferred", "迁移级别（未评价）", "unavailable"],
     ] as const) {
       const level = page.locator(`[data-growth-level="${status}"]`);
       await expect(level).toContainText(label);
@@ -588,9 +637,11 @@ test.describe("annotation desk redesign contracts", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/compare?cycle=cycle-demo");
 
-    const evidence = page.locator("[data-evidence-state='verified']").first();
+    const evidence = page
+      .locator("[data-evidence-state='unavailable']")
+      .first();
     const subject = evidence.getByText("本次证据", { exact: true });
-    const note = evidence.getByText(/旧问题没有复发/);
+    const note = evidence.getByText(/虚构改写示例/);
     const [subjectBox, noteBox] = await Promise.all([
       subject.boundingBox(),
       note.boundingBox(),
@@ -608,8 +659,9 @@ test.describe("annotation desk redesign contracts", () => {
     await page.goto("/growth");
 
     const table = page.getByRole("table", { name: "能力状态表" });
-    for (const label of ["已保持", "临时通过"]) {
-      const subject = table.getByText(label, { exact: true });
+    const demoStates = table.getByText("未评价", { exact: true });
+    await expect(demoStates).toHaveCount(4);
+    for (const subject of [demoStates.nth(0), demoStates.nth(1)]) {
       const evidence = subject.locator("..");
       const evidenceLabel = evidence.locator(":scope > span").last();
       const geometry = await Promise.all(

@@ -1,7 +1,7 @@
 /* Legacy hooks scoped to this module; DOM classes remain for compatibility. */
 :global(.transfer-check-card) {
   max-width: 790px;
-  padding: clamp(22px, 4vw, 35px);
+  padding: clamp(var(--desk-space-6), 4vw, var(--desk-space-8));
   margin: 0 auto;
 }
 :global(.transfer-check-head) {
@@ -12,64 +12,64 @@
 :global(.transfer-check-head > span) {
   display: inline-flex;
   color: var(--ink-faint);
-  font-size: 0.7rem;
+  font-size: var(--desk-type-auxiliary);
   align-items: center;
-  gap: 5px;
+  gap: var(--desk-space-1);
 }
 :global(.transfer-check-card blockquote) {
-  margin: 24px 0;
-  color: #2d3d50;
+  margin: var(--desk-space-6) 0;
+  color: var(--desk-ink);
   font-family: var(--font-serif);
-  font-size: 1.1rem;
+  font-size: var(--desk-type-subheading);
   line-height: 1.65;
 }
 :global(.transfer-task-prompt) {
   display: flex;
-  padding: 14px;
-  margin-bottom: 13px;
-  color: #4b5f78;
+  padding: var(--desk-space-3);
+  margin-bottom: var(--desk-space-3);
+  color: var(--desk-ink-muted);
   background: var(--blue-soft);
-  border-radius: 10px;
+  border-radius: var(--desk-radius-md);
   align-items: flex-start;
-  gap: 9px;
+  gap: var(--desk-space-2);
 }
 :global(.transfer-task-prompt svg) {
-  margin-top: 2px;
+  margin-top: var(--desk-space-1);
   color: var(--blue);
   flex: none;
 }
 :global(.transfer-task-prompt strong) {
-  font-size: 0.75rem;
+  font-size: var(--desk-type-auxiliary);
 }
 :global(.transfer-task-prompt p) {
-  margin: 2px 0 0;
-  font-size: 0.75rem;
+  margin: var(--desk-space-1) 0 0;
+  font-size: var(--desk-type-auxiliary);
 }
 :global(.transfer-textarea) {
   width: 100%;
   min-height: 180px;
-  padding: 16px;
-  background: #fbfcfd;
+  padding: var(--desk-space-4);
+  background: var(--desk-paper);
   border: 1px solid var(--line-strong);
-  border-radius: 10px;
+  border-radius: var(--desk-radius-md);
   font-family: var(--font-serif);
-  font-size: 1rem;
+  font-size: var(--desk-type-body);
   line-height: 1.7;
   resize: vertical;
 }
 :global(.transfer-textarea:focus) {
-  background: #fff;
+  background: var(--desk-paper);
   border-color: var(--blue);
-  outline: 3px solid rgba(24, 89, 173, 0.1);
+  outline: 3px solid color-mix(in srgb, var(--desk-blue) 10%, transparent);
 }
 :global(.transfer-check-card footer) {
   display: flex;
-  margin-top: 13px;
+  margin-top: var(--desk-space-3);
   color: var(--ink-faint);
-  font-size: 0.7rem;
+  font-size: var(--desk-type-auxiliary);
   align-items: center;
   justify-content: space-between;
-  gap: 15px;
+  gap: var(--desk-space-4);
 }
 @media (max-width: 680px) {
   :global(.transfer-check-card footer) {
@@ -110,7 +110,7 @@
 .protocolHeading h2 {
   max-width: 15ch;
   margin: var(--desk-space-2) 0 0;
-  font-size: clamp(1.3rem, 2.2vw, 1.75rem);
+  font-size: var(--desk-type-section-title);
   line-height: 1.18;
 }
 
@@ -138,7 +138,7 @@
 
 .protocol [data-auxiliary],
 .outcomes span {
-  font-size: 0.8rem;
+  font-size: var(--desk-type-meta);
 }
 
 .outcomes {
@@ -161,23 +161,23 @@
 .protocol li:last-child p {
   margin: 0;
   color: color-mix(in srgb, var(--desk-ink) 70%, transparent);
-  font-size: 0.875rem;
+  font-size: var(--desk-type-label);
   line-height: 1.6;
 }
 
 .stateRecord,
 .answerRecord {
   position: relative;
-  margin-left: var(--desk-space-5);
+  margin-left: var(--desk-space-4);
   box-shadow: none;
 }
 
 .stateRecord::before,
 .answerRecord::before {
   position: absolute;
-  top: var(--desk-space-5);
-  bottom: var(--desk-space-5);
-  left: calc(-1 * var(--desk-space-5));
+  top: var(--desk-space-4);
+  bottom: var(--desk-space-4);
+  left: calc(-1 * var(--desk-space-4));
   width: 3px;
   background: var(--desk-blue);
   content: "";
@@ -212,9 +212,9 @@
   }
 
   .protocol {
-    padding: var(--desk-space-5);
+    padding: var(--desk-space-4);
     grid-template-columns: minmax(0, 1fr);
-    gap: var(--desk-space-5);
+    gap: var(--desk-space-4);
   }
 
   .protocolHeading h2 {

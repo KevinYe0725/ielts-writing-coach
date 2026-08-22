@@ -216,7 +216,7 @@ export default function TransferPage({
     >
       <PageHeader
         actions={
-          <Badge tone={processing ? "amber" : "violet"}>
+          <Badge tone={processing ? "amber" : "blue"}>
             {processing ? (
               <LoaderCircle aria-hidden="true" className="spin" size={13} />
             ) : (

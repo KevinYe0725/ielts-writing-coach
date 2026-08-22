@@ -8,7 +8,7 @@
 }
 
 .workspace :global(.page-header .eyebrow) {
-  font-size: 0.8rem;
+  font-size: var(--desk-type-meta);
 }
 
 .workspace :global(.page-header h1),
@@ -22,7 +22,7 @@
   padding: 0 0 var(--desk-space-4);
   color: var(--desk-ink);
   font-family: var(--desk-font-utility);
-  font-size: 0.82rem;
+  font-size: var(--desk-type-label);
   align-items: center;
   justify-content: space-between;
   gap: var(--desk-space-4);
@@ -31,7 +31,7 @@
 .limitCopy {
   max-width: 52ch;
   color: var(--desk-amber);
-  font-weight: 650;
+  font-weight: var(--desk-weight-emphasis);
   text-align: right;
 }
 
@@ -48,7 +48,7 @@
   background: var(--desk-paper);
   border: 1px solid color-mix(in srgb, var(--desk-ink) 13%, transparent);
   border-radius: var(--desk-radius-md);
-  box-shadow: 0 8px 22px rgb(23 32 51 / 5%);
+  box-shadow: none;
   grid-template-rows: auto auto auto 1fr auto;
   gap: var(--desk-space-4);
 }
@@ -75,13 +75,13 @@
 .cardTopline > span:last-child {
   color: var(--desk-evidence-muted);
   font-family: var(--desk-font-utility);
-  font-size: 0.8rem;
+  font-size: var(--desk-type-meta);
 }
 
 .workspace :global(.badge),
 .compact :global(.badge),
 .compactHeading :global(.eyebrow) {
-  font-size: 0.8rem;
+  font-size: var(--desk-type-meta);
 }
 
 .prompt {
@@ -91,7 +91,7 @@
   overflow: hidden;
   color: var(--desk-ink);
   font-family: var(--desk-font-reading);
-  font-size: 1.01rem;
+  font-size: var(--desk-type-reading);
   font-variation-settings: "wght" 440;
   line-height: 1.55;
   -webkit-box-orient: vertical;
@@ -114,14 +114,14 @@
   height: 30px;
   color: var(--desk-blue);
   background: color-mix(in srgb, var(--desk-blue) 9%, transparent);
-  border-radius: 50%;
+  border-radius: var(--desk-radius-round);
   place-items: center;
 }
 
 .nextStep strong {
   display: block;
-  margin-bottom: 2px;
-  font-size: 0.9rem;
+  margin-bottom: var(--desk-space-1);
+  font-size: var(--desk-type-body);
 }
 
 .nextStep p {
@@ -129,7 +129,7 @@
   margin: 0;
   overflow: hidden;
   color: color-mix(in srgb, var(--desk-ink) 62%, transparent);
-  font-size: 0.82rem;
+  font-size: var(--desk-type-label);
   line-height: 1.45;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -187,7 +187,7 @@
 }
 
 .compactHeading :global(.eyebrow) {
-  margin-bottom: 2px;
+  margin-bottom: var(--desk-space-1);
 }
 
 .compact .statusLine {
@@ -201,7 +201,7 @@
 
 .compact .prompt {
   min-height: 3.1em;
-  font-size: 0.94rem;
+  font-size: var(--desk-type-body);
   -webkit-line-clamp: 2;
 }
 

@@ -492,7 +492,7 @@ export default function TodayPage() {
                           )}
                         </Badge>
                         {selectedQuestion.visibility === "private" ? (
-                          <Badge tone="violet">
+                          <Badge tone="neutral">
                             {text("仅自己可见", "Private")}
                           </Badge>
                         ) : null}
@@ -669,7 +669,7 @@ export default function TodayPage() {
               </div>
             </div>
             <div className={styles.evidenceItem} role="listitem">
-              <span className="stat-icon violet">
+              <span className="stat-icon blue">
                 <Target aria-hidden="true" size={19} />
               </span>
               <div>

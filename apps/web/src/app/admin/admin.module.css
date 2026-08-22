@@ -2,20 +2,20 @@
 :global(.health-grid) {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 11px;
+  gap: var(--desk-space-3);
 }
 :global(.health-card) {
   display: flex;
   min-height: 120px;
-  padding: 17px;
+  padding: var(--desk-space-4);
   align-items: flex-start;
-  gap: 11px;
+  gap: var(--desk-space-3);
 }
 :global(.health-icon) {
   display: grid;
   width: 36px;
   height: 36px;
-  border-radius: 10px;
+  border-radius: var(--desk-radius-md);
   flex: none;
   place-items: center;
 }
@@ -38,29 +38,29 @@
 }
 :global(.health-card div > span) {
   color: var(--ink-faint);
-  font-size: 0.65rem;
+  font-size: var(--desk-type-auxiliary);
 }
 :global(.health-card strong) {
-  margin: 2px 0;
-  font-size: 0.91rem;
+  margin: var(--desk-space-1) 0;
+  font-size: var(--desk-type-body);
 }
 :global(.health-card small) {
   overflow: hidden;
   color: var(--ink-soft);
-  font-size: 0.64rem;
+  font-size: var(--desk-type-auxiliary);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 :global(.admin-alert) {
   display: flex;
-  padding: 14px 16px;
-  margin-top: 12px;
-  color: #70491b;
+  padding: var(--desk-space-3) var(--desk-space-4);
+  margin-top: var(--desk-space-3);
+  color: var(--desk-amber);
   background: var(--amber-soft);
-  border: 1px solid #ead2a0;
-  border-radius: 11px;
+  border: 1px solid var(--desk-line-strong);
+  border-radius: var(--desk-radius-md);
   align-items: center;
-  gap: 11px;
+  gap: var(--desk-space-3);
 }
 :global(.admin-alert > svg) {
   flex: none;
@@ -69,50 +69,50 @@
   flex: 1;
 }
 :global(.admin-alert strong) {
-  font-size: 0.77rem;
+  font-size: var(--desk-type-meta);
 }
 :global(.admin-alert p) {
-  margin: 2px 0 0;
-  font-size: 0.69rem;
+  margin: var(--desk-space-1) 0 0;
+  font-size: var(--desk-type-auxiliary);
 }
 :global(.admin-main-grid) {
   display: grid;
-  margin-top: 13px;
+  margin-top: var(--desk-space-3);
   grid-template-columns: repeat(2, 1fr);
-  gap: 11px;
+  gap: var(--desk-space-3);
 }
 :global(.admin-panel) {
   min-height: 250px;
-  padding: 21px;
+  padding: var(--desk-space-6);
 }
 :global(.panel-heading-icon) {
   color: var(--blue);
 }
 :global(.queue-bars) {
   display: grid;
-  margin-top: 24px;
-  gap: 14px;
+  margin-top: var(--desk-space-6);
+  gap: var(--desk-space-3);
 }
 :global(.queue-bars > div) {
   display: grid;
   grid-template-columns: 60px minmax(0, 1fr) 28px;
   color: var(--ink-soft);
-  font-size: 0.69rem;
+  font-size: var(--desk-type-auxiliary);
   align-items: center;
-  gap: 9px;
+  gap: var(--desk-space-2);
 }
 :global(.queue-bars i) {
   display: block;
   height: 7px;
   overflow: hidden;
-  background: #edf0f3;
-  border-radius: 999px;
+  background: var(--desk-line);
+  border-radius: var(--desk-radius-pill);
 }
 :global(.queue-bars i b) {
   display: block;
   height: 100%;
-  background: #8da5c0;
-  border-radius: 999px;
+  background: var(--desk-evidence-muted);
+  border-radius: var(--desk-radius-pill);
 }
 :global(.queue-bars i b.running) {
   background: var(--blue);
@@ -122,49 +122,49 @@
 }
 :global(.user-numbers) {
   display: grid;
-  margin: 23px 0 18px;
+  margin: var(--desk-space-6) 0 var(--desk-space-4);
   grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
+  gap: var(--desk-space-2);
 }
 :global(.user-numbers div) {
   display: flex;
-  padding: 15px;
+  padding: var(--desk-space-4);
   background: var(--surface-muted);
-  border-radius: 10px;
+  border-radius: var(--desk-radius-md);
   flex-direction: column;
 }
 :global(.user-numbers strong) {
-  font-size: 1.35rem;
+  font-size: var(--desk-type-section-title);
 }
 :global(.user-numbers span) {
   color: var(--ink-faint);
-  font-size: 0.65rem;
+  font-size: var(--desk-type-auxiliary);
 }
 :global(.policy-row) {
   display: flex;
-  padding-top: 13px;
+  padding-top: var(--desk-space-3);
   border-top: 1px solid var(--line);
   align-items: center;
   justify-content: space-between;
-  font-size: 0.72rem;
+  font-size: var(--desk-type-auxiliary);
 }
 :global(.operations-list) {
   display: grid;
-  gap: 9px;
+  gap: var(--desk-space-2);
 }
 :global(.operations-list .card) {
   display: flex;
   min-height: 82px;
-  padding: 15px 17px;
+  padding: var(--desk-space-4) var(--desk-space-4);
   align-items: center;
-  gap: 11px;
+  gap: var(--desk-space-3);
   box-shadow: none;
 }
 :global(.operation-icon) {
   display: grid;
   width: 38px;
   height: 38px;
-  border-radius: 10px;
+  border-radius: var(--desk-radius-md);
   flex: none;
   place-items: center;
 }
@@ -176,48 +176,44 @@
   color: var(--blue);
   background: var(--blue-soft);
 }
-:global(.operation-icon.violet) {
-  color: var(--violet);
-  background: var(--violet-soft);
-}
 :global(.operations-list .card > div) {
   flex: 1;
 }
 :global(.operations-list strong) {
   display: block;
-  font-size: 0.77rem;
+  font-size: var(--desk-type-meta);
 }
 :global(.operations-list p) {
-  margin: 2px 0 0;
+  margin: var(--desk-space-1) 0 0;
   color: var(--ink-faint);
-  font-size: 0.67rem;
+  font-size: var(--desk-type-auxiliary);
 }
 :global(.operations-list .audit-log-card) {
   display: block;
-  padding: 18px;
+  padding: var(--desk-space-4);
 }
 :global(.audit-event-list) {
   display: grid;
   max-height: 360px;
-  margin: 14px 0 0;
+  margin: var(--desk-space-3) 0 0;
   padding: 0;
   overflow: auto;
   list-style: none;
 }
 :global(.audit-event-list li) {
   display: flex;
-  padding: 10px 0;
+  padding: var(--desk-space-2) 0;
   border-top: 1px solid var(--line);
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--desk-space-4);
 }
 :global(.audit-event-list li > span) {
   display: flex;
   min-width: 0;
   flex-direction: column;
   align-items: flex-start;
-  gap: 3px;
+  gap: var(--desk-space-1);
 }
 :global(.audit-event-list li > span:last-child) {
   align-items: flex-end;
@@ -226,7 +222,7 @@
 :global(.audit-event-list small),
 :global(.audit-event-list time) {
   color: var(--ink-faint);
-  font-size: 0.63rem;
+  font-size: var(--desk-type-auxiliary);
 }
 @media (max-width: 900px) {
   :global(.health-grid) {
@@ -263,7 +259,7 @@
 }
 
 .desk :global(.page-header h1) {
-  font-size: clamp(2rem, 3.4vw, 2.8rem);
+  font-size: var(--desk-type-page-title);
   letter-spacing: -0.04em;
 }
 
@@ -310,7 +306,7 @@
 .desk :global(.audit-event-list small),
 .desk :global(.audit-event-list time),
 .desk [data-admin-auxiliary] {
-  font-size: max(0.8rem, 12px);
+  font-size: var(--desk-type-meta);
 }
 
 .desk :global(.admin-alert) {
@@ -406,8 +402,8 @@
 
 .accessState {
   display: grid;
-  width: min(760px, 100%);
-  min-height: 220px;
+  width: min(var(--desk-layout-reading-copy), 100%);
+  min-height: var(--desk-layout-reading-aside);
   padding: var(--desk-space-6);
   margin: 0 auto;
   color: var(--desk-ink);
@@ -437,7 +433,7 @@
   max-width: 62ch;
   margin: 0;
   color: color-mix(in srgb, var(--desk-ink) 74%, var(--desk-paper));
-  font-size: max(0.8rem, 12px);
+  font-size: var(--desk-type-meta);
 }
 
 .accessStateActions {
