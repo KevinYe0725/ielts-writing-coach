@@ -88,6 +88,8 @@ test.describe("deterministic setup and Today experience", () => {
     ).toBeVisible();
     await expect(page.locator(".next-task-card")).toHaveCount(1);
     await expect(page.locator(".next-task-card a.button")).toHaveCount(1);
+    await expect(page.locator("[data-essay-workspace]")).toBeVisible();
+    await expect(page.locator("main .button-primary:visible")).toHaveCount(1);
     await expect(
       page.locator(".next-task-card").getByRole("link", { name: "开始重写" }),
     ).toBeVisible();

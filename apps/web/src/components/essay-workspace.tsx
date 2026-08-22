@@ -138,7 +138,11 @@ export function EssayWorkspaceContent({
                 </p>
               </div>
             </div>
-            <ActionLink href={essay.nextTask.href} size="sm">
+            <ActionLink
+              href={essay.nextTask.href}
+              size="sm"
+              variant="secondary"
+            >
               {text(essay.nextTask.actionZh, essay.nextTask.actionEn)}
             </ActionLink>
           </article>
