@@ -14,13 +14,18 @@ import { useLocale } from "@/components/locale-provider";
 import {
   Badge,
   Card,
+  DemoLanguageEvidenceNotice,
   EvidenceLink,
   PageHeader,
   SectionHeader,
   Skeleton,
 } from "@/components/ui";
 import { useDemoResource } from "@/components/use-demo-resource";
-import { learningClient, type SkillState } from "@/lib/client";
+import {
+  learningClient,
+  learningClientDemoMode,
+  type SkillState,
+} from "@/lib/client";
 
 import styles from "./growth.module.css";
 
@@ -50,6 +55,7 @@ export default function GrowthPage() {
       <Skeleton label={text("正在准备成长记录…", "Preparing growth record…")} />
     );
 
+  const demoMode = learningClientDemoMode;
   const skillState = (state: SkillState) => {
     const states = {
       diagnosed: { zh: "已诊断", en: "Diagnosed", tone: "neutral" as const },
@@ -58,10 +64,26 @@ export default function GrowthPage() {
       retained: { zh: "已保持", en: "Retained", tone: "green" as const },
       transferred: { zh: "已迁移", en: "Transferred", tone: "green" as const },
     };
-    return states[state];
+    if (!demoMode) return states[state];
+    return {
+      zh:
+        state === "retained"
+          ? "保留级别未评价"
+          : state === "transferred"
+            ? "迁移级别未评价"
+            : `${states[state].zh} · 演示未授予`,
+      en:
+        state === "retained"
+          ? "Retention level not evaluated"
+          : state === "transferred"
+            ? "Transfer level not evaluated"
+            : `${states[state].en} · not awarded in Demo`,
+      tone: "neutral" as const,
+    };
   };
-  const firstScore = data.weeklyScores.at(0)?.score ?? null;
-  const latestScore = data.weeklyScores.at(-1)?.score ?? null;
+  const displayedScores = demoMode ? [] : data.weeklyScores;
+  const firstScore = displayedScores.at(0)?.score ?? null;
+  const latestScore = displayedScores.at(-1)?.score ?? null;
   const scoreChange =
     firstScore === null || latestScore === null
       ? null
@@ -81,6 +103,8 @@ export default function GrowthPage() {
         )}
       />
 
+      {demoMode ? <DemoLanguageEvidenceNotice /> : null}
+
       <Card className={styles.levelArchive}>
         <div className={styles.archiveHeading}>
           <p className="eyebrow" data-auxiliary>
@@ -94,8 +118,12 @@ export default function GrowthPage() {
           </h2>
           <p>
             {text(
-              "蓝色只表示本轮能用；只有延迟保持与陌生题迁移才显示为绿色验证。",
-              "Blue means applied in the current cycle only. Delayed retention and new-topic transfer are the green verified states.",
+              demoMode
+                ? "这里只解释五个证据级别；演示不会授予任何级别。"
+                : "蓝色只表示本轮能用；只有延迟保持与陌生题迁移才显示为绿色验证。",
+              demoMode
+                ? "This only explains the five evidence levels; Demo awards none of them."
+                : "Blue means applied in the current cycle only. Delayed retention and new-topic transfer are the green verified states.",
             )}
           </p>
         </div>
@@ -125,7 +153,7 @@ export default function GrowthPage() {
                             ? "Verified in a delayed closed-book check"
                             : "Verified on an unfamiliar topic",
                   )}
-                  state={growthEvidenceState[level]}
+                  state={demoMode ? "unavailable" : growthEvidenceState[level]}
                 >
                   {text(presentation.zh, presentation.en)}
                 </EvidenceLink>
@@ -164,8 +192,10 @@ export default function GrowthPage() {
           <div>
             <span>{text("当前 → 目标", "Current → target")}</span>
             <strong>
-              {data.currentBand === null ? "—" : data.currentBand.toFixed(1)}
-              <small> → {data.targetBand.toFixed(1)}</small>
+              {demoMode || data.currentBand === null
+                ? "—"
+                : data.currentBand.toFixed(1)}
+              <small> → {demoMode ? "—" : data.targetBand.toFixed(1)}</small>
             </strong>
           </div>
         </Card>
@@ -216,7 +246,7 @@ export default function GrowthPage() {
                   )
             }
           >
-            {data.weeklyScores.length === 0 ? (
+            {displayedScores.length === 0 ? (
               <p className={styles.emptyTrend}>
                 {text(
                   "暂无可比较的同量表估分，不生成趋势。",
@@ -224,7 +254,7 @@ export default function GrowthPage() {
                 )}
               </p>
             ) : (
-              data.weeklyScores.map((point) => (
+              displayedScores.map((point) => (
                 <div className="chart-column" key={point.label}>
                   <span className="chart-value">{point.score.toFixed(1)}</span>
                   <div className="chart-bar-track">
@@ -250,7 +280,7 @@ export default function GrowthPage() {
           </span>
           <p className="eyebrow">{text("北极星指标", "North-star metric")}</p>
           <strong>
-            {data.independentNonRecurrenceRate === null
+            {demoMode || data.independentNonRecurrenceRate === null
               ? "—"
               : `${data.independentNonRecurrenceRate}%`}
           </strong>
@@ -286,7 +316,9 @@ export default function GrowthPage() {
           return (
             <div
               className="skill-table-row"
-              data-evidence-state={growthEvidenceState[skill.state]}
+              data-evidence-state={
+                demoMode ? "unavailable" : growthEvidenceState[skill.state]
+              }
               key={skill.id}
               role="row"
             >
@@ -303,21 +335,27 @@ export default function GrowthPage() {
               <span role="cell">
                 <EvidenceLink
                   label={text(
-                    skill.evidenceCount === 0
-                      ? "证据不足"
-                      : `${skill.evidenceCount} 条有效证据`,
-                    skill.evidenceCount === 0
-                      ? "Insufficient evidence"
-                      : `${skill.evidenceCount} valid evidence events`,
+                    demoMode
+                      ? "演示记录，不是有效证据"
+                      : skill.evidenceCount === 0
+                        ? "证据不足"
+                        : `${skill.evidenceCount} 条有效证据`,
+                    demoMode
+                      ? "Demo record; not valid evidence"
+                      : skill.evidenceCount === 0
+                        ? "Insufficient evidence"
+                        : `${skill.evidenceCount} valid evidence events`,
                   )}
-                  state={growthEvidenceState[skill.state]}
+                  state={
+                    demoMode ? "unavailable" : growthEvidenceState[skill.state]
+                  }
                 >
                   {text(state.zh, state.en)}
                 </EvidenceLink>
               </span>
               <span role="cell" className="recurrence-cell">
                 <strong>
-                  {skill.recurrenceRate === null
+                  {demoMode || skill.recurrenceRate === null
                     ? "—"
                     : `${skill.recurrenceRate}%`}
                 </strong>

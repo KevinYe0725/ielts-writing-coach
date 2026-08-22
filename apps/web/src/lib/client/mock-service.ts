@@ -94,9 +94,6 @@ const writeStorage = (key: string, value: string): void => {
   if (canUseStorage()) window.localStorage.setItem(key, value);
 };
 
-const countWords = (value: string): number =>
-  value.trim().split(/\s+/).filter(Boolean).length;
-
 const removeStorage = (key: string): void => {
   if (canUseStorage()) window.localStorage.removeItem(key);
 };
@@ -950,18 +947,17 @@ const comparison: ComparisonData = {
   },
   v1Words: 276,
   v2Words: 291,
-  retained: true,
-  summaryZh:
-    "目标表达在自检前的闭卷版本中再次出现；Mock 数据仅用于演示证据状态。",
+  retained: false,
+  summaryZh: "这是虚构的产品流程数据，不是语言评估，也不会授予 retained。",
   summaryEn:
-    "The target appeared again in the blind pre-check draft; Mock data demonstrates the evidence state only.",
+    "This is fictional product-flow data, not a language evaluation, and retained is not awarded.",
   modelEssaySource: "mock",
   modelEssay:
     "Introducing foreign-language lessons in primary school can create practical difficulties, but the long-term benefits are greater when teaching is appropriate for children. Young learners are generally willing to imitate unfamiliar sounds and are less anxious about making mistakes. Regular exposure can therefore make common language patterns familiar before academic work becomes more demanding.\n\nThe main concern is that an additional subject may increase pupils' workload and take time away from play, exercise, or rest. This risk is real when schools rely on tests and heavy homework. However, it is largely a question of course design. Short, interactive lessons based on stories and communication can provide useful exposure without placing children under excessive academic pressure.\n\nIn conclusion, early language education offers lasting linguistic and cultural value, while its principal disadvantage is manageable. Provided that lessons remain enjoyable and age-appropriate, the advantages outweigh the costs.",
   points: [
     {
       id: "point-pressure",
-      state: "resolved",
+      state: "watch",
       titleZh: "学业压力的自然表达",
       titleEn: "Natural expression of academic pressure",
       before:
@@ -975,7 +971,7 @@ const comparison: ComparisonData = {
     },
     {
       id: "point-chain",
-      state: "improved",
+      state: "watch",
       titleZh: "早期接触的因果链",
       titleEn: "Causal chain for early exposure",
       before:
@@ -1018,27 +1014,21 @@ const comparison: ComparisonData = {
 };
 
 const growth: GrowthData = {
-  essaysCompleted: 8,
-  learningMinutes: 412,
-  currentBand: 6.5,
+  essaysCompleted: 0,
+  learningMinutes: 0,
+  currentBand: null,
   targetBand: 7,
-  independentNonRecurrenceRate: 43,
-  weeklyScores: [
-    { label: "W1", score: 5.5 },
-    { label: "W2", score: 6 },
-    { label: "W3", score: 6 },
-    { label: "W4", score: 6.5 },
-    { label: "W5", score: 6.5 },
-  ],
+  independentNonRecurrenceRate: null,
+  weeklyScores: [],
   skills: [
     {
       id: "collocation_perspective",
       labelZh: "自然搭配与英语视角",
       labelEn: "Collocation & English perspective",
       category: "LR",
-      state: "retained",
-      evidenceCount: 7,
-      recurrenceRate: 18,
+      state: "diagnosed",
+      evidenceCount: 0,
+      recurrenceRate: null,
       nextReviewZh: "周六陌生题复测",
       nextReviewEn: "Transfer check on Saturday",
     },
@@ -1048,8 +1038,8 @@ const growth: GrowthData = {
       labelEn: "Complete comparisons",
       category: "GRA",
       state: "applied",
-      evidenceCount: 4,
-      recurrenceRate: 33,
+      evidenceCount: 0,
+      recurrenceRate: null,
       nextReviewZh: "下篇作文自动检查",
       nextReviewEn: "Checked in the next essay",
     },
@@ -1059,8 +1049,8 @@ const growth: GrowthData = {
       labelEn: "Cause–mechanism–result chain",
       category: "TR",
       state: "practicing",
-      evidenceCount: 3,
-      recurrenceRate: 50,
+      evidenceCount: 0,
+      recurrenceRate: null,
       nextReviewZh: "周四 20:00 短回炉",
       nextReviewEn: "Short review Thursday at 20:00",
     },
@@ -1069,9 +1059,9 @@ const growth: GrowthData = {
       labelZh: "冠词与可数性",
       labelEn: "Articles & countability",
       category: "GRA",
-      state: "transferred",
-      evidenceCount: 11,
-      recurrenceRate: 9,
+      state: "diagnosed",
+      evidenceCount: 0,
+      recurrenceRate: null,
       nextReviewZh: "两周后混合检测",
       nextReviewEn: "Mixed check in two weeks",
     },
@@ -1709,47 +1699,25 @@ export class MockLearningClient implements LearningClient {
       writeStorage("iwc:practice-paper-started", startedAt);
     }
     const itemResults = submittedAt
-      ? questions.map((question) => {
-          const answer = answers[question.id]?.trim() ?? "";
-          const meetsStandard =
-            question.responseMode === "choice"
-              ? answer === "A"
-              : countWords(answer) >= Math.min(question.minimumWords, 20);
-          return {
-            itemId: question.id,
-            status: meetsStandard
-              ? ("MEETS_STANDARD" as const)
-              : ("NEEDS_WORK" as const),
-            score: meetsStandard ? 100 : 45,
-            feedbackZh: meetsStandard
-              ? "答案达到本题交卷前公开的评分点。"
-              : "答案尚未完整覆盖题面明确要求，请对照下方评分点修改。",
-            strengthsZh: meetsStandard ? ["回答切合题意。"] : [],
-            problems: meetsStandard
-              ? []
-              : [
-                  {
-                    criterionLabelZh: "题意完成",
-                    explanationZh:
-                      "当前回答没有完整呈现题面要求的因果关系或必要信息。",
-                    evidence: answer.slice(0, 120),
-                  },
-                ],
-            improvedAnswerEn: meetsStandard
-              ? ""
-              : "Early exposure helps children become familiar with basic language patterns, so they face fewer difficulties when language study becomes more demanding.",
-            nextStepZh: meetsStandard
-              ? "保持这种清晰度。"
-              : "先圈出题面中的动作和信息要求，再重写一个完整答案。",
-          };
-        })
+      ? questions.map((question) => ({
+          itemId: question.id,
+          status: "NOT_SCORABLE" as const,
+          score: 0,
+          feedbackZh:
+            "虚构演示只确认交卷流程，不判断答案质量，也不生成能力证据。",
+          strengthsZh: [],
+          problems: [],
+          improvedAnswerEn: "",
+          nextStepZh: "连接真实评估服务后再生成逐题语言反馈。",
+        }))
       : [];
     const result = submittedAt
       ? {
           totalScore:
             itemResults.reduce((sum, item) => sum + item.score, 0) /
             itemResults.length,
-          summaryZh: "整卷已完成。下方只展开未达到公开评分点的题目。",
+          summaryZh:
+            "虚构演示已完成交卷流程；未进行语言评估，也未生成能力证据。",
           itemResults,
         }
       : null;

@@ -1274,7 +1274,7 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
     expect(hydrationErrors).toEqual([]);
   });
 
-  test("submits once and expands teaching analysis only for missed answers", async ({
+  test("submits once and keeps the Demo paper explicitly unscored", async ({
     page,
   }) => {
     await page.goto(paperUrl);
@@ -1286,12 +1286,26 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
       );
     await page.getByRole("button", { name: "交卷" }).click();
 
-    await expect(page.getByText("整卷结果", { exact: true })).toBeVisible();
-    await expect(page.getByText("已达标", { exact: true })).toHaveCount(2);
+    const demoNotice = page.locator("[data-demo-language-evidence]");
+    await expect(demoNotice).toContainText(
+      "虚构演示数据 · Fictional demo data",
+    );
+    await expect(demoNotice).toContainText(
+      "不是语言评估 · Not a language evaluation",
+    );
     await expect(
-      page.getByRole("heading", { name: "这题为什么没有达标" }),
-    ).toHaveCount(6);
-    await expect(page.getByText("参考改法", { exact: true })).toHaveCount(6);
+      page.getByText("交卷流程已完成", { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByText("未进行语言评估", { exact: true })).toHaveCount(
+      8,
+    );
+    await expect(page.getByText("已达标", { exact: true })).toHaveCount(0);
+    await expect(page.locator(".practice-paper-summary")).not.toContainText(
+      /\b(?:45|100)\b/u,
+    );
+    await expect(page.locator(".practice-paper-page .badge-green")).toHaveCount(
+      0,
+    );
     const submittedAnswers = await page.evaluate(() =>
       JSON.parse(
         window.localStorage.getItem("iwc:practice-paper-answers") ?? "{}",
@@ -1542,13 +1556,29 @@ test.describe("compare, transfer, and growth evidence records", () => {
     await page.goto("/compare?cycle=cycle-demo");
 
     const record = page.locator('[data-evidence-record="comparison"]');
+    const demoNotice = record.locator("[data-demo-language-evidence]");
+    await expect(demoNotice).toContainText(
+      "虚构演示数据 · Fictional demo data",
+    );
+    await expect(demoNotice).toContainText(
+      "不是语言评估 · Not a language evaluation",
+    );
     await expect(record).toContainText("Version 1");
     await expect(record).toContainText("Version 2");
+    await expect(
+      record.locator('[data-evidence-state="verified"]'),
+    ).toHaveCount(0);
+    await expect(record.locator(".badge-green")).toHaveCount(0);
+    await expect(record.locator(".version-score strong")).toHaveText([
+      "—",
+      "—",
+    ]);
     await expect(record).toContainText("四项估分变化");
     await expect(record.locator(".criterion-delta")).toHaveCount(4);
     await expect(record).toContainText("每 100 词");
-    for (const state of ["已消失", "已改善", "继续观察"]) {
-      await expect(record.getByText(state, { exact: true })).toBeVisible();
+    await expect(record.getByText("未评价", { exact: true })).toHaveCount(3);
+    for (const state of ["已消失", "已改善"]) {
+      await expect(record.getByText(state, { exact: true })).toHaveCount(0);
     }
     await expect(record).toContainText("证据不足时不声称掌握");
     await expect(page.getByRole("link", { name: /查看安排/ })).toHaveAttribute(
@@ -1558,6 +1588,31 @@ test.describe("compare, transfer, and growth evidence records", () => {
     await expect(
       page.getByRole("button", { name: /Mock flow reference/ }),
     ).toBeVisible();
+  });
+
+  test("growth keeps fictional Demo scores and mastery states unavailable", async ({
+    page,
+  }) => {
+    await page.goto("/growth");
+
+    const record = page.locator('[data-evidence-record="growth"]');
+    const demoNotice = record.locator("[data-demo-language-evidence]");
+    await expect(demoNotice).toContainText(
+      "虚构演示数据 · Fictional demo data",
+    );
+    await expect(demoNotice).toContainText(
+      "不是语言评估 · Not a language evaluation",
+    );
+    await expect(
+      record.locator('[data-evidence-state="verified"]'),
+    ).toHaveCount(0);
+    await expect(record.locator(".badge-green")).toHaveCount(0);
+    await expect(
+      record.getByText("暂无可比较的同量表估分，不生成趋势。"),
+    ).toBeVisible();
+    await expect(record.locator(".chart-bar-track")).toHaveCount(0);
+    await expect(record.getByText("已保持", { exact: true })).toHaveCount(0);
+    await expect(record.getByText("已迁移", { exact: true })).toHaveCount(0);
   });
 
   test("transfer keeps the closed-book protocol and every server outcome explicit", async ({

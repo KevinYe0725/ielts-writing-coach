@@ -11,6 +11,7 @@ import {
   Badge,
   Button,
   Card,
+  DemoLanguageEvidenceNotice,
   LoadingButtonContent,
   PageHeader,
   Skeleton,
@@ -20,6 +21,7 @@ import { useFocusedPackageRecovery } from "@/components/use-focused-package-reco
 import {
   LearningClientError,
   learningClient,
+  learningClientDemoMode,
   type PracticePaperQuestion,
 } from "@/lib/client";
 import {
@@ -138,6 +140,7 @@ export default function PracticePaperPage({
     [cycleId, lessonId],
   );
   const { data, error, loading, retry } = useDemoResource(loader);
+  const demoMode = learningClientDemoMode;
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [now, setNow] = useState(() => Date.now());
   const [submitting, setSubmitting] = useState(false);
@@ -327,7 +330,7 @@ export default function PracticePaperPage({
               {text("查看详细批改", "View detailed feedback")}
             </ActionLink>
             {data.submittedAt ? (
-              <Badge tone="green">
+              <Badge tone={demoMode ? "neutral" : "green"}>
                 <FileCheck2 aria-hidden="true" size={14} />
                 {text("已交卷", "Submitted")}
               </Badge>
@@ -349,15 +352,27 @@ export default function PracticePaperPage({
         description={text(data.objectiveZh, data.objectiveEn)}
       />
 
+      {demoMode && data.result ? <DemoLanguageEvidenceNotice /> : null}
+
       {data.result ? (
         <Card className={cn("practice-paper-summary", styles.resultSummary)}>
           <div>
-            <strong>{Math.round(data.result.totalScore)}</strong>
-            <span>/ 100</span>
+            <strong>
+              {demoMode ? "—" : Math.round(data.result.totalScore)}
+            </strong>
+            <span>{demoMode ? text("未评分", "Unscored") : "/ 100"}</span>
           </div>
           <div>
-            <p className="eyebrow">{text("整卷结果", "Paper result")}</p>
-            <h2>{text("先看未达标题", "Review only what needs work")}</h2>
+            <p className="eyebrow">
+              {demoMode
+                ? text("演示交卷记录", "Demo submission record")
+                : text("整卷结果", "Paper result")}
+            </p>
+            <h2>
+              {demoMode
+                ? text("交卷流程已完成", "Submission flow complete")
+                : text("先看未达标题", "Review only what needs work")}
+            </h2>
             <p>{data.result.summaryZh}</p>
           </div>
         </Card>
@@ -437,12 +452,22 @@ export default function PracticePaperPage({
                 <header className={styles.questionHeader}>
                   <div>
                     <Badge
-                      tone={result ? (needsWork ? "amber" : "green") : "blue"}
+                      tone={
+                        result
+                          ? demoMode
+                            ? "neutral"
+                            : needsWork
+                              ? "amber"
+                              : "green"
+                          : "blue"
+                      }
                     >
                       {result
-                        ? needsWork
-                          ? text("需要解析", "Needs review")
-                          : text("已达标", "Meets standard")
+                        ? demoMode
+                          ? text("未进行语言评估", "No language evaluation")
+                          : needsWork
+                            ? text("需要解析", "Needs review")
+                            : text("已达标", "Meets standard")
                         : `${question.number}`}
                     </Badge>
                     <span>{text("题", "Question")}</span>
@@ -485,7 +510,7 @@ export default function PracticePaperPage({
                   }
                   question={question}
                 />
-                {result && needsWork ? (
+                {result && needsWork && !demoMode ? (
                   <div
                     className={cn("practice-paper-analysis", styles.analysis)}
                   >

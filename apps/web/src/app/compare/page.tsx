@@ -20,13 +20,18 @@ import {
   Badge,
   Button,
   Card,
+  DemoLanguageEvidenceNotice,
   EvidenceLink,
   PageHeader,
   SectionHeader,
   Skeleton,
 } from "@/components/ui";
 import { useDemoResource } from "@/components/use-demo-resource";
-import { LearningClientError, learningClient } from "@/lib/client";
+import {
+  LearningClientError,
+  learningClient,
+  learningClientDemoMode,
+} from "@/lib/client";
 import {
   singleRouteParam,
   type LearningSearchParams,
@@ -77,7 +82,8 @@ export default function ComparePage({
     }
     return <Skeleton label={messages.common.loading} />;
   }
-  const retained = data.retained ?? false;
+  const demoMode = learningClientDemoMode;
+  const retained = demoMode ? false : (data.retained ?? false);
   const ScoreDeltaIcon = data.overallDelta >= 0 ? TrendingUp : FileDiff;
   const signed = (value: number, digits = 1) =>
     `${value > 0 ? "+" : ""}${value.toFixed(digits)}`;
@@ -107,31 +113,39 @@ export default function ComparePage({
     <div className={styles.desk} data-evidence-record="comparison">
       <PageHeader
         actions={
-          <Badge tone={retained ? "green" : "amber"}>
+          <Badge tone={demoMode ? "neutral" : retained ? "green" : "amber"}>
             {retained ? (
               <CheckCircle2 aria-hidden="true" size={13} />
             ) : (
               <TriangleAlert aria-hidden="true" size={13} />
             )}
-            {retained
-              ? text("闭卷证据达到保留门槛", "Retention gate passed")
-              : text(
-                  "闭卷重写完成 · 继续观察",
-                  "Rewrite complete · keep watching",
-                )}
+            {demoMode
+              ? text("演示证据不可用", "Demo evidence unavailable")
+              : retained
+                ? text("闭卷证据达到保留门槛", "Retention gate passed")
+                : text(
+                    "闭卷重写完成 · 继续观察",
+                    "Rewrite complete · keep watching",
+                  )}
           </Badge>
         }
         eyebrow={text("Version 1 / Version 2", "Version 1 / Version 2")}
         title={text(
-          retained
-            ? "目标能力正在稳定，但仍需迁移证据"
-            : "重写完成，但系统不会把不足的证据算作掌握",
-          retained
-            ? "The target is stabilising, but transfer evidence is still needed"
-            : "The rewrite is complete, but insufficient evidence is not counted as mastery",
+          demoMode
+            ? "演示页面不生成分数或能力结论"
+            : retained
+              ? "目标能力正在稳定，但仍需迁移证据"
+              : "重写完成，但系统不会把不足的证据算作掌握",
+          demoMode
+            ? "This demo produces no score or skill verdict"
+            : retained
+              ? "The target is stabilising, but transfer evidence is still needed"
+              : "The rewrite is complete, but insufficient evidence is not counted as mastery",
         )}
         description={data.promptTitle}
       />
+
+      {demoMode ? <DemoLanguageEvidenceNotice /> : null}
 
       <Card className={`comparison-hero ${styles.versionRecord}`}>
         <p className={styles.recordLabel} data-auxiliary>
@@ -139,19 +153,23 @@ export default function ComparePage({
         </p>
         <div className="version-score before">
           <span>Version 1</span>
-          <strong>{data.v1Score.toFixed(1)}</strong>
+          <strong>{demoMode ? "—" : data.v1Score.toFixed(1)}</strong>
           <small>
             {data.v1Words} {text("词", "words")}
           </small>
         </div>
         <div className="score-bridge">
           <ScoreDeltaIcon aria-hidden="true" size={20} />
-          <strong>{signed(data.overallDelta)}</strong>
-          <span>{text("同量表 AI 估分变化", "Same-rubric AI change")}</span>
+          <strong>{demoMode ? "—" : signed(data.overallDelta)}</strong>
+          <span>
+            {demoMode
+              ? text("演示不估分", "Demo is unscored")
+              : text("同量表 AI 估分变化", "Same-rubric AI change")}
+          </span>
         </div>
         <div className="version-score after">
           <span>Version 2</span>
-          <strong>{data.v2Score.toFixed(1)}</strong>
+          <strong>{demoMode ? "—" : data.v2Score.toFixed(1)}</strong>
           <small>
             {data.v2Words} {text("词", "words")}
           </small>
@@ -162,19 +180,27 @@ export default function ComparePage({
           </p>
           <h2>
             {text(
-              retained
-                ? "闭卷证据通过 retained 门槛"
-                : "本次只记录完成，不授予 retained",
-              retained
-                ? "The blind draft passed the retained evidence gate"
-                : "Completion is recorded, but retained is not awarded",
+              demoMode
+                ? "流程示例已完成，但没有语言评价"
+                : retained
+                  ? "闭卷证据通过 retained 门槛"
+                  : "本次只记录完成，不授予 retained",
+              demoMode
+                ? "The flow example is complete without a language evaluation"
+                : retained
+                  ? "The blind draft passed the retained evidence gate"
+                  : "Completion is recorded, but retained is not awarded",
             )}
           </h2>
           <p>
             {text(
-              data.summaryZh ?? "系统只根据自检前快照更新能力证据。",
-              data.summaryEn ??
-                "Skill evidence is updated only from the pre-self-check snapshot.",
+              demoMode
+                ? "页面内容是虚构示例，不代表任何学习者的分数、保持或迁移证据。"
+                : (data.summaryZh ?? "系统只根据自检前快照更新能力证据。"),
+              demoMode
+                ? "The page is fictional and represents no learner score, retention, or transfer evidence."
+                : (data.summaryEn ??
+                    "Skill evidence is updated only from the pre-self-check snapshot."),
             )}
           </p>
         </div>
@@ -188,8 +214,10 @@ export default function ComparePage({
             </p>
             <h2>{text("四项估分变化", "Four-criterion score changes")}</h2>
           </div>
-          <Badge tone="blue">
-            {text("同一评分标准", "Same marking standard")}
+          <Badge tone={demoMode ? "neutral" : "blue"}>
+            {demoMode
+              ? text("未进行评分", "Not scored")
+              : text("同一评分标准", "Same marking standard")}
           </Badge>
         </div>
         <div className="criterion-delta-grid">
@@ -200,10 +228,12 @@ export default function ComparePage({
                 {text(criterion.labelZh, criterion.labelEn)}
               </span>
               <span>
-                {criterion.v1.toFixed(1)} → {criterion.v2.toFixed(1)}
+                {demoMode
+                  ? "— → —"
+                  : `${criterion.v1.toFixed(1)} → ${criterion.v2.toFixed(1)}`}
               </span>
               <strong className={criterion.delta < 0 ? "negative" : ""}>
-                {signed(criterion.delta)}
+                {demoMode ? "—" : signed(criterion.delta)}
               </strong>
             </div>
           ))}
@@ -212,26 +242,34 @@ export default function ComparePage({
           <div>
             <span>{text("核心问题频率", "Core-issue frequency")}</span>
             <strong>
-              {data.recurrence.v1Per100Words.toFixed(2)} →{" "}
-              {data.recurrence.v2Per100Words.toFixed(2)}
+              {demoMode
+                ? "— → —"
+                : `${data.recurrence.v1Per100Words.toFixed(2)} → ${data.recurrence.v2Per100Words.toFixed(2)}`}
             </strong>
             <small>{text("每 100 词", "per 100 words")}</small>
           </div>
           <Badge
             tone={
-              !data.recurrence.evidenceVerified || data.recurrence.recurred
+              demoMode ||
+              !data.recurrence.evidenceVerified ||
+              data.recurrence.recurred
                 ? "amber"
                 : "green"
             }
           >
-            {!data.recurrence.evidenceVerified
-              ? text("跨度证据待复核", "Span evidence unverified")
-              : data.recurrence.recurred
-                ? text(
-                    `仍复发 ${data.recurrence.v2Occurrences} 次`,
-                    `Recurred ${data.recurrence.v2Occurrences} time(s)`,
-                  )
-                : text("未检测到复发", "No recurrence detected")}
+            {demoMode
+              ? text(
+                  "演示不生成复发证据",
+                  "Demo creates no recurrence evidence",
+                )
+              : !data.recurrence.evidenceVerified
+                ? text("跨度证据待复核", "Span evidence unverified")
+                : data.recurrence.recurred
+                  ? text(
+                      `仍复发 ${data.recurrence.v2Occurrences} 次`,
+                      `Recurred ${data.recurrence.v2Occurrences} time(s)`,
+                    )
+                  : text("未检测到复发", "No recurrence detected")}
           </Badge>
         </div>
       </Card>
@@ -245,17 +283,26 @@ export default function ComparePage({
       />
       <div className={`comparison-list ${styles.changeRecord}`}>
         {data.points.map((point) => {
-          const presentation = statePresentation[point.state];
+          const presentation = demoMode
+            ? {
+                zh: "未评价",
+                en: "Not evaluated",
+                tone: "neutral" as const,
+                icon: FileDiff,
+              }
+            : statePresentation[point.state];
           const Icon = presentation.icon;
           return (
             <Card
               className={`comparison-card ${styles.changeCard}`}
               data-evidence-state={
-                point.state === "resolved"
-                  ? "verified"
-                  : point.state === "improved"
-                    ? "active"
-                    : "revision"
+                demoMode
+                  ? "unavailable"
+                  : point.state === "resolved"
+                    ? "verified"
+                    : point.state === "improved"
+                      ? "active"
+                      : "revision"
               }
               key={point.id}
             >
@@ -281,13 +328,22 @@ export default function ComparePage({
               </div>
               <EvidenceLink
                 className={`${styles.pointEvidence}`}
-                label={text(point.noteZh, point.noteEn)}
+                label={
+                  demoMode
+                    ? text(
+                        "虚构改写示例，不生成语言证据",
+                        "Fictional rewrite example; no language evidence is created",
+                      )
+                    : text(point.noteZh, point.noteEn)
+                }
                 state={
-                  point.state === "resolved"
-                    ? "verified"
-                    : point.state === "improved"
-                      ? "active"
-                      : "revision"
+                  demoMode
+                    ? "unavailable"
+                    : point.state === "resolved"
+                      ? "verified"
+                      : point.state === "improved"
+                        ? "active"
+                        : "revision"
                 }
               >
                 <span>

@@ -6,7 +6,13 @@ import {
   type HTMLAttributes,
   type ReactNode,
 } from "react";
-import { ArrowRight, Check, ChevronRight, LoaderCircle } from "lucide-react";
+import {
+  ArrowRight,
+  Check,
+  ChevronRight,
+  Info,
+  LoaderCircle,
+} from "lucide-react";
 
 import { cn } from "@/components/utils";
 
@@ -142,6 +148,22 @@ export function SectionHeader({
       </div>
       {action}
     </div>
+  );
+}
+
+export function DemoLanguageEvidenceNotice() {
+  return (
+    <aside
+      className="status-banner status-banner-warning"
+      data-demo-language-evidence
+      role="note"
+    >
+      <Info aria-hidden="true" size={20} />
+      <div>
+        <strong>虚构演示数据 · Fictional demo data</strong>
+        <p>不是语言评估 · Not a language evaluation</p>
+      </div>
+    </aside>
   );
 }
 

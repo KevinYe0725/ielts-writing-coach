@@ -18,8 +18,11 @@ export function createLearningClient(
   return demoMode ? mockLearningClient : new HttpLearningClient(httpOptions);
 }
 
+export const learningClientDemoMode =
+  process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+
 export const learningClient: LearningClient = createLearningClient({
-  demoMode: process.env.NEXT_PUBLIC_DEMO_MODE === "true",
+  demoMode: learningClientDemoMode,
 });
 
 export * from "./errors";
