@@ -54,6 +54,13 @@ test.describe("annotation desk redesign contracts", () => {
       );
       await page.goto(route);
       await expectPageLayout(page, layout);
+    });
+  }
+
+  for (const [route] of routeMatrix) {
+    test(`${route} has no horizontal overflow at 390×844`, async ({ page }) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.goto(route);
       await expectNoHorizontalOverflow(page);
     });
   }
