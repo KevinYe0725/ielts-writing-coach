@@ -3,14 +3,96 @@ import AxeBuilder from "@axe-core/playwright";
 
 import { expectBasicAccessibility } from "./support";
 
-async function expectFontSizeAtLeast(
+async function expectAllVisibleFontsAtLeast(
   locator: import("@playwright/test").Locator,
-  minimumPixels: number,
+  state: string,
+  minimumPixels = 12,
 ) {
-  const fontSize = await locator.evaluate((element) =>
-    Number.parseFloat(window.getComputedStyle(element).fontSize),
+  await expect(locator.first()).toBeVisible();
+  const measurements = await locator.evaluateAll((elements) =>
+    elements.map((element) => ({
+      fontSize: Number.parseFloat(window.getComputedStyle(element).fontSize),
+      text:
+        element.getAttribute("aria-label") ||
+        element.textContent?.trim().slice(0, 80) ||
+        element.tagName.toLowerCase(),
+    })),
   );
-  expect(fontSize).toBeGreaterThanOrEqual(minimumPixels);
+  expect(
+    measurements.length,
+    `${state} must not be an empty collection`,
+  ).toBeGreaterThan(0);
+  expect(
+    measurements.filter(
+      ({ fontSize }) => !Number.isFinite(fontSize) || fontSize < minimumPixels,
+    ),
+    `${state}: ${JSON.stringify(measurements, null, 2)}`,
+  ).toEqual([]);
+}
+
+async function expectVisibleTextFloor(
+  root: import("@playwright/test").Locator,
+  state: string,
+) {
+  await expect(root).toBeVisible();
+  const violations = await root.evaluate((container) => {
+    const visible = (element: Element) => {
+      if (
+        element.closest(
+          "[aria-hidden='true'], .sr-only, input[type='hidden'], svg",
+        )
+      )
+        return false;
+      const style = window.getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      return (
+        style.display !== "none" &&
+        style.visibility !== "hidden" &&
+        Number.parseFloat(style.opacity || "1") > 0 &&
+        rect.width > 0 &&
+        rect.height > 0
+      );
+    };
+    const candidates = Array.from(container.querySelectorAll("*"));
+    return candidates.flatMap((element) => {
+      if (!visible(element)) return [];
+      const explicitControl = element.matches(
+        "label, input, select, button, small, .badge, [role='tab'], progress, [role='progressbar']",
+      );
+      const ownText = Array.from(element.childNodes).some(
+        (node) =>
+          node.nodeType === Node.TEXT_NODE && Boolean(node.textContent?.trim()),
+      );
+      const hasVisibleTextChild = Array.from(element.children).some(
+        (child) => visible(child) && Boolean(child.textContent?.trim()),
+      );
+      if (!explicitControl && (!ownText || hasVisibleTextChild)) return [];
+
+      const fontSize = Number.parseFloat(
+        window.getComputedStyle(element).fontSize,
+      );
+      if (fontSize >= 12) return [];
+      const field = element as HTMLInputElement;
+      const text =
+        field.labels?.[0]?.textContent?.trim() ||
+        element.getAttribute("aria-label") ||
+        field.placeholder ||
+        element.textContent?.trim() ||
+        element.tagName.toLowerCase();
+      return [
+        {
+          fontSize,
+          selector: `${element.tagName.toLowerCase()}${element.className ? `.${String(element.className).trim().replace(/\s+/g, ".")}` : ""}`,
+          text: text.slice(0, 80),
+        },
+      ];
+    });
+  });
+
+  expect(
+    violations,
+    `${state}: ${JSON.stringify(violations, null, 2)}`,
+  ).toEqual([]);
 }
 
 async function signedInSession(page: import("@playwright/test").Page) {
@@ -273,29 +355,79 @@ test.describe("account controls", () => {
       }
     });
 
-    test(`entry, account, and settings auxiliary text stays at least 12px on ${viewport.label}`, async ({
+    test(`all visible Entry, Settings, and Account text stays at least 12px on ${viewport.label}`, async ({
       page,
     }) => {
       await signedInSession(page);
       await page.setViewportSize(viewport);
 
       await page.goto("/signin");
-      await expectFontSizeAtLeast(page.getByText("忘记密码？"), 12);
+      await expectVisibleTextFloor(page.getByRole("main"), "/signin");
+
+      await page.goto("/join?token=font-floor-token");
+      await expectVisibleTextFloor(page.getByRole("main"), "/join form");
+
+      await page.goto("/recover?error=INVALID_TOKEN");
+      await expectVisibleTextFloor(
+        page.getByRole("main"),
+        "/recover invalid-token state",
+      );
+
+      await page.goto("/setup");
+      await expectVisibleTextFloor(page.getByRole("main"), "/setup mode");
+      const setupProgressLabels = page.locator(
+        ".setup-steps li > span:visible, .setup-steps li strong:visible",
+      );
+      await expectAllVisibleFontsAtLeast(
+        setupProgressLabels,
+        "/setup progress labels",
+      );
 
       await page.goto("/settings");
+      await expectVisibleTextFloor(
+        page.getByRole("main"),
+        "/settings learning",
+      );
+      await page.getByRole("button", { name: "计划与提醒" }).click();
+      await expectVisibleTextFloor(
+        page.getByRole("main"),
+        "/settings schedule",
+      );
       await page.getByRole("button", { name: "AI 服务" }).click();
-      await expectFontSizeAtLeast(
-        page.getByText("供应商、密钥、模型路由与连接生命周期"),
-        12,
+      const badges = page.getByRole("main").locator(".badge:visible");
+      await expectAllVisibleFontsAtLeast(badges, "/settings badges");
+      await page.getByText("按学习步骤选择模型", { exact: true }).click();
+      await expect(
+        page.getByText(
+          "Model-route administration is unavailable in the browser-only demo.",
+        ),
+      ).toBeVisible();
+      const routeInputs = page.locator(".route-editor-row .text-input:visible");
+      await expect(routeInputs).toHaveCount(9);
+      await expectAllVisibleFontsAtLeast(
+        routeInputs,
+        "/settings route editor inputs",
+      );
+      await page.getByRole("button", { name: "新增或切换 AI 服务" }).click();
+      await page.getByLabel("服务商预设").selectOption("custom");
+      await expectVisibleTextFloor(
+        page.getByRole("main"),
+        "/settings AI advanced",
       );
 
-      await page.goto("/account");
-      await expectFontSizeAtLeast(
-        page
-          .locator("[aria-labelledby='signed-in-account']")
-          .getByText("学习者", { exact: true }),
-        12,
+      await page.getByRole("button", { name: "数据与隐私" }).click();
+      const dataFileInput = page.locator(
+        '.import-data-action input[type="file"]',
       );
+      await expect(dataFileInput).toBeVisible();
+      await expectAllVisibleFontsAtLeast(
+        dataFileInput,
+        "/settings data file input",
+      );
+      await expectVisibleTextFloor(page.getByRole("main"), "/settings data");
+
+      await page.goto("/account");
+      await expectVisibleTextFloor(page.getByRole("main"), "/account");
     });
   }
 });

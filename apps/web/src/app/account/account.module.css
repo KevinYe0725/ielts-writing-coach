@@ -22,6 +22,18 @@
   text-align: center;
 }
 
+.page :global(.badge),
+.page :global(label),
+.page :global(input),
+.page :global(select),
+.page :global(button),
+.page :global(small),
+.page :global([role="tab"]),
+.page :global(progress),
+.page :global([role="progressbar"]) {
+  font-size: max(0.8rem, 12px);
+}
+
 .heading {
   max-width: 620px;
   margin-bottom: 38px;

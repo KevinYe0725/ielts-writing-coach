@@ -52,6 +52,16 @@
 }
 
 .page :global(.settings-section-head p),
+.page :global(.eyebrow),
+.page :global(.badge),
+.page :global(label),
+.page :global(input),
+.page :global(select),
+.page :global(button),
+.page :global(small),
+.page :global([role="tab"]),
+.page :global(progress),
+.page :global([role="progressbar"]),
 .page :global(.field-hint),
 .page :global(.settings-savebar > span),
 .page :global(.data-action-list small),
@@ -65,8 +75,10 @@
 .page :global(.ai-danger-zone span),
 .page :global(.inline-probe),
 .page :global(.import-result dt),
-.page :global(.import-result dd) {
-  font-size: max(0.75rem, 12px);
+.page :global(.import-result dd),
+.page :global(.route-editor-row .text-input),
+.page :global(.import-data-action input[type="file"]) {
+  font-size: max(0.8rem, 12px);
 }
 
 .advancedSettings {
