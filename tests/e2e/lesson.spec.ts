@@ -52,7 +52,8 @@ const httpTeaching = {
     {
       titleZh: "把方法用到新句子里",
       titleEn: "Apply the method in a new sentence",
-      markdown: "先说明变化怎样发生，再写出可以观察的结果。",
+      markdown:
+        "先说明变化怎样发生，再写出可以观察的结果。\n\n> Flexible schedules protect focused work.\n\n> 先写清机制，再说明结果。",
     },
   ],
   practicePrompts: [httpPrompt],
@@ -1889,6 +1890,21 @@ test.describe("tutorial answer analysis over the public HTTP contract", () => {
     deterministicDemo,
     "Run with NEXT_PUBLIC_DEMO_MODE=false and an HTTP-mode web server.",
   );
+
+  test("dynamic Markdown assigns English only to deterministically English quotes", async ({
+    page,
+  }) => {
+    await installHttpTeachingApi(page, { restore: null });
+    await page.goto(httpLessonUrl);
+
+    const quotes = page.locator('[data-teaching-block="MARKDOWN"] blockquote');
+    const englishQuote = quotes.filter({
+      hasText: "Flexible schedules protect focused work.",
+    });
+    const chineseQuote = quotes.filter({ hasText: "先写清机制，再说明结果。" });
+    await expect(englishQuote).toHaveAttribute("lang", "en");
+    await expect(chineseQuote).not.toHaveAttribute("lang");
+  });
 
   test("practice paper pending evaluation keeps the explicit progress check", async ({
     page,

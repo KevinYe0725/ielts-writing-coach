@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  isValidElement,
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ArrowRight,
   BookOpenCheck,
@@ -453,6 +460,27 @@ function PracticePrompt({
   );
 }
 
+function markdownNodeText(node: ReactNode): string {
+  if (typeof node === "string" || typeof node === "number") {
+    return String(node);
+  }
+  if (Array.isArray(node)) return node.map(markdownNodeText).join(" ");
+  if (isValidElement<{ children?: ReactNode }>(node)) {
+    return markdownNodeText(node.props.children);
+  }
+  return "";
+}
+
+function markdownQuoteLanguage(children: ReactNode): "en" | undefined {
+  const letters = [...markdownNodeText(children).matchAll(/\p{L}/gu)].map(
+    (match) => match[0],
+  );
+  if (letters.length === 0) return undefined;
+  return letters.every((letter) => /\p{Script=Latin}/u.test(letter))
+    ? "en"
+    : undefined;
+}
+
 function MarkdownSection({ section }: { section: TeachingSectionMarkdown }) {
   return (
     <div
@@ -463,7 +491,9 @@ function MarkdownSection({ section }: { section: TeachingSectionMarkdown }) {
       <Markdown
         components={{
           blockquote: ({ children }) => (
-            <blockquote lang="en">{children}</blockquote>
+            <blockquote lang={markdownQuoteLanguage(children)}>
+              {children}
+            </blockquote>
           ),
         }}
       >
