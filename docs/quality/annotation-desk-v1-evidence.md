@@ -22,7 +22,7 @@ Evidence labels:
 | Item                         | Observed value                             |
 | ---------------------------- | ------------------------------------------ |
 | Branch                       | `codex/frontend-redesign`                  |
-| Verified production commit   | `6d22b2e18771df7bb2f64b8fb235e09a7d72f7a4` |
+| Verified production commit   | `89700fae749d01cede391dd67561fe093753bb24` |
 | Task 13 evidence base        | `d6d351a3de1665486f152da0f72a944436e2d88a` |
 | Merge base / rollback commit | `e13e97fee3006f9bd080b060350ba811556c187d` |
 | Node                         | `v24.19.0`                                 |
@@ -108,21 +108,22 @@ growth history, and exact `activeCount === activeLimit === 8` behavior.
 
 ## Fix-round closure
 
-| Finding                           | Final implementation and evidence                                                                                                                                                                                                                        |
-| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Compare 4.46:1 contrast           | `.unlockNote` uses approved Ink. Four-project `/compare` axe passes.                                                                                                                                                                                     |
-| Growth 10.4px / 4.0:1 suffixes    | Supporting suffixes use approved Ink and `max(0.8rem, 12px)`. Computed-size contract and four-project axe pass.                                                                                                                                          |
-| Mobile feedback 4.39:1            | Inactive mobile tab uses approved Ink; four-project feedback axe passes.                                                                                                                                                                                 |
-| Lesson wide overflow              | Reading main expands to 1160px; the page becomes container-responsive by 1320px. 1440 keeps the two-column sticky TOC, while 1280 safely uses the collapsed TOC. All six widths have zero document overflow.                                             |
-| False Today topbar context        | Transfer, Account, Admin, and Backup map to their real labels/hrefs; transfer preserves its exact dynamic query identity. Unknown fallback links no longer claim `aria-current`.                                                                         |
-| Locale reload reset               | Locale is a `useSyncExternalStore` preference backed by localStorage and a tab event. SSR keeps the stable Chinese snapshot; hydration restores the saved locale without first overwriting it. SPA navigation and reload remain English after selection. |
-| Settings 390px clipping           | At 460px and below, categories use a discoverable 2×2 grid. At 390 and 320, nav `scrollWidth === clientWidth`, all four labels are complete, and document overflow is zero.                                                                              |
-| WebKit/mobile backup download     | Archive and checksum downloads use appended anchors with a 150ms browser-registration window before revocation/next download. All four projects observe archive first, checksum second, then secret clearing.                                            |
-| 40px Firefox rounding             | Geometry assertion allows the engine-safe 39.5px epsilon while retaining the 40px design rule.                                                                                                                                                           |
-| 1.9 WebKit line-height rounding   | Ratio assertion uses 1.899, covering floating representation without weakening the 1.9 declaration.                                                                                                                                                      |
-| Desktop tests in mobile project   | Only the desktop-control/hardware-keyboard cases are skipped in mobile; dedicated mobile menu/account/Shell coverage remains active.                                                                                                                     |
-| Offscreen skip-link pointer click | AppShell activates the focused skip link with Enter. The dedicated keyboard accessibility tests also pass.                                                                                                                                               |
-| Format gate                       | Four tracked files were formatted and `.learnings/` was narrowly ignored. Full format check exits 0.                                                                                                                                                     |
+| Finding                           | Final implementation and evidence                                                                                                                                                                                                                                  |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Compare 4.46:1 contrast           | `.unlockNote` uses approved Ink. Four-project `/compare` axe passes.                                                                                                                                                                                               |
+| Growth 10.4px / 4.0:1 suffixes    | Supporting suffixes use approved Ink and `max(0.8rem, 12px)`. Computed-size contract and four-project axe pass.                                                                                                                                                    |
+| Mobile feedback 4.39:1            | Inactive mobile tab uses approved Ink; four-project feedback axe passes.                                                                                                                                                                                           |
+| Lesson wide overflow              | Reading main expands to 1160px; the page becomes container-responsive by 1320px. 1440 keeps the two-column sticky TOC, while 1280 safely uses the collapsed TOC. All six widths have zero document overflow.                                                       |
+| False Today topbar context        | Transfer, Account, Admin, and Backup map to their real labels/hrefs; transfer preserves its exact dynamic query identity. Unknown fallback links no longer claim `aria-current`.                                                                                   |
+| Locale reload reset               | Locale is a `useSyncExternalStore` preference backed by localStorage and a tab event. SSR keeps the stable Chinese snapshot; hydration restores the saved locale without first overwriting it. SPA navigation and reload remain English after selection.           |
+| Settings 390px clipping           | At 460px and below, categories use a discoverable 2×2 grid. At 390 and 320, nav `scrollWidth === clientWidth`, all four labels are complete, and document overflow is zero.                                                                                        |
+| WebKit/mobile backup download     | Archive and checksum downloads use appended anchors with a 150ms browser-registration window before revocation/next download. All four projects observe archive first, checksum second, then secret clearing.                                                      |
+| 40px Firefox rounding             | Geometry assertion allows the engine-safe 39.5px epsilon while retaining the 40px design rule.                                                                                                                                                                     |
+| 1.9 WebKit line-height rounding   | Ratio assertion uses 1.899, covering floating representation without weakening the 1.9 declaration.                                                                                                                                                                |
+| Desktop tests in mobile project   | Only the desktop-control/hardware-keyboard cases are skipped in mobile; dedicated mobile menu/account/Shell coverage remains active.                                                                                                                               |
+| Offscreen skip-link pointer click | AppShell activates the focused skip link with Enter. The dedicated keyboard accessibility tests also pass.                                                                                                                                                         |
+| Format gate                       | Four tracked files were formatted and `.learnings/` was narrowly ignored. Full format check exits 0.                                                                                                                                                               |
+| Stale Topbar resource identity    | The active Write, Feedback, Lesson, Rewrite, Compare, and Transfer context link now uses the authoritative current URL. Navigation still uses stored cycle-safe destinations. Old→new Transfer and stale Feedback mutations pass in Chromium, Firefox, and WebKit. |
 
 The full-run convergence also exposed and closed three deterministic harness
 issues without changing product semantics: Today essay metadata contrast now
@@ -130,26 +131,37 @@ uses Ink/Muted tokens; transfer expiry is installed before the first document
 instead of racing a Today navigation; Entry/axe checks wait for route identity,
 React handlers, and CSS settlement rather than using fixed sleeps.
 
+Fix round 2 production commit
+`89700fae749d01cede391dd67561fe093753bb24` closes the stale-storage review
+finding. Before the implementation change, both regressions failed in all
+three desktop engines (6/6 failures): Transfer linked the stored
+`cycle=old&task=old`, and Feedback linked a stored/merged cycle-only target.
+After the change, the focused matrix passed 6/6 and the complete desktop
+AppShell file passed 30 tests with 3 intentional Demo/HTTP-boundary skips.
+The final repository gates and complete four-project Demo matrix were then
+rerun with Node 24.19.0 and remained green at 584 passed, 160 intentional
+skips, and 0 failed.
+
 ## Functional freeze matrix
 
-| Surface                       | Status   | Evidence                                                                                                                                                                                       |
-| ----------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Global Shell                  | VERIFIED | Language switch plus reload persistence, sidebar storage, dynamic destinations, notifications, account Escape focus, logout clearing, mobile menu, skip link, and truthful route context pass. |
-| `/`, `/signin`                | VERIFIED | Anonymous root, personal registration, shared invitation restriction, safe local `next`, and unsafe redirect rejection pass.                                                                   |
-| `/join`, `/recover`, `/setup` | VERIFIED | Token/error query clearing, no token storage, invalid/missing states, setup flow, and provider recovery pass.                                                                                  |
-| `/today`                      | VERIFIED | Every next action, exactly one primary CTA, new essay, mixed review, waiting notice, and AI queued/failed/blocked states pass.                                                                 |
-| `/essays`                     | VERIFIED | Multiple independent hrefs, public/custom questions, Academic/General controls, and the exact 8/8 limit pass.                                                                                  |
-| `/write`                      | VERIFIED | Autosave, IndexedDB conflict, recovery, timer, modal, keyboard shortcuts, and duplicate submission lock pass.                                                                                  |
-| `/feedback`                   | VERIFIED | Optional lesson identity, complete report, retry states, bidirectional issue linking, keyboard activation, mobile tabs, and model lock pass.                                                   |
-| `/lesson`                     | VERIFIED | Dynamic Markdown, restore, timeout, every analysis state, unlimited retry, responsive TOC, and paper entry pass.                                                                               |
-| `/lesson/paper`               | VERIFIED | Eight identities, draft restore, source links, timeout lock, empty answers, pending and result groups, navigation, and unobscured input pass.                                                  |
-| `/rewrite`                    | VERIFIED | Prerequisite, locked/expired/reschedule, blind V2, 35/5 boundary, snapshot failure, and compare destination pass.                                                                              |
-| `/compare`                    | VERIFIED | Four deltas, recurrence normalization, insufficient evidence, retained gate, model unlock, and exact next href pass.                                                                           |
-| `/transfer`                   | VERIFIED | Eight-minute protocol, immutable first answer, processing, all outcomes, evaluation failure, expiry, no opportunity, and reschedule pass.                                                      |
-| `/growth`                     | VERIFIED | All five levels, valid green semantics, neutral empty history, and readable metrics pass.                                                                                                      |
-| `/settings`                   | VERIFIED | Learning, reminder, AI, model routing, data controls, failure recovery, and 2×2 mobile category navigation pass.                                                                               |
-| `/account`                    | VERIFIED | Session redirect, identity, password validation, menu behavior, and logout clearing pass in fixtures.                                                                                          |
-| `/admin`, `/admin/backup`     | VERIFIED | RBAC, honest health, recovery link, SMTP, audit, Owner-only backup, validation, failure states, ordered dual download, and secret clearing pass.                                               |
+| Surface                       | Status   | Evidence                                                                                                                                                                                                                                  |
+| ----------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Global Shell                  | VERIFIED | Language switch plus reload persistence, cycle-safe sidebar storage, authoritative current-resource Topbar identity, notifications, account Escape focus, logout clearing, mobile menu, skip link, and truthful fixed-route context pass. |
+| `/`, `/signin`                | VERIFIED | Anonymous root, personal registration, shared invitation restriction, safe local `next`, and unsafe redirect rejection pass.                                                                                                              |
+| `/join`, `/recover`, `/setup` | VERIFIED | Token/error query clearing, no token storage, invalid/missing states, setup flow, and provider recovery pass.                                                                                                                             |
+| `/today`                      | VERIFIED | Every next action, exactly one primary CTA, new essay, mixed review, waiting notice, and AI queued/failed/blocked states pass.                                                                                                            |
+| `/essays`                     | VERIFIED | Multiple independent hrefs, public/custom questions, Academic/General controls, and the exact 8/8 limit pass.                                                                                                                             |
+| `/write`                      | VERIFIED | Autosave, IndexedDB conflict, recovery, timer, modal, keyboard shortcuts, and duplicate submission lock pass.                                                                                                                             |
+| `/feedback`                   | VERIFIED | Optional lesson identity, complete report, retry states, bidirectional issue linking, keyboard activation, mobile tabs, and model lock pass.                                                                                              |
+| `/lesson`                     | VERIFIED | Dynamic Markdown, restore, timeout, every analysis state, unlimited retry, responsive TOC, and paper entry pass.                                                                                                                          |
+| `/lesson/paper`               | VERIFIED | Eight identities, draft restore, source links, timeout lock, empty answers, pending and result groups, navigation, and unobscured input pass.                                                                                             |
+| `/rewrite`                    | VERIFIED | Prerequisite, locked/expired/reschedule, blind V2, 35/5 boundary, snapshot failure, and compare destination pass.                                                                                                                         |
+| `/compare`                    | VERIFIED | Four deltas, recurrence normalization, insufficient evidence, retained gate, model unlock, and exact next href pass.                                                                                                                      |
+| `/transfer`                   | VERIFIED | Eight-minute protocol, immutable first answer, processing, all outcomes, evaluation failure, expiry, no opportunity, and reschedule pass.                                                                                                 |
+| `/growth`                     | VERIFIED | All five levels, valid green semantics, neutral empty history, and readable metrics pass.                                                                                                                                                 |
+| `/settings`                   | VERIFIED | Learning, reminder, AI, model routing, data controls, failure recovery, and 2×2 mobile category navigation pass.                                                                                                                          |
+| `/account`                    | VERIFIED | Session redirect, identity, password validation, menu behavior, and logout clearing pass in fixtures.                                                                                                                                     |
+| `/admin`, `/admin/backup`     | VERIFIED | RBAC, honest health, recovery link, SMTP, audit, Owner-only backup, validation, failure states, ordered dual download, and secret clearing pass.                                                                                          |
 
 Demo/Mock outcomes are never presented as real language-scoring evidence.
 
