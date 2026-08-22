@@ -5,6 +5,11 @@
   container-type: inline-size;
 }
 
+.page :global(.eyebrow),
+.page :global(.badge) {
+  font-size: 0.8rem;
+}
+
 .page :global(.page-header) {
   margin-bottom: var(--desk-space-6);
 }

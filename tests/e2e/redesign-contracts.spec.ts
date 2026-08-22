@@ -208,6 +208,43 @@ test.describe("annotation desk redesign contracts", () => {
     );
   });
 
+  for (const viewport of [
+    { label: "desktop", width: 1440, height: 960 },
+    { label: "390px mobile", width: 390, height: 844 },
+  ]) {
+    test(`feedback eyebrows and badges stay at least 12px on ${viewport.label}`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({
+        width: viewport.width,
+        height: viewport.height,
+      });
+      await page.goto(
+        "/feedback?cycle=cycle-demo&lesson=lesson-collocation-perspective",
+      );
+
+      const pageHeaderEyebrow = page.getByText("第1步 · 详细批改与改正", {
+        exact: true,
+      });
+      const internalEyebrow = page.getByText("本篇诊断", { exact: true });
+      const trustBadge = page.getByText("示例报告 · 未评价语言", {
+        exact: true,
+      });
+      const modelLockBadge = page.getByText("Version 2 后开放", {
+        exact: true,
+      });
+
+      for (const auxiliaryText of [
+        pageHeaderEyebrow,
+        internalEyebrow,
+        trustBadge,
+        modelLockBadge,
+      ]) {
+        await expectFontSizeAtLeast(auxiliaryText, 12);
+      }
+    });
+  }
+
   for (const [route, layout] of routeMatrix) {
     test(`${route} uses ${layout}`, async ({ page }) => {
       await page.goto(route);
