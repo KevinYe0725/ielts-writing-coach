@@ -176,7 +176,7 @@ test.describe("desktop learning workspace", () => {
     expect(await gridColumnCount(grid)).toBe(2);
   });
 
-  test("keeps essay badge and date support text at least 12px at 390px", async ({
+  test("keeps essay badge, date, and page eyebrow at least 12px at 390px", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 844 });
@@ -194,12 +194,18 @@ test.describe("desktop learning workspace", () => {
         .evaluate((element) =>
           Number.parseFloat(window.getComputedStyle(element).fontSize),
         ),
+      page
+        .locator(".page-header .eyebrow")
+        .evaluate((element) =>
+          Number.parseFloat(window.getComputedStyle(element).fontSize),
+        ),
     ]);
 
     for (const size of supportSizes) {
-      expect(size, "badge and date computed font sizes").toBeGreaterThanOrEqual(
-        12,
-      );
+      expect(
+        size,
+        "badge, date, and page eyebrow computed font sizes",
+      ).toBeGreaterThanOrEqual(12);
     }
   });
 

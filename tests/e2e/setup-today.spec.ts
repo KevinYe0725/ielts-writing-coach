@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 import {
   deterministicDemo,
@@ -105,43 +105,6 @@ test.describe("deterministic setup and Today experience", () => {
     ).toHaveCount(1);
   });
 
-  test("mixed-review opens hidden-review question selection and its start action", async ({
-    page,
-  }) => {
-    await page.goto("/today?mixed-review=1");
-
-    await expect(page).toHaveURL(/\/today\?mixed-review=1$/);
-    await expect(
-      page.getByRole("heading", {
-        name: "完成新作文并被动复测旧目标",
-      }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("heading", { name: "先选一道题" }),
-    ).toBeVisible();
-    await expect(
-      page.locator(".next-task-card").getByRole("button", {
-        name: "用这道题开始",
-      }),
-    ).toBeVisible();
-  });
-
-  test("feedback-waiting notice keeps the queued state and refresh action", async ({
-    page,
-  }) => {
-    await page.goto("/today?notice=feedback-waiting-ai");
-
-    await expect(page).toHaveURL(/\/today\?notice=feedback-waiting-ai$/);
-    await expect(
-      page.getByText("作文已提交并锁定，批改正在排队", { exact: true }),
-    ).toBeVisible();
-    await expect(
-      page.locator(".next-task-card").getByRole("link", {
-        name: "刷新状态",
-      }),
-    ).toHaveAttribute("href", "/today");
-  });
-
   test("the whole interface switches language without translating the task", async ({
     page,
   }) => {
@@ -189,5 +152,166 @@ test.describe("deterministic setup and Today experience", () => {
         document.documentElement.clientWidth,
     );
     expect(overflow).toBeLessThanOrEqual(1);
+  });
+});
+
+type TodayHttpState = "mixed-review" | "feedback-waiting";
+
+async function routeTodayHttpFixture(page: Page, state: TodayHttpState) {
+  await page.route("**/api/v1/auth/get-session", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        session: { token: "today-http-fixture" },
+        user: {
+          id: "today-http-user",
+          email: "learner@example.com",
+          name: "Learner",
+          role: "learner",
+        },
+      }),
+    });
+  });
+  await page.route("**/api/v1/notifications", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ notifications: [] }),
+    });
+  });
+  await page.route("**/api/v1/providers", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ providers: [{ enabled: true }] }),
+    });
+  });
+  await page.route("**/api/v1/growth", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        summary: {
+          essays_completed: 4,
+          independent_non_recurrence_rate: 43,
+          recorded_learning_minutes: 126,
+        },
+      }),
+    });
+  });
+  await page.route("**/api/v1/essays", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ active_count: 0, active_limit: 8, essays: [] }),
+    });
+  });
+  await page.route("**/api/v1/questions", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        questions: [
+          {
+            externalId: "http-question-education",
+            prompt:
+              "Some people believe schools should teach financial literacy. To what extent do you agree or disagree?",
+            questionType: "opinion",
+            topic: "education",
+            ieltsTrack: "academic",
+            visibility: "public",
+          },
+        ],
+      }),
+    });
+  });
+  await page.route("**/api/v1/today", async (route) => {
+    const cycle = {
+      id: "cycle-http-fixture",
+      status: state === "mixed-review" ? "CORE_CYCLE_COMPLETED" : "ANALYZING",
+      question: {
+        prompt: "HTTP-boundary Today fixture",
+        type: "opinion",
+        topic: "education",
+      },
+      resources: {
+        writing_available: true,
+        feedback_available: false,
+        lesson_id: null,
+        rewrite_task_id: null,
+        comparison_available: false,
+        transfer_task_id: null,
+        pending_job:
+          state === "feedback-waiting"
+            ? {
+                id: "job-http-feedback",
+                status: "RUNNING",
+                task_kind: "ielts_assessment",
+                error_code: null,
+                error_safe_message: null,
+              }
+            : null,
+      },
+    };
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        cycle,
+        next_action:
+          state === "mixed-review"
+            ? {
+                kind: "START_MIXED_REVIEW",
+                entityId: "mixed-review-http",
+                dueAt: null,
+              }
+            : {
+                kind: "WAIT_FOR_ASSESSMENT",
+                entityId: "cycle-http-fixture",
+                dueAt: null,
+              },
+        queue: [],
+      }),
+    });
+  });
+}
+
+test.describe("Today query states at the HTTP boundary", () => {
+  test.skip(
+    deterministicDemo,
+    "Run with NEXT_PUBLIC_DEMO_MODE=false and an isolated HTTP-mode server.",
+  );
+
+  test("mixed-review opens hidden-review question selection and its start action", async ({
+    page,
+  }) => {
+    await routeTodayHttpFixture(page, "mixed-review");
+    await page.goto("/today?mixed-review=1");
+
+    await expect(page).toHaveURL(/\/today\?mixed-review=1$/);
+    await expect(
+      page.getByRole("heading", {
+        name: "完成新作文并被动复测旧目标",
+      }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "先选一道题" }),
+    ).toBeVisible();
+    await expect(
+      page.locator(".next-task-card").getByRole("button", {
+        name: "用这道题开始",
+      }),
+    ).toBeVisible();
+  });
+
+  test("feedback-waiting notice keeps the queued state and refresh action", async ({
+    page,
+  }) => {
+    await routeTodayHttpFixture(page, "feedback-waiting");
+    await page.goto("/today?notice=feedback-waiting-ai");
+
+    await expect(page).toHaveURL(/\/today\?notice=feedback-waiting-ai$/);
+    await expect(
+      page.getByText("作文已提交并锁定，批改正在排队", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.locator(".next-task-card").getByRole("link", {
+        name: "刷新状态",
+      }),
+    ).toHaveAttribute("href", "/today");
   });
 });

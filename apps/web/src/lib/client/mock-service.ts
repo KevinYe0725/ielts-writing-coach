@@ -1133,7 +1133,7 @@ export class MockLearningClient implements LearningClient {
         },
       };
     }
-    const today: TodayData = {
+    return {
       learnerName: "Simon",
       greetingZh: "晚上好，Simon。今天只做这一件事。",
       greetingEn: "Good evening, Simon. There is only one thing to do today.",
@@ -1265,63 +1265,6 @@ export class MockLearningClient implements LearningClient {
         repeatedErrorReduction: 43,
       },
     };
-
-    const query = canUseStorage()
-      ? new URLSearchParams(window.location.search)
-      : null;
-    if (query?.get("mixed-review") === "1") {
-      return {
-        ...today,
-        nextTask: {
-          id: "mixed-review-demo",
-          kind: "first-attempt",
-          eyebrowZh: "D14 被动复测",
-          eyebrowEn: "D14 hidden review",
-          titleZh: "完成新作文并被动复测旧目标",
-          titleEn: "Write a new essay with a hidden prior-skill check",
-          descriptionZh:
-            "旧目标保持隐藏；系统只根据这篇新作文中自然出现的证据判断保持情况。",
-          descriptionEn:
-            "The prior skill stays hidden and is checked only through natural evidence in the new essay.",
-          durationMinutes: 40,
-          href: "/today?mixed-review=1",
-          actionZh: "选择新题",
-          actionEn: "Choose a new prompt",
-          dueLabelZh: "今天完成",
-          dueLabelEn: "Complete today",
-        },
-      };
-    }
-    if (query?.get("notice") === "feedback-waiting-ai") {
-      return {
-        ...today,
-        pendingJob: {
-          id: "demo-feedback-job",
-          status: "RUNNING",
-          taskKind: "ielts_assessment",
-          errorCode: null,
-          errorSafeMessage: null,
-        },
-        nextTask: {
-          id: "demo-feedback-job",
-          kind: "feedback",
-          eyebrowZh: "批改处理中",
-          eyebrowEn: "Feedback is processing",
-          titleZh: "等待批改完成",
-          titleEn: "Wait for feedback",
-          descriptionZh: "AI 任务完成后这里会自动更新。",
-          descriptionEn: "This updates when the AI job completes.",
-          durationMinutes: 0,
-          href: "/today",
-          actionZh: "刷新状态",
-          actionEn: "Refresh status",
-          dueLabelZh: "处理中",
-          dueLabelEn: "Processing",
-        },
-      };
-    }
-
-    return today;
   }
 
   async getEssayWorkspace(): Promise<EssayWorkspaceData> {

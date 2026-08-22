@@ -7,6 +7,10 @@
   margin-bottom: var(--desk-space-4);
 }
 
+.workspace :global(.page-header .eyebrow) {
+  font-size: 0.8rem;
+}
+
 .workspace :global(.page-header h1),
 .compactHeading h2 {
   letter-spacing: -0.025em;
