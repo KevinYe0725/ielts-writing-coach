@@ -47,7 +47,7 @@
   font-size: var(--desk-type-body);
 }
 :global(.score-bridge span) {
-  color: var(--ink-faint);
+  color: var(--desk-ink);
   font-size: var(--desk-type-auxiliary);
 }
 :global(.comparison-interpretation) {
@@ -170,7 +170,7 @@
 :global(.sentence-after > span) {
   display: block;
   margin-bottom: var(--desk-space-1);
-  color: var(--ink-faint);
+  color: var(--desk-ink);
   font-size: var(--desk-type-auxiliary);
   font-weight: var(--desk-weight-bold);
   letter-spacing: 0.06em;
