@@ -46,24 +46,16 @@ const httpTeaching = {
   format: "ADAPTIVE_ARTICLE_V1",
   titleZh: "把因果链中间的一步写清楚",
   titleEn: "Make the middle of a causal chain clear",
-  introductionZh: "先理解方法，再独立完成一道短句练习。",
-  introductionEn: "Understand the method, then complete one short exercise.",
+  introductionMarkdown: "先理解方法，再独立完成一道短句练习。",
   estimatedMinutes: 12,
   sections: [
     {
-      anchor: "apply-the-link",
       titleZh: "把方法用到新句子里",
       titleEn: "Apply the method in a new sentence",
-      blocks: [
-        {
-          kind: "PRACTICE",
-          titleZh: "独立补出机制",
-          titleEn: "Supply the mechanism independently",
-          prompts: [httpPrompt],
-        },
-      ],
+      markdown: "先说明变化怎样发生，再写出可以观察的结果。",
     },
   ],
+  practicePrompts: [httpPrompt],
 } as const;
 
 type PublicPracticeResponse = {
@@ -589,8 +581,8 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
       .evaluateAll((sections) => sections.map((section) => section.id));
     expect(sectionAnchors).toEqual([
       "see-the-missing-link",
-      "build-one-step-at-a-time",
-      "try-and-check",
+      "build-the-mechanism-one-step-at-a-time",
+      "transfer-the-method-to-a-new-topic",
     ]);
     await expect(contents.locator("a")).toHaveCount(sectionAnchors.length);
 
@@ -674,7 +666,9 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
       "aria-expanded",
       "false",
     );
-    const heading = page.locator("#build-one-step-at-a-time-heading");
+    const heading = page.locator(
+      "#build-the-mechanism-one-step-at-a-time-heading",
+    );
     await expect(heading).toBeFocused();
     await expect
       .poll(() =>
@@ -727,18 +721,19 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
       "children always have a better ability to absorb new knowledges",
     );
     await expect(article).not.toContainText(/你的原文|原文定位|你现在的表达/);
-    await expect(
-      article.locator('[data-teaching-block="EXPLANATION"]'),
-    ).toBeVisible();
-    await expect(
-      article.locator('[data-teaching-block="REASONING"]'),
-    ).toBeVisible();
+    const markdownBlocks = article.locator('[data-teaching-block="MARKDOWN"]');
+    await expect(markdownBlocks).toHaveCount(3);
+    await expect(markdownBlocks.nth(0)).toContainText(
+      "机制说明变化如何从起点走到终点",
+    );
+    await expect(markdownBlocks.nth(1)).toContainText(
+      "Separated cycle lanes make short journeys feel safer",
+    );
+    await expect(markdownBlocks.nth(2)).toContainText("下次写作只检查这三件事");
     await expect(
       article.locator('[data-teaching-block="PRACTICE"]'),
     ).toBeVisible();
-    await expect(
-      article.locator('[data-teaching-block="SUMMARY"]'),
-    ).toBeVisible();
+    await expect(article.locator("[data-teaching-practice]")).toHaveCount(3);
     await expect(article.locator("textarea")).toHaveCount(2);
     await expect(
       page.getByRole("link", { name: "开始60分钟训练卷" }),
@@ -760,25 +755,20 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
       }),
     ).toBeVisible();
     await expect(article.locator("[data-teaching-section]")).toHaveCount(2);
-    await expect(
-      article.locator('[data-teaching-block="TOOLKIT"]'),
-    ).toBeVisible();
-    await expect(
-      article.locator('[data-teaching-block="PITFALLS"]'),
-    ).toBeVisible();
-    await expect(
-      article.locator('[data-teaching-block="CONTRAST"]'),
-    ).toBeVisible();
-    await expect(article.getByText("较弱写法", { exact: true })).toBeVisible();
-    await expect(
-      article.getByText("更合适写法", { exact: true }),
-    ).toBeVisible();
+    const markdownBlocks = article.locator('[data-teaching-block="MARKDOWN"]');
+    await expect(markdownBlocks).toHaveCount(2);
+    await expect(markdownBlocks.nth(0)).toContainText("pose a risk to");
+    await expect(markdownBlocks.nth(1)).toContainText("用三个问题管住搭配选择");
+    await expect(article).toContainText(
+      "Untreated industrial waste poses a serious risk to river ecosystems.",
+    );
+    await expect(article).toContainText(
+      "Housing costs have a substantial influence on where young adults choose to live.",
+    );
     await expect(article.getByText("只给结论", { exact: true })).toHaveCount(0);
-    await expect(
-      article.locator('[data-teaching-block="REASONING"]'),
-    ).toHaveCount(0);
+    await expect(article.locator("[data-teaching-practice]")).toHaveCount(3);
     await expect(article.locator('input[type="radio"]')).toHaveCount(3);
-    await expect(article.locator("textarea")).toHaveCount(1);
+    await expect(article.locator("textarea")).toHaveCount(2);
   });
 
   test("freezes the first short answer, compares it immediately, and restores it after refresh", async ({

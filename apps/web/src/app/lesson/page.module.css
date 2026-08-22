@@ -1,4 +1,15 @@
+.readingPage {
+  width: min(1040px, calc(100vw - 296px));
+  max-width: none;
+  padding: 0;
+}
+
+:global([data-sidebar-state="collapsed"]) .readingPage {
+  width: min(1040px, calc(100vw - 128px));
+}
+
 .article {
+  width: 100%;
   container-name: teaching-article;
   container-type: inline-size;
   min-width: 0;
@@ -113,7 +124,7 @@
 .practiceLead,
 .toolList p,
 .pitfallList p {
-  font-size: 1.02rem;
+  font-size: 17px;
   line-height: 1.82;
 }
 
@@ -187,7 +198,7 @@
 .referenceAnswer span,
 .articleActions span {
   color: var(--ink-faint);
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 800;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -224,7 +235,7 @@
 .example figcaption {
   margin-bottom: 8px;
   color: var(--ink-faint);
-  font-size: 0.73rem;
+  font-size: 0.75rem;
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -234,7 +245,7 @@
 .referenceAnswer blockquote {
   margin: 0;
   color: #263a52;
-  font-family: var(--font-serif);
+  font-family: var(--desk-font-reading);
   font-size: 1.08rem;
   line-height: 1.78;
 }
@@ -365,7 +376,7 @@
 
 .pitfallList > section > div span {
   color: var(--green);
-  font-size: 0.74rem;
+  font-size: 0.75rem;
   font-weight: 800;
   text-transform: uppercase;
 }
@@ -402,7 +413,7 @@
 .practiceInstruction p {
   margin: 0;
   color: #2d435d;
-  font-family: var(--font-serif);
+  font-family: var(--desk-font-reading);
   font-size: 1.07rem;
   line-height: 1.75;
 }
@@ -493,7 +504,7 @@
   display: block;
   margin-bottom: 6px;
   color: var(--ink-faint);
-  font-size: 0.74rem;
+  font-size: 0.75rem;
   font-weight: 800;
   letter-spacing: 0.045em;
   text-transform: uppercase;
@@ -536,7 +547,7 @@
   margin: 0;
   overflow-wrap: anywhere;
   color: #263c55;
-  font-family: var(--font-serif);
+  font-family: var(--desk-font-reading);
   font-size: 1.03rem;
   line-height: 1.78;
 }
@@ -652,7 +663,7 @@
   color: #345b82;
   background: #eaf2fa;
   border-radius: 5px;
-  font-family: var(--font-serif);
+  font-family: var(--desk-font-reading);
 }
 
 .analysisWhy,
@@ -802,9 +813,9 @@
 
 .contentsColumn {
   position: sticky;
-  top: 24px;
+  top: 88px;
   min-width: 0;
-  max-height: calc(100dvh - 48px);
+  max-height: calc(100dvh - 104px);
   overflow-y: auto;
 }
 
@@ -819,7 +830,7 @@
 .contents > p {
   margin: 0 0 13px 14px;
   color: var(--ink-faint);
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -858,7 +869,7 @@
 
 .contents a > span {
   padding-top: 1px;
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   font-weight: 800;
 }
 
@@ -975,7 +986,7 @@
   .practiceLead,
   .toolList p,
   .pitfallList p {
-    font-size: 1rem;
+    font-size: 17px;
   }
 
   .example {
@@ -1036,6 +1047,13 @@
   }
 
   .articleActions a {
+    width: 100%;
+  }
+}
+
+@media (max-width: 1180px) {
+  .readingPage,
+  :global([data-sidebar-state="collapsed"]) .readingPage {
     width: 100%;
   }
 }

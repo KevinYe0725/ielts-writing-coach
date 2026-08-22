@@ -212,6 +212,51 @@ test.describe("annotation desk redesign contracts", () => {
     { label: "desktop", width: 1440, height: 960 },
     { label: "390px mobile", width: 390, height: 844 },
   ]) {
+    test(`teaching prose and auxiliary labels stay readable on ${viewport.label}`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({
+        width: viewport.width,
+        height: viewport.height,
+      });
+      await page.goto(
+        "/lesson?cycle=cycle-demo&lesson=lesson-collocation-perspective",
+      );
+
+      const prose = page.locator("[data-teaching-prose]").first();
+      const proseMetrics = await prose.evaluate((element) => {
+        const style = window.getComputedStyle(element);
+        return {
+          fontSize: Number.parseFloat(style.fontSize),
+          lineHeight: Number.parseFloat(style.lineHeight),
+        };
+      });
+      expect(proseMetrics.fontSize).toBeGreaterThanOrEqual(17);
+      expect(
+        proseMetrics.lineHeight / proseMetrics.fontSize,
+      ).toBeGreaterThanOrEqual(1.8);
+
+      const articleMeta = page.getByText("专项能力教程", { exact: true });
+      await expectFontSizeAtLeast(articleMeta, 12);
+
+      if (viewport.width < 720) {
+        await expectFontSizeAtLeast(
+          page.locator("[data-teaching-toc-toggle]"),
+          12,
+        );
+      } else {
+        await expectFontSizeAtLeast(
+          page.locator("[data-teaching-toc] > p"),
+          12,
+        );
+      }
+    });
+  }
+
+  for (const viewport of [
+    { label: "desktop", width: 1440, height: 960 },
+    { label: "390px mobile", width: 390, height: 844 },
+  ]) {
     test(`feedback eyebrows and badges stay at least 12px on ${viewport.label}`, async ({
       page,
     }) => {

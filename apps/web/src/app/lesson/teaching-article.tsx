@@ -455,10 +455,34 @@ function PracticePrompt({
 
 function MarkdownSection({ section }: { section: TeachingSectionMarkdown }) {
   return (
-    <div className={styles.prose} data-teaching-prose>
+    <div
+      className={styles.prose}
+      data-teaching-block="MARKDOWN"
+      data-teaching-prose
+    >
       <Markdown>{section.markdown}</Markdown>
     </div>
   );
+}
+
+function sectionAnchors(
+  sections: readonly TeachingSectionMarkdown[],
+): readonly string[] {
+  const occurrences = new Map<string, number>();
+
+  return sections.map((section, index) => {
+    const normalized = section.titleEn
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/['’]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+    const base = normalized || `section-${index + 1}`;
+    const occurrence = (occurrences.get(base) ?? 0) + 1;
+    occurrences.set(base, occurrence);
+    return occurrence === 1 ? base : `${base}-${occurrence}`;
+  });
 }
 
 function PracticePrompts({
@@ -537,12 +561,9 @@ function TeachingArticleContent({
   const restoreTimers = useRef<Record<string, number>>({});
   const mounted = useRef(true);
   const [contentsOpen, setContentsOpen] = useState(false);
-  const sectionSlug = (index: number) => `section-${index + 1}`;
-  const [activeAnchor, setActiveAnchor] = useState(sectionSlug(0));
-  const sectionSignature = useMemo(
-    () => data.sections.map((_, index) => sectionSlug(index)).join("|"),
-    [data.sections],
-  );
+  const anchors = useMemo(() => sectionAnchors(data.sections), [data.sections]);
+  const [activeAnchor, setActiveAnchor] = useState(anchors[0] ?? "section-1");
+  const sectionSignature = anchors.join("|");
 
   const clearPoll = (promptId: string) => {
     const timers = pollTimers.current[promptId];
@@ -893,7 +914,7 @@ function TeachingArticleContent({
 
   useEffect(() => {
     const sections = data.sections
-      .map((_, index) => document.getElementById(sectionSlug(index)))
+      .map((_, index) => document.getElementById(anchors[index] ?? ""))
       .filter((section): section is HTMLElement => Boolean(section));
     if (sections.length === 0 || !("IntersectionObserver" in window)) return;
 
@@ -913,7 +934,7 @@ function TeachingArticleContent({
     );
     sections.forEach((section) => observer.observe(section));
     return () => observer.disconnect();
-  }, [data.sections, sectionSignature]);
+  }, [anchors, data.sections, sectionSignature]);
 
   return (
     <article className={styles.article} data-teaching-article>
@@ -939,7 +960,7 @@ function TeachingArticleContent({
       <div className={styles.readingLayout} data-teaching-layout>
         <div className={styles.articleBody} data-teaching-content>
           {data.sections.map((section, sectionIndex) => {
-            const slug = sectionSlug(sectionIndex);
+            const slug = anchors[sectionIndex] ?? `section-${sectionIndex + 1}`;
             return (
               <section
                 aria-labelledby={`${slug}-heading`}
@@ -1023,7 +1044,7 @@ function TeachingArticleContent({
             <p>{text("本文目录", "In this tutorial")}</p>
             <ol>
               {data.sections.map((section, index) => {
-                const slug = sectionSlug(index);
+                const slug = anchors[index] ?? `section-${index + 1}`;
                 return (
                   <li key={slug}>
                     <a
