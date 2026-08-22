@@ -68,76 +68,92 @@ export async function expectVisibleTextFloor(
   minimumPixels = 12,
 ): Promise<void> {
   await expect(root, `${state}: root must be visible`).toBeVisible();
-  const report = await root.evaluate((container, minimum) => {
-    const visible = (element: Element) => {
-      if (
-        element.closest(
-          "[aria-hidden='true'], .sr-only, input[type='hidden'], svg, [hidden]",
+  const inspect = () =>
+    root.evaluate((container, minimum) => {
+      const visible = (element: Element) => {
+        if (
+          element.closest(
+            "[aria-hidden='true'], .sr-only, input[type='hidden'], svg, [hidden]",
+          )
         )
-      )
-        return false;
-      const style = window.getComputedStyle(element);
-      const rect = element.getBoundingClientRect();
-      return (
-        style.display !== "none" &&
-        style.visibility !== "hidden" &&
-        Number.parseFloat(style.opacity || "1") > 0 &&
-        rect.width > 0 &&
-        rect.height > 0
-      );
-    };
-    const candidates = [container, ...container.querySelectorAll("*")];
-    const covered: Array<{
-      fontSize: number;
-      selector: string;
-      text: string;
-    }> = [];
+          return false;
+        const style = window.getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        return (
+          style.display !== "none" &&
+          style.visibility !== "hidden" &&
+          Number.parseFloat(style.opacity || "1") > 0 &&
+          rect.width > 0 &&
+          rect.height > 0
+        );
+      };
+      const candidates = [container, ...container.querySelectorAll("*")];
+      const covered: Array<{
+        fontSize: number;
+        selector: string;
+        text: string;
+      }> = [];
 
-    for (const element of candidates) {
-      if (!visible(element)) continue;
-      const explicitTextControl = element.matches(
-        "a, button, label, input, select, textarea, output, small, time, summary, .badge, [role='tab'], [role='status'], [role='progressbar']",
-      );
-      const ownText = Array.from(element.childNodes).some(
-        (node) =>
-          node.nodeType === Node.TEXT_NODE && Boolean(node.textContent?.trim()),
-      );
-      const hasVisibleTextChild = Array.from(element.children).some(
-        (child) => visible(child) && Boolean(child.textContent?.trim()),
-      );
-      if (!explicitTextControl && (!ownText || hasVisibleTextChild)) continue;
+      for (const element of candidates) {
+        if (!visible(element)) continue;
+        const explicitTextControl = element.matches(
+          "a, button, label, input, select, textarea, output, small, time, summary, .badge, [role='tab'], [role='status'], [role='progressbar']",
+        );
+        const ownText = Array.from(element.childNodes).some(
+          (node) =>
+            node.nodeType === Node.TEXT_NODE &&
+            Boolean(node.textContent?.trim()),
+        );
+        const hasVisibleTextChild = Array.from(element.children).some(
+          (child) => visible(child) && Boolean(child.textContent?.trim()),
+        );
+        if (!explicitTextControl && (!ownText || hasVisibleTextChild)) continue;
 
-      const field = element as HTMLInputElement;
-      const text =
-        field.labels?.[0]?.textContent?.trim() ||
-        element.getAttribute("aria-label") ||
-        field.placeholder ||
-        element.textContent?.trim() ||
-        element.tagName.toLowerCase();
-      if (!text) continue;
-      covered.push({
-        fontSize: Number.parseFloat(window.getComputedStyle(element).fontSize),
-        selector: `${element.tagName.toLowerCase()}${element.className ? `.${String(element.className).trim().replace(/\s+/g, ".")}` : ""}`,
-        text: text.slice(0, 100),
-      });
-    }
+        const field = element as HTMLInputElement;
+        const text =
+          field.labels?.[0]?.textContent?.trim() ||
+          element.getAttribute("aria-label") ||
+          field.placeholder ||
+          element.textContent?.trim() ||
+          element.tagName.toLowerCase();
+        if (!text) continue;
+        covered.push({
+          fontSize: Number.parseFloat(
+            window.getComputedStyle(element).fontSize,
+          ),
+          selector: `${element.tagName.toLowerCase()}${element.className ? `.${String(element.className).trim().replace(/\s+/g, ".")}` : ""}`,
+          text: text.slice(0, 100),
+        });
+      }
 
-    return {
-      covered: covered.length,
-      violations: covered.filter(
-        ({ fontSize }) => !Number.isFinite(fontSize) || fontSize < minimum,
-      ),
-    };
-  }, minimumPixels);
+      return {
+        covered: covered.length,
+        violations: covered.filter(
+          ({ fontSize }) => !Number.isFinite(fontSize) || fontSize < minimum,
+        ),
+      };
+    }, minimumPixels);
 
+  let report = await inspect();
+  await expect
+    .poll(
+      async () => {
+        report = await inspect();
+        return {
+          hasCoverage: report.covered > 0,
+          violations: report.violations,
+        };
+      },
+      {
+        message: `${state}: wait for visible text and computed CSS`,
+        timeout: 15_000,
+      },
+    )
+    .toEqual({ hasCoverage: true, violations: [] });
   expect(
     report.covered,
     `${state}: visible text/control coverage`,
   ).toBeGreaterThan(0);
-  expect(
-    report.violations,
-    `${state}: ${JSON.stringify(report.violations, null, 2)}`,
-  ).toEqual([]);
 }
 
 export async function expectPageLayout(
