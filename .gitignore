@@ -8,6 +8,7 @@ test-results/
 results.sarif
 .playwright-cli/
 output/
+.superpowers/sdd/
 **/*.tsbuildinfo
 **/__pycache__/
 **/*.py[cod]
