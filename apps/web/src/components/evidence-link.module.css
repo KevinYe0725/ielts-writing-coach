@@ -55,7 +55,7 @@
 }
 
 .unavailable {
-  --evidence-color: var(--desk-error);
+  --evidence-color: var(--desk-evidence-muted);
 }
 
 .unavailable .line {
@@ -72,13 +72,35 @@
 
 @media (max-width: 520px) {
   .evidenceLink {
+    position: relative;
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     row-gap: var(--desk-space-1);
   }
 
+  .evidenceLink:not(.disabled) {
+    padding-left: var(--desk-space-3);
+  }
+
   .line {
+    position: absolute;
+    top: 2px;
+    bottom: 2px;
+    left: 0;
+    width: 0;
+    min-width: 0;
+    height: auto;
+    border-top: 0;
+    border-left: 3px solid currentColor;
+    transform: none;
+  }
+
+  .line::after {
     display: none;
+  }
+
+  .unavailable .line {
+    border-left-style: dashed;
   }
 
   .label {
