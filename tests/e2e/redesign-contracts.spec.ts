@@ -36,14 +36,21 @@ async function expectFontSizeAtLeast(
   expect(fontSize).toBeGreaterThanOrEqual(minimumPixels);
 }
 
-async function expectFrozenHookWithModuleClass(
+async function expectComputedStyles(
   locator: Locator,
-  frozenHook: string,
+  expectedStyles: Record<string, string>,
 ): Promise<void> {
   await expect(locator).toBeAttached();
-  const classes = await locator.evaluate((element) => [...element.classList]);
-  expect(classes).toContain(frozenHook);
-  expect(classes.some((className) => className !== frozenHook)).toBe(true);
+  const computedStyles = await locator.evaluate((element, properties) => {
+    const style = window.getComputedStyle(element);
+    return Object.fromEntries(
+      Object.keys(properties).map((property) => [
+        property,
+        style.getPropertyValue(property),
+      ]),
+    );
+  }, expectedStyles);
+  expect(computedStyles).toEqual(expectedStyles);
 }
 
 test.describe("annotation desk redesign contracts", () => {
@@ -69,24 +76,30 @@ test.describe("annotation desk redesign contracts", () => {
   test("keeps frozen hooks attached while modules own their visual surfaces", async ({
     page,
   }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/today");
-    await expectFrozenHookWithModuleClass(
-      page.locator(".mobile-header"),
-      "mobile-header",
-    );
-    await expect(page.locator(".mobile-menu")).toBeAttached();
-    await expectFrozenHookWithModuleClass(
-      page.locator(".next-task-card"),
-      "next-task-card",
-    );
+    const mobileHeader = page.locator(".mobile-header");
+    const mobileMenu = page.locator(".mobile-menu");
+    const nextTask = page.locator(".next-task-card");
+    await expect(mobileHeader).toHaveClass(/mobile-header/);
+    await expectComputedStyles(mobileHeader, {
+      display: "flex",
+      position: "sticky",
+    });
+    await expect(mobileMenu).toHaveClass(/mobile-menu/);
+    await expectComputedStyles(mobileMenu, { position: "relative" });
+    await expect(nextTask).toHaveClass(/next-task-card/);
+    await expectComputedStyles(nextTask, { position: "relative" });
 
     await page.goto(
       "/lesson/paper?cycle=cycle-demo&lesson=lesson-collocation-perspective",
     );
-    await expectFrozenHookWithModuleClass(
-      page.locator(".practice-paper-question").first(),
-      "practice-paper-question",
-    );
+    const paperQuestion = page.locator(".practice-paper-question").first();
+    await expect(paperQuestion).toHaveClass(/practice-paper-question/);
+    await expectComputedStyles(paperQuestion, {
+      "border-radius": "0px",
+      "box-shadow": "none",
+    });
   });
 
   test("entry surfaces use the entry layout without leaking one-time tokens", async ({

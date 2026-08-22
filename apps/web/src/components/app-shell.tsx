@@ -299,7 +299,7 @@ function MobileHeader({
       <Brand />
       <div className="mobile-header-actions">
         <LocaleSwitch />
-        <details className="mobile-menu">
+        <details className={cn("mobile-menu", styles.mobileMenu)}>
           <summary aria-label={text("打开导航", "Open navigation")}>
             <Menu aria-hidden="true" size={21} />
           </summary>

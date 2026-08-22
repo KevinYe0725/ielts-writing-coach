@@ -412,11 +412,11 @@
   width: min(1320px, 100%);
 }
 
-:global(.mobile-header) {
+.mobileHeader {
   display: none;
 }
 
-:global(.mobile-menu summary) {
+.mobileMenu summary {
   display: grid;
   width: 40px;
   height: 40px;
@@ -428,10 +428,10 @@
   place-items: center;
 }
 
-:global(.mobile-menu summary::-webkit-details-marker) {
+.mobileMenu summary::-webkit-details-marker {
   display: none;
 }
-:global(.mobile-menu-panel) {
+.mobileMenuPanel {
   display: none;
 }
 @media (min-width: 961px) and (max-width: 1120px) {
@@ -451,7 +451,7 @@
   }
 }
 @media (max-width: 960px) {
-  :global(.mobile-header) {
+  .mobileHeader {
     position: sticky;
     z-index: 30;
     top: 0;
@@ -466,24 +466,24 @@
   }
 }
 @media (max-width: 960px) {
-  :global(.mobile-header .brand-copy small) {
+  .mobileHeader :global(.brand-copy small) {
     display: none;
   }
 }
 @media (max-width: 960px) {
-  :global(.mobile-header-actions) {
+  .mobileHeader :global(.mobile-header-actions) {
     display: flex;
     align-items: center;
     gap: 7px;
   }
 }
 @media (max-width: 960px) {
-  :global(.mobile-menu) {
+  .mobileMenu {
     position: relative;
   }
 }
 @media (max-width: 960px) {
-  :global(.mobile-menu[open] .mobile-menu-panel) {
+  .mobileMenu[open] .mobileMenuPanel {
     position: absolute;
     top: 48px;
     right: 0;
@@ -497,7 +497,7 @@
   }
 }
 @media (max-width: 960px) {
-  :global(.mobile-menu-panel > p) {
+  .mobileMenuPanel > p {
     margin: 3px 7px 10px;
     color: var(--ink-faint);
     font-size: 0.75rem;
@@ -707,13 +707,20 @@
 }
 
 .entryTopbar {
+  display: flex;
+  width: min(1180px, calc(100% - 40px));
+  min-height: 76px;
+  margin: 0 auto;
   background: color-mix(in srgb, var(--desk-paper) 94%, transparent);
   border-color: color-mix(in srgb, var(--desk-ink) 13%, transparent);
+  align-items: center;
+  justify-content: space-between;
 }
 
 .entryMain {
   width: 100%;
   min-width: 0;
+  padding: 30px 20px 80px;
 }
 
 .accountMenu {
@@ -790,5 +797,17 @@
 
   .entryShell {
     background: var(--desk-canvas);
+  }
+
+  .entryMain {
+    padding: 16px 14px 60px;
+  }
+
+  .entryTopbar {
+    width: calc(100% - 28px);
+  }
+
+  .entryTopbar :global(.brand-copy small) {
+    display: none;
   }
 }

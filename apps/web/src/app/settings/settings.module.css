@@ -1,3 +1,23 @@
+/* Shared form hooks owned on this surface. */
+:where(.page) :global(.form-grid) {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+:where(.page) :global(.form-field-wide) {
+  grid-column: 1 / -1;
+}
+@media (max-width: 760px) {
+  :where(.page) :global(.form-grid) {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 760px) {
+  :where(.page) :global(.form-field-wide) {
+    grid-column: auto;
+  }
+}
+
 /* Legacy hooks scoped to this module; DOM classes remain for compatibility. */
 :global(.settings-layout) {
   display: grid;
