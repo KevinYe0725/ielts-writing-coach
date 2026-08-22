@@ -53,3 +53,21 @@ export async function expectBasicAccessibility(page: Page): Promise<void> {
     unnamedButtons: 0,
   });
 }
+
+export async function expectNoHorizontalOverflow(page: Page): Promise<void> {
+  const size = await page.evaluate(() => ({
+    client: document.documentElement.clientWidth,
+    scroll: document.documentElement.scrollWidth,
+  }));
+  expect(size.scroll).toBeLessThanOrEqual(size.client);
+}
+
+export async function expectPageLayout(
+  page: Page,
+  variant: "focus" | "workspace" | "reading",
+): Promise<void> {
+  await expect(page.locator("main")).toHaveAttribute(
+    "data-page-layout",
+    variant,
+  );
+}
