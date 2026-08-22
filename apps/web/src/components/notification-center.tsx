@@ -6,6 +6,9 @@ import { useCallback, useEffect, useState } from "react";
 import { Bell, Check } from "lucide-react";
 
 import { useLocale } from "@/components/locale-provider";
+import { cn } from "@/components/utils";
+
+import styles from "./app-shell.module.css";
 
 interface NotificationItem {
   id: string;
@@ -65,14 +68,17 @@ export function NotificationCenter() {
   };
 
   return (
-    <details className="notification-center">
-      <summary aria-label={text("查看提醒", "View notifications")}>
+    <details className={cn("notification-center", styles.notificationCenter)}>
+      <summary
+        aria-label={text("查看提醒", "View notifications")}
+        className={styles.notificationSummary}
+      >
         <Bell aria-hidden="true" size={17} />
         {unread.length > 0 ? (
           <span aria-label={`${unread.length} unread`}>{unread.length}</span>
         ) : null}
       </summary>
-      <div className="notification-panel">
+      <div className={cn("notification-panel", styles.notificationPanel)}>
         <strong>{text("提醒", "Notifications")}</strong>
         {unread.length === 0 ? (
           <p>{text("暂无新提醒。", "No new notifications.")}</p>

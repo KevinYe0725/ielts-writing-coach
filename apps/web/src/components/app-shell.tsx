@@ -12,6 +12,7 @@ import {
   BarChart3,
   BookOpenCheck,
   BrainCircuit,
+  ChevronRight,
   ClipboardCheck,
   FileDiff,
   Feather,
@@ -30,12 +31,15 @@ import {
 import { useLocale } from "@/components/locale-provider";
 import { NotificationCenter } from "@/components/notification-center";
 import { AccountMenu } from "@/components/account-menu";
+import { layoutVariantForPathname } from "@/components/layout/page-layout";
 import { cn } from "@/components/utils";
 import {
   buildLearningDestinations,
   readLearningDestinations,
   type LearningDestinations,
 } from "@/lib/client/learning-navigation";
+
+import styles from "./app-shell.module.css";
 
 const navItems = [
   { href: "/today", key: "today", icon: Home },
@@ -55,6 +59,33 @@ const utilityItems = [
 const SIDEBAR_STORAGE_KEY = "iwc:sidebar-collapsed:v1";
 const SIDEBAR_CHANGE_EVENT = "iwc:sidebar-preference";
 let transientSidebarCollapsed = false;
+
+function useLearningDestinations(pathname: string) {
+  const [destinations, setDestinations] = useState<LearningDestinations>(() =>
+    buildLearningDestinations({
+      cycleId: null,
+      writingAvailable: false,
+      feedbackAvailable: false,
+      lessonId: null,
+      rewriteTaskId: null,
+      comparisonAvailable: false,
+      transferTaskId: null,
+    }),
+  );
+
+  useEffect(() => {
+    const update = () => setDestinations(readLearningDestinations());
+    window.addEventListener("storage", update);
+    window.addEventListener("iwc:learning-navigation", update);
+    update();
+    return () => {
+      window.removeEventListener("storage", update);
+      window.removeEventListener("iwc:learning-navigation", update);
+    };
+  }, [pathname]);
+
+  return destinations;
+}
 
 function sidebarCollapsedSnapshot() {
   if (typeof window === "undefined") return false;
@@ -102,7 +133,7 @@ function LocaleSwitch() {
   return (
     <button
       aria-label={text("切换到英文界面", "Switch to Chinese interface")}
-      className="locale-switch"
+      className={cn("locale-switch", styles.localeSwitch)}
       onClick={() => setLocale(next)}
       type="button"
     >
@@ -117,7 +148,7 @@ function Brand() {
   return (
     <Link
       aria-label={`${messages.brand} · ${messages.nav.today}`}
-      className="brand"
+      className={cn("brand", styles.brand)}
       href="/today"
     >
       <span className="brand-mark" aria-hidden="true">
@@ -131,30 +162,29 @@ function Brand() {
   );
 }
 
-function Navigation({ compact = false }: { compact?: boolean }) {
+function destinationForItem(
+  item: (typeof navItems)[number],
+  destinations: LearningDestinations,
+) {
+  return item.key === "essays" ? item.href : destinations[item.key];
+}
+
+function itemIsActive(pathname: string, item: (typeof navItems)[number]) {
+  return (
+    pathname === item.href ||
+    (item.href === "/lesson" && pathname.startsWith("/lesson/"))
+  );
+}
+
+function Navigation({
+  compact = false,
+  destinations,
+}: {
+  compact?: boolean;
+  destinations: LearningDestinations;
+}) {
   const pathname = usePathname();
   const { messages, text } = useLocale();
-  const [destinations, setDestinations] = useState<LearningDestinations>(() =>
-    buildLearningDestinations({
-      cycleId: null,
-      writingAvailable: false,
-      feedbackAvailable: false,
-      lessonId: null,
-      rewriteTaskId: null,
-      comparisonAvailable: false,
-      transferTaskId: null,
-    }),
-  );
-  useEffect(() => {
-    const update = () => setDestinations(readLearningDestinations());
-    window.addEventListener("storage", update);
-    window.addEventListener("iwc:learning-navigation", update);
-    update();
-    return () => {
-      window.removeEventListener("storage", update);
-      window.removeEventListener("iwc:learning-navigation", update);
-    };
-  }, [pathname]);
   return (
     <nav
       aria-label={text("主导航", "Primary navigation")}
@@ -166,11 +196,8 @@ function Navigation({ compact = false }: { compact?: boolean }) {
         ) : null}
         {navItems.map((item) => {
           const Icon = item.icon;
-          const active =
-            pathname === item.href ||
-            (item.href === "/lesson" && pathname.startsWith("/lesson/"));
-          const destination =
-            item.key === "essays" ? item.href : destinations[item.key];
+          const active = itemIsActive(pathname, item);
+          const destination = destinationForItem(item, destinations);
           if (!destination) {
             return (
               <span
@@ -227,13 +254,23 @@ function Navigation({ compact = false }: { compact?: boolean }) {
   );
 }
 
-function Sidebar({ hidden }: { hidden: boolean }) {
+function Sidebar({
+  destinations,
+  hidden,
+}: {
+  destinations: LearningDestinations;
+  hidden: boolean;
+}) {
   const { text } = useLocale();
   return (
-    <aside className="sidebar" hidden={hidden} id="primary-sidebar">
+    <aside
+      className={cn("sidebar", styles.sidebar)}
+      hidden={hidden}
+      id="primary-sidebar"
+    >
       <Brand />
-      <Navigation />
-      <div className="sidebar-foot">
+      <Navigation destinations={destinations} />
+      <div className={cn("sidebar-foot", styles.sidebarFoot)}>
         <div className="system-mini-card">
           <span className="system-mini-icon" aria-hidden="true">
             <UserRound size={17} />
@@ -251,10 +288,14 @@ function Sidebar({ hidden }: { hidden: boolean }) {
   );
 }
 
-function MobileHeader() {
+function MobileHeader({
+  destinations,
+}: {
+  destinations: LearningDestinations;
+}) {
   const { messages, text } = useLocale();
   return (
-    <header className="mobile-header">
+    <header className={cn("mobile-header", styles.mobileHeader)}>
       <Brand />
       <div className="mobile-header-actions">
         <LocaleSwitch />
@@ -262,9 +303,9 @@ function MobileHeader() {
           <summary aria-label={text("打开导航", "Open navigation")}>
             <Menu aria-hidden="true" size={21} />
           </summary>
-          <div className="mobile-menu-panel">
+          <div className={cn("mobile-menu-panel", styles.mobileMenuPanel)}>
             <p>{messages.brandTagline}</p>
-            <Navigation compact />
+            <Navigation compact destinations={destinations} />
             <div className="mobile-utility-links">
               <Link href="/settings">
                 <Settings aria-hidden="true" size={17} />
@@ -280,15 +321,39 @@ function MobileHeader() {
 }
 
 function Topbar({
+  destinations,
+  pathname,
   sidebarExpanded,
   onToggleSidebar,
 }: {
+  destinations: LearningDestinations;
+  pathname: string;
   sidebarExpanded: boolean;
   onToggleSidebar: () => void;
 }) {
-  const { text } = useLocale();
+  const { messages, text } = useLocale();
+  const activeItem = navItems.find((item) => itemIsActive(pathname, item));
+  const activeUtility = utilityItems.find((item) => pathname === item.href);
+  const context = activeItem
+    ? {
+        href: destinationForItem(activeItem, destinations) ?? activeItem.href,
+        icon: activeItem.icon,
+        label: messages.nav[activeItem.key],
+      }
+    : activeUtility
+      ? {
+          href: activeUtility.href,
+          icon: activeUtility.icon,
+          label: messages.nav[activeUtility.key],
+        }
+      : {
+          href: destinations.today,
+          icon: Home,
+          label: messages.nav.today,
+        };
+  const ContextIcon = context.icon;
   return (
-    <header className="topbar">
+    <header className={cn("topbar", styles.topbar)}>
       <div className="topbar-leading">
         <button
           aria-controls="primary-sidebar"
@@ -314,14 +379,23 @@ function Topbar({
             )}
           </span>
         </button>
-        <div className="focus-message">
-          <Sparkles aria-hidden="true" size={16} />
-          <span>
-            {text(
-              "流程已经排好，你只需完成眼前一步",
-              "The sequence is planned; focus only on the next action",
-            )}
+        <div
+          className={cn("focus-message", styles.contextTopbar)}
+          data-context-topbar
+        >
+          <span className={styles.contextKicker}>
+            <Sparkles aria-hidden="true" size={14} />
+            {text("当前步骤", "Current step")}
           </span>
+          <Link
+            aria-current="page"
+            className={styles.contextLink}
+            href={context.href}
+          >
+            <ContextIcon aria-hidden="true" size={17} />
+            <span>{context.label}</span>
+            <ChevronRight aria-hidden="true" size={15} />
+          </Link>
         </div>
       </div>
       <div className="topbar-actions">
@@ -335,6 +409,8 @@ function Topbar({
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { text } = useLocale();
+  const destinations = useLearningDestinations(pathname);
+  const layoutVariant = layoutVariantForPathname(pathname);
   const sidebarCollapsed = useSyncExternalStore(
     subscribeToSidebarPreference,
     sidebarCollapsedSnapshot,
@@ -346,15 +422,20 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   if (setup) {
     return (
-      <div className="setup-shell">
+      <div className={cn("setup-shell", styles.entryShell)}>
         <a className="skip-link" href="#main-content">
           {text("跳到主要内容", "Skip to main content")}
         </a>
-        <header className="setup-topbar">
+        <header className={cn("setup-topbar", styles.entryTopbar)}>
           <Brand />
           <LocaleSwitch />
         </header>
-        <main id="main-content" tabIndex={-1}>
+        <main
+          className={styles.entryMain}
+          data-page-layout={layoutVariant}
+          id="main-content"
+          tabIndex={-1}
+        >
           {children}
         </main>
       </div>
@@ -363,21 +444,29 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div
-      className="app-shell"
+      className={cn("app-shell", styles.shell)}
       data-app-shell
+      data-design-system="annotation-desk-v1"
       data-sidebar-state={sidebarCollapsed ? "collapsed" : "expanded"}
     >
       <a className="skip-link" href="#main-content">
         {text("跳到主要内容", "Skip to main content")}
       </a>
-      <Sidebar hidden={sidebarCollapsed} />
-      <div className="app-column">
-        <MobileHeader />
+      <Sidebar destinations={destinations} hidden={sidebarCollapsed} />
+      <div className={cn("app-column", styles.appColumn)}>
+        <MobileHeader destinations={destinations} />
         <Topbar
+          destinations={destinations}
           onToggleSidebar={() => saveSidebarPreference(!sidebarCollapsed)}
+          pathname={pathname}
           sidebarExpanded={!sidebarCollapsed}
         />
-        <main className="main-content" id="main-content" tabIndex={-1}>
+        <main
+          className={cn("main-content", styles.mainContent)}
+          data-page-layout={layoutVariant}
+          id="main-content"
+          tabIndex={-1}
+        >
           {children}
         </main>
       </div>

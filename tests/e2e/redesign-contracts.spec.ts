@@ -12,10 +12,7 @@ const routeMatrix = [
   ["/essays", "focus"],
   ["/write?cycle=cycle-demo", "workspace"],
   ["/feedback?cycle=cycle-demo", "workspace"],
-  [
-    "/lesson?cycle=cycle-demo&lesson=lesson-collocation-perspective",
-    "reading",
-  ],
+  ["/lesson?cycle=cycle-demo&lesson=lesson-collocation-perspective", "reading"],
   [
     "/lesson/paper?cycle=cycle-demo&lesson=lesson-collocation-perspective",
     "workspace",
@@ -31,10 +28,6 @@ test.describe("annotation desk redesign contracts", () => {
   test.beforeEach(async ({ page }) => resetDemoState(page));
 
   test("declares the annotation desk design system", async ({ page }) => {
-    test.fail(
-      true,
-      "The annotation desk design-system and layout attributes arrive in Tasks 2-3.",
-    );
     await page.goto("/today");
     await expect(page.locator("[data-app-shell]")).toHaveAttribute(
       "data-design-system",
@@ -46,12 +39,16 @@ test.describe("annotation desk redesign contracts", () => {
     );
   });
 
+  test("entry pages expose their page-layout contract", async ({ page }) => {
+    await page.goto("/signin");
+    await expect(page.locator("main")).toHaveAttribute(
+      "data-page-layout",
+      "entry",
+    );
+  });
+
   for (const [route, layout] of routeMatrix) {
     test(`${route} uses ${layout}`, async ({ page }) => {
-      test.fail(
-        true,
-        "The annotation desk page-layout attributes arrive in Tasks 2-3.",
-      );
       await page.goto(route);
       await expectPageLayout(page, layout);
     });

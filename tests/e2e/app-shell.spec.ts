@@ -17,6 +17,23 @@ async function gridColumnCount(
   });
 }
 
+async function signedInSession(page: import("@playwright/test").Page) {
+  await page.route("**/api/v1/auth/get-session", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        session: { token: "never-rendered" },
+        user: {
+          id: "shell-test-user",
+          email: "learner@example.com",
+          name: "Learner",
+          role: "learner",
+        },
+      }),
+    });
+  });
+}
+
 test.describe("desktop learning workspace", () => {
   test.skip(
     !deterministicDemo,
@@ -90,7 +107,9 @@ test.describe("desktop learning workspace", () => {
     await expect(page.locator("[data-sidebar-toggle]")).toBeHidden();
     await expect(page.locator("#primary-sidebar")).toBeHidden();
     await expect(page.locator(".mobile-header")).toBeVisible();
-    await page.locator(".mobile-menu > summary").click();
+    const menu = page.locator(".mobile-menu > summary");
+    await expect(menu).toHaveAccessibleName(/打开导航|open navigation/i);
+    await menu.click();
     await expect(page.locator(".mobile-menu-panel")).toBeVisible();
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth),
@@ -136,5 +155,142 @@ test.describe("desktop learning workspace", () => {
     await expect(
       page.locator('[data-essay-workspace="compact"]'),
     ).toBeVisible();
+  });
+
+  test("keeps the active learning step and cycle-safe destination in the context topbar", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto(feedbackUrl);
+
+    const contextLink = page
+      .locator("[data-context-topbar]")
+      .getByRole("link", { name: /批改|feedback/i });
+    await expect(contextLink).toBeVisible();
+    await expect(contextLink).toHaveAttribute(
+      "href",
+      "/feedback?cycle=cycle-demo",
+    );
+  });
+
+  test("persists the locale choice in storage and across app navigation", async ({
+    page,
+  }) => {
+    await page.goto("/today");
+
+    await page.locator(".topbar .locale-switch").click();
+    await expect(page.locator("html")).toHaveAttribute("lang", "en");
+    await expect
+      .poll(() =>
+        page.evaluate(() => window.localStorage.getItem("iwc.locale")),
+      )
+      .toBe("en");
+
+    await page.getByRole("link", { name: /我的作文|my essays/i }).click();
+    await expect(page).toHaveURL(/\/essays$/);
+    await expect(page.locator("html")).toHaveAttribute("lang", "en");
+    await expect(page.locator(".topbar .locale-switch")).toHaveAccessibleName(
+      "Switch to Chinese interface",
+    );
+  });
+
+  test("returns account-menu focus on Escape and clears learning destinations on logout", async ({
+    page,
+  }) => {
+    await signedInSession(page);
+    await page.route("**/api/v1/auth/sign-out", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ success: true }),
+      });
+    });
+    await page.goto("/today");
+    await expect(
+      page.locator('[data-essay-workspace="compact"]'),
+    ).toBeVisible();
+    await page.evaluate(() => {
+      window.sessionStorage.setItem(
+        "iwc:learning-navigation:v1",
+        JSON.stringify({ feedback: "/feedback?cycle=private-cycle" }),
+      );
+    });
+
+    const trigger = page.getByRole("button", { name: /learner@example\.com/i });
+    await trigger.click();
+    await expect(page.getByRole("menu")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(trigger).toBeFocused();
+
+    await trigger.click();
+    await page.getByRole("menuitem", { name: /退出登录|sign out/i }).click();
+    await expect(page).toHaveURL(/\/signin$/);
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          window.sessionStorage.getItem("iwc:learning-navigation:v1"),
+        ),
+      )
+      .toBeNull();
+  });
+
+  test("skip link moves keyboard focus to the main workspace", async ({
+    page,
+  }) => {
+    await page.goto("/today");
+
+    const skipLink = page.locator('a.skip-link[href="#main-content"]');
+    await skipLink.focus();
+    await expect(skipLink).toBeVisible();
+    await skipLink.click();
+    await expect(page.locator("#main-content")).toBeFocused();
+  });
+});
+
+test.describe("notification center against the HTTP boundary", () => {
+  test.skip(
+    deterministicDemo,
+    "The deterministic browser demo intentionally does not call notification APIs.",
+  );
+
+  test("shows unread notifications and marks one as read", async ({ page }) => {
+    await signedInSession(page);
+    await page.route("**/api/v1/notifications", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          notifications: [
+            {
+              id: "notification-1",
+              readAt: null,
+              payload: {
+                titleZh: "批注已就绪",
+                titleEn: "Annotations are ready",
+                href: "/feedback?cycle=cycle-demo",
+              },
+              scheduledAt: "2026-08-22T08:00:00.000Z",
+            },
+          ],
+        }),
+      });
+    });
+    await page.route(
+      "**/api/v1/notifications/notification-1/read",
+      async (route) => {
+        await route.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify({ success: true }),
+        });
+      },
+    );
+
+    await page.goto("/today");
+    const center = page.locator(".notification-center");
+    await expect(center.getByLabel("1 unread")).toBeVisible();
+    await center.locator("summary").click();
+    await center
+      .getByRole("button", { name: /标为已读|mark as read/i })
+      .click();
+    await expect(center.getByLabel("1 unread")).toHaveCount(0);
+    await expect(center).toContainText(/暂无新提醒|no new notifications/i);
   });
 });

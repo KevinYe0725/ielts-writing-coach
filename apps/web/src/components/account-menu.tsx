@@ -13,6 +13,8 @@ import {
   type AccountIdentity,
 } from "@/lib/client/account-session";
 
+import styles from "./app-shell.module.css";
+
 type AccountMenuVariant = "sidebar" | "mobile";
 
 function roleLabel(role: AccountIdentity["role"], chinese: boolean) {
@@ -81,7 +83,11 @@ export function AccountMenu({ variant }: { variant: AccountMenuVariant }) {
 
   return (
     <div
-      className={cn("account-menu", `account-menu-${variant}`)}
+      className={cn(
+        "account-menu",
+        `account-menu-${variant}`,
+        styles.accountMenu,
+      )}
       data-account-menu={variant}
       ref={wrapperRef}
     >
@@ -97,7 +103,7 @@ export function AccountMenu({ variant }: { variant: AccountMenuVariant }) {
               )
             : text("正在读取账户", "Loading account")
         }
-        className="account-trigger"
+        className={cn("account-trigger", styles.accountTrigger)}
         disabled={!identity}
         onClick={() => {
           setError(null);
@@ -120,7 +126,7 @@ export function AccountMenu({ variant }: { variant: AccountMenuVariant }) {
       {open && identity ? (
         <div
           aria-label={text("账户菜单", "Account menu")}
-          className="account-popover"
+          className={cn("account-popover", styles.accountPopover)}
           id={menuId}
           role="menu"
         >
