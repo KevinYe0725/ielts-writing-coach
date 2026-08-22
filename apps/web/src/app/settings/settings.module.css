@@ -54,19 +54,12 @@
 .page :global(.settings-section-head p),
 .page :global(.eyebrow),
 .page :global(.badge),
-.page :global(label),
-.page :global(input),
-.page :global(select),
-.page :global(button),
-.page :global(small),
-.page :global([role="tab"]),
-.page :global(progress),
-.page :global([role="progressbar"]),
 .page :global(.field-hint),
 .page :global(.settings-savebar > span),
 .page :global(.data-action-list small),
 .page :global(.connection-overview span),
 .page :global(.connection-health-row),
+.page :global(.connection-health-row small),
 .page :global(.routing-details summary),
 .page :global(.routing-details p),
 .page :global(.route-editor-row strong),
@@ -78,6 +71,16 @@
 .page :global(.import-result dd),
 .page :global(.route-editor-row .text-input),
 .page :global(.import-data-action input[type="file"]) {
+  font-size: max(0.8rem, 12px);
+}
+
+.page :global(.text-input),
+.page :global(.select-input),
+.page :global(.button:not(.button-sm)) {
+  font-size: 15px;
+}
+
+.page :global(.day-picker button) {
   font-size: max(0.8rem, 12px);
 }
 

@@ -69,11 +69,6 @@
 .surface :global(.badge),
 .surface :global(.setup-steps li > span),
 .surface :global(.setup-steps li strong),
-.surface :global(label),
-.surface :global(input),
-.surface :global(select),
-.surface :global(button),
-.surface :global(small),
 .surface :global(.field-hint),
 .surface :global(.save-mode small),
 .surface :global(.probe-header span),
@@ -86,6 +81,12 @@
 .surface :global(.advanced-disclosure summary),
 .surface :global(.advanced-disclosure p) {
   font-size: max(0.8rem, 12px);
+}
+
+.surface :global(.text-input),
+.surface :global(.select-input),
+.surface :global(.button:not(.button-sm)) {
+  font-size: 15px;
 }
 
 @media (max-width: 700px) {

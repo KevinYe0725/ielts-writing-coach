@@ -429,5 +429,51 @@ test.describe("account controls", () => {
       await page.goto("/account");
       await expectVisibleTextFloor(page.getByRole("main"), "/account");
     });
+
+    test(`primary controls retain the body-size type scale on ${viewport.label}`, async ({
+      page,
+    }) => {
+      await signedInSession(page);
+      await page.setViewportSize(viewport);
+
+      await page.goto("/signin");
+      await expectAllVisibleFontsAtLeast(
+        page.locator("#signin-email"),
+        "/signin email input",
+        14.5,
+      );
+      await expectAllVisibleFontsAtLeast(
+        page.getByRole("button", { name: "继续", exact: true }),
+        "/signin primary button",
+        14.5,
+      );
+
+      await page.goto("/setup");
+      await expectAllVisibleFontsAtLeast(
+        page.getByRole("button", { name: "继续", exact: true }),
+        "/setup primary button",
+        14.5,
+      );
+
+      await page.goto("/settings");
+      await page.getByRole("button", { name: "计划与提醒" }).click();
+      await expectAllVisibleFontsAtLeast(
+        page.getByLabel("时区"),
+        "/settings standard select",
+        14.5,
+      );
+      await expectAllVisibleFontsAtLeast(
+        page.getByLabel("常用学习时间"),
+        "/settings standard text input",
+        14.5,
+      );
+
+      await page.goto("/account");
+      await expectAllVisibleFontsAtLeast(
+        page.getByLabel("当前密码"),
+        "/account password input",
+        14.5,
+      );
+    });
   }
 });

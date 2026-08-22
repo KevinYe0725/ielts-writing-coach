@@ -22,16 +22,14 @@
   text-align: center;
 }
 
-.page :global(.badge),
-.page :global(label),
-.page :global(input),
-.page :global(select),
-.page :global(button),
-.page :global(small),
-.page :global([role="tab"]),
-.page :global(progress),
-.page :global([role="progressbar"]) {
+.page :global(.badge) {
   font-size: max(0.8rem, 12px);
+}
+
+.page :global(.text-input),
+.page :global(.select-input),
+.page :global(.button:not(.button-sm)) {
+  font-size: 15px;
 }
 
 .heading {
