@@ -6,8 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
-  useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 
@@ -22,37 +21,58 @@ interface LocaleContextValue {
 }
 
 const LocaleContext = createContext<LocaleContextValue | null>(null);
+const LOCALE_STORAGE_KEY = "iwc.locale";
+const LOCALE_CHANGE_EVENT = "iwc:locale-change";
+let transientLocale: Locale = "zh-CN";
+
+function localeSnapshot(): Locale {
+  if (typeof window === "undefined") return transientLocale;
+  try {
+    const saved = window.localStorage.getItem(LOCALE_STORAGE_KEY);
+    if (saved === "en" || saved === "zh-CN") transientLocale = saved;
+  } catch {
+    // The in-memory preference keeps this tab usable when storage is blocked.
+  }
+  return transientLocale;
+}
+
+function subscribeToLocale(onStoreChange: () => void) {
+  const handleStorage = (event: StorageEvent) => {
+    if (event.key !== LOCALE_STORAGE_KEY) return;
+    transientLocale =
+      event.newValue === "en" || event.newValue === "zh-CN"
+        ? event.newValue
+        : "zh-CN";
+    onStoreChange();
+  };
+  window.addEventListener("storage", handleStorage);
+  window.addEventListener(LOCALE_CHANGE_EVENT, onStoreChange);
+  return () => {
+    window.removeEventListener("storage", handleStorage);
+    window.removeEventListener(LOCALE_CHANGE_EVENT, onStoreChange);
+  };
+}
+
+function saveLocale(next: Locale) {
+  transientLocale = next;
+  try {
+    window.localStorage.setItem(LOCALE_STORAGE_KEY, next);
+  } catch {
+    // The transient preference still applies for this tab.
+  }
+  window.dispatchEvent(new Event(LOCALE_CHANGE_EVENT));
+}
 
 export function LocaleProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>("zh-CN");
-  const restoreTimeout = useRef<number | null>(null);
-
-  useEffect(() => {
-    const saved = window.localStorage.getItem("iwc.locale");
-    if (saved !== "en" && saved !== "zh-CN") return;
-    restoreTimeout.current = window.setTimeout(() => {
-      restoreTimeout.current = null;
-      setLocaleState(saved);
-    }, 0);
-    return () => {
-      if (restoreTimeout.current !== null)
-        window.clearTimeout(restoreTimeout.current);
-    };
-  }, []);
-
-  const setLocale = useCallback((next: Locale) => {
-    // A fast interaction can happen before the deferred preference restore.
-    // The user's explicit choice must always win that race.
-    if (restoreTimeout.current !== null) {
-      window.clearTimeout(restoreTimeout.current);
-      restoreTimeout.current = null;
-    }
-    setLocaleState(next);
-  }, []);
+  const locale = useSyncExternalStore(
+    subscribeToLocale,
+    localeSnapshot,
+    (): Locale => "zh-CN",
+  );
+  const setLocale = useCallback((next: Locale) => saveLocale(next), []);
 
   useEffect(() => {
     document.documentElement.lang = locale;
-    window.localStorage.setItem("iwc.locale", locale);
   }, [locale]);
 
   const value = useMemo<LocaleContextValue>(

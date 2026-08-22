@@ -9,25 +9,30 @@ async function expectAllVisibleFontsAtLeast(
   minimumPixels = 12,
 ) {
   await expect(locator.first()).toBeVisible();
-  const measurements = await locator.evaluateAll((elements) =>
-    elements.map((element) => ({
-      fontSize: Number.parseFloat(window.getComputedStyle(element).fontSize),
-      text:
-        element.getAttribute("aria-label") ||
-        element.textContent?.trim().slice(0, 80) ||
-        element.tagName.toLowerCase(),
-    })),
-  );
-  expect(
-    measurements.length,
-    `${state} must not be an empty collection`,
-  ).toBeGreaterThan(0);
-  expect(
-    measurements.filter(
-      ({ fontSize }) => !Number.isFinite(fontSize) || fontSize < minimumPixels,
-    ),
-    `${state}: ${JSON.stringify(measurements, null, 2)}`,
-  ).toEqual([]);
+  await expect
+    .poll(
+      () =>
+        locator.evaluateAll(
+          (elements, minimum) =>
+            elements
+              .map((element) => ({
+                fontSize: Number.parseFloat(
+                  window.getComputedStyle(element).fontSize,
+                ),
+                text:
+                  element.getAttribute("aria-label") ||
+                  element.textContent?.trim().slice(0, 80) ||
+                  element.tagName.toLowerCase(),
+              }))
+              .filter(
+                ({ fontSize }) =>
+                  !Number.isFinite(fontSize) || fontSize < minimum,
+              ),
+          minimumPixels,
+        ),
+      { message: state },
+    )
+    .toEqual([]);
 }
 
 async function expectVisibleTextFloor(
@@ -95,6 +100,23 @@ async function expectVisibleTextFloor(
   ).toEqual([]);
 }
 
+async function expectAxeRoute(
+  page: import("@playwright/test").Page,
+  route: string,
+) {
+  await expect(async () => {
+    if (new URL(page.url()).pathname !== route) await page.goto(route);
+    await expectBasicAccessibility(page);
+    const scan = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
+      .analyze();
+    expect(
+      scan.violations,
+      `${route}: ${JSON.stringify(scan.violations, null, 2)}`,
+    ).toEqual([]);
+  }).toPass({ timeout: 15_000 });
+}
+
 async function signedInSession(page: import("@playwright/test").Page) {
   await page.route("**/api/v1/auth/get-session", async (route) => {
     await route.fulfill({
@@ -118,10 +140,27 @@ async function enterSignInCredentials(
 ) {
   const emailInput = page.locator("#signin-email");
   const passwordInput = page.locator("#signin-password");
-  await emailInput.click();
-  await emailInput.pressSequentially(email);
-  await passwordInput.click();
-  await passwordInput.pressSequentially("secure-password");
+  await expect
+    .poll(
+      () =>
+        emailInput.evaluate((element) =>
+          Object.keys(element).some((key) => key.startsWith("__reactProps$")),
+        ),
+      { timeout: 20_000 },
+    )
+    .toBe(true);
+  await emailInput.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        window.requestAnimationFrame(() =>
+          window.requestAnimationFrame(() => resolve()),
+        ),
+      ),
+  );
+  await emailInput.fill(email);
+  await passwordInput.fill("secure-password");
+  await expect(emailInput).toHaveValue(email);
+  await expect(passwordInput).toHaveValue("secure-password");
   await expect(
     page.getByRole("button", { name: /继续|continue/i }),
   ).toBeEnabled();
@@ -333,19 +372,17 @@ test.describe("account controls", () => {
     test(`entry, account, and settings surfaces pass axe at ${viewport.label}`, async ({
       page,
     }) => {
-      await signedInSession(page);
       await page.setViewportSize(viewport);
 
-      for (const route of ["/signin", "/setup", "/settings", "/account"]) {
+      for (const route of ["/signin", "/setup"]) {
         await page.goto(route);
-        await expectBasicAccessibility(page);
-        const scan = await new AxeBuilder({ page })
-          .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
-          .analyze();
-        expect(
-          scan.violations,
-          `${route}: ${JSON.stringify(scan.violations, null, 2)}`,
-        ).toEqual([]);
+        await expectAxeRoute(page, route);
+      }
+
+      await signedInSession(page);
+      for (const route of ["/settings", "/account"]) {
+        await page.goto(route);
+        await expectAxeRoute(page, route);
         const overflow = await page.evaluate(
           () =>
             document.documentElement.scrollWidth -
@@ -358,7 +395,6 @@ test.describe("account controls", () => {
     test(`all visible Entry, Settings, and Account text stays at least 12px on ${viewport.label}`, async ({
       page,
     }) => {
-      await signedInSession(page);
       await page.setViewportSize(viewport);
 
       await page.goto("/signin");
@@ -383,6 +419,7 @@ test.describe("account controls", () => {
         "/setup progress labels",
       );
 
+      await signedInSession(page);
       await page.goto("/settings");
       await expectVisibleTextFloor(
         page.getByRole("main"),
@@ -433,7 +470,6 @@ test.describe("account controls", () => {
     test(`primary controls retain the body-size type scale on ${viewport.label}`, async ({
       page,
     }) => {
-      await signedInSession(page);
       await page.setViewportSize(viewport);
 
       await page.goto("/signin");
@@ -455,6 +491,7 @@ test.describe("account controls", () => {
         14.5,
       );
 
+      await signedInSession(page);
       await page.goto("/settings");
       await page.getByRole("button", { name: "计划与提醒" }).click();
       await expectAllVisibleFontsAtLeast(

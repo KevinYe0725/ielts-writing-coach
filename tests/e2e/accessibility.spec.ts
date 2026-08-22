@@ -19,6 +19,29 @@ const coreRoutes = [
   "/settings",
 ] as const;
 
+async function expectAxeRoute(
+  page: import("@playwright/test").Page,
+  route: string,
+) {
+  const expected = new URL(route, "http://playwright.local");
+  await expect(async () => {
+    const current = new URL(page.url());
+    if (
+      current.pathname !== expected.pathname ||
+      current.search !== expected.search
+    ) {
+      await page.goto(route);
+    }
+    await expectBasicAccessibility(page);
+    const scan = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
+      .analyze();
+    expect(scan.violations, JSON.stringify(scan.violations, null, 2)).toEqual(
+      [],
+    );
+  }).toPass({ timeout: 15_000 });
+}
+
 test.describe("cross-browser accessibility smoke checks", () => {
   test.skip(
     !deterministicDemo,
@@ -32,13 +55,7 @@ test.describe("cross-browser accessibility smoke checks", () => {
       page,
     }) => {
       await page.goto(route);
-      await expectBasicAccessibility(page);
-      const scan = await new AxeBuilder({ page })
-        .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
-        .analyze();
-      expect(scan.violations, JSON.stringify(scan.violations, null, 2)).toEqual(
-        [],
-      );
+      await expectAxeRoute(page, route);
     });
   }
 

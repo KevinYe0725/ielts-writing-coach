@@ -1,4 +1,5 @@
 .next
+.learnings/
 dist
 coverage
 node_modules

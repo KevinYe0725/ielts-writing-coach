@@ -1623,10 +1623,12 @@ test.describe("compare, transfer, and growth evidence records", () => {
   test("an expired transfer window can be rescheduled without failure evidence", async ({
     page,
   }) => {
-    await page.goto("/today");
-    await page.evaluate(() =>
-      localStorage.setItem("iwc.demo.transfer-window-expired", "true"),
-    );
+    await page.addInitScript(() => {
+      const fixtureKey = "iwc.test.transfer-window-expired-installed";
+      if (sessionStorage.getItem(fixtureKey)) return;
+      localStorage.setItem("iwc.demo.transfer-window-expired", "true");
+      sessionStorage.setItem(fixtureKey, "true");
+    });
     await page.goto("/transfer?cycle=cycle-demo&task=transfer-task");
 
     const expired = page.locator('[data-transfer-state="expired"]');

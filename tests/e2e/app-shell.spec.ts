@@ -225,9 +225,50 @@ test.describe("desktop learning workspace", () => {
     );
   });
 
+  test("maps transfer, account, and administration to their real current context", async ({
+    page,
+  }, testInfo) => {
+    test.skip(
+      testInfo.project.name === "mobile",
+      "The touch project uses the mobile navigation instead of the desktop context topbar.",
+    );
+    await signedInSession(page);
+    await page.addInitScript(() => {
+      window.sessionStorage.setItem(
+        "iwc:learning-navigation:v1",
+        JSON.stringify({
+          transfer: "/transfer?cycle=cycle-demo&task=transfer-task",
+        }),
+      );
+    });
+
+    for (const [path, name, href] of [
+      [
+        "/transfer?cycle=cycle-demo&task=transfer-task",
+        /陌生题迁移|transfer/i,
+        "/transfer?cycle=cycle-demo&task=transfer-task",
+      ],
+      ["/account", /账户|account/i, "/account"],
+      ["/admin", /系统状态|system status/i, "/admin"],
+      ["/admin/backup", /创建备份|create backup/i, "/admin/backup"],
+    ] as const) {
+      await page.goto(path);
+      const contextLink = page
+        .locator("[data-context-topbar]")
+        .getByRole("link", { name });
+      await expect(contextLink).toBeVisible();
+      await expect(contextLink).toHaveAttribute("href", href);
+      await expect(contextLink).toHaveAttribute("aria-current", "page");
+    }
+  });
+
   test("persists the locale choice in storage and across app navigation", async ({
     page,
-  }) => {
+  }, testInfo) => {
+    test.skip(
+      testInfo.project.name === "mobile",
+      "The touch project exercises the visible mobile locale switch separately.",
+    );
     await page.goto("/today");
 
     await page.locator(".topbar .locale-switch").click();
@@ -244,11 +285,26 @@ test.describe("desktop learning workspace", () => {
     await expect(page.locator(".topbar .locale-switch")).toHaveAccessibleName(
       "Switch to Chinese interface",
     );
+
+    await page.reload();
+    await expect(page.locator("html")).toHaveAttribute("lang", "en");
+    await expect
+      .poll(() =>
+        page.evaluate(() => window.localStorage.getItem("iwc.locale")),
+      )
+      .toBe("en");
+    await expect(page.locator(".topbar .locale-switch")).toHaveAccessibleName(
+      "Switch to Chinese interface",
+    );
   });
 
   test("returns account-menu focus on Escape and clears learning destinations on logout", async ({
     page,
-  }) => {
+  }, testInfo) => {
+    test.skip(
+      testInfo.project.name === "mobile",
+      "The touch project covers account actions in the mobile navigation.",
+    );
     await signedInSession(page);
     await page.route("**/api/v1/auth/sign-out", async (route) => {
       await route.fulfill({
@@ -287,13 +343,20 @@ test.describe("desktop learning workspace", () => {
 
   test("skip link moves keyboard focus to the main workspace", async ({
     page,
-  }) => {
+  }, testInfo) => {
+    test.skip(
+      testInfo.project.name === "mobile",
+      "The touch project has no hardware-keyboard contract.",
+    );
     await page.goto("/today");
 
     const skipLink = page.locator('a.skip-link[href="#main-content"]');
+    if (testInfo.project.name === "webkit") {
+      await page.waitForTimeout(300);
+    }
     await skipLink.focus();
     await expect(skipLink).toBeVisible();
-    await skipLink.click();
+    await page.keyboard.press("Enter");
     await expect(page.locator("#main-content")).toBeFocused();
   });
 });

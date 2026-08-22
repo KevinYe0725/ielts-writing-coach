@@ -947,7 +947,7 @@
     display: flex;
     min-height: 42px;
     padding: var(--desk-space-2) var(--desk-space-3);
-    color: var(--desk-evidence-muted);
+    color: var(--desk-ink);
     background: transparent;
     border: 0;
     border-radius: var(--desk-radius-sm);

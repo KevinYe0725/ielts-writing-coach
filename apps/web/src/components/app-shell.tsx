@@ -322,11 +322,13 @@ function MobileHeader({
 
 function Topbar({
   destinations,
+  currentHref,
   pathname,
   sidebarExpanded,
   onToggleSidebar,
 }: {
   destinations: LearningDestinations;
+  currentHref: string;
   pathname: string;
   sidebarExpanded: boolean;
   onToggleSidebar: () => void;
@@ -334,23 +336,54 @@ function Topbar({
   const { messages, text } = useLocale();
   const activeItem = navItems.find((item) => itemIsActive(pathname, item));
   const activeUtility = utilityItems.find((item) => pathname === item.href);
+  const routeContext =
+    pathname === "/transfer"
+      ? {
+          href: destinations.transfer ?? currentHref,
+          icon: Sparkles,
+          label: text("陌生题迁移", "Transfer"),
+        }
+      : pathname === "/account"
+        ? {
+            href: "/account",
+            icon: UserRound,
+            label: text("账户", "Account"),
+          }
+        : pathname === "/admin/backup"
+          ? {
+              href: "/admin/backup",
+              icon: Settings,
+              label: text("创建备份", "Create backup"),
+            }
+          : pathname === "/admin"
+            ? {
+                href: "/admin",
+                icon: Settings,
+                label: messages.nav.admin,
+              }
+            : null;
   const context = activeItem
     ? {
         href: destinationForItem(activeItem, destinations) ?? activeItem.href,
         icon: activeItem.icon,
         label: messages.nav[activeItem.key],
+        current: true,
       }
     : activeUtility
       ? {
           href: activeUtility.href,
           icon: activeUtility.icon,
           label: messages.nav[activeUtility.key],
+          current: true,
         }
-      : {
-          href: destinations.today,
-          icon: Home,
-          label: messages.nav.today,
-        };
+      : routeContext
+        ? { ...routeContext, current: true }
+        : {
+            href: destinations.today,
+            icon: Home,
+            label: messages.nav.today,
+            current: false,
+          };
   const ContextIcon = context.icon;
   return (
     <header className={cn("topbar", styles.topbar)}>
@@ -388,7 +421,7 @@ function Topbar({
             {text("当前步骤", "Current step")}
           </span>
           <Link
-            aria-current="page"
+            aria-current={context.current ? "page" : undefined}
             className={styles.contextLink}
             href={context.href}
           >
@@ -408,6 +441,11 @@ function Topbar({
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const currentHref = useSyncExternalStore(
+    () => () => undefined,
+    () => `${window.location.pathname}${window.location.search}`,
+    () => pathname,
+  );
   const { text } = useLocale();
   const destinations = useLearningDestinations(pathname);
   const layoutVariant = layoutVariantForPathname(pathname);
@@ -456,6 +494,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className={cn("app-column", styles.appColumn)}>
         <MobileHeader destinations={destinations} />
         <Topbar
+          currentHref={currentHref}
           destinations={destinations}
           onToggleSidebar={() => saveSidebarPreference(!sidebarCollapsed)}
           pathname={pathname}

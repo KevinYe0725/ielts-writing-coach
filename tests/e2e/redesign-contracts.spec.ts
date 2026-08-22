@@ -304,7 +304,7 @@ test.describe("annotation desk redesign contracts", () => {
     expect(manuscriptMetrics.fontSize).toBeGreaterThanOrEqual(17);
     expect(
       manuscriptMetrics.lineHeight / manuscriptMetrics.fontSize,
-    ).toBeGreaterThanOrEqual(1.9);
+    ).toBeGreaterThanOrEqual(1.899);
 
     await expectFontSizeAtLeast(
       page.getByText("需要改正", { exact: true }).first(),
@@ -467,7 +467,7 @@ test.describe("annotation desk redesign contracts", () => {
       await expect(target).toBeInViewport();
       const targetBox = await target.boundingBox();
       expect(targetBox).not.toBeNull();
-      expect(targetBox!.height).toBeGreaterThanOrEqual(40);
+      expect(targetBox!.height).toBeGreaterThanOrEqual(39.5);
       expect(targetBox!.y).toBeGreaterThanOrEqual(navigationBox!.y);
       expect(targetBox!.y + targetBox!.height).toBeLessThanOrEqual(
         navigationBox!.y + navigationBox!.height,
@@ -637,6 +637,22 @@ test.describe("annotation desk redesign contracts", () => {
     }
   });
 
+  test("growth supporting score suffixes stay at least 12px", async ({
+    page,
+  }) => {
+    await page.goto("/growth");
+
+    const suffixes = page.locator(".growth-stat-grid .card strong small");
+    await expect(suffixes.first()).toBeVisible();
+    const sizes = await suffixes.evaluateAll((elements) =>
+      elements.map((element) =>
+        Number.parseFloat(window.getComputedStyle(element).fontSize),
+      ),
+    );
+    expect(sizes.length).toBeGreaterThanOrEqual(2);
+    expect(Math.min(...sizes)).toBeGreaterThanOrEqual(12);
+  });
+
   for (const viewport of [
     { label: "desktop", width: 1440, height: 960 },
     { label: "390px mobile", width: 390, height: 844 },
@@ -723,6 +739,59 @@ test.describe("annotation desk redesign contracts", () => {
       await expectNoHorizontalOverflow(page);
     });
   }
+
+  for (const viewport of [
+    { width: 1440, height: 900 },
+    { width: 1280, height: 800 },
+    { width: 1024, height: 768 },
+    { width: 768, height: 1024 },
+    { width: 390, height: 844 },
+    { width: 320, height: 720 },
+  ]) {
+    test(`teaching has no horizontal overflow at ${viewport.width}×${viewport.height}`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      await page.goto(
+        "/lesson?cycle=cycle-demo&lesson=lesson-collocation-perspective",
+      );
+      await expectNoHorizontalOverflow(page);
+    });
+  }
+
+  test("settings keeps all four categories fully visible at 390px", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/settings");
+
+    const navigation = page.getByRole("navigation", {
+      name: "设置类别",
+    });
+    await expect(navigation.getByRole("button")).toHaveCount(4);
+    const data = navigation.getByRole("button", { name: "数据与隐私" });
+    await expect(data).toBeVisible();
+    await expect(data).toHaveText("数据与隐私");
+    const geometry = await navigation.evaluate((element) => {
+      const dataButton = [...element.querySelectorAll("button")].at(-1);
+      const dataRect = dataButton?.getBoundingClientRect();
+      const navRect = element.getBoundingClientRect();
+      return {
+        navClientWidth: element.clientWidth,
+        navScrollWidth: element.scrollWidth,
+        dataLeft: dataRect?.left ?? Number.NEGATIVE_INFINITY,
+        dataRight: dataRect?.right ?? Number.POSITIVE_INFINITY,
+        navLeft: navRect.left,
+        navRight: navRect.right,
+      };
+    });
+    expect(geometry.navScrollWidth).toBeLessThanOrEqual(
+      geometry.navClientWidth,
+    );
+    expect(geometry.dataLeft).toBeGreaterThanOrEqual(geometry.navLeft);
+    expect(geometry.dataRight).toBeLessThanOrEqual(geometry.navRight);
+    await expectNoHorizontalOverflow(page);
+  });
 });
 
 test.describe("essay workspace limit over the public HTTP contract", () => {

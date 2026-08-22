@@ -20,7 +20,7 @@
   display: flex;
   min-height: 42px;
   padding: 0 0 var(--desk-space-4);
-  color: color-mix(in srgb, var(--desk-ink) 62%, transparent);
+  color: var(--desk-ink);
   font-family: var(--desk-font-utility);
   font-size: 0.82rem;
   align-items: center;
@@ -73,7 +73,7 @@
 }
 
 .cardTopline > span:last-child {
-  color: color-mix(in srgb, var(--desk-ink) 48%, transparent);
+  color: var(--desk-evidence-muted);
   font-family: var(--desk-font-utility);
   font-size: 0.8rem;
 }

@@ -772,6 +772,27 @@
   }
 }
 
+@media (max-width: 460px) {
+  .page :global(.settings-nav) {
+    display: grid;
+    padding: var(--desk-space-1);
+    overflow: visible;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--desk-space-1);
+  }
+
+  .page :global(.settings-nav button) {
+    min-width: 0;
+    white-space: normal;
+  }
+
+  .page :global(.settings-nav button.active)::after {
+    right: var(--desk-space-2);
+    bottom: 0;
+    left: var(--desk-space-2);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .advancedSummary > svg {
     transition: none;

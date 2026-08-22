@@ -267,9 +267,9 @@ describe("deterministic Mock Provider", () => {
     expect(result.value.teachingModule.estimatedMinutes).toBeGreaterThanOrEqual(
       25,
     );
-    expect(result.value.teachingModule.practicePrompts.length).toBeGreaterThanOrEqual(
-      3,
-    );
+    expect(
+      result.value.teachingModule.practicePrompts.length,
+    ).toBeGreaterThanOrEqual(3);
     expect(result.value.teachingModule).not.toHaveProperty("knowledgeCards");
     expect(result.value.teachingModule).not.toHaveProperty("expressionBank");
     expect(result.value.teachingModule).not.toHaveProperty("workedExample");

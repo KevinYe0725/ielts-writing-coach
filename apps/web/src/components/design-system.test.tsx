@@ -67,9 +67,7 @@ describe("annotation desk primitives", () => {
       evidenceLinkCss.indexOf("@media (max-width: 520px)"),
     );
 
-    expect(mobileRules).not.toMatch(
-      /\.line\s*\{[^}]*display:\s*none;/s,
-    );
+    expect(mobileRules).not.toMatch(/\.line\s*\{[^}]*display:\s*none;/s);
     expect(mobileRules).toMatch(
       /\.line\s*\{[^}]*border-left:\s*3px solid currentColor;/s,
     );

@@ -1154,7 +1154,7 @@
   }
 }
 
-@media (max-width: 1180px) {
+@media (max-width: 1320px) {
   .readingPage,
   :global([data-sidebar-state="collapsed"]) .readingPage {
     width: 100%;

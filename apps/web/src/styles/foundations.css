@@ -6,8 +6,8 @@
 :root {
   --desk-font-body: "Noto Sans SC Variable", "PingFang SC", sans-serif;
   --desk-font-reading: "Source Serif 4 Variable", "Songti SC", serif;
-  --desk-font-utility: "IBM Plex Sans Variable", "Noto Sans SC Variable",
-    sans-serif;
+  --desk-font-utility:
+    "IBM Plex Sans Variable", "Noto Sans SC Variable", sans-serif;
 }
 
 html {

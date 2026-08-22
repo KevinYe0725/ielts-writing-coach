@@ -310,6 +310,11 @@
   font-size: clamp(1.35rem, 2.5vw, 1.8rem);
 }
 
+.secondaryStats :global(.card > div > strong small) {
+  color: var(--desk-ink);
+  font-size: max(0.8rem, 12px);
+}
+
 .supportingMetrics {
   align-items: stretch;
 }

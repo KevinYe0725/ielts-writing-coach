@@ -460,6 +460,7 @@
 .unlockNote {
   display: inline-flex;
   margin-top: calc(-1 * var(--desk-space-5));
+  color: var(--desk-ink);
   align-items: center;
   gap: var(--desk-space-2);
 }

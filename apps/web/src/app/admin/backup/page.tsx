@@ -16,6 +16,19 @@ function fileNameFromDisposition(value: string | null): string {
   );
 }
 
+async function downloadBlob(blob: Blob, fileName: string): Promise<void> {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = fileName;
+  anchor.hidden = true;
+  document.body.append(anchor);
+  anchor.click();
+  await new Promise<void>((resolve) => window.setTimeout(resolve, 150));
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
 export default function BackupPage() {
   const { text } = useLocale();
   const statusLoader = useCallback(() => learningClient.getSystemStatus(), []);
@@ -55,27 +68,18 @@ export default function BackupPage() {
         );
       }
       const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
       const archiveName = fileNameFromDisposition(
         response.headers.get("content-disposition"),
       );
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = archiveName;
-      anchor.click();
-      URL.revokeObjectURL(url);
+      await downloadBlob(blob, archiveName);
       const checksum = response.headers.get("x-iwc-backup-sha256");
       if (checksum) {
-        const checksumUrl = URL.createObjectURL(
+        await downloadBlob(
           new Blob([`${checksum}  ${archiveName}\n`], {
             type: "text/plain;charset=utf-8",
           }),
+          `${archiveName}.sha256`,
         );
-        const checksumAnchor = document.createElement("a");
-        checksumAnchor.href = checksumUrl;
-        checksumAnchor.download = `${archiveName}.sha256`;
-        checksumAnchor.click();
-        URL.revokeObjectURL(checksumUrl);
       }
       setPassphrase("");
       setConfirmation("");

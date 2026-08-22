@@ -4,15 +4,9 @@ import { cn } from "@/components/utils";
 
 import styles from "./page-layout.module.css";
 
-export type PageLayoutVariant =
-  | "entry"
-  | "focus"
-  | "reading"
-  | "workspace";
+export type PageLayoutVariant = "entry" | "focus" | "reading" | "workspace";
 
-export function layoutVariantForPathname(
-  pathname: string,
-): PageLayoutVariant {
+export function layoutVariantForPathname(pathname: string): PageLayoutVariant {
   if (
     ["/signin", "/join", "/recover", "/setup"].some((route) =>
       pathname.startsWith(route),
