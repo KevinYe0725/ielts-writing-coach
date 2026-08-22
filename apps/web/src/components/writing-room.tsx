@@ -24,6 +24,7 @@ import {
 } from "@/components/ui";
 import { useDemoResource } from "@/components/use-demo-resource";
 import { useDialogFocus } from "@/components/use-dialog-focus";
+import { cn } from "@/components/utils";
 import {
   DraftConflictError,
   LearningClientError,
@@ -38,6 +39,8 @@ import {
   type CachedWritingDraft,
 } from "@/lib/client/draft-cache";
 import { learningRouteHref } from "@/lib/client/learning-route";
+
+import styles from "./writing-room.module.css";
 
 function formatTime(seconds: number): string {
   const minutes = Math.floor(seconds / 60)
@@ -108,13 +111,13 @@ export function WritingRoom({
         ? (loadError.details?.availableAt as string | undefined)
         : undefined;
     if (!availableAt) {
-      setRewriteCountdown(null);
-      return;
+      const resetTimer = window.setTimeout(() => setRewriteCountdown(null), 0);
+      return () => window.clearTimeout(resetTimer);
     }
     const target = Date.parse(availableAt);
     if (!Number.isFinite(target)) {
-      setRewriteCountdown(null);
-      return;
+      const resetTimer = window.setTimeout(() => setRewriteCountdown(null), 0);
+      return () => window.clearTimeout(resetTimer);
     }
     const tick = () => {
       const remaining = target - Date.now();
@@ -124,9 +127,12 @@ export function WritingRoom({
       }
       setRewriteCountdown(formatCountdown(remaining, locale === "zh-CN"));
     };
-    tick();
+    const initialTimer = window.setTimeout(tick, 0);
     const timer = window.setInterval(tick, 1_000);
-    return () => window.clearInterval(timer);
+    return () => {
+      window.clearTimeout(initialTimer);
+      window.clearInterval(timer);
+    };
   }, [loadError, locale]);
   const [draft, setDraft] = useState("");
   const [remaining, setRemaining] = useState(40 * 60);
@@ -541,8 +547,8 @@ export function WritingRoom({
   }
 
   return (
-    <div className="writing-page">
-      <header className="writing-topbar">
+    <div className={cn("writing-page", styles.page)}>
+      <header className={cn("writing-topbar", styles.topbar)}>
         <div className="writing-title-group">
           <Badge tone={mode === "rewrite" ? "violet" : "blue"}>
             {mode === "rewrite"
@@ -644,9 +650,12 @@ export function WritingRoom({
         </div>
       ) : null}
 
-      <div className="writing-layout">
+      <div
+        className={cn("writing-layout", "writing-room", styles.room)}
+        data-writing-mode={mode}
+      >
         <aside
-          className="prompt-panel"
+          className={cn("prompt-panel", "writing-prompt", styles.prompt)}
           aria-labelledby="writing-prompt-heading"
         >
           <div className="prompt-sticky">
@@ -722,7 +731,10 @@ export function WritingRoom({
           </div>
         </aside>
 
-        <section className="editor-panel" aria-labelledby="essay-editor-label">
+        <section
+          className={cn("editor-panel", "writing-editor", styles.editor)}
+          aria-labelledby="essay-editor-label"
+        >
           <div className="editor-heading">
             <label id="essay-editor-label" htmlFor="essay-editor">
               {text("你的作文", "Your essay")}

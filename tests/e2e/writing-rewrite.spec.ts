@@ -12,6 +12,18 @@ test.describe("timed writing rooms", () => {
 
   test.beforeEach(async ({ page }) => resetDemoState(page));
 
+  test("writing workspace keeps rules visible on mobile", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/write?cycle=cycle-demo");
+
+    await expect(page.getByText(/40 分钟/)).toBeVisible();
+    await expect(page.getByText(/至少写 250 词/)).toBeVisible();
+    await expect(page.locator("main")).toHaveAttribute(
+      "data-page-layout",
+      "workspace",
+    );
+  });
+
   test("supports the primary keyboard save and submit flow", async ({
     page,
   }, testInfo) => {

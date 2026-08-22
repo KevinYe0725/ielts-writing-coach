@@ -1,0 +1,113 @@
+.page {
+  width: 100%;
+  min-width: 0;
+  min-height: calc(100svh - 72px);
+  margin: 0;
+  overflow: clip;
+  background: var(--desk-paper);
+  border: 1px solid color-mix(in srgb, var(--desk-ink) 13%, transparent);
+  border-radius: var(--desk-radius-md);
+  box-shadow: 0 12px 34px color-mix(in srgb, var(--desk-ink) 7%, transparent);
+}
+
+.topbar {
+  background: color-mix(in srgb, var(--desk-paper) 96%, white);
+  border-color: color-mix(in srgb, var(--desk-ink) 13%, transparent);
+  font-family: var(--desk-font-utility);
+}
+
+.room {
+  display: grid;
+  min-width: 0;
+  min-height: calc(100svh - 139px);
+  grid-template-columns: minmax(0, 38fr) minmax(0, 62fr);
+}
+
+.prompt {
+  min-width: 0;
+  padding: clamp(var(--desk-space-6), 3.2vw, var(--desk-space-12));
+  background:
+    linear-gradient(
+      to right,
+      transparent 0,
+      transparent 23px,
+      color-mix(in srgb, var(--desk-error) 17%, transparent) 23px,
+      color-mix(in srgb, var(--desk-error) 17%, transparent) 24px,
+      transparent 24px
+    ),
+    var(--desk-paper);
+  border-right: 1px solid color-mix(in srgb, var(--desk-ink) 14%, transparent);
+}
+
+.prompt :global(.eyebrow),
+.prompt :global(.exam-rules),
+.prompt :global(.self-check-box) {
+  font-family: var(--desk-font-utility);
+}
+
+.prompt :global(blockquote),
+.prompt :global(.prompt-instruction) {
+  color: var(--desk-ink);
+  font-family: var(--desk-font-reading);
+}
+
+.editor {
+  min-width: 0;
+  padding: clamp(var(--desk-space-6), 4vw, var(--desk-space-12))
+    clamp(var(--desk-space-6), 5vw, 70px) var(--desk-space-8);
+  background: color-mix(in srgb, var(--desk-paper) 88%, white);
+}
+
+.editor :global(.editor-heading),
+.editor :global(.editor-footer) {
+  font-family: var(--desk-font-utility);
+}
+
+.editor :global(.essay-editor) {
+  color: var(--desk-ink);
+  font-family: var(--desk-font-reading);
+}
+
+@media (max-width: 760px) {
+  .page {
+    min-height: calc(100svh - 66px);
+    border-inline: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .room {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+  }
+
+  .prompt {
+    padding: var(--desk-space-6) var(--desk-space-4);
+    background:
+      linear-gradient(
+        to right,
+        transparent 0,
+        transparent 11px,
+        color-mix(in srgb, var(--desk-error) 15%, transparent) 11px,
+        color-mix(in srgb, var(--desk-error) 15%, transparent) 12px,
+        transparent 12px
+      ),
+      var(--desk-paper);
+    border-right: 0;
+    border-bottom: 1px solid
+      color-mix(in srgb, var(--desk-ink) 14%, transparent);
+  }
+
+  .prompt :global(.exam-rules) {
+    display: grid;
+    padding-top: var(--desk-space-4);
+    margin-top: var(--desk-space-6);
+    gap: var(--desk-space-3);
+  }
+
+  .editor {
+    min-height: 640px;
+    padding: var(--desk-space-6) var(--desk-space-4);
+  }
+}

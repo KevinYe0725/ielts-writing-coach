@@ -59,6 +59,33 @@ test.describe("annotation desk redesign contracts", () => {
     await expect(desk.locator("[data-today-evidence]")).toBeVisible();
   });
 
+  test("writing desk reserves the prompt paper beside the editor", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 960 });
+    await page.goto("/write?cycle=cycle-demo");
+
+    const room = page.locator('[data-writing-mode="first"]');
+    const prompt = room.locator(".writing-prompt");
+    const editor = room.locator(".writing-editor");
+    await expect(room).toBeVisible();
+    await expect(prompt).toBeVisible();
+    await expect(editor).toBeVisible();
+
+    const [roomBox, promptBox, editorBox] = await Promise.all([
+      room.boundingBox(),
+      prompt.boundingBox(),
+      editor.boundingBox(),
+    ]);
+    expect(roomBox).not.toBeNull();
+    expect(promptBox).not.toBeNull();
+    expect(editorBox).not.toBeNull();
+    expect(promptBox!.width / roomBox!.width).toBeGreaterThanOrEqual(0.36);
+    expect(promptBox!.width / roomBox!.width).toBeLessThanOrEqual(0.4);
+    expect(editorBox!.width / roomBox!.width).toBeGreaterThanOrEqual(0.6);
+    expect(editorBox!.width / roomBox!.width).toBeLessThanOrEqual(0.64);
+  });
+
   for (const [route, layout] of routeMatrix) {
     test(`${route} uses ${layout}`, async ({ page }) => {
       await page.goto(route);
