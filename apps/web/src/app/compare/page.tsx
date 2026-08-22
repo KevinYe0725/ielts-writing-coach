@@ -20,6 +20,7 @@ import {
   Badge,
   Button,
   Card,
+  EvidenceLink,
   PageHeader,
   SectionHeader,
   Skeleton,
@@ -30,6 +31,8 @@ import {
   singleRouteParam,
   type LearningSearchParams,
 } from "@/lib/client/learning-route";
+
+import styles from "./compare.module.css";
 
 export default function ComparePage({
   searchParams,
@@ -101,7 +104,7 @@ export default function ComparePage({
   };
 
   return (
-    <>
+    <div className={styles.desk} data-evidence-record="comparison">
       <PageHeader
         actions={
           <Badge tone={retained ? "green" : "amber"}>
@@ -130,7 +133,10 @@ export default function ComparePage({
         description={data.promptTitle}
       />
 
-      <Card className="comparison-hero">
+      <Card className={`comparison-hero ${styles.versionRecord}`}>
+        <p className={styles.recordLabel} data-auxiliary>
+          {text("记录 01 · 闭卷版本", "Record 01 · Closed-book versions")}
+        </p>
         <div className="version-score before">
           <span>Version 1</span>
           <strong>{data.v1Score.toFixed(1)}</strong>
@@ -174,7 +180,7 @@ export default function ComparePage({
         </div>
       </Card>
 
-      <Card className="comparison-metrics-card">
+      <Card className={`comparison-metrics-card ${styles.metricsRecord}`}>
         <div className="comparison-metrics-heading">
           <div>
             <p className="eyebrow">
@@ -230,13 +236,29 @@ export default function ComparePage({
         </div>
       </Card>
 
-      <SectionHeader title={text("关键变化", "Key changes")} />
-      <div className="comparison-list">
+      <SectionHeader
+        description={text(
+          "证据不足时不声称掌握；一次修正仍会进入后续观察。",
+          "Insufficient evidence never becomes a mastery claim; a single correction remains under review.",
+        )}
+        title={text("关键变化", "Key changes")}
+      />
+      <div className={`comparison-list ${styles.changeRecord}`}>
         {data.points.map((point) => {
           const presentation = statePresentation[point.state];
           const Icon = presentation.icon;
           return (
-            <Card className="comparison-card" key={point.id}>
+            <Card
+              className={`comparison-card ${styles.changeCard}`}
+              data-evidence-state={
+                point.state === "resolved"
+                  ? "verified"
+                  : point.state === "improved"
+                    ? "active"
+                    : "revision"
+              }
+              key={point.id}
+            >
               <div className="comparison-card-title">
                 <Badge tone={presentation.tone}>
                   <Icon aria-hidden="true" size={13} />
@@ -257,16 +279,28 @@ export default function ComparePage({
                   <p lang="en">{point.after}</p>
                 </div>
               </div>
-              <div className="comparison-note">
-                <Target aria-hidden="true" size={15} />
-                <span>{text(point.noteZh, point.noteEn)}</span>
-              </div>
+              <EvidenceLink
+                className={`${styles.pointEvidence}`}
+                label={text(point.noteZh, point.noteEn)}
+                state={
+                  point.state === "resolved"
+                    ? "verified"
+                    : point.state === "improved"
+                      ? "active"
+                      : "revision"
+                }
+              >
+                <span>
+                  <Target aria-hidden="true" size={15} />
+                  {text("本次证据", "Current evidence")}
+                </span>
+              </EvidenceLink>
             </Card>
           );
         })}
       </div>
 
-      <Card className="next-evidence-card">
+      <Card className={`next-evidence-card ${styles.nextRecord}`}>
         <span className="next-evidence-icon">
           <Sparkles aria-hidden="true" size={22} />
         </span>
@@ -311,6 +345,13 @@ export default function ComparePage({
               : "This is a Band 7–7.5-style AI teaching reference, not an official score or teacher certification, and should not be memorised as a script.",
         )}
       />
+      <p className={styles.unlockNote} data-auxiliary>
+        <BookOpen aria-hidden="true" size={14} />
+        {text(
+          "Version 2 完成后才解锁任务对应范文",
+          "The task-specific reference unlocks only after Version 2",
+        )}
+      </p>
       {data.modelEssay ? (
         <Card className="model-essay-card">
           <button
@@ -353,6 +394,6 @@ export default function ComparePage({
           ) : null}
         </Card>
       ) : null}
-    </>
+    </div>
   );
 }

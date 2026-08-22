@@ -14,12 +14,31 @@ import { useLocale } from "@/components/locale-provider";
 import {
   Badge,
   Card,
+  EvidenceLink,
   PageHeader,
   SectionHeader,
   Skeleton,
 } from "@/components/ui";
 import { useDemoResource } from "@/components/use-demo-resource";
 import { learningClient, type SkillState } from "@/lib/client";
+
+import styles from "./growth.module.css";
+
+const growthEvidenceState = {
+  diagnosed: "unavailable",
+  practicing: "revision",
+  applied: "active",
+  retained: "verified",
+  transferred: "verified",
+} as const;
+
+const growthLevels: SkillState[] = [
+  "diagnosed",
+  "practicing",
+  "applied",
+  "retained",
+  "transferred",
+];
 
 export default function GrowthPage() {
   const { text } = useLocale();
@@ -37,7 +56,7 @@ export default function GrowthPage() {
       practicing: { zh: "练习中", en: "Practising", tone: "amber" as const },
       applied: { zh: "临时通过", en: "Applied", tone: "blue" as const },
       retained: { zh: "已保持", en: "Retained", tone: "green" as const },
-      transferred: { zh: "已迁移", en: "Transferred", tone: "violet" as const },
+      transferred: { zh: "已迁移", en: "Transferred", tone: "green" as const },
     };
     return states[state];
   };
@@ -49,7 +68,7 @@ export default function GrowthPage() {
       : latestScore - firstScore;
 
   return (
-    <>
+    <div className={styles.record} data-evidence-record="growth">
       <PageHeader
         eyebrow={text("能力档案", "Skill record")}
         title={text(
@@ -62,7 +81,61 @@ export default function GrowthPage() {
         )}
       />
 
-      <div className="growth-stat-grid">
+      <Card className={styles.levelArchive}>
+        <div className={styles.archiveHeading}>
+          <p className="eyebrow" data-auxiliary>
+            {text("证据等级", "Evidence levels")}
+          </p>
+          <h2>
+            {text(
+              "从发现问题，到陌生题仍能使用",
+              "From diagnosis to use on a new topic",
+            )}
+          </h2>
+          <p>
+            {text(
+              "蓝色只表示本轮能用；只有延迟保持与陌生题迁移才显示为绿色验证。",
+              "Blue means applied in the current cycle only. Delayed retention and new-topic transfer are the green verified states.",
+            )}
+          </p>
+        </div>
+        <ol className={styles.levels}>
+          {growthLevels.map((level) => {
+            const presentation = skillState(level);
+            return (
+              <li data-growth-level={level} key={level}>
+                <EvidenceLink
+                  label={text(
+                    level === "diagnosed"
+                      ? "已有诊断，尚无应用证据"
+                      : level === "practicing"
+                        ? "正在改写，仍需独立作答"
+                        : level === "applied"
+                          ? "本轮临时通过，不等于掌握"
+                          : level === "retained"
+                            ? "延迟闭卷证据已验证"
+                            : "陌生话题证据已验证",
+                    level === "diagnosed"
+                      ? "Diagnosed; no application evidence yet"
+                      : level === "practicing"
+                        ? "In practice; independent use still needed"
+                        : level === "applied"
+                          ? "Applied this cycle; not mastery"
+                          : level === "retained"
+                            ? "Verified in a delayed closed-book check"
+                            : "Verified on an unfamiliar topic",
+                  )}
+                  state={growthEvidenceState[level]}
+                >
+                  {text(presentation.zh, presentation.en)}
+                </EvidenceLink>
+              </li>
+            );
+          })}
+        </ol>
+      </Card>
+
+      <div className={`growth-stat-grid ${styles.secondaryStats}`}>
         <Card>
           <span className="stat-icon blue">
             <BookCheck aria-hidden="true" size={19} />
@@ -114,8 +187,8 @@ export default function GrowthPage() {
         </Card>
       </div>
 
-      <div className="growth-main-grid">
-        <Card className="score-trend-card">
+      <div className={`growth-main-grid ${styles.supportingMetrics}`}>
+        <Card className={`score-trend-card ${styles.scoreRecord}`}>
           <div className="card-title-row">
             <div>
               <p className="eyebrow">{text("限时表现", "Timed performance")}</p>
@@ -132,7 +205,7 @@ export default function GrowthPage() {
             )}
           </div>
           <div
-            className="score-chart"
+            className={`score-chart ${styles.scoreChart}`}
             role="img"
             aria-label={
               firstScore === null || latestScore === null
@@ -143,17 +216,26 @@ export default function GrowthPage() {
                   )
             }
           >
-            {data.weeklyScores.map((point) => (
-              <div className="chart-column" key={point.label}>
-                <span className="chart-value">{point.score.toFixed(1)}</span>
-                <div className="chart-bar-track">
-                  <span
-                    style={{ height: `${((point.score - 4) / 4) * 100}%` }}
-                  />
+            {data.weeklyScores.length === 0 ? (
+              <p className={styles.emptyTrend}>
+                {text(
+                  "暂无可比较的同量表估分，不生成趋势。",
+                  "No comparable same-rubric scores are available, so no trend is shown.",
+                )}
+              </p>
+            ) : (
+              data.weeklyScores.map((point) => (
+                <div className="chart-column" key={point.label}>
+                  <span className="chart-value">{point.score.toFixed(1)}</span>
+                  <div className="chart-bar-track">
+                    <span
+                      style={{ height: `${((point.score - 4) / 4) * 100}%` }}
+                    />
+                  </div>
+                  <small>{point.label}</small>
                 </div>
-                <small>{point.label}</small>
-              </div>
-            ))}
+              ))
+            )}
           </div>
           <p className="chart-note">
             {text(
@@ -189,7 +271,7 @@ export default function GrowthPage() {
 
       <SectionHeader title={text("能力状态", "Skill states")} />
       <div
-        className="skill-table"
+        className={`skill-table ${styles.skillArchive}`}
         role="table"
         aria-label={text("能力状态表", "Skill state table")}
       >
@@ -202,7 +284,12 @@ export default function GrowthPage() {
         {data.skills.map((skill) => {
           const state = skillState(skill.state);
           return (
-            <div className="skill-table-row" key={skill.id} role="row">
+            <div
+              className="skill-table-row"
+              data-evidence-state={growthEvidenceState[skill.state]}
+              key={skill.id}
+              role="row"
+            >
               <div role="cell">
                 <Badge tone="neutral">{skill.category}</Badge>
                 <span>
@@ -214,7 +301,19 @@ export default function GrowthPage() {
                 </span>
               </div>
               <span role="cell">
-                <Badge tone={state.tone}>{text(state.zh, state.en)}</Badge>
+                <EvidenceLink
+                  label={text(
+                    skill.evidenceCount === 0
+                      ? "证据不足"
+                      : `${skill.evidenceCount} 条有效证据`,
+                    skill.evidenceCount === 0
+                      ? "Insufficient evidence"
+                      : `${skill.evidenceCount} valid evidence events`,
+                  )}
+                  state={growthEvidenceState[skill.state]}
+                >
+                  {text(state.zh, state.en)}
+                </EvidenceLink>
               </span>
               <span role="cell" className="recurrence-cell">
                 <strong>
@@ -237,6 +336,6 @@ export default function GrowthPage() {
           );
         })}
       </div>
-    </>
+    </div>
   );
 }

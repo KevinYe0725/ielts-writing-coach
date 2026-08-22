@@ -22,6 +22,7 @@ import {
   Badge,
   Button,
   Card,
+  EvidenceLink,
   LoadingButtonContent,
   PageHeader,
   Skeleton,
@@ -37,6 +38,8 @@ import {
   singleRouteParam,
   type LearningSearchParams,
 } from "@/lib/client/learning-route";
+
+import styles from "./transfer.module.css";
 
 const POLL_INTERVAL_MS = 1_500;
 
@@ -200,7 +203,11 @@ export default function TransferPage({
         : "blue";
 
   return (
-    <>
+    <div
+      className={styles.desk}
+      data-evidence-record="transfer"
+      data-poll-interval-ms={POLL_INTERVAL_MS}
+    >
       <PageHeader
         actions={
           <Badge tone={processing ? "amber" : "violet"}>
@@ -225,8 +232,80 @@ export default function TransferPage({
         )}
       />
 
+      <Card className={styles.protocol} data-transfer-protocol>
+        <div className={styles.protocolHeading}>
+          <p className="eyebrow" data-auxiliary>
+            {text("证据协议", "Evidence protocol")}
+          </p>
+          <h2>
+            {text(
+              "一次首答，一条服务器结论",
+              "One first answer, one server conclusion",
+            )}
+          </h2>
+        </div>
+        <ol>
+          <li>
+            <EvidenceLink
+              label={text(
+                "目标技能、提示和原题答案均已隐藏",
+                "Target skill, hints, and previous answer stay hidden",
+              )}
+              state="verified"
+            >
+              <span data-auxiliary>
+                01 · {text("闭卷开始", "Closed-book start")}
+              </span>
+            </EvidenceLink>
+          </li>
+          <li>
+            <EvidenceLink
+              label={text(
+                "90–140 词只提示篇幅，不参与本地判分",
+                "90–140 words is guidance only, never local grading",
+              )}
+              state="active"
+            >
+              <span data-auxiliary>
+                02 · {text("8 分钟首答封存", "8-minute first answer")}
+              </span>
+            </EvidenceLink>
+          </li>
+          <li>
+            <EvidenceLink
+              label={text(
+                "每 1.5 秒读取服务器状态；答案不会被重新打开",
+                "Server state is checked every 1.5 seconds; the answer stays frozen",
+              )}
+              state="revision"
+            >
+              <span data-auxiliary>
+                03 · <span>PROCESSING</span>
+              </span>
+            </EvidenceLink>
+          </li>
+          <li>
+            <div className={styles.outcomes}>
+              <span data-auxiliary>PASS</span>
+              <span data-auxiliary>FAIL</span>
+              <span data-auxiliary>NO_OPPORTUNITY</span>
+            </div>
+            <p>
+              {text(
+                "评估失败：答案已保存，不是学习失败。Mock 只演示流程，不评分语言。",
+                "Evaluation failure: the answer is saved; this is not a learning failure. Mock demonstrates the workflow and does not score language.",
+              )}
+            </p>
+          </li>
+        </ol>
+      </Card>
+
       {task.windowExpired ? (
-        <Card aria-live="polite" className="transfer-result-card">
+        <Card
+          aria-live="polite"
+          className={`transfer-result-card ${styles.stateRecord}`}
+          data-transfer-state="expired"
+        >
           <CalendarClock aria-hidden="true" size={36} />
           <Badge tone="amber">
             {text("迁移窗口已错过", "Transfer window missed")}
@@ -255,7 +334,17 @@ export default function TransferPage({
           </Button>
         </Card>
       ) : result ? (
-        <Card aria-live="polite" className="transfer-result-card">
+        <Card
+          aria-live="polite"
+          className={`transfer-result-card ${styles.stateRecord}`}
+          data-transfer-state={
+            result.outcome === "NO_OPPORTUNITY"
+              ? "no-opportunity"
+              : result.mockLanguageScoring
+                ? "mock-result"
+                : result.outcome.toLowerCase()
+          }
+        >
           <span className="completion-icon">
             {result.outcome === "PASS" ? (
               <CheckCircle2 aria-hidden="true" size={36} />
@@ -334,7 +423,11 @@ export default function TransferPage({
           </ActionLink>
         </Card>
       ) : evaluationError ? (
-        <Card aria-live="assertive" className="transfer-result-card">
+        <Card
+          aria-live="assertive"
+          className={`transfer-result-card ${styles.stateRecord}`}
+          data-transfer-state="evaluation-error"
+        >
           <TriangleAlert aria-hidden="true" size={36} />
           <Badge tone="amber">{evaluationError.code}</Badge>
           <h2>
@@ -358,7 +451,8 @@ export default function TransferPage({
         <Card
           aria-busy="true"
           aria-live="polite"
-          className="transfer-result-card"
+          className={`transfer-result-card ${styles.stateRecord}`}
+          data-transfer-state="processing"
         >
           <LoaderCircle aria-hidden="true" className="spin" size={36} />
           <Badge tone="amber">202 · {submission?.jobStatus ?? "QUEUED"}</Badge>
@@ -376,7 +470,10 @@ export default function TransferPage({
           </p>
         </Card>
       ) : unavailable ? (
-        <Card className="transfer-result-card">
+        <Card
+          className={`transfer-result-card ${styles.stateRecord}`}
+          data-transfer-state="planned"
+        >
           <Clock3 aria-hidden="true" size={36} />
           <Badge tone="neutral">{task.status}</Badge>
           <h2>{text("迁移窗口尚未开放", "The transfer window is not open")}</h2>
@@ -392,7 +489,10 @@ export default function TransferPage({
           </ActionLink>
         </Card>
       ) : (
-        <Card className="transfer-check-card">
+        <Card
+          className={`transfer-check-card ${styles.answerRecord}`}
+          data-transfer-state="ready"
+        >
           <div className="transfer-check-head">
             <Badge tone="blue">{task.question.category}</Badge>
             <span>
@@ -469,6 +569,6 @@ export default function TransferPage({
           </footer>
         </Card>
       )}
-    </>
+    </div>
   );
 }

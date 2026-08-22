@@ -1325,6 +1325,258 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
   });
 });
 
+async function installHttpTransferApi(
+  page: Page,
+  state: "processing" | "pass" | "fail" | "evaluation-error",
+) {
+  const taskId = `transfer-${state}`;
+  const task = {
+    id: taskId,
+    source_cycle_id: "cycle-http-transfer",
+    status: state === "pass" || state === "fail" ? "COMPLETED" : "READY",
+    available_at: "2026-08-23T00:00:00.000Z",
+    expires_at: "2026-08-25T00:00:00.000Z",
+    target_hint_hidden: true,
+    question: {
+      id: "question-http-transfer",
+      topic: "Public transport",
+      questionType: "Opinion",
+      prompt: "Cities should make public transport free for all residents.",
+      instructions: "To what extent do you agree or disagree?",
+    },
+    ...(state === "processing"
+      ? { pending_job_id: "transfer-job-processing" }
+      : {}),
+    ...(state === "evaluation-error"
+      ? {
+          evaluation_error: {
+            code: "PROVIDER_UNAVAILABLE",
+            safe_message: "The configured evaluator is unavailable.",
+          },
+        }
+      : {}),
+    ...(state === "pass" || state === "fail"
+      ? {
+          result: {
+            outcome: state.toUpperCase(),
+            confidence: 0.91,
+            feedback_zh:
+              state === "pass" ? "服务端证据通过。" : "服务端证据尚未通过。",
+            feedback_en:
+              state === "pass"
+                ? "The server evidence passed."
+                : "The server evidence did not pass.",
+            evidence: "A frozen first-answer span.",
+            status: state === "pass" ? "QUALIFYING" : "INSUFFICIENT",
+            transferred: state === "pass",
+            gate_missing: state === "pass" ? [] : ["independent use"],
+            mock_language_scoring: false,
+          },
+        }
+      : {}),
+  };
+
+  await page.route("**/api/v1/**", async (route) => {
+    const { pathname } = new URL(route.request().url());
+    if (pathname === "/api/v1/auth/get-session") {
+      await route.fulfill({ contentType: "application/json", body: "null" });
+      return;
+    }
+    if (pathname === "/api/v1/transfer-tasks") {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ transfer_tasks: [task] }),
+      });
+      return;
+    }
+    await route.fulfill({ status: 404, body: "Not found" });
+  });
+
+  return `/transfer?cycle=cycle-http-transfer&task=${taskId}`;
+}
+
+test.describe("compare, transfer, and growth evidence records", () => {
+  test.skip(
+    !deterministicDemo,
+    "Run with NEXT_PUBLIC_DEMO_MODE=true and a demo-mode web server.",
+  );
+
+  test.beforeEach(async ({ page }) => resetDemoState(page));
+
+  test("compare preserves authoritative evidence and the exact next-task href", async ({
+    page,
+  }) => {
+    await page.goto("/compare?cycle=cycle-demo");
+
+    const record = page.locator('[data-evidence-record="comparison"]');
+    await expect(record).toContainText("Version 1");
+    await expect(record).toContainText("Version 2");
+    await expect(record).toContainText("四项估分变化");
+    await expect(record.locator(".criterion-delta")).toHaveCount(4);
+    await expect(record).toContainText("每 100 词");
+    for (const state of ["已消失", "已改善", "继续观察"]) {
+      await expect(record.getByText(state, { exact: true })).toBeVisible();
+    }
+    await expect(record).toContainText("证据不足时不声称掌握");
+    await expect(page.getByRole("link", { name: /查看安排/ })).toHaveAttribute(
+      "href",
+      "/transfer?cycle=cycle-demo&task=transfer-task",
+    );
+    await expect(
+      page.getByRole("button", { name: /Mock flow reference/ }),
+    ).toBeVisible();
+  });
+
+  test("transfer keeps the closed-book protocol and every server outcome explicit", async ({
+    page,
+  }) => {
+    await page.goto("/transfer?cycle=cycle-demo&task=transfer-task");
+
+    const record = page.locator('[data-evidence-record="transfer"]');
+    await expect(record).toHaveAttribute("data-poll-interval-ms", "1500");
+    await expect(record).toContainText("8 分钟");
+    await expect(record).toContainText("90–140 词");
+    await expect(record).toContainText("只提示篇幅，不参与本地判分");
+    await expect(record).toContainText("目标技能、提示和原题答案均已隐藏");
+    for (const state of ["PROCESSING", "PASS", "FAIL", "NO_OPPORTUNITY"]) {
+      await expect(record.getByText(state, { exact: true })).toBeVisible();
+    }
+    await expect(record).toContainText("评估失败：答案已保存，不是学习失败");
+    await expect(record).toContainText("Mock 只演示流程，不评分语言");
+  });
+
+  test("transfer freezes the first answer and records mock without a language verdict", async ({
+    page,
+  }) => {
+    const firstAnswer =
+      "Technology can reduce routine workload because automated tools handle repetitive checks, so teachers can spend more time responding to individual learning needs.";
+    await page.goto("/transfer?cycle=cycle-demo&task=transfer-task");
+    await page.getByLabel("你的英文答案").fill(firstAnswer);
+    await page.getByRole("button", { name: /提交给服务器评估/ }).click();
+
+    await expect(
+      page.locator('[data-transfer-state="mock-result"]'),
+    ).toBeVisible();
+    await expect(page.getByLabel("你的英文答案")).toHaveCount(0);
+    expect(
+      await page.evaluate(() =>
+        localStorage.getItem("iwc.demo.transfer-answer"),
+      ),
+    ).toBe(firstAnswer);
+    await expect(
+      page.getByText("Mock：仅演示流程，不是语言评分"),
+    ).toBeVisible();
+  });
+
+  test("transfer records no natural opportunity without creating failure evidence", async ({
+    page,
+  }) => {
+    await page.goto("/transfer?cycle=cycle-demo&task=transfer-task");
+    await page.getByRole("button", { name: "这道题没有自然机会" }).click();
+
+    const result = page.locator('[data-transfer-state="no-opportunity"]');
+    await expect(result).toContainText("NO_OPPORTUNITY");
+    await expect(result).toContainText("不会计为失败");
+  });
+
+  test("an expired transfer window can be rescheduled without failure evidence", async ({
+    page,
+  }) => {
+    await page.goto("/today");
+    await page.evaluate(() =>
+      localStorage.setItem("iwc.demo.transfer-window-expired", "true"),
+    );
+    await page.goto("/transfer?cycle=cycle-demo&task=transfer-task");
+
+    const expired = page.locator('[data-transfer-state="expired"]');
+    await expect(expired).toContainText("错过窗口不会产生失败证据");
+    await page.getByRole("button", { name: "重新安排迁移窗口" }).click();
+    await expect(page).toHaveURL(/\/today$/);
+    expect(
+      await page.evaluate(() =>
+        localStorage.getItem("iwc.demo.transfer-window-expired"),
+      ),
+    ).toBeNull();
+  });
+});
+
+test.describe("transfer evidence states over the public HTTP contract", () => {
+  test.skip(
+    deterministicDemo,
+    "Run with NEXT_PUBLIC_DEMO_MODE=false and an HTTP-mode web server.",
+  );
+
+  test("transfer keeps the immutable answer pending while the server processes it", async ({
+    page,
+  }) => {
+    const url = await installHttpTransferApi(page, "processing");
+    await page.goto(url);
+    const state = page.locator('[data-transfer-state="processing"]');
+    await expect(state).toHaveAttribute("aria-busy", "true");
+    await expect(state).toContainText("首答已封存，等待服务器评估");
+  });
+
+  for (const outcome of ["pass", "fail"] as const) {
+    test(`transfer renders the authoritative ${outcome.toUpperCase()} result`, async ({
+      page,
+    }) => {
+      const url = await installHttpTransferApi(page, outcome);
+      await page.goto(url);
+      const state = page.locator(`[data-transfer-state="${outcome}"]`);
+      await expect(state).toContainText(`服务器结果：${outcome.toUpperCase()}`);
+      await expect(state).toContainText("A frozen first-answer span.");
+    });
+  }
+
+  test("transfer says a saved answer with evaluation failure is not learning failure", async ({
+    page,
+  }) => {
+    const url = await installHttpTransferApi(page, "evaluation-error");
+    await page.goto(url);
+    const state = page.locator('[data-transfer-state="evaluation-error"]');
+    await expect(state).toContainText("首答已保存，但服务器评估未完成");
+    await expect(state).toContainText(
+      "这不是学习表现失败，也不会产生 FAIL 证据",
+    );
+  });
+
+  test("growth does not invent a score trend when the server has no history", async ({
+    page,
+  }) => {
+    await page.route("**/api/v1/**", async (route) => {
+      const { pathname } = new URL(route.request().url());
+      if (pathname === "/api/v1/auth/get-session") {
+        await route.fulfill({ contentType: "application/json", body: "null" });
+        return;
+      }
+      if (pathname === "/api/v1/growth") {
+        await route.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify({
+            score_history: [],
+            skills: [],
+            summary: {
+              current_estimated_band: null,
+              essays_completed: 0,
+              independent_non_recurrence_rate: null,
+              recorded_learning_minutes: 0,
+              target_band: 7,
+            },
+          }),
+        });
+        return;
+      }
+      await route.fulfill({ status: 404, body: "Not found" });
+    });
+
+    await page.goto("/growth");
+    await expect(
+      page.getByText("暂无可比较的同量表估分，不生成趋势。"),
+    ).toBeVisible();
+    await expect(page.locator(".chart-column")).toHaveCount(0);
+  });
+});
+
 test.describe("tutorial answer analysis over the public HTTP contract", () => {
   test.skip(
     deterministicDemo,

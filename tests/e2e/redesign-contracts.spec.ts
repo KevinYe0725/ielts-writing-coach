@@ -2,6 +2,7 @@ import { expect, test, type Locator } from "@playwright/test";
 
 import {
   deterministicDemo,
+  expectBasicAccessibility,
   expectNoHorizontalOverflow,
   expectPageLayout,
   resetDemoState,
@@ -12,6 +13,9 @@ const routeMatrix = [
   ["/essays", "focus"],
   ["/write?cycle=cycle-demo", "workspace"],
   ["/feedback?cycle=cycle-demo", "workspace"],
+  ["/compare?cycle=cycle-demo", "workspace"],
+  ["/transfer?cycle=cycle-demo&task=transfer-task", "workspace"],
+  ["/growth", "reading"],
   ["/lesson?cycle=cycle-demo&lesson=lesson-collocation-perspective", "reading"],
   [
     "/lesson/paper?cycle=cycle-demo&lesson=lesson-collocation-perspective",
@@ -437,6 +441,74 @@ test.describe("annotation desk redesign contracts", () => {
     expect(family).toContain("Noto Sans SC");
     expect(family).not.toContain("Source Serif 4");
   });
+
+  test("growth displays every level without overstating evidence", async ({
+    page,
+  }) => {
+    await page.goto("/growth");
+
+    for (const [status, label, evidenceState] of [
+      ["diagnosed", "已诊断", "unavailable"],
+      ["practicing", "练习中", "revision"],
+      ["applied", "临时通过", "active"],
+      ["retained", "已保持", "verified"],
+      ["transferred", "已迁移", "verified"],
+    ] as const) {
+      const level = page.locator(`[data-growth-level="${status}"]`);
+      await expect(level).toContainText(label);
+      await expect(level.locator("[data-evidence-state]")).toHaveAttribute(
+        "data-evidence-state",
+        evidenceState,
+      );
+    }
+  });
+
+  test("compare keeps the mobile evidence subject readable above its note", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/compare?cycle=cycle-demo");
+
+    const evidence = page.locator("[data-evidence-state='verified']").first();
+    const subject = evidence.getByText("本次证据", { exact: true });
+    const note = evidence.getByText(/旧问题没有复发/);
+    const [subjectBox, noteBox] = await Promise.all([
+      subject.boundingBox(),
+      note.boundingBox(),
+    ]);
+    expect(subjectBox).not.toBeNull();
+    expect(noteBox).not.toBeNull();
+    expect(subjectBox!.width).toBeGreaterThan(50);
+    expect(subjectBox!.y).toBeLessThan(noteBox!.y);
+  });
+
+  for (const viewport of [
+    { label: "desktop", width: 1440, height: 960 },
+    { label: "390px mobile", width: 390, height: 844 },
+  ]) {
+    test(`evidence records stay legible and overflow-free on ${viewport.label}`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      for (const route of [
+        "/compare?cycle=cycle-demo",
+        "/transfer?cycle=cycle-demo&task=transfer-task",
+        "/growth",
+      ]) {
+        await page.goto(route);
+        await expect(
+          page.locator("[data-evidence-record]").first(),
+        ).toBeVisible();
+        await expectNoHorizontalOverflow(page);
+        await expectBasicAccessibility(page);
+        for (const auxiliary of await page
+          .locator("[data-evidence-record] [data-auxiliary]")
+          .all()) {
+          await expectFontSizeAtLeast(auxiliary, 12);
+        }
+      }
+    });
+  }
 
   for (const viewport of [
     { label: "desktop", width: 1440, height: 960 },
