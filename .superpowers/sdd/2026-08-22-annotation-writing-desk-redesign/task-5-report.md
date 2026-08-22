@@ -72,11 +72,11 @@ BASE 的 `react-hooks/set-state-in-effect` 错误位于 rewrite **开放倒计�
 
 ## 真实浏览器视觉 QA
 
-- `output/playwright/task-5-writing-desktop.png`：1440×960 首写桌面，题纸/编辑区清晰分栏，规则、计时与提交操作可见。
-- `output/playwright/task-5-writing-mobile.png`：390×844 首写移动端，规则完整呈现、无水平溢出，编辑区顺序正确。
-- `output/playwright/task-5-rewrite-desktop.png`：1440×960 V2，完整显示 blind-rewrite 顶部提示与锁定的最后 5 分钟自检框，未泄露目标。
+- `output/playwright/task-5-writing-desktop.png`：在 1440×960 viewport 设置下执行的首写 full-page capture；题纸/编辑区清晰分栏，规则、计时与提交操作可见。
+- `output/playwright/task-5-writing-mobile.png`：在 390×844 viewport 设置下执行的首写 full-page capture；规则完整呈现、无水平溢出，编辑区顺序正确。
+- `output/playwright/task-5-rewrite-desktop.png`：在 1440×960 viewport 设置下执行的 V2 full-page capture；完整显示 blind-rewrite 顶部提示与锁定的最后 5 分钟自检框，未泄露目标。
 
-三张截图均人工查看；视觉签名为题纸左侧的克制红色批注边线，其他区域沿用 Task 2 的 desk tokens、字体和间距。未新增无关动画或装饰。
+三张截图均人工查看；文件实际像素尺寸由 full-page 内容高度与设备缩放共同决定，不把它等同于 viewport。题纸与编辑区只通过信息层级和中性分隔线区分，不使用无业务含义的 Error 红装饰。
 
 ## 自审
 
@@ -91,3 +91,48 @@ BASE 的 `react-hooks/set-state-in-effect` 错误位于 rewrite **开放倒计�
 - `mind` MCP 在本会话未注册，无法执行 AGENTS.md 要求的 Mind 查询/持久化；未保存任何敏感或替代记忆。
 - demo 模式真实浏览器中 `/api/v1/auth/get-session` 返回既有 503；页面数据、快照、交互和 E2E 均正常，未发现本任务引入的浏览器错误。
 - 视觉截图位于已忽略的 `output/playwright/`，用于本地 QA，不纳入产品提交。
+
+---
+
+## Fix Round 1：视觉语义、可读字号与 snapshot 失败验收
+
+### 状态
+
+- **完成**：移除题纸桌面/移动端基于 `--desk-error` 的装饰线；Error 红只用于同步失败、snapshot 封存失败和 danger action。
+- **完成**：CSS Module 现在拥有 WritingRoom 正常、active、warning、failure、locked、toast、编辑器、按钮和 modal 的最终可见颜色；legacy frozen classes 仍保留。
+- **完成**：模块无 raw `white`、hex、rgb/rgba 或 legacy palette 变量；只使用批准的 desk tokens 与透明派生。
+- **完成**：saved 状态为 Ink，saving 为 Annotation Blue，unsaved 为 Amber；250 词完成与 V2 active 均为 Annotation Blue，不再使用 Green/Violet。
+- **完成**：考试规则、保存状态、快捷键、最后 5 分钟说明以及 V2 解锁说明的 computed font-size 均至少 12px。
+- **完成**：新增非 Demo HTTP fixture，使真实 `HttpLearningClient` 的 blind snapshot PATCH 确定性返回 503；错误文案显示为 Error token，抽象目标保持不可见。
+- Fix commit：`fix: align writing states with annotation semantics`（最终哈希以 `git log -1` 为准）。
+
+### RED / GREEN
+
+- 视觉与字号 RED：`3 failed, 16 passed`；规则 computed size 为 11.84px，saved 仍为 legacy Green，题纸仍有装饰 gradient。
+- snapshot failure fixture 初始行为验收确认错误文案与目标隔离已存在；增加 Error token computed 断言后 RED：`1 failed, 6 skipped`，实际仍为 legacy Violet `rgb(98, 88, 111)`。
+- 视觉与字号 GREEN：`19 passed`。
+- 非 Demo snapshot failure GREEN：`1 passed, 6 skipped`；确认且仅确认一次 `PATCH /api/v1/writing-attempts/attempt-snapshot-failure`，错误文案出现，目标不存在。
+- 回归中发现 V2 解锁说明因 `<small>` UA 缩放落到 9.728px 且对比度 4.31:1；现有 axe 测试构成 RED。模块显式设为 12px Annotation Blue 后 focused axe：`1 passed`。
+
+### 最终验证
+
+- Demo writing + accessibility + redesign contracts：`37 passed, 1 skipped`（snapshot HTTP fixture 按模式正确跳过）。
+- 非 Demo writing-rewrite：`1 passed, 6 skipped`（仅运行 HTTP snapshot failure 合同）。
+- Web unit：`258 passed, 53 skipped`。
+- Web typecheck：exit 0。
+- Web lint：0 errors；4 条 warning 位于未修改的既有文件。
+- Web production build：compiled、TypeScript、44 个 static page generation 全部通过。
+- `git diff --check`：通过。
+
+### Fix Round 1 浏览器截图
+
+- `output/playwright/task-5-fix1-writing-desktop-1440x960-full.png`：在 1440×960 viewport 设置下执行的首写 full-page capture。
+- `output/playwright/task-5-fix1-writing-mobile-390x844-full.png`：在 390×844 viewport 设置下执行的首写 full-page capture。
+- `output/playwright/task-5-fix1-rewrite-desktop-1440x960-full.png`：在 1440×960 viewport 设置下执行的 V2 full-page capture。
+
+三张 capture 均人工复核。它们是特定 viewport 设置下的 full-page capture，文件像素尺寸不宣称等于 viewport。视觉结果确认无 Error 红装饰、移动规则完整、V2 active 为 Blue、saved 为 Ink、最后 5 分钟说明清晰可读。
+
+### Concerns
+
+- production-mode 浏览器 QA 的 `/api/v1/auth/get-session` 仍返回既有 503；不影响 demo 页面数据、E2E 或本轮视觉/交互验收。
+- `output/playwright/` 被忽略，截图只作为本地 QA 证据，不进入提交。

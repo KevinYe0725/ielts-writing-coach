@@ -1,8 +1,108 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 import { deterministicDemo, resetDemoState } from "./support";
 
 const fortyFiveWords = `Primary school pupils can benefit from early language lessons because regular exposure makes unfamiliar patterns easier to recognise. Short interactive classes also build confidence without creating an excessive workload. However, schools should protect time for play, exercise and rest, so the programme remains age appropriate and genuinely useful.`;
+
+const httpRewriteUrl =
+  "/rewrite?cycle=cycle-http&task=rewrite-snapshot-failure";
+const hiddenAbstractTarget = "Check paragraph logic before submitting.";
+
+async function installSnapshotFailureApi(page: Page): Promise<string[]> {
+  const requests: string[] = [];
+  const question = {
+    id: "snapshot-question",
+    topic: "Education",
+    questionType: "Advantages / Disadvantages",
+    prompt:
+      "Some experts believe children should learn another language in primary school.",
+    instructions: "Discuss whether the advantages outweigh the disadvantages.",
+  };
+  const attempt = {
+    id: "attempt-snapshot-failure",
+    kind: "version_2",
+    content: "",
+    createdAt: "2026-08-23T00:05:00.000Z",
+    cycleId: "cycle-http",
+    revision: 1,
+    draftBeforeSelfCheck: null,
+    draftAfterSelfCheck: null,
+  };
+
+  await page.route("**/api/v1/**", async (route) => {
+    const request = route.request();
+    const { pathname } = new URL(request.url());
+    requests.push(`${request.method()} ${pathname}`);
+
+    if (pathname === "/api/v1/auth/get-session") {
+      await route.fulfill({ contentType: "application/json", body: "null" });
+      return;
+    }
+    if (
+      pathname === "/api/v1/rewrite-tasks/rewrite-snapshot-failure" &&
+      request.method() === "GET"
+    ) {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          rewrite_task: {
+            id: "rewrite-snapshot-failure",
+            cycle_id: "cycle-http",
+            status: "IN_PROGRESS",
+            available_at: "2026-08-22T00:00:00.000Z",
+            question,
+            abstract_checklist: [hiddenAbstractTarget],
+          },
+        }),
+      });
+      return;
+    }
+    if (pathname === "/api/v1/training-cycles/cycle-http") {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          cycle: {
+            id: "cycle-http",
+            status: "ATTEMPT_2_ACTIVE",
+            question,
+            writingAttempts: [attempt],
+          },
+        }),
+      });
+      return;
+    }
+    if (
+      pathname === "/api/v1/writing-attempts/attempt-snapshot-failure" &&
+      request.method() === "GET"
+    ) {
+      await route.fulfill({
+        contentType: "application/json",
+        headers: { etag: 'W/"1"' },
+        body: JSON.stringify({ attempt }),
+      });
+      return;
+    }
+    if (
+      pathname === "/api/v1/writing-attempts/attempt-snapshot-failure" &&
+      request.method() === "PATCH"
+    ) {
+      await route.fulfill({
+        contentType: "application/problem+json",
+        status: 503,
+        body: JSON.stringify({
+          type: "https://coach.test/problems/snapshot-unavailable",
+          title: "Snapshot unavailable",
+          status: 503,
+          detail: "The blind snapshot could not be sealed.",
+          code: "SNAPSHOT_UNAVAILABLE",
+        }),
+      });
+      return;
+    }
+    await route.fulfill({ status: 404, body: "Not found" });
+  });
+  return requests;
+}
 
 test.describe("timed writing rooms", () => {
   test.skip(
@@ -199,5 +299,34 @@ test.describe("timed writing rooms", () => {
         ),
       )
       .toBeNull();
+  });
+});
+
+test.describe("blind snapshot failure over the public HTTP contract", () => {
+  test.skip(
+    deterministicDemo,
+    "Run with NEXT_PUBLIC_DEMO_MODE=false and an HTTP-mode web server.",
+  );
+
+  test("keeps abstract goals hidden when the blind snapshot cannot be sealed", async ({
+    page,
+  }) => {
+    await page.clock.install({ time: new Date("2026-08-23T00:40:00.000Z") });
+    const requests = await installSnapshotFailureApi(page);
+
+    await page.goto(httpRewriteUrl);
+
+    const snapshotError = page.getByText(
+      "闭卷草稿尚未安全锁定，请检查连接后重试。",
+    );
+    await expect(snapshotError).toBeVisible();
+    await expect(snapshotError).toHaveCSS("color", "rgb(180, 71, 76)");
+    await expect(page.getByText(hiddenAbstractTarget)).toHaveCount(0);
+    expect(
+      requests.filter(
+        (request) =>
+          request === "PATCH /api/v1/writing-attempts/attempt-snapshot-failure",
+      ),
+    ).toHaveLength(1);
   });
 });

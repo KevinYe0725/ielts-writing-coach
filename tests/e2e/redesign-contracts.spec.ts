@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator } from "@playwright/test";
 
 import {
   deterministicDemo,
@@ -18,6 +18,17 @@ const routeMatrix = [
     "workspace",
   ],
 ] as const;
+
+async function expectFontSizeAtLeast(
+  locator: Locator,
+  minimumPixels: number,
+): Promise<void> {
+  await expect(locator).toBeAttached();
+  const fontSize = await locator.evaluate((element) =>
+    Number.parseFloat(window.getComputedStyle(element).fontSize),
+  );
+  expect(fontSize).toBeGreaterThanOrEqual(minimumPixels);
+}
 
 test.describe("annotation desk redesign contracts", () => {
   test.skip(
@@ -84,6 +95,71 @@ test.describe("annotation desk redesign contracts", () => {
     expect(promptBox!.width / roomBox!.width).toBeLessThanOrEqual(0.4);
     expect(editorBox!.width / roomBox!.width).toBeGreaterThanOrEqual(0.6);
     expect(editorBox!.width / roomBox!.width).toBeLessThanOrEqual(0.64);
+  });
+
+  for (const viewport of [
+    { label: "desktop", width: 1440, height: 960 },
+    { label: "390px mobile", width: 390, height: 844 },
+  ]) {
+    test(`writing auxiliary text stays at least 12px on ${viewport.label}`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({
+        width: viewport.width,
+        height: viewport.height,
+      });
+      await page.goto(
+        "/rewrite?cycle=cycle-demo&task=rewrite-primary-language",
+      );
+
+      const rule = page.getByText("构思、写作和检查均计入 40 分钟");
+      const save = page.getByText("已自动保存", { exact: true });
+      const shortcut = page.getByText(/快捷键：/);
+      const finalFive = page.getByText(
+        "为保留闭卷证据，剩余 5 分钟时才会显示。",
+      );
+
+      await expect(rule).toBeVisible();
+      await expect(shortcut).toBeVisible();
+      await expect(finalFive).toBeVisible();
+      for (const auxiliaryText of [rule, save, shortcut, finalFive]) {
+        await expectFontSizeAtLeast(auxiliaryText, 12);
+      }
+    });
+  }
+
+  test("writing states use annotation tokens instead of success or violet decoration", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 960 });
+    await page.goto("/rewrite?cycle=cycle-demo&task=rewrite-primary-language");
+
+    await expect(page.getByText("已自动保存", { exact: true })).toHaveCSS(
+      "color",
+      "rgb(23, 32, 51)",
+    );
+    await expect(
+      page.getByText("Version 2 · 闭卷重写", { exact: true }),
+    ).toHaveCSS("color", "rgb(29, 86, 160)");
+    await expect(page.locator(".writing-prompt")).toHaveCSS(
+      "background-image",
+      "none",
+    );
+    await expect(page.locator(".writing-editor")).toHaveCSS(
+      "background-color",
+      "rgb(252, 251, 248)",
+    );
+
+    await page.goto("/write?cycle=cycle-demo");
+    await page
+      .getByRole("textbox", { name: "你的作文" })
+      .fill(
+        Array.from({ length: 250 }, (_, index) => `word${index}`).join(" "),
+      );
+    await expect(page.getByText("250 词", { exact: true })).toHaveCSS(
+      "color",
+      "rgb(29, 86, 160)",
+    );
   });
 
   for (const [route, layout] of routeMatrix) {

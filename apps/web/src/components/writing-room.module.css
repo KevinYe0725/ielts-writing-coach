@@ -4,6 +4,7 @@
   min-height: calc(100svh - 72px);
   margin: 0;
   overflow: clip;
+  color: var(--desk-ink);
   background: var(--desk-paper);
   border: 1px solid color-mix(in srgb, var(--desk-ink) 13%, transparent);
   border-radius: var(--desk-radius-md);
@@ -11,9 +12,83 @@
 }
 
 .topbar {
-  background: color-mix(in srgb, var(--desk-paper) 96%, white);
+  background: var(--desk-paper);
   border-color: color-mix(in srgb, var(--desk-ink) 13%, transparent);
   font-family: var(--desk-font-utility);
+}
+
+.topbar :global(.writing-title-group > strong) {
+  color: color-mix(in srgb, var(--desk-ink) 68%, transparent);
+}
+
+.topbar :global(.badge) {
+  color: var(--desk-blue);
+  background: color-mix(in srgb, var(--desk-blue) 10%, transparent);
+  font-size: 0.75rem;
+}
+
+.topbar :global(.save-state) {
+  color: var(--desk-ink);
+  font-size: 0.75rem;
+}
+
+.topbar :global(.save-state[data-save-state="saving"]) {
+  color: var(--desk-blue);
+}
+
+.topbar :global(.save-state[data-save-state="unsaved"]) {
+  color: var(--desk-amber);
+}
+
+.topbar :global(.timer) {
+  color: var(--desk-ink);
+  background: color-mix(in srgb, var(--desk-blue) 4%, transparent);
+  border-color: color-mix(in srgb, var(--desk-ink) 13%, transparent);
+}
+
+.topbar :global(.timer-warning) {
+  color: var(--desk-amber);
+  background: color-mix(in srgb, var(--desk-amber) 8%, transparent);
+  border-color: color-mix(in srgb, var(--desk-amber) 28%, transparent);
+}
+
+.page :global(.integrity-banner) {
+  color: var(--desk-ink);
+  background: color-mix(in srgb, var(--desk-blue) 7%, transparent);
+  border-color: color-mix(in srgb, var(--desk-blue) 20%, transparent);
+  font-family: var(--desk-font-utility);
+}
+
+.page :global(.integrity-banner svg) {
+  color: var(--desk-blue);
+}
+
+.page :global(.integrity-banner small) {
+  color: var(--desk-blue);
+  font-size: 0.75rem;
+}
+
+.page :global(.integrity-banner[role="alert"]) {
+  color: var(--desk-error);
+  background: color-mix(in srgb, var(--desk-error) 7%, transparent);
+  border-color: color-mix(in srgb, var(--desk-error) 26%, transparent);
+}
+
+.page :global(.integrity-banner[role="alert"] svg),
+.page :global(.integrity-banner[role="alert"] small) {
+  color: var(--desk-error);
+}
+
+.page :global(.locked-banner) {
+  color: var(--desk-ink);
+  background: color-mix(in srgb, var(--desk-blue) 6%, transparent);
+  border-color: color-mix(in srgb, var(--desk-blue) 18%, transparent);
+}
+
+.page :global(.writing-toast) {
+  color: var(--desk-paper);
+  background: var(--desk-green);
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--desk-ink) 28%, transparent);
 }
 
 .room {
@@ -26,17 +101,13 @@
 .prompt {
   min-width: 0;
   padding: clamp(var(--desk-space-6), 3.2vw, var(--desk-space-12));
-  background:
-    linear-gradient(
-      to right,
-      transparent 0,
-      transparent 23px,
-      color-mix(in srgb, var(--desk-error) 17%, transparent) 23px,
-      color-mix(in srgb, var(--desk-error) 17%, transparent) 24px,
-      transparent 24px
-    ),
-    var(--desk-paper);
+  color: var(--desk-ink);
+  background: var(--desk-paper);
   border-right: 1px solid color-mix(in srgb, var(--desk-ink) 14%, transparent);
+}
+
+.prompt :global(.prompt-sticky) {
+  color: var(--desk-ink);
 }
 
 .prompt :global(.eyebrow),
@@ -45,17 +116,70 @@
   font-family: var(--desk-font-utility);
 }
 
+.prompt :global(h1),
 .prompt :global(blockquote),
 .prompt :global(.prompt-instruction) {
   color: var(--desk-ink);
+}
+
+.prompt :global(blockquote),
+.prompt :global(.prompt-instruction) {
   font-family: var(--desk-font-reading);
+}
+
+.prompt :global(.exam-rules) {
+  color: color-mix(in srgb, var(--desk-ink) 66%, transparent);
+  border-color: color-mix(in srgb, var(--desk-ink) 14%, transparent);
+}
+
+.prompt :global(.exam-rules div) {
+  font-size: 0.75rem;
+}
+
+.prompt :global(.exam-rules svg) {
+  color: var(--desk-evidence-muted);
+}
+
+.prompt :global(.self-check-box) {
+  color: var(--desk-ink);
+  background: color-mix(in srgb, var(--desk-blue) 5%, transparent);
+  border-color: color-mix(in srgb, var(--desk-blue) 24%, transparent);
+}
+
+.prompt :global(.self-check-box.locked) {
+  color: var(--desk-ink);
+  background: color-mix(in srgb, var(--desk-blue) 5%, transparent);
+  border-color: color-mix(in srgb, var(--desk-blue) 28%, transparent);
+}
+
+.prompt :global(.self-check-box.visible) {
+  color: var(--desk-ink);
+  background: color-mix(in srgb, var(--desk-blue) 9%, transparent);
+  border-color: color-mix(in srgb, var(--desk-blue) 34%, transparent);
+}
+
+.prompt :global(.self-check-box strong),
+.prompt :global(.self-check-box p),
+.prompt :global(.self-check-box ul) {
+  color: inherit;
+  font-size: 0.75rem;
+}
+
+.prompt
+  :global(.self-check-box[data-snapshot-state="saving"] p[role="status"]) {
+  color: var(--desk-blue);
+}
+
+.prompt :global(.self-check-box[data-snapshot-state="error"] p[role="status"]) {
+  color: var(--desk-error);
 }
 
 .editor {
   min-width: 0;
   padding: clamp(var(--desk-space-6), 4vw, var(--desk-space-12))
     clamp(var(--desk-space-6), 5vw, 70px) var(--desk-space-8);
-  background: color-mix(in srgb, var(--desk-paper) 88%, white);
+  color: var(--desk-ink);
+  background: var(--desk-paper);
 }
 
 .editor :global(.editor-heading),
@@ -63,9 +187,111 @@
   font-family: var(--desk-font-utility);
 }
 
+.editor :global(.editor-heading label) {
+  color: color-mix(in srgb, var(--desk-ink) 68%, transparent);
+}
+
+.editor :global(.word-count) {
+  color: var(--desk-evidence-muted);
+  font-size: 0.75rem;
+}
+
+.editor :global(.word-count.complete) {
+  color: var(--desk-blue);
+}
+
 .editor :global(.essay-editor) {
   color: var(--desk-ink);
+  background: transparent;
   font-family: var(--desk-font-reading);
+  caret-color: var(--desk-blue);
+}
+
+.editor :global(.essay-editor::placeholder) {
+  color: color-mix(in srgb, var(--desk-evidence-muted) 62%, transparent);
+}
+
+.editor :global(.essay-editor:focus-visible) {
+  outline-color: var(--desk-blue);
+}
+
+.editor :global(.editor-footer) {
+  border-color: color-mix(in srgb, var(--desk-ink) 13%, transparent);
+}
+
+.editor :global(.editor-footer p) {
+  color: var(--desk-evidence-muted);
+  font-size: 0.75rem;
+}
+
+.page :global(.button-primary) {
+  color: var(--desk-paper);
+  background: var(--desk-blue);
+  border-color: var(--desk-blue);
+  box-shadow: 0 5px 14px color-mix(in srgb, var(--desk-blue) 17%, transparent);
+}
+
+.page :global(.button-primary:hover:not(:disabled)) {
+  color: var(--desk-paper);
+  background: var(--desk-ink);
+  border-color: var(--desk-ink);
+}
+
+.page :global(.button-secondary) {
+  color: var(--desk-ink);
+  background: var(--desk-paper);
+  border-color: color-mix(in srgb, var(--desk-ink) 24%, transparent);
+}
+
+.page :global(.button-secondary:hover:not(:disabled)),
+.page :global(.button-ghost:hover:not(:disabled)) {
+  color: var(--desk-blue);
+  background: color-mix(in srgb, var(--desk-blue) 7%, transparent);
+  border-color: color-mix(in srgb, var(--desk-blue) 34%, transparent);
+}
+
+.page :global(.button-ghost) {
+  color: var(--desk-blue);
+  background: transparent;
+}
+
+.page :global(.button-danger) {
+  color: var(--desk-paper);
+  background: var(--desk-error);
+  border-color: var(--desk-error);
+}
+
+.page :global(.button:focus-visible) {
+  outline-color: color-mix(in srgb, var(--desk-blue) 44%, transparent);
+}
+
+.page :global(.modal-backdrop) {
+  background: color-mix(in srgb, var(--desk-ink) 46%, transparent);
+}
+
+.page :global(.modal-card) {
+  color: var(--desk-ink);
+  background: var(--desk-paper);
+  border-color: color-mix(in srgb, var(--desk-ink) 14%, transparent);
+  box-shadow: 0 18px 60px color-mix(in srgb, var(--desk-ink) 18%, transparent);
+}
+
+.page :global(.modal-icon) {
+  color: var(--desk-amber);
+  background: color-mix(in srgb, var(--desk-amber) 10%, transparent);
+}
+
+.page :global(.modal-card h2) {
+  color: var(--desk-ink);
+}
+
+.page :global(.modal-card > p),
+.page :global(.submit-summary) {
+  color: var(--desk-evidence-muted);
+}
+
+.page :global(.submit-summary) {
+  background: color-mix(in srgb, var(--desk-canvas) 72%, transparent);
 }
 
 @media (max-width: 760px) {
@@ -84,16 +310,7 @@
 
   .prompt {
     padding: var(--desk-space-6) var(--desk-space-4);
-    background:
-      linear-gradient(
-        to right,
-        transparent 0,
-        transparent 11px,
-        color-mix(in srgb, var(--desk-error) 15%, transparent) 11px,
-        color-mix(in srgb, var(--desk-error) 15%, transparent) 12px,
-        transparent 12px
-      ),
-      var(--desk-paper);
+    background: var(--desk-paper);
     border-right: 0;
     border-bottom: 1px solid
       color-mix(in srgb, var(--desk-ink) 14%, transparent);

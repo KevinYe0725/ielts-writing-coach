@@ -550,7 +550,7 @@ export function WritingRoom({
     <div className={cn("writing-page", styles.page)}>
       <header className={cn("writing-topbar", styles.topbar)}>
         <div className="writing-title-group">
-          <Badge tone={mode === "rewrite" ? "violet" : "blue"}>
+          <Badge tone="blue">
             {mode === "rewrite"
               ? text("Version 2 · 闭卷重写", "Version 2 · closed-book rewrite")
               : text("Version 1 · 首写", "Version 1 · first attempt")}
@@ -558,7 +558,11 @@ export function WritingRoom({
           <strong>{data.prompt.category}</strong>
         </div>
         <div className="writing-controls">
-          <span aria-live="polite" className="save-state">
+          <span
+            aria-live="polite"
+            className="save-state"
+            data-save-state={saveState}
+          >
             {saveState === "saving" ? (
               text("正在保存…", "Saving…")
             ) : saveState === "unsaved" ? (
@@ -694,6 +698,7 @@ export function WritingRoom({
             {mode === "rewrite" ? (
               <div
                 className={`self-check-box ${selfCheckVisible ? "visible" : "locked"}`}
+                data-snapshot-state={snapshotState}
               >
                 <strong>
                   {text("最后 5 分钟自检", "Final five-minute self-check")}
