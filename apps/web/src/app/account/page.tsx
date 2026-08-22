@@ -93,7 +93,7 @@ export default function AccountPage() {
 
   const chinese = locale === "zh-CN";
   return (
-    <div className={styles.page}>
+    <div className={styles.page} data-account-desk="focus">
       <header className={styles.heading}>
         <Badge tone="blue">
           <ShieldCheck aria-hidden="true" size={14} />

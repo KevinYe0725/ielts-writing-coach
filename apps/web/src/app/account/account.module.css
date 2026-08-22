@@ -1,7 +1,19 @@
 .page {
-  width: min(760px, 100%);
+  position: relative;
+  width: min(820px, 100%);
   margin: 0 auto;
   padding: 18px 0 72px;
+}
+
+.page::before {
+  position: absolute;
+  top: 130px;
+  bottom: 72px;
+  left: 21px;
+  width: 2px;
+  content: "";
+  background: var(--blue);
+  opacity: 0.7;
 }
 
 .loading {
@@ -31,7 +43,21 @@
 }
 
 .section {
+  position: relative;
+  padding-left: 52px;
   margin-top: 30px;
+}
+
+.section::before {
+  position: absolute;
+  top: 13px;
+  left: 15px;
+  width: 13px;
+  height: 13px;
+  content: "";
+  background: var(--surface);
+  border: 2px solid var(--blue);
+  border-radius: 50%;
 }
 
 .sectionHeading {
@@ -57,6 +83,9 @@
   padding: 18px;
   align-items: center;
   gap: 13px;
+  border-color: var(--line-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: 7px 7px 0 var(--surface-blue);
 }
 
 .identityInitial {
@@ -90,6 +119,8 @@
 
 .formCard {
   padding: 20px;
+  border-color: var(--line-strong);
+  border-radius: var(--radius-sm);
 }
 
 .form {
@@ -101,7 +132,7 @@
 .error,
 .success {
   margin: -8px 0 0;
-  font-size: 0.82rem;
+  font-size: max(0.82rem, 12px);
   line-height: 1.55;
 }
 
@@ -123,6 +154,18 @@
 @media (max-width: 700px) {
   .page {
     padding: 5px 0 48px;
+  }
+
+  .page::before {
+    left: 7px;
+  }
+
+  .section {
+    padding-left: 24px;
+  }
+
+  .section::before {
+    left: 1px;
   }
 
   .heading {

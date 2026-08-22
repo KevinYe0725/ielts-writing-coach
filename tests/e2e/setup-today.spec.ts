@@ -52,6 +52,32 @@ test.describe("deterministic setup and Today experience", () => {
     await expect(page.getByText("系统已就绪", { exact: true })).toBeVisible();
   });
 
+  test("setup keeps provider failure actionable inside the entry surface", async ({
+    page,
+  }) => {
+    await page.goto("/setup");
+    await expect(page.locator("[data-entry-surface='setup']")).toBeVisible();
+    await page.waitForTimeout(300);
+    await page.getByRole("button", { name: "继续", exact: true }).click();
+    await page.getByLabel("你的名字").fill("Simon");
+    await page.getByLabel("登录邮箱").fill("simon@example.com");
+    await page.getByLabel("密码").fill("a-secure-demo-password");
+    await page.getByRole("button", { name: "连接 AI" }).click();
+    await page.getByLabel("供应商").selectOption("custom");
+    await page.getByLabel("Base URL").fill("https://provider.example/v1");
+    await page.getByLabel("模型 ID").fill("provider-model");
+
+    await page.getByRole("button", { name: "测试连接" }).click();
+    await expect(page.getByText("需要修复", { exact: true })).toBeVisible();
+    await expect(
+      page.getByText("连接信息不完整，请检查 API Key 和模型。"),
+    ).toBeVisible();
+    await expect(page.getByLabel("Base URL")).toHaveValue(
+      "https://provider.example/v1",
+    );
+    await expect(page.getByLabel("API Key")).toHaveValue("");
+  });
+
   test("Today exposes exactly one primary next action", async ({ page }) => {
     await page.goto("/today");
 

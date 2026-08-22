@@ -9,6 +9,8 @@ import { useLocale } from "@/components/locale-provider";
 import { Badge, Button, Card, LoadingButtonContent } from "@/components/ui";
 import { useOneTimeLinkFromAddressBar } from "@/lib/client/one-time-link";
 
+import styles from "../entry.module.css";
+
 export default function JoinPage() {
   const router = useRouter();
   const { text } = useLocale();
@@ -57,10 +59,13 @@ export default function JoinPage() {
   };
 
   return (
-    <div className="setup-container">
+    <div
+      className={`setup-container ${styles.surface}`}
+      data-entry-surface="join"
+    >
       <section
         aria-labelledby="join-title"
-        className="setup-panel setup-panel-narrow"
+        className={`setup-panel setup-panel-narrow ${styles.panel}`}
       >
         <div className="setup-heading">
           <Badge tone="violet">
@@ -78,11 +83,14 @@ export default function JoinPage() {
           </p>
         </div>
         {!ready ? (
-          <Card aria-busy="true" className="setup-form-card">
+          <Card
+            aria-busy="true"
+            className={`setup-form-card ${styles.stateCard}`}
+          >
             <p>{text("正在验证邀请…", "Checking invitation…")}</p>
           </Card>
         ) : !token ? (
-          <Card className="setup-form-card">
+          <Card className={`setup-form-card ${styles.stateCard}`}>
             <p role="alert">
               {text(
                 "邀请链接缺少令牌。",
@@ -92,7 +100,7 @@ export default function JoinPage() {
             <Link href="/signin">{text("返回登录", "Back to sign in")}</Link>
           </Card>
         ) : (
-          <Card className="setup-form-card">
+          <Card className={`setup-form-card ${styles.formCard}`}>
             <form className="form-grid" onSubmit={submit}>
               <div className="form-field form-field-wide">
                 <label htmlFor="join-name">{text("姓名", "Name")}</label>

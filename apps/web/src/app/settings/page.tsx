@@ -51,6 +51,8 @@ import {
   type UserPreferences,
 } from "@/lib/client";
 
+import styles from "./settings.module.css";
+
 type SettingsTab = "learning" | "schedule" | "ai" | "data";
 
 const AI_ROUTE_TASK_COPY: Record<
@@ -387,12 +389,12 @@ export default function SettingsPage() {
   ];
 
   return (
-    <>
+    <div className={styles.page} data-settings-desk="focus">
       <PageHeader
         eyebrow={text("个人与实例设置", "Personal & instance settings")}
         title={text("设置", "Settings")}
       />
-      <div className="settings-layout">
+      <div className={`settings-layout ${styles.layout}`}>
         <nav
           aria-label={text("设置类别", "Settings categories")}
           className="settings-nav"
@@ -1051,7 +1053,7 @@ export default function SettingsPage() {
           </Card>
         </div>
       ) : null}
-    </>
+    </div>
   );
 }
 
@@ -1248,435 +1250,469 @@ function AiSettings({
   };
   return (
     <div className="ai-settings-stack">
-      <Card className="settings-section">
-        <div className="settings-section-head">
-          <span className="settings-icon">
-            <Cloud aria-hidden="true" size={20} />
-          </span>
-          <div>
-            <h2>{text("AI 服务", "AI service")}</h2>
-            <p>
+      <details
+        aria-label={text("高级设置", "Advanced settings")}
+        className={styles.advancedSettings}
+        data-settings-advanced
+        open
+      >
+        <summary className={styles.advancedSummary}>
+          <span>
+            <strong>{text("高级设置", "Advanced settings")}</strong>
+            <small>
               {text(
-                "只有实例管理员可以查看技术状态或修改连接。",
-                "Only instance administrators can view technical status or change the connection.",
+                "供应商、密钥、模型路由与连接生命周期",
+                "Provider, secrets, model routing, and connection lifecycle",
               )}
-            </p>
-          </div>
-          <Badge tone={connected ? "green" : "red"}>
-            {connected
-              ? text("连接正常", "Connected")
-              : text("未连接", "Not connected")}
-          </Badge>
-        </div>
-        <div className="connection-overview">
-          <div>
-            <span>{text("供应商", "Provider")}</span>
-            <strong>{data.ai.displayName}</strong>
-          </div>
-          <div>
-            <span>{text("默认模型", "Default model")}</span>
-            <strong>{data.ai.model}</strong>
-          </div>
-          <div>
-            <span>API Key</span>
-            <strong>
-              {data.ai.secretSource === "environment"
-                ? text("由环境变量管理", "Managed by environment")
-                : data.ai.secretHint}
-            </strong>
-          </div>
-          <div>
-            <span>{text("最近测试", "Last tested")}</span>
-            <strong>{text(data.ai.lastTestedZh, data.ai.lastTestedEn)}</strong>
-          </div>
-        </div>
-        <div className="connection-health-row">
-          <span className={connected ? "" : "warning"}>
-            {connected ? <Check aria-hidden="true" size={14} /> : "!"}
-            {text("基础连接", "Connection")}
+            </small>
           </span>
-          <span className={data.ai.structuredOutput ? "" : "warning"}>
-            {data.ai.structuredOutput ? (
-              <Check aria-hidden="true" size={14} />
-            ) : (
-              "!"
-            )}
-            {text("结构化输出", "Structured output")}
-          </span>
-          <span className="warning">
-            ! {text("不代表人工校准", "Not human-calibrated")}
-          </span>
-          {data.ai.latencyMs ? <small>{data.ai.latencyMs} ms</small> : null}
-        </div>
-        {data.ai.secretSource !== "environment" &&
-        data.ai.provider !== "mock" ? (
-          <>
-            <div className="settings-divider" />
-            <div className="replace-key-form">
-              <div className="form-field">
-                <label htmlFor="new-api-key">
-                  {text("替换 API Key", "Replace API key")}
-                </label>
-                <div className="input-with-icon">
-                  <KeyRound aria-hidden="true" size={16} />
-                  <input
-                    autoComplete="off"
-                    className="text-input"
-                    id="new-api-key"
-                    onChange={(event) => onKeyChange(event.target.value)}
-                    placeholder={text(
-                      "输入完整新密钥",
-                      "Enter the complete new key",
-                    )}
-                    spellCheck={false}
-                    type="password"
-                    value={newKey}
-                  />
-                </div>
-                <p className="field-hint">
-                  <EyeOff aria-hidden="true" size={13} />
+          <ChevronDown aria-hidden="true" size={18} />
+        </summary>
+        <div className={styles.advancedBody}>
+          <Card className="settings-section">
+            <div className="settings-section-head">
+              <span className="settings-icon">
+                <Cloud aria-hidden="true" size={20} />
+              </span>
+              <div>
+                <h2>{text("AI 服务", "AI service")}</h2>
+                <p>
                   {text(
-                    "原始密钥永不回显；更新必须完整输入。",
-                    "The original secret is never revealed; replacement requires the complete new key.",
+                    "只有实例管理员可以查看技术状态或修改连接。",
+                    "Only instance administrators can view technical status or change the connection.",
                   )}
                 </p>
               </div>
-              <div className="inline-actions">
-                <Button
-                  disabled={testing || replacing || !newKey}
-                  onClick={onTest}
-                  variant="secondary"
-                >
-                  {testing ? (
-                    <LoadingButtonContent label={text("测试中…", "Testing…")} />
-                  ) : (
-                    <>
-                      <RefreshCw aria-hidden="true" size={16} />
-                      {text("测试连接", "Test connection")}
-                    </>
-                  )}
-                </Button>
-                <Button
-                  disabled={testing || replacing || !newKey}
-                  onClick={onReplace}
-                >
-                  {replacing ? (
-                    <LoadingButtonContent
-                      label={text("正在替换…", "Replacing…")}
-                    />
-                  ) : (
-                    text("验证并替换", "Verify & replace")
-                  )}
-                </Button>
+              <Badge tone={connected ? "green" : "red"}>
+                {connected
+                  ? text("连接正常", "Connected")
+                  : text("未连接", "Not connected")}
+              </Badge>
+            </div>
+            <div className="connection-overview">
+              <div>
+                <span>{text("供应商", "Provider")}</span>
+                <strong>{data.ai.displayName}</strong>
+              </div>
+              <div>
+                <span>{text("默认模型", "Default model")}</span>
+                <strong>{data.ai.model}</strong>
+              </div>
+              <div>
+                <span>API Key</span>
+                <strong>
+                  {data.ai.secretSource === "environment"
+                    ? text("由环境变量管理", "Managed by environment")
+                    : data.ai.secretHint}
+                </strong>
+              </div>
+              <div>
+                <span>{text("最近测试", "Last tested")}</span>
+                <strong>
+                  {text(data.ai.lastTestedZh, data.ai.lastTestedEn)}
+                </strong>
               </div>
             </div>
-          </>
-        ) : null}
-        {probe ? (
-          <div
-            aria-live="polite"
-            className={cn(
-              "inline-probe",
-              probe.status === "failure" ? "error" : "success",
-            )}
-          >
-            <strong>{text(probe.messageZh, probe.messageEn)}</strong>
-            <span>
-              {probe.latencyMs
-                ? `${probe.latencyMs} ms`
-                : text("请检查密钥与模型", "Check the key and model")}
-            </span>
-          </div>
-        ) : null}
-        <div className="settings-divider" />
-        <div className="inline-actions">
-          <Button
-            onClick={() => setShowAddConnection((current) => !current)}
-            variant="secondary"
-          >
-            <Cloud aria-hidden="true" size={16} />
-            {showAddConnection
-              ? text("收起新增连接", "Close new connection")
-              : text("新增或切换 AI 服务", "Add or switch AI service")}
-          </Button>
-        </div>
-        {showAddConnection ? (
-          <div className="replace-key-form">
-            <div className="form-grid">
-              <div className="form-field form-field-wide">
-                <label htmlFor="new-provider-vendor">
-                  {text("服务商预设", "Provider preset")}
-                </label>
-                <select
-                  className="select-input"
-                  id="new-provider-vendor"
-                  onChange={(event) =>
-                    selectNewVendor(event.target.value as ProviderVendor)
-                  }
-                  value={newVendor}
-                >
-                  <optgroup label={text("全球主流服务", "Global providers")}>
-                    {providerCatalog
-                      .filter((preset) => preset.region === "global")
-                      .map((preset) => (
-                        <option key={preset.id} value={preset.id}>
-                          {text(preset.labelZh, preset.label)}
-                        </option>
-                      ))}
-                  </optgroup>
-                  <optgroup label={text("中国大陆服务", "China providers")}>
-                    {providerCatalog
-                      .filter((preset) => preset.region === "china")
-                      .map((preset) => (
-                        <option key={preset.id} value={preset.id}>
-                          {text(preset.labelZh, preset.label)}
-                        </option>
-                      ))}
-                  </optgroup>
-                  <optgroup
-                    label={text(
-                      "企业、自建与本地",
-                      "Enterprise, custom & local",
-                    )}
-                  >
-                    {providerCatalog
-                      .filter(
-                        (preset) =>
-                          ["custom", "local"].includes(preset.region) &&
-                          preset.id !== "mock",
-                      )
-                      .map((preset) => (
-                        <option key={preset.id} value={preset.id}>
-                          {text(preset.labelZh, preset.label)}
-                        </option>
-                      ))}
-                  </optgroup>
-                  <option value="mock">
-                    {text("Mock（仅演示）", "Mock (demo only)")}
-                  </option>
-                </select>
-                <p className="field-hint">
-                  {text(
-                    newProviderPreset.compatibilityNoteZh,
-                    newProviderPreset.compatibilityNoteEn,
-                  )}
-                </p>
-              </div>
-              <div className="form-field">
-                <label htmlFor="new-provider-model">
-                  {text("模型 ID", "Model ID")}
-                </label>
-                <input
-                  className="text-input"
-                  id="new-provider-model"
-                  onChange={(event) => setNewProviderModel(event.target.value)}
-                  spellCheck={false}
-                  value={newProviderModel}
-                />
-              </div>
-              {newProviderPreset.configurableBaseUrl ? (
-                <div className="form-field form-field-wide">
-                  <label htmlFor="new-provider-base-url">Base URL</label>
-                  <input
-                    className="text-input"
-                    id="new-provider-base-url"
-                    onChange={(event) =>
-                      setNewProviderBaseUrl(event.target.value)
-                    }
-                    type="url"
-                    value={newProviderBaseUrl}
-                  />
-                  <p className="field-hint">
-                    {text(
-                      "必须是精确 API 根地址。本地/私网地址只有进入管理员 allowlist 后才可访问。",
-                      "Use the exact API root. Local or private URLs work only after the operator adds them to the allowlist.",
-                    )}
-                  </p>
-                </div>
-              ) : null}
-              {newVendor !== "mock" ? (
-                <div className="form-field form-field-wide">
-                  <label htmlFor="new-provider-api-key">API Key</label>
-                  <div className="input-with-icon">
-                    <KeyRound aria-hidden="true" size={16} />
-                    <input
-                      autoComplete="off"
-                      className="text-input"
-                      id="new-provider-api-key"
-                      onChange={(event) =>
-                        setNewProviderKey(event.target.value)
-                      }
-                      placeholder={newProviderPreset.apiKeyPlaceholder}
-                      spellCheck={false}
-                      type="password"
-                      value={newProviderKey}
-                    />
+            <div className="connection-health-row">
+              <span className={connected ? "" : "warning"}>
+                {connected ? <Check aria-hidden="true" size={14} /> : "!"}
+                {text("基础连接", "Connection")}
+              </span>
+              <span className={data.ai.structuredOutput ? "" : "warning"}>
+                {data.ai.structuredOutput ? (
+                  <Check aria-hidden="true" size={14} />
+                ) : (
+                  "!"
+                )}
+                {text("结构化输出", "Structured output")}
+              </span>
+              <span className="warning">
+                ! {text("不代表人工校准", "Not human-calibrated")}
+              </span>
+              {data.ai.latencyMs ? <small>{data.ai.latencyMs} ms</small> : null}
+            </div>
+            {data.ai.secretSource !== "environment" &&
+            data.ai.provider !== "mock" ? (
+              <>
+                <div className="settings-divider" />
+                <div className="replace-key-form">
+                  <div className="form-field">
+                    <label htmlFor="new-api-key">
+                      {text("替换 API Key", "Replace API key")}
+                    </label>
+                    <div className="input-with-icon">
+                      <KeyRound aria-hidden="true" size={16} />
+                      <input
+                        autoComplete="off"
+                        className="text-input"
+                        id="new-api-key"
+                        onChange={(event) => onKeyChange(event.target.value)}
+                        placeholder={text(
+                          "输入完整新密钥",
+                          "Enter the complete new key",
+                        )}
+                        spellCheck={false}
+                        type="password"
+                        value={newKey}
+                      />
+                    </div>
+                    <p className="field-hint">
+                      <EyeOff aria-hidden="true" size={13} />
+                      {text(
+                        "原始密钥永不回显；更新必须完整输入。",
+                        "The original secret is never revealed; replacement requires the complete new key.",
+                      )}
+                    </p>
+                  </div>
+                  <div className="inline-actions">
+                    <Button
+                      disabled={testing || replacing || !newKey}
+                      onClick={onTest}
+                      variant="secondary"
+                    >
+                      {testing ? (
+                        <LoadingButtonContent
+                          label={text("测试中…", "Testing…")}
+                        />
+                      ) : (
+                        <>
+                          <RefreshCw aria-hidden="true" size={16} />
+                          {text("测试连接", "Test connection")}
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      disabled={testing || replacing || !newKey}
+                      onClick={onReplace}
+                    >
+                      {replacing ? (
+                        <LoadingButtonContent
+                          label={text("正在替换…", "Replacing…")}
+                        />
+                      ) : (
+                        text("验证并替换", "Verify & replace")
+                      )}
+                    </Button>
                   </div>
                 </div>
-              ) : null}
-            </div>
+              </>
+            ) : null}
+            {probe ? (
+              <div
+                aria-live="polite"
+                className={cn(
+                  "inline-probe",
+                  probe.status === "failure" ? "error" : "success",
+                )}
+              >
+                <strong>{text(probe.messageZh, probe.messageEn)}</strong>
+                <span>
+                  {probe.latencyMs
+                    ? `${probe.latencyMs} ms`
+                    : text("请检查密钥与模型", "Check the key and model")}
+                </span>
+              </div>
+            ) : null}
+            <div className="settings-divider" />
             <div className="inline-actions">
               <Button
-                disabled={
-                  savingProvider ||
-                  !newProviderModel.trim() ||
-                  (newVendor !== "mock" &&
-                    !["ollama", "lm_studio", "custom"].includes(newVendor) &&
-                    !newProviderKey)
-                }
-                onClick={() => void saveNewProvider()}
+                onClick={() => setShowAddConnection((current) => !current)}
+                variant="secondary"
               >
-                {savingProvider ? (
-                  <LoadingButtonContent
-                    label={text("正在测试并保存…", "Testing and saving…")}
-                  />
-                ) : (
-                  text("测试并设为默认", "Test and set as default")
-                )}
+                <Cloud aria-hidden="true" size={16} />
+                {showAddConnection
+                  ? text("收起新增连接", "Close new connection")
+                  : text("新增或切换 AI 服务", "Add or switch AI service")}
               </Button>
             </div>
-            {providerMessage ? (
-              <p aria-live="polite" className="field-hint">
-                {providerMessage}
-              </p>
-            ) : null}
-          </div>
-        ) : null}
-      </Card>
-      <Card className="settings-section compact-section">
-        <div className="settings-section-head">
-          <span className="settings-icon">
-            <Settings2 aria-hidden="true" size={20} />
-          </span>
-          <div>
-            <h2>{text("模型分工", "Model assignments")}</h2>
-            <p>
-              {text(
-                "简单模式使用一个模型完成所有开放 AI 任务。",
-                "Simple mode uses one model for every open-ended AI task.",
-              )}
-            </p>
-          </div>
-          <Badge tone="blue">{text("简单模式", "Simple mode")}</Badge>
-        </div>
-        <details
-          className="routing-details"
-          onToggle={(event) => {
-            if (event.currentTarget.open) void loadRoutes();
-          }}
-        >
-          <summary>
-            {text("按学习步骤选择模型", "Choose models by learning step")}
-            <ChevronDown aria-hidden="true" size={16} />
-          </summary>
-          <div>
-            <p>
-              {text(
-                "如果你有多个可用模型，可以为作文批改、出题和复盘分别选择；不设置时统一使用默认模型。",
-                "If you have several models, you can choose one for essay feedback, paper generation, or review. Otherwise the default model is used throughout.",
-              )}
-            </p>
-            {routesLoading ? (
-              <p className="field-hint">
-                {text("正在读取模型选择…", "Loading model choices…")}
-              </p>
-            ) : (
-              <div className="route-editor-list">
-                {AI_ROUTE_TASKS.map((task) => {
-                  const model = routeDrafts[task.id] ?? "";
-                  const provider = routeProviders[task.id];
-                  return (
-                    <div className="route-editor-row" key={task.id}>
-                      <span>
-                        <strong>{text(task.zh, task.en)}</strong>
-                        <small>
-                          {provider
-                            ? text(
-                                "使用当前 AI 连接",
-                                "Uses the current AI connection",
-                              )
-                            : text("使用默认模型", "Uses the default model")}
-                        </small>
-                      </span>
-                      <input
-                        aria-label={`${text(task.zh, task.en)} model`}
-                        className="text-input"
-                        onChange={(event) =>
-                          setRouteDrafts((current) => ({
-                            ...current,
-                            [task.id]: event.target.value,
-                          }))
-                        }
-                        placeholder={
-                          isConcreteModel(data.ai.model)
-                            ? data.ai.model
-                            : "gpt-5-mini"
-                        }
-                        spellCheck={false}
-                        value={model}
-                      />
-                      <Button
-                        disabled={
-                          routeSaving !== null ||
-                          !connected ||
-                          data.ai.id === "missing" ||
-                          model.trim().length === 0
-                        }
-                        onClick={() => void saveRoute(task.id)}
-                        size="sm"
-                        variant="secondary"
+            {showAddConnection ? (
+              <div className="replace-key-form">
+                <div className="form-grid">
+                  <div className="form-field form-field-wide">
+                    <label htmlFor="new-provider-vendor">
+                      {text("服务商预设", "Provider preset")}
+                    </label>
+                    <select
+                      className="select-input"
+                      id="new-provider-vendor"
+                      onChange={(event) =>
+                        selectNewVendor(event.target.value as ProviderVendor)
+                      }
+                      value={newVendor}
+                    >
+                      <optgroup
+                        label={text("全球主流服务", "Global providers")}
                       >
-                        {routeSaving === task.id
-                          ? text("保存中…", "Saving…")
-                          : text("保存", "Save")}
-                      </Button>
+                        {providerCatalog
+                          .filter((preset) => preset.region === "global")
+                          .map((preset) => (
+                            <option key={preset.id} value={preset.id}>
+                              {text(preset.labelZh, preset.label)}
+                            </option>
+                          ))}
+                      </optgroup>
+                      <optgroup label={text("中国大陆服务", "China providers")}>
+                        {providerCatalog
+                          .filter((preset) => preset.region === "china")
+                          .map((preset) => (
+                            <option key={preset.id} value={preset.id}>
+                              {text(preset.labelZh, preset.label)}
+                            </option>
+                          ))}
+                      </optgroup>
+                      <optgroup
+                        label={text(
+                          "企业、自建与本地",
+                          "Enterprise, custom & local",
+                        )}
+                      >
+                        {providerCatalog
+                          .filter(
+                            (preset) =>
+                              ["custom", "local"].includes(preset.region) &&
+                              preset.id !== "mock",
+                          )
+                          .map((preset) => (
+                            <option key={preset.id} value={preset.id}>
+                              {text(preset.labelZh, preset.label)}
+                            </option>
+                          ))}
+                      </optgroup>
+                      <option value="mock">
+                        {text("Mock（仅演示）", "Mock (demo only)")}
+                      </option>
+                    </select>
+                    <p className="field-hint">
+                      {text(
+                        newProviderPreset.compatibilityNoteZh,
+                        newProviderPreset.compatibilityNoteEn,
+                      )}
+                    </p>
+                  </div>
+                  <div className="form-field">
+                    <label htmlFor="new-provider-model">
+                      {text("模型 ID", "Model ID")}
+                    </label>
+                    <input
+                      className="text-input"
+                      id="new-provider-model"
+                      onChange={(event) =>
+                        setNewProviderModel(event.target.value)
+                      }
+                      spellCheck={false}
+                      value={newProviderModel}
+                    />
+                  </div>
+                  {newProviderPreset.configurableBaseUrl ? (
+                    <div className="form-field form-field-wide">
+                      <label htmlFor="new-provider-base-url">Base URL</label>
+                      <input
+                        className="text-input"
+                        id="new-provider-base-url"
+                        onChange={(event) =>
+                          setNewProviderBaseUrl(event.target.value)
+                        }
+                        type="url"
+                        value={newProviderBaseUrl}
+                      />
+                      <p className="field-hint">
+                        {text(
+                          "必须是精确 API 根地址。本地/私网地址只有进入管理员 allowlist 后才可访问。",
+                          "Use the exact API root. Local or private URLs work only after the operator adds them to the allowlist.",
+                        )}
+                      </p>
                     </div>
-                  );
-                })}
+                  ) : null}
+                  {newVendor !== "mock" ? (
+                    <div className="form-field form-field-wide">
+                      <label htmlFor="new-provider-api-key">API Key</label>
+                      <div className="input-with-icon">
+                        <KeyRound aria-hidden="true" size={16} />
+                        <input
+                          autoComplete="off"
+                          className="text-input"
+                          id="new-provider-api-key"
+                          onChange={(event) =>
+                            setNewProviderKey(event.target.value)
+                          }
+                          placeholder={newProviderPreset.apiKeyPlaceholder}
+                          spellCheck={false}
+                          type="password"
+                          value={newProviderKey}
+                        />
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+                <div className="inline-actions">
+                  <Button
+                    disabled={
+                      savingProvider ||
+                      !newProviderModel.trim() ||
+                      (newVendor !== "mock" &&
+                        !["ollama", "lm_studio", "custom"].includes(
+                          newVendor,
+                        ) &&
+                        !newProviderKey)
+                    }
+                    onClick={() => void saveNewProvider()}
+                  >
+                    {savingProvider ? (
+                      <LoadingButtonContent
+                        label={text("正在测试并保存…", "Testing and saving…")}
+                      />
+                    ) : (
+                      text("测试并设为默认", "Test and set as default")
+                    )}
+                  </Button>
+                </div>
+                {providerMessage ? (
+                  <p aria-live="polite" className="field-hint">
+                    {providerMessage}
+                  </p>
+                ) : null}
               </div>
-            )}
-            {routeMessage ? (
-              <p aria-live="polite" className="field-hint">
-                {routeMessage}
-              </p>
+            ) : null}
+          </Card>
+          <Card className="settings-section compact-section">
+            <div className="settings-section-head">
+              <span className="settings-icon">
+                <Settings2 aria-hidden="true" size={20} />
+              </span>
+              <div>
+                <h2>{text("模型分工", "Model assignments")}</h2>
+                <p>
+                  {text(
+                    "简单模式使用一个模型完成所有开放 AI 任务。",
+                    "Simple mode uses one model for every open-ended AI task.",
+                  )}
+                </p>
+              </div>
+              <Badge tone="blue">{text("简单模式", "Simple mode")}</Badge>
+            </div>
+            <details
+              className="routing-details"
+              onToggle={(event) => {
+                if (event.currentTarget.open) void loadRoutes();
+              }}
+            >
+              <summary>
+                {text("按学习步骤选择模型", "Choose models by learning step")}
+                <ChevronDown aria-hidden="true" size={16} />
+              </summary>
+              <div>
+                <p>
+                  {text(
+                    "如果你有多个可用模型，可以为作文批改、出题和复盘分别选择；不设置时统一使用默认模型。",
+                    "If you have several models, you can choose one for essay feedback, paper generation, or review. Otherwise the default model is used throughout.",
+                  )}
+                </p>
+                {routesLoading ? (
+                  <p className="field-hint">
+                    {text("正在读取模型选择…", "Loading model choices…")}
+                  </p>
+                ) : (
+                  <div className="route-editor-list">
+                    {AI_ROUTE_TASKS.map((task) => {
+                      const model = routeDrafts[task.id] ?? "";
+                      const provider = routeProviders[task.id];
+                      return (
+                        <div className="route-editor-row" key={task.id}>
+                          <span>
+                            <strong>{text(task.zh, task.en)}</strong>
+                            <small>
+                              {provider
+                                ? text(
+                                    "使用当前 AI 连接",
+                                    "Uses the current AI connection",
+                                  )
+                                : text(
+                                    "使用默认模型",
+                                    "Uses the default model",
+                                  )}
+                            </small>
+                          </span>
+                          <input
+                            aria-label={`${text(task.zh, task.en)} model`}
+                            className="text-input"
+                            onChange={(event) =>
+                              setRouteDrafts((current) => ({
+                                ...current,
+                                [task.id]: event.target.value,
+                              }))
+                            }
+                            placeholder={
+                              isConcreteModel(data.ai.model)
+                                ? data.ai.model
+                                : "gpt-5-mini"
+                            }
+                            spellCheck={false}
+                            value={model}
+                          />
+                          <Button
+                            disabled={
+                              routeSaving !== null ||
+                              !connected ||
+                              data.ai.id === "missing" ||
+                              model.trim().length === 0
+                            }
+                            onClick={() => void saveRoute(task.id)}
+                            size="sm"
+                            variant="secondary"
+                          >
+                            {routeSaving === task.id
+                              ? text("保存中…", "Saving…")
+                              : text("保存", "Save")}
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                {routeMessage ? (
+                  <p aria-live="polite" className="field-hint">
+                    {routeMessage}
+                  </p>
+                ) : null}
+              </div>
+            </details>
+          </Card>
+          <div className="ai-danger-zone">
+            <LockKeyhole aria-hidden="true" size={17} />
+            <div>
+              <strong>
+                {text(
+                  "删除连接会暂停等待中的 AI 任务",
+                  "Deleting the connection pauses queued AI work",
+                )}
+              </strong>
+              <span>
+                {text(
+                  "删除只移除本实例保存的密钥，不会在供应商侧撤销。",
+                  "Deletion removes the secret from this instance; it does not revoke it at the provider.",
+                )}
+              </span>
+            </div>
+            <Button
+              disabled={
+                deletingConnection ||
+                data.ai.id === "missing" ||
+                data.ai.secretSource === "environment"
+              }
+              onClick={() => void deleteCurrentConnection()}
+              size="sm"
+              variant="danger"
+            >
+              {data.ai.secretSource === "environment"
+                ? text("环境连接只读", "Environment connection is read-only")
+                : text("删除当前连接…", "Delete current connection…")}
+            </Button>
+            {deleteConnectionMessage ? (
+              <span aria-live="polite">{deleteConnectionMessage}</span>
             ) : null}
           </div>
-        </details>
-      </Card>
-      <div className="ai-danger-zone">
-        <LockKeyhole aria-hidden="true" size={17} />
-        <div>
-          <strong>
-            {text(
-              "删除连接会暂停等待中的 AI 任务",
-              "Deleting the connection pauses queued AI work",
-            )}
-          </strong>
-          <span>
-            {text(
-              "删除只移除本实例保存的密钥，不会在供应商侧撤销。",
-              "Deletion removes the secret from this instance; it does not revoke it at the provider.",
-            )}
-          </span>
         </div>
-        <Button
-          disabled={
-            deletingConnection ||
-            data.ai.id === "missing" ||
-            data.ai.secretSource === "environment"
-          }
-          onClick={() => void deleteCurrentConnection()}
-          size="sm"
-          variant="danger"
-        >
-          {data.ai.secretSource === "environment"
-            ? text("环境连接只读", "Environment connection is read-only")
-            : text("删除当前连接…", "Delete current connection…")}
-        </Button>
-        {deleteConnectionMessage ? (
-          <span aria-live="polite">{deleteConnectionMessage}</span>
-        ) : null}
-      </div>
+      </details>
     </div>
   );
 }

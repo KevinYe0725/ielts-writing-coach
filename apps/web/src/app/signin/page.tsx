@@ -8,6 +8,8 @@ import { KeyRound, LogIn } from "lucide-react";
 import { useLocale } from "@/components/locale-provider";
 import { Badge, Button, Card, LoadingButtonContent } from "@/components/ui";
 
+import styles from "../entry.module.css";
+
 interface ProblemPayload {
   detail?: string;
   message?: string;
@@ -86,10 +88,13 @@ function SignInForm() {
   };
 
   return (
-    <div className="setup-container">
+    <div
+      className={`setup-container ${styles.surface} ${styles.signinSurface}`}
+      data-entry-surface="signin"
+    >
       <section
         aria-labelledby="signin-title"
-        className="setup-panel setup-panel-narrow"
+        className={`setup-panel setup-panel-narrow ${styles.panel}`}
       >
         <div className="setup-heading">
           <Badge tone="blue">
@@ -106,7 +111,7 @@ function SignInForm() {
             )}
           </p>
         </div>
-        <Card className="setup-form-card">
+        <Card className={`setup-form-card ${styles.formCard}`}>
           <form className="form-grid" onSubmit={submit}>
             <div className="form-field form-field-wide">
               <label htmlFor="signin-email">{text("邮箱", "Email")}</label>
@@ -159,7 +164,7 @@ function SignInForm() {
             </div>
           </form>
         </Card>
-        <p className="field-hint">
+        <p className={`field-hint ${styles.afterForm}`}>
           <Link href="/recover">{text("忘记密码？", "Forgot password?")}</Link>
         </p>
       </section>

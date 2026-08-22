@@ -1,0 +1,172 @@
+.page {
+  width: min(1040px, 100%);
+  margin: 0 auto;
+  padding-bottom: 72px;
+}
+
+.layout {
+  position: relative;
+}
+
+.layout::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 206px;
+  width: 1px;
+  content: "";
+  background: var(--line);
+}
+
+.page :global(.settings-nav) {
+  padding: 4px 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.page :global(.settings-nav button) {
+  position: relative;
+  border-radius: var(--radius-sm);
+  font-size: max(0.8rem, 12px);
+}
+
+.page :global(.settings-nav button.active)::after {
+  position: absolute;
+  top: 9px;
+  right: -16px;
+  bottom: 9px;
+  width: 2px;
+  content: "";
+  background: var(--blue);
+}
+
+.page :global(.settings-content) {
+  padding-left: 20px;
+}
+
+.page :global(.settings-section) {
+  border-color: var(--line-strong);
+  border-radius: var(--radius-sm);
+}
+
+.page :global(.settings-section-head p),
+.page :global(.field-hint),
+.page :global(.settings-savebar > span),
+.page :global(.data-action-list small),
+.page :global(.connection-overview span),
+.page :global(.connection-health-row),
+.page :global(.routing-details summary),
+.page :global(.routing-details p),
+.page :global(.route-editor-row strong),
+.page :global(.route-editor-row small),
+.page :global(.ai-danger-zone strong),
+.page :global(.ai-danger-zone span),
+.page :global(.inline-probe),
+.page :global(.import-result dt),
+.page :global(.import-result dd) {
+  font-size: max(0.75rem, 12px);
+}
+
+.advancedSettings {
+  overflow: clip;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+}
+
+.advancedSummary {
+  display: flex;
+  min-height: 68px;
+  padding: 14px 18px;
+  color: var(--blue-dark);
+  cursor: pointer;
+  background: var(--surface-blue);
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  list-style: none;
+}
+
+.advancedSummary::-webkit-details-marker {
+  display: none;
+}
+
+.advancedSummary > span {
+  display: grid;
+  gap: 2px;
+}
+
+.advancedSummary strong {
+  font-size: 0.9rem;
+}
+
+.advancedSummary small {
+  color: var(--ink-soft);
+  font-size: max(0.75rem, 12px);
+}
+
+.advancedSummary > svg {
+  transition: transform 160ms ease;
+}
+
+.advancedSettings[open] .advancedSummary > svg {
+  transform: rotate(180deg);
+}
+
+.advancedBody {
+  display: grid;
+  padding: 12px;
+  gap: 12px;
+}
+
+.advancedBody > :global(.settings-section) {
+  border-color: var(--line);
+}
+
+@media (max-width: 900px) {
+  .layout::before {
+    display: none;
+  }
+
+  .page :global(.settings-nav) {
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .page :global(.settings-nav button.active)::after {
+    top: auto;
+    right: 10px;
+    bottom: -10px;
+    left: 10px;
+    width: auto;
+    height: 2px;
+  }
+
+  .page :global(.settings-content) {
+    padding-left: 0;
+  }
+}
+
+@media (max-width: 680px) {
+  .page {
+    padding-bottom: 48px;
+  }
+
+  .advancedSummary {
+    min-height: 64px;
+    padding: 12px 14px;
+  }
+
+  .advancedBody {
+    padding: 7px;
+    gap: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .advancedSummary > svg {
+    transition: none;
+  }
+}

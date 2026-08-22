@@ -36,6 +36,8 @@ import {
 } from "@/lib/client";
 import { useOneTimeLinkFromAddressBar } from "@/lib/client/one-time-link";
 
+import styles from "../entry.module.css";
+
 const initialForm: BootstrapInput = {
   deploymentMode: "personal",
   adminName: "",
@@ -160,7 +162,10 @@ export default function SetupPage() {
   };
 
   return (
-    <div className="setup-container">
+    <div
+      className={`setup-container ${styles.surface} ${styles.setupSurface}`}
+      data-entry-surface="setup"
+    >
       <ol
         aria-label={text("设置进度", "Setup progress")}
         className="setup-steps"

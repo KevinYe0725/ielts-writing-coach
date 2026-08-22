@@ -1,0 +1,116 @@
+.surface {
+  position: relative;
+  width: min(960px, 100%);
+  min-height: calc(100dvh - 118px);
+  padding: clamp(28px, 6vw, 74px) clamp(18px, 4vw, 48px) 72px;
+  margin: 0 auto;
+}
+
+.surface::before {
+  position: absolute;
+  top: clamp(28px, 6vw, 74px);
+  bottom: 72px;
+  left: clamp(6px, 2vw, 22px);
+  width: 2px;
+  content: "";
+  background: var(--blue);
+  opacity: 0.72;
+}
+
+.panel {
+  position: relative;
+  padding-left: clamp(12px, 2vw, 30px);
+}
+
+.panel::after {
+  position: absolute;
+  top: 12px;
+  left: -7px;
+  width: 13px;
+  height: 13px;
+  content: "";
+  background: var(--surface);
+  border: 2px solid var(--blue);
+  border-radius: 50%;
+}
+
+.formCard,
+.stateCard {
+  border-color: var(--line-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: 8px 8px 0 var(--surface-blue);
+}
+
+.stateCard {
+  min-height: 150px;
+}
+
+.stateCard p,
+.formCard p,
+.afterForm {
+  font-size: max(0.75rem, 12px);
+}
+
+.afterForm {
+  margin: 22px 0 0;
+  text-align: center;
+}
+
+.signinSurface {
+  display: grid;
+  align-items: center;
+}
+
+.setupSurface {
+  width: min(1080px, 100%);
+}
+
+.surface :global(.setup-heading p),
+.surface :global(.field-hint),
+.surface :global(.save-mode small),
+.surface :global(.probe-header span),
+.surface :global(.probe-placeholder p),
+.surface :global(.probe-results > p),
+.surface :global(.probe-results li),
+.surface :global(.cost-note strong),
+.surface :global(.cost-note span),
+.surface :global(.connection-success-card small),
+.surface :global(.advanced-disclosure summary),
+.surface :global(.advanced-disclosure p) {
+  font-size: max(0.75rem, 12px);
+}
+
+@media (max-width: 700px) {
+  .surface {
+    min-height: calc(100dvh - 86px);
+    padding: 28px 10px 52px 26px;
+  }
+
+  .surface::before {
+    top: 28px;
+    bottom: 52px;
+    left: 10px;
+  }
+
+  .panel {
+    padding-left: 8px;
+  }
+
+  .panel::after {
+    left: -23px;
+  }
+
+  .formCard,
+  .stateCard {
+    box-shadow: 5px 5px 0 var(--surface-blue);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .surface *,
+  .surface *::before,
+  .surface *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

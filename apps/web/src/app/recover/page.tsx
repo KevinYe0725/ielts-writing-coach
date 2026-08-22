@@ -8,6 +8,8 @@ import { useLocale } from "@/components/locale-provider";
 import { Badge, Button, Card, LoadingButtonContent } from "@/components/ui";
 import { useOneTimeLinkFromAddressBar } from "@/lib/client/one-time-link";
 
+import styles from "../entry.module.css";
+
 export default function RecoverPage() {
   const { text } = useLocale();
   const { invalidToken, ready, token } = useOneTimeLinkFromAddressBar();
@@ -84,10 +86,13 @@ export default function RecoverPage() {
   };
 
   return (
-    <div className="setup-container">
+    <div
+      className={`setup-container ${styles.surface}`}
+      data-entry-surface="recover"
+    >
       <section
         aria-labelledby="recover-title"
-        className="setup-panel setup-panel-narrow"
+        className={`setup-panel setup-panel-narrow ${styles.panel}`}
       >
         <div className="setup-heading">
           <Badge tone="blue">
@@ -115,7 +120,7 @@ export default function RecoverPage() {
                 )}
           </p>
         </div>
-        <Card className="setup-form-card">
+        <Card className={`setup-form-card ${styles.formCard}`}>
           {!ready ? (
             <p aria-busy="true">
               {text("正在检查恢复链接…", "Checking recovery link…")}

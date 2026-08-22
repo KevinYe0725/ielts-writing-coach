@@ -1,6 +1,17 @@
 import { expect, test } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
 
 import { expectBasicAccessibility } from "./support";
+
+async function expectFontSizeAtLeast(
+  locator: import("@playwright/test").Locator,
+  minimumPixels: number,
+) {
+  const fontSize = await locator.evaluate((element) =>
+    Number.parseFloat(window.getComputedStyle(element).fontSize),
+  );
+  expect(fontSize).toBeGreaterThanOrEqual(minimumPixels);
+}
 
 async function signedInSession(page: import("@playwright/test").Page) {
   await page.route("**/api/v1/auth/get-session", async (route) => {
@@ -121,6 +132,7 @@ test.describe("account controls", () => {
     });
 
     await page.goto("/account");
+    await expect(page.locator("[data-account-desk='focus']")).toBeVisible();
     await expect(
       page.getByRole("heading", { name: /账户与安全|account and security/i }),
     ).toBeVisible();
@@ -133,6 +145,14 @@ test.describe("account controls", () => {
     const update = page.getByRole("button", {
       name: /更新密码|update password/i,
     });
+    await expect(page.getByLabel(/^新密码$|^new password$/i)).toHaveAttribute(
+      "minlength",
+      "12",
+    );
+    await expect(page.getByLabel(/^新密码$|^new password$/i)).toHaveAttribute(
+      "maxlength",
+      "128",
+    );
     await expect(update).toBeDisabled();
     await page
       .getByLabel(/当前密码|current password/i)
@@ -223,4 +243,59 @@ test.describe("account controls", () => {
     );
     expect(overflow).toBeLessThanOrEqual(1);
   });
+
+  for (const viewport of [
+    { label: "desktop", width: 1440, height: 960 },
+    { label: "390px mobile", width: 390, height: 844 },
+  ]) {
+    test(`entry, account, and settings surfaces pass axe at ${viewport.label}`, async ({
+      page,
+    }) => {
+      await signedInSession(page);
+      await page.setViewportSize(viewport);
+
+      for (const route of ["/signin", "/setup", "/settings", "/account"]) {
+        await page.goto(route);
+        await expectBasicAccessibility(page);
+        const scan = await new AxeBuilder({ page })
+          .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
+          .analyze();
+        expect(
+          scan.violations,
+          `${route}: ${JSON.stringify(scan.violations, null, 2)}`,
+        ).toEqual([]);
+        const overflow = await page.evaluate(
+          () =>
+            document.documentElement.scrollWidth -
+            document.documentElement.clientWidth,
+        );
+        expect(overflow).toBeLessThanOrEqual(1);
+      }
+    });
+
+    test(`entry, account, and settings auxiliary text stays at least 12px on ${viewport.label}`, async ({
+      page,
+    }) => {
+      await signedInSession(page);
+      await page.setViewportSize(viewport);
+
+      await page.goto("/signin");
+      await expectFontSizeAtLeast(page.getByText("忘记密码？"), 12);
+
+      await page.goto("/settings");
+      await page.getByRole("button", { name: "AI 服务" }).click();
+      await expectFontSizeAtLeast(
+        page.getByText("供应商、密钥、模型路由与连接生命周期"),
+        12,
+      );
+
+      await page.goto("/account");
+      await expectFontSizeAtLeast(
+        page
+          .locator("[aria-labelledby='signed-in-account']")
+          .getByText("学习者", { exact: true }),
+        12,
+      );
+    });
+  }
 });

@@ -54,12 +54,83 @@ test.describe("annotation desk redesign contracts", () => {
     );
   });
 
-  test("entry pages expose their page-layout contract", async ({ page }) => {
-    await page.goto("/signin");
+  test("entry surfaces use the entry layout without leaking one-time tokens", async ({
+    page,
+  }) => {
+    const response = await page.goto("/recover?error=INVALID_TOKEN");
+
+    expect(response?.status()).toBe(200);
     await expect(page.locator("main")).toHaveAttribute(
       "data-page-layout",
       "entry",
     );
+    await expect(page.locator("[data-entry-surface='recover']")).toBeVisible();
+    await expect(page).toHaveURL(/\/recover$/);
+    await expect(page.getByText("恢复链接无效或已过期。")).toBeVisible();
+    const storedValues = await page.evaluate(() => [
+      ...Object.values(localStorage),
+      ...Object.values(sessionStorage),
+    ]);
+    expect(storedValues.join("\n")).not.toContain("INVALID_TOKEN");
+  });
+
+  test("entry pages retain account-mode guidance and state-specific surfaces", async ({
+    page,
+  }) => {
+    await page.goto("/signin");
+    await expect(page.locator("[data-entry-surface='signin']")).toBeVisible();
+    await expect(
+      page.getByText(/个人学习空间会为新邮箱创建账号/),
+    ).toBeVisible();
+    await expect(page.getByText(/共享空间需要邀请链接/)).toBeVisible();
+
+    await page.goto("/join?token=opaque-entry-token");
+    await expect(page.locator("[data-entry-surface='join']")).toBeVisible();
+    await expect(page).toHaveURL(/\/join$/);
+    await expect(page.getByLabel("姓名")).toBeVisible();
+    const joinStorage = await page.evaluate(() => [
+      ...Object.values(localStorage),
+      ...Object.values(sessionStorage),
+    ]);
+    expect(joinStorage.join("\n")).not.toContain("opaque-entry-token");
+  });
+
+  test("settings keeps technical controls in a visible advanced section", async ({
+    page,
+  }) => {
+    await page.goto("/settings");
+    await page.getByRole("button", { name: "AI 服务" }).click();
+
+    const advanced = page.getByRole("group", { name: "高级设置" });
+    await expect(advanced).toBeVisible();
+    await expect(advanced).toHaveAttribute("open", "");
+    await expect(advanced.getByText("供应商", { exact: true })).toBeVisible();
+    await expect(advanced.getByText("默认模型", { exact: true })).toBeVisible();
+    await expect(advanced.getByText("API Key", { exact: true })).toBeVisible();
+    await expect(
+      advanced.getByRole("button", { name: "新增或切换 AI 服务" }),
+    ).toBeVisible();
+    await expect(
+      advanced.getByText("按学习步骤选择模型", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      advanced.getByRole("button", { name: /删除当前连接/ }),
+    ).toBeVisible();
+  });
+
+  test("settings retains every data portability and deletion control", async ({
+    page,
+  }) => {
+    await page.goto("/settings");
+    await page.getByRole("button", { name: "数据与隐私" }).click();
+
+    await expect(page.getByLabel("选择交换包")).toBeVisible();
+    await expect(page.getByLabel("选择训练轮次")).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "下载交换包" }),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "创建导出" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "删除…" })).toBeVisible();
   });
 
   test("Today composes the focus layout as a writing desk", async ({
