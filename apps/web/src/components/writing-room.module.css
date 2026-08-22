@@ -87,7 +87,7 @@
 
 .page :global(.writing-toast) {
   color: var(--desk-paper);
-  background: var(--desk-green);
+  background: var(--desk-blue);
   box-shadow: 0 12px 32px color-mix(in srgb, var(--desk-ink) 28%, transparent);
 }
 

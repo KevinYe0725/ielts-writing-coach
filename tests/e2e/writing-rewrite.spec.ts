@@ -145,6 +145,19 @@ test.describe("timed writing rooms", () => {
     await expect(dialog.getByText(/48 词/)).toBeVisible();
     await dialog.getByRole("button", { name: "确认提交" }).click();
 
+    const submissionToast = page
+      .getByRole("status")
+      .filter({ hasText: "作文提交成功，正在生成批改…" });
+    await expect(submissionToast).toBeVisible();
+    await expect(submissionToast).toHaveCSS(
+      "background-color",
+      "rgb(29, 86, 160)",
+    );
+    await expect(submissionToast).not.toHaveCSS(
+      "background-color",
+      "rgb(47, 109, 90)",
+    );
+
     await expect(page).toHaveURL(/\/feedback\?cycle=cycle-demo$/);
   });
 

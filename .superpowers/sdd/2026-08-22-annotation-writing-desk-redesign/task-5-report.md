@@ -136,3 +136,29 @@ BASE 的 `react-hooks/set-state-in-effect` 错误位于 rewrite **开放倒计�
 
 - production-mode 浏览器 QA 的 `/api/v1/auth/get-session` 仍返回既有 503；不影响 demo 页面数据、E2E 或本轮视觉/交互验收。
 - `output/playwright/` 被忽略，截图只作为本地 QA 证据，不进入提交。
+
+---
+
+## Fix Round 2：提交请求成功 toast 语义色
+
+### 状态与范围
+
+- **完成**：`作文提交成功，正在生成批改…` 只表示提交请求成功、批改开始，不代表能力验证，因此 toast 从 `--desk-green` 改为 Annotation Blue `--desk-blue`。
+- **完成**：WritingRoom 组件与 CSS Module 的可执行源码扫描均无 `--desk-green` 引用；普通保存和提交成功表面不再使用 Green。
+- **范围受控**：只修改 `writing-room.module.css`、既有提交 E2E 和本报告；未改组件状态机、API/client、路由、保存、提交或快照逻辑。
+- Fix commit：`fix: use annotation blue for submission status`（最终哈希以 `git log -1` 为准）。
+
+### RED / GREEN
+
+- 在真实键盘保存/提交流程中新增 computed-color 合同：toast 必须可见、背景必须为 `rgb(29, 86, 160)`，并显式排除 Green `rgb(47, 109, 90)`。
+- RED：focused E2E `1 failed`；浏览器实际解析到 `rgb(47, 109, 90)`。
+- GREEN：同一 focused E2E `1 passed`；浏览器实际合同改为 Annotation Blue。
+
+### 验证
+
+- Demo writing-rewrite + redesign contracts：`25 passed, 1 skipped`。
+- Web component/unit：`258 passed, 53 skipped`。
+- Web typecheck：exit 0。
+- Web lint：0 errors；4 条既有 warning 位于未修改文件。
+- `rg -- '--desk-green' writing-room.module.css writing-room.tsx`：无匹配。
+- `git diff --check`：通过。
