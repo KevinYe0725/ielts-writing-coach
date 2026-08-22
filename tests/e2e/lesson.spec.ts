@@ -335,6 +335,25 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
 
   test.beforeEach(async ({ page }) => resetDemoState(page));
 
+  test("feedback uses the workspace and preserves optional lesson identity", async ({
+    page,
+  }) => {
+    await page.goto(feedbackUrl);
+
+    await expect(page.locator("main")).toHaveAttribute(
+      "data-page-layout",
+      "workspace",
+    );
+    const workbench = page.locator("[data-feedback-workbench]");
+    await expect(workbench).toBeVisible();
+    await expect(
+      workbench.locator('[data-feedback-evidence][aria-hidden="true"]').first(),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: /专项教学/ }).first(),
+    ).toHaveAttribute("href", /lesson=lesson-collocation-perspective/);
+  });
+
   test("uses feedback columns only when the report has enough content space", async ({
     page,
   }) => {
@@ -517,6 +536,14 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
     await expect(suggestionsTab).toHaveAttribute("aria-selected", "true");
     await expect(suggestions).toBeVisible();
     await expect(essay).toBeHidden();
+    await suggestionsTab.evaluate((element) => {
+      document.documentElement.style.scrollBehavior = "auto";
+      const top = element.getBoundingClientRect().top + window.scrollY;
+      window.scrollTo(0, top + 200);
+    });
+    const stickyTabBox = await suggestionsTab.boundingBox();
+    expect(stickyTabBox).not.toBeNull();
+    expect(stickyTabBox!.y).toBeGreaterThanOrEqual(66);
 
     await essayTab.click();
     await expect(essayTab).toHaveAttribute("aria-selected", "true");

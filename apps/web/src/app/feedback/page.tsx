@@ -35,10 +35,12 @@ import {
   Badge,
   Button,
   Card,
+  EvidenceLink,
   LoadingButtonContent,
   PageHeader,
   Skeleton,
 } from "@/components/ui";
+import { PageLayout } from "@/components/layout/page-layout";
 import { useDemoResource } from "@/components/use-demo-resource";
 import {
   LearningClientError,
@@ -352,7 +354,7 @@ export default function FeedbackPage({
   );
 
   return (
-    <div className={styles.page}>
+    <PageLayout variant="workspace" className={styles.page!}>
       <PageHeader
         actions={
           <div className={styles.headerActions}>
@@ -443,7 +445,11 @@ export default function FeedbackPage({
         </div>
       ) : null}
 
-      <Card className={styles.overviewCard}>
+      <section
+        aria-labelledby="feedback-assessment-heading"
+        className={styles.assessmentSummary}
+        data-feedback-summary
+      >
         <div className={styles.overallScore}>
           <div
             className={styles.scoreBadge}
@@ -464,7 +470,9 @@ export default function FeedbackPage({
           </div>
           <div>
             <p className="eyebrow">{text("本篇诊断", "Essay diagnosis")}</p>
-            <h2>{text(data.overallSummaryZh, data.overallSummaryEn)}</h2>
+            <h2 id="feedback-assessment-heading">
+              {text(data.overallSummaryZh, data.overallSummaryEn)}
+            </h2>
             <p className={styles.strengthLine}>
               <CheckCircle2 aria-hidden="true" size={17} />
               <span>
@@ -493,7 +501,7 @@ export default function FeedbackPage({
             </details>
           ))}
         </div>
-      </Card>
+      </section>
 
       <div
         aria-label={text("报告视图", "Report view")}
@@ -728,7 +736,21 @@ export default function FeedbackPage({
                           ) : null}
                         </span>
                         <strong>{text(issue.titleZh, issue.titleEn)}</strong>
-                        <small lang="en">{issue.evidence}</small>
+                        <span
+                          aria-hidden="true"
+                          className={styles.evidenceRelation}
+                          data-feedback-evidence
+                        >
+                          <EvidenceLink
+                            label={text("修改建议", "Suggestion")}
+                            state="revision"
+                          >
+                            <span lang="en">{issue.evidence}</span>
+                          </EvidenceLink>
+                        </span>
+                        <small className="sr-only" lang="en">
+                          {issue.evidence}
+                        </small>
                       </span>
                       <ChevronDown aria-hidden="true" size={17} />
                     </button>
@@ -938,8 +960,8 @@ export default function FeedbackPage({
             )}
           </p>
         </div>
-        <Badge tone="violet">Version 2 {text("后开放", "required")}</Badge>
+        <Badge tone="neutral">Version 2 {text("后开放", "required")}</Badge>
       </Card>
-    </div>
+    </PageLayout>
   );
 }

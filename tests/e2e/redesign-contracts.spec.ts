@@ -162,6 +162,52 @@ test.describe("annotation desk redesign contracts", () => {
     );
   });
 
+  test("feedback evidence and manuscript stay readable in the workspace", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 960 });
+    await page.goto(
+      "/feedback?cycle=cycle-demo&lesson=lesson-collocation-perspective",
+    );
+
+    const essay = page.locator("[data-feedback-essay]");
+    const manuscriptMetrics = await essay.evaluate((element) => {
+      const style = window.getComputedStyle(element);
+      return {
+        fontSize: Number.parseFloat(style.fontSize),
+        lineHeight: Number.parseFloat(style.lineHeight),
+      };
+    });
+    expect(manuscriptMetrics.fontSize).toBeGreaterThanOrEqual(17);
+    expect(
+      manuscriptMetrics.lineHeight / manuscriptMetrics.fontSize,
+    ).toBeGreaterThanOrEqual(1.9);
+
+    await expectFontSizeAtLeast(
+      page.getByText("需要改正", { exact: true }).first(),
+      13,
+    );
+    const evidence = page
+      .locator('[data-feedback-evidence][aria-hidden="true"]')
+      .first();
+    await expect(evidence).toBeVisible();
+    await expect(
+      evidence.locator('[data-evidence-state="revision"]'),
+    ).toBeVisible();
+    const evidenceLabelMetrics = await evidence
+      .getByText("修改建议", { exact: true })
+      .evaluate((element) => {
+        const style = window.getComputedStyle(element);
+        return {
+          height: element.getBoundingClientRect().height,
+          lineHeight: Number.parseFloat(style.lineHeight),
+        };
+      });
+    expect(evidenceLabelMetrics.height).toBeLessThanOrEqual(
+      evidenceLabelMetrics.lineHeight * 1.1,
+    );
+  });
+
   for (const [route, layout] of routeMatrix) {
     test(`${route} uses ${layout}`, async ({ page }) => {
       await page.goto(route);
