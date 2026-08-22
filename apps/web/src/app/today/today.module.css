@@ -19,6 +19,14 @@
   line-height: 1.08;
 }
 
+.desk :global(.badge),
+.desk :global(.due-label),
+.desk :global(.task-meta),
+.desk :global(.eyebrow),
+.desk :global(.cycle-step > div > span) {
+  font-size: 0.8rem;
+}
+
 .primaryAction {
   position: relative;
   padding: var(--desk-space-8);
@@ -97,7 +105,7 @@
 .evidenceItem > div > span {
   display: block;
   font-family: var(--desk-font-utility);
-  font-size: 0.76rem;
+  font-size: 0.8rem;
   letter-spacing: 0.01em;
   line-height: 1.35;
 }

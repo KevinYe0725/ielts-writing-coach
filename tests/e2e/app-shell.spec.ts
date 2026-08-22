@@ -176,6 +176,33 @@ test.describe("desktop learning workspace", () => {
     expect(await gridColumnCount(grid)).toBe(2);
   });
 
+  test("keeps essay badge and date support text at least 12px at 390px", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/essays");
+
+    const firstCard = page.locator("[data-essay-card]").first();
+    const supportSizes = await Promise.all([
+      firstCard
+        .locator(".badge")
+        .evaluate((element) =>
+          Number.parseFloat(window.getComputedStyle(element).fontSize),
+        ),
+      firstCard
+        .getByText("8月14日", { exact: true })
+        .evaluate((element) =>
+          Number.parseFloat(window.getComputedStyle(element).fontSize),
+        ),
+    ]);
+
+    for (const size of supportSizes) {
+      expect(size, "badge and date computed font sizes").toBeGreaterThanOrEqual(
+        12,
+      );
+    }
+  });
+
   test("keeps the active learning step and cycle-safe destination in the context topbar", async ({
     page,
   }) => {

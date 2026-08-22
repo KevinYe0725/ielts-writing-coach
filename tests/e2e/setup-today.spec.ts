@@ -105,16 +105,41 @@ test.describe("deterministic setup and Today experience", () => {
     ).toHaveCount(1);
   });
 
-  test("Today preserves mixed-review and waiting-notice query identities", async ({
+  test("mixed-review opens hidden-review question selection and its start action", async ({
     page,
   }) => {
     await page.goto("/today?mixed-review=1");
-    await expect(page).toHaveURL(/\/today\?mixed-review=1$/);
-    await expect(page.locator(".next-task-card")).toHaveCount(1);
 
+    await expect(page).toHaveURL(/\/today\?mixed-review=1$/);
+    await expect(
+      page.getByRole("heading", {
+        name: "完成新作文并被动复测旧目标",
+      }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "先选一道题" }),
+    ).toBeVisible();
+    await expect(
+      page.locator(".next-task-card").getByRole("button", {
+        name: "用这道题开始",
+      }),
+    ).toBeVisible();
+  });
+
+  test("feedback-waiting notice keeps the queued state and refresh action", async ({
+    page,
+  }) => {
     await page.goto("/today?notice=feedback-waiting-ai");
+
     await expect(page).toHaveURL(/\/today\?notice=feedback-waiting-ai$/);
-    await expect(page.locator(".next-task-card")).toHaveCount(1);
+    await expect(
+      page.getByText("作文已提交并锁定，批改正在排队", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.locator(".next-task-card").getByRole("link", {
+        name: "刷新状态",
+      }),
+    ).toHaveAttribute("href", "/today");
   });
 
   test("the whole interface switches language without translating the task", async ({

@@ -71,7 +71,13 @@
 .cardTopline > span:last-child {
   color: color-mix(in srgb, var(--desk-ink) 48%, transparent);
   font-family: var(--desk-font-utility);
-  font-size: 0.74rem;
+  font-size: 0.8rem;
+}
+
+.workspace :global(.badge),
+.compact :global(.badge),
+.compactHeading :global(.eyebrow) {
+  font-size: 0.8rem;
 }
 
 .prompt {
