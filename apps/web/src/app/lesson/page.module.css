@@ -1,3 +1,101 @@
+/* Legacy hooks scoped to this module; DOM classes remain for compatibility. */
+:global(.lesson-stage-nav li.done) {
+  color: var(--green);
+}
+:global(.lesson-stage-nav li.done > span) {
+  color: #fff;
+  background: var(--green);
+  border-color: var(--green);
+}
+:global(.lesson-stage-nav li.current) {
+  color: var(--blue-dark);
+}
+:global(.lesson-stage-nav li.current > span) {
+  color: #fff;
+  background: var(--blue);
+  border-color: var(--blue);
+  box-shadow: 0 0 0 4px var(--blue-soft);
+}
+
+:global(.lesson-workspace) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 250px;
+  align-items: start;
+  gap: 14px;
+}
+:global(.choice-list label.selected) {
+  background: #f2f7fe;
+  border-color: var(--blue);
+  box-shadow: 0 0 0 2px rgba(24, 89, 173, 0.08);
+}
+:global(.choice-list label.selected .choice-letter) {
+  color: #fff;
+  background: var(--blue);
+  border-color: var(--blue);
+}
+:global(.spotlight-token.selected) {
+  color: #fff;
+  background: var(--blue);
+  border-color: var(--blue);
+}
+:global(.expression-map label) {
+  justify-content: space-between;
+}
+:global(.expression-map select) {
+  max-width: 58%;
+  padding: 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+}
+:global(.lesson-side-panel .card) {
+  padding: 16px;
+  box-shadow: none;
+}
+:global(.side-card-icon.green) {
+  color: var(--green);
+  background: var(--green-soft);
+}
+:global(.modal-actions-stacked .button) {
+  width: 100%;
+}
+:global(.completion-result-grid .card) {
+  padding: 17px;
+  text-align: left;
+  box-shadow: none;
+}
+:global(.result-dot.green) {
+  background: var(--green);
+  box-shadow: 0 0 0 5px var(--green-soft);
+}
+:global(.result-dot.amber) {
+  background: #b17d27;
+  box-shadow: 0 0 0 5px var(--amber-soft);
+}
+:global(.result-dot.blue) {
+  background: var(--blue);
+  box-shadow: 0 0 0 5px var(--blue-soft);
+}
+@media (max-width: 900px) {
+  :global(.lesson-workspace) {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 680px) {
+  :global(.lesson-header-actions .button) {
+    flex: 1;
+  }
+}
+@media (max-width: 680px) {
+  :global(.exercise-footer > .button) {
+    width: 100%;
+  }
+}
+@media (max-width: 680px) {
+  :global(.hint-actions .button) {
+    width: 100%;
+  }
+}
+
 .readingPage {
   width: min(1040px, calc(100vw - 296px));
   max-width: none;

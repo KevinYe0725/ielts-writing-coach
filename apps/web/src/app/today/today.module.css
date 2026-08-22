@@ -1,3 +1,189 @@
+/* Legacy hooks scoped to this module; DOM classes remain for compatibility. */
+:global(.next-task-card) {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(21px, 3.5vw, 34px);
+  border-color: #ccdae9;
+  box-shadow: 0 9px 30px rgba(30, 65, 103, 0.07);
+}
+:global(.next-task-accent) {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 210px;
+  height: 210px;
+  background: radial-gradient(
+    circle at top right,
+    rgba(68, 129, 196, 0.16),
+    transparent 67%
+  );
+  pointer-events: none;
+}
+:global(.next-task-topline) {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+}
+:global(.due-label) {
+  display: inline-flex;
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+  align-items: center;
+  gap: 6px;
+}
+:global(.next-task-body) {
+  position: relative;
+  display: flex;
+  margin-top: 22px;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 30px;
+}
+:global(.next-task-copy) {
+  max-width: 650px;
+}
+:global(.next-task-copy h2) {
+  margin-bottom: 9px;
+  font-size: clamp(1.35rem, 2.2vw, 1.85rem);
+}
+:global(.next-task-copy > p) {
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+}
+:global(.task-meta) {
+  display: flex;
+  flex-wrap: wrap;
+  color: var(--ink-faint);
+  font-size: 0.76rem;
+  gap: 16px;
+}
+:global(.task-meta span) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+:global(.cycle-timeline-card) {
+  padding: 20px 22px;
+}
+:global(.cycle-timeline) {
+  display: grid;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  grid-template-columns: repeat(5, 1fr);
+}
+:global(.cycle-step) {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  text-align: center;
+  align-items: center;
+  flex-direction: column;
+}
+:global(.cycle-node) {
+  z-index: 1;
+  display: grid;
+  width: 30px;
+  height: 30px;
+  margin-bottom: 9px;
+  color: var(--ink-faint);
+  background: #fff;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  font-size: 0.73rem;
+  font-weight: 700;
+  place-items: center;
+}
+:global(.cycle-step-done .cycle-node) {
+  color: #fff;
+  background: var(--green);
+  border-color: var(--green);
+}
+:global(.cycle-step-current .cycle-node) {
+  color: #fff;
+  background: var(--blue);
+  border-color: var(--blue);
+  box-shadow: 0 0 0 5px var(--blue-soft);
+}
+:global(.cycle-step div) {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+:global(.cycle-step strong) {
+  font-size: 0.76rem;
+}
+:global(.cycle-step span:not(.cycle-node):not(.cycle-line)) {
+  color: var(--ink-faint);
+  font-size: 0.66rem;
+}
+:global(.cycle-line) {
+  position: absolute;
+  top: 15px;
+  left: calc(50% + 15px);
+  width: calc(100% - 30px);
+  height: 1px;
+  background: var(--line-strong);
+}
+:global(.cycle-step-done .cycle-line) {
+  background: #7fb29f;
+}
+@media (max-width: 760px) {
+  :global(.next-task-body) {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+@media (max-width: 760px) {
+  :global(.next-task-body .button) {
+    width: 100%;
+  }
+}
+@media (max-width: 760px) {
+  :global(.cycle-timeline-card) {
+    padding: 17px;
+  }
+}
+@media (max-width: 760px) {
+  :global(.cycle-timeline) {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+}
+@media (max-width: 760px) {
+  :global(.cycle-step) {
+    min-height: 54px;
+    text-align: left;
+    align-items: flex-start;
+    padding-left: 45px;
+  }
+}
+@media (max-width: 760px) {
+  :global(.cycle-node) {
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+}
+@media (max-width: 760px) {
+  :global(.cycle-line) {
+    top: 30px;
+    left: 15px;
+    width: 1px;
+    height: 24px;
+  }
+}
+@media (max-width: 760px) {
+  :global(.next-task-topline) {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
 .desk {
   display: grid;
   min-width: 0;

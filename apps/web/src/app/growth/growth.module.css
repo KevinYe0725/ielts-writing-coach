@@ -1,3 +1,240 @@
+/* Legacy hooks scoped to this module; DOM classes remain for compatibility. */
+:global(.growth-stat-grid) {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 11px;
+}
+:global(.growth-stat-grid .card) {
+  display: flex;
+  min-height: 103px;
+  padding: 16px;
+  align-items: center;
+  gap: 11px;
+}
+:global(.growth-stat-grid .card > div) {
+  display: flex;
+  flex-direction: column;
+}
+:global(.growth-stat-grid .card > div > span) {
+  color: var(--ink-soft);
+  font-size: 0.69rem;
+}
+:global(.growth-stat-grid .card strong) {
+  font-size: 1.28rem;
+}
+:global(.growth-stat-grid .card strong small) {
+  color: var(--ink-faint);
+  font-size: 0.65rem;
+}
+:global(.growth-main-grid) {
+  display: grid;
+  margin-top: 13px;
+  grid-template-columns: minmax(0, 1.5fr) minmax(250px, 0.7fr);
+  gap: 12px;
+}
+:global(.score-trend-card),
+:global(.north-star-card) {
+  min-height: 310px;
+  padding: 22px;
+}
+:global(.score-chart) {
+  display: flex;
+  height: 175px;
+  margin-top: 18px;
+  align-items: flex-end;
+  justify-content: space-around;
+  gap: 12px;
+}
+:global(.chart-column) {
+  display: flex;
+  height: 100%;
+  flex: 1;
+  align-items: center;
+  flex-direction: column;
+}
+:global(.chart-value) {
+  margin-bottom: 4px;
+  color: var(--ink-soft);
+  font-size: 0.66rem;
+  font-weight: 700;
+}
+:global(.chart-bar-track) {
+  display: flex;
+  width: min(35px, 100%);
+  min-height: 125px;
+  background: #eef1f4;
+  border-radius: 6px 6px 2px 2px;
+  align-items: flex-end;
+  flex: 1;
+  overflow: hidden;
+}
+:global(.chart-bar-track > span) {
+  display: block;
+  width: 100%;
+  background: linear-gradient(180deg, #4c8bd2, var(--blue));
+  border-radius: 6px 6px 2px 2px;
+}
+:global(.chart-column small) {
+  margin-top: 5px;
+  color: var(--ink-faint);
+  font-size: 0.62rem;
+}
+:global(.chart-note) {
+  margin: 12px 0 0;
+  color: var(--ink-faint);
+  font-size: 0.65rem;
+}
+:global(.north-star-card) {
+  background: linear-gradient(145deg, #edf7f2, #fff);
+  border-color: #d3e7dd;
+}
+:global(.north-star-icon) {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 14px;
+  color: var(--green);
+  background: #fff;
+  border-radius: 12px;
+  place-items: center;
+}
+:global(.north-star-card > strong) {
+  display: block;
+  color: var(--green);
+  font-size: 2.5rem;
+  line-height: 1.1;
+}
+:global(.north-star-card h2) {
+  margin-top: 9px;
+  font-size: 0.98rem;
+}
+:global(.north-star-card > p:not(.eyebrow)) {
+  color: #5d6c65;
+  font-size: 0.72rem;
+}
+
+:global(.skill-table) {
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  box-shadow: var(--shadow-sm);
+}
+:global(.skill-table-head),
+:global(.skill-table-row) {
+  display: grid;
+  grid-template-columns: minmax(240px, 1.4fr) 120px 120px minmax(160px, 0.8fr);
+  align-items: center;
+  gap: 14px;
+}
+:global(.skill-table-head) {
+  min-height: 44px;
+  padding: 0 18px;
+  color: var(--ink-faint);
+  background: var(--surface-muted);
+  border-bottom: 1px solid var(--line);
+  font-size: 0.67rem;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+:global(.skill-table-row) {
+  min-height: 72px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--line);
+}
+:global(.skill-table-row:last-child) {
+  border-bottom: 0;
+}
+:global(.skill-table-row > div:first-child) {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+:global(.skill-table-row > div:first-child > span) {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+:global(.skill-table-row strong) {
+  font-size: 0.78rem;
+}
+:global(.skill-table-row small) {
+  color: var(--ink-faint);
+  font-size: 0.65rem;
+}
+:global(.recurrence-cell) {
+  display: flex;
+  flex-direction: column;
+}
+:global(.recurrence-cell > i) {
+  display: block;
+  width: 75px;
+  height: 4px;
+  margin-top: 4px;
+  overflow: hidden;
+  background: #edf0f3;
+  border-radius: 999px;
+}
+:global(.recurrence-cell > i b) {
+  display: block;
+  height: 100%;
+  background: #be7b7f;
+  border-radius: 999px;
+}
+:global(.next-review) {
+  color: var(--ink-soft);
+  font-size: 0.7rem;
+}
+@media (max-width: 900px) {
+  :global(.growth-stat-grid) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 900px) {
+  :global(.growth-main-grid) {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 900px) {
+  :global(.skill-table-head) {
+    display: none;
+  }
+}
+@media (max-width: 900px) {
+  :global(.skill-table-row) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 9px;
+  }
+}
+@media (max-width: 900px) {
+  :global(.recurrence-cell),
+  :global(.next-review) {
+    grid-column: auto;
+  }
+}
+@media (max-width: 680px) {
+  :global(.growth-stat-grid) {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 680px) {
+  :global(.growth-stat-grid .card) {
+    min-height: 82px;
+  }
+}
+@media (max-width: 680px) {
+  :global(.skill-table-row) {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+}
+@media (max-width: 680px) {
+  :global(.skill-table-row > span) {
+    justify-self: start;
+  }
+}
+
 .record {
   display: grid;
   min-width: 0;

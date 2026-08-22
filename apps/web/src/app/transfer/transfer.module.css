@@ -1,3 +1,88 @@
+/* Legacy hooks scoped to this module; DOM classes remain for compatibility. */
+:global(.transfer-check-card) {
+  max-width: 790px;
+  padding: clamp(22px, 4vw, 35px);
+  margin: 0 auto;
+}
+:global(.transfer-check-head) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+:global(.transfer-check-head > span) {
+  display: inline-flex;
+  color: var(--ink-faint);
+  font-size: 0.7rem;
+  align-items: center;
+  gap: 5px;
+}
+:global(.transfer-check-card blockquote) {
+  margin: 24px 0;
+  color: #2d3d50;
+  font-family: var(--font-serif);
+  font-size: 1.1rem;
+  line-height: 1.65;
+}
+:global(.transfer-task-prompt) {
+  display: flex;
+  padding: 14px;
+  margin-bottom: 13px;
+  color: #4b5f78;
+  background: var(--blue-soft);
+  border-radius: 10px;
+  align-items: flex-start;
+  gap: 9px;
+}
+:global(.transfer-task-prompt svg) {
+  margin-top: 2px;
+  color: var(--blue);
+  flex: none;
+}
+:global(.transfer-task-prompt strong) {
+  font-size: 0.75rem;
+}
+:global(.transfer-task-prompt p) {
+  margin: 2px 0 0;
+  font-size: 0.75rem;
+}
+:global(.transfer-textarea) {
+  width: 100%;
+  min-height: 180px;
+  padding: 16px;
+  background: #fbfcfd;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  font-family: var(--font-serif);
+  font-size: 1rem;
+  line-height: 1.7;
+  resize: vertical;
+}
+:global(.transfer-textarea:focus) {
+  background: #fff;
+  border-color: var(--blue);
+  outline: 3px solid rgba(24, 89, 173, 0.1);
+}
+:global(.transfer-check-card footer) {
+  display: flex;
+  margin-top: 13px;
+  color: var(--ink-faint);
+  font-size: 0.7rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+}
+@media (max-width: 680px) {
+  :global(.transfer-check-card footer) {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+@media (max-width: 680px) {
+  :global(.transfer-check-card footer .button) {
+    width: 100%;
+  }
+}
+
 .desk {
   display: grid;
   min-width: 0;

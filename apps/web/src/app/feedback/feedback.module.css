@@ -1,3 +1,34 @@
+/* Legacy hooks scoped to this module; DOM classes remain for compatibility. */
+:global(.feedback-hero-grid) {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(260px, 0.8fr);
+  gap: 14px;
+}
+:global(.score-copy > p:not(.eyebrow)) {
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+}
+:global(.strength-card > p:not(.eyebrow)) {
+  color: #546b62;
+  font-size: 0.8rem;
+}
+:global(.lesson-schedule-card p:not(.eyebrow)) {
+  margin-bottom: 9px;
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+}
+
+:global(.teaching-quick-checks .card) {
+  display: grid;
+  gap: 12px;
+}
+
+@media (max-width: 960px) {
+  :global(.feedback-hero-grid) {
+    grid-template-columns: 1fr;
+  }
+}
+
 .page {
   padding-bottom: var(--desk-space-8);
   color: var(--desk-ink);

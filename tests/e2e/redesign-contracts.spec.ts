@@ -36,6 +36,16 @@ async function expectFontSizeAtLeast(
   expect(fontSize).toBeGreaterThanOrEqual(minimumPixels);
 }
 
+async function expectFrozenHookWithModuleClass(
+  locator: Locator,
+  frozenHook: string,
+): Promise<void> {
+  await expect(locator).toBeAttached();
+  const classes = await locator.evaluate((element) => [...element.classList]);
+  expect(classes).toContain(frozenHook);
+  expect(classes.some((className) => className !== frozenHook)).toBe(true);
+}
+
 test.describe("annotation desk redesign contracts", () => {
   test.skip(
     !deterministicDemo,
@@ -53,6 +63,29 @@ test.describe("annotation desk redesign contracts", () => {
     await expect(page.locator("main")).toHaveAttribute(
       "data-page-layout",
       "focus",
+    );
+  });
+
+  test("keeps frozen hooks attached while modules own their visual surfaces", async ({
+    page,
+  }) => {
+    await page.goto("/today");
+    await expectFrozenHookWithModuleClass(
+      page.locator(".mobile-header"),
+      "mobile-header",
+    );
+    await expect(page.locator(".mobile-menu")).toBeAttached();
+    await expectFrozenHookWithModuleClass(
+      page.locator(".next-task-card"),
+      "next-task-card",
+    );
+
+    await page.goto(
+      "/lesson/paper?cycle=cycle-demo&lesson=lesson-collocation-perspective",
+    );
+    await expectFrozenHookWithModuleClass(
+      page.locator(".practice-paper-question").first(),
+      "practice-paper-question",
     );
   });
 
