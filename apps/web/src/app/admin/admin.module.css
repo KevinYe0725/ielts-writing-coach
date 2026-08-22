@@ -20,8 +20,8 @@
   place-items: center;
 }
 :global(.health-healthy .health-icon) {
-  color: var(--green);
-  background: var(--green-soft);
+  color: var(--desk-blue);
+  background: var(--desk-blue-soft);
 }
 :global(.health-warning .health-icon) {
   color: var(--amber);
@@ -169,8 +169,8 @@
   place-items: center;
 }
 :global(.operation-icon.green) {
-  color: var(--green);
-  background: var(--green-soft);
+  color: var(--desk-blue);
+  background: var(--desk-blue-soft);
 }
 :global(.operation-icon.blue) {
   color: var(--blue);
@@ -285,8 +285,8 @@
 }
 
 .desk :global(.health-healthy .health-icon) {
-  color: var(--desk-green);
-  background: color-mix(in srgb, var(--desk-green) 10%, var(--desk-paper));
+  color: var(--desk-blue);
+  background: color-mix(in srgb, var(--desk-blue) 10%, var(--desk-paper));
 }
 
 .desk :global(.health-warning .health-icon) {
@@ -382,8 +382,8 @@
 }
 
 .operationIconProtected {
-  color: var(--desk-green);
-  background: color-mix(in srgb, var(--desk-green) 9%, var(--desk-paper));
+  color: var(--desk-blue);
+  background: color-mix(in srgb, var(--desk-blue) 9%, var(--desk-paper));
 }
 
 .operationIconStandard {

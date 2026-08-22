@@ -660,7 +660,7 @@ export default function TodayPage() {
               </div>
             </div>
             <div className={styles.evidenceItem} role="listitem">
-              <span className="stat-icon green">
+              <span className="stat-icon blue">
                 <Gauge aria-hidden="true" size={19} />
               </span>
               <div>

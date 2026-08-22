@@ -279,7 +279,7 @@ export default function AdminPage() {
               <p className="eyebrow">{text("队列", "Queue")}</p>
               <h2>{text("后台任务", "Background work")}</h2>
             </div>
-            <Badge tone={data.queue.failed ? "amber" : "green"}>
+            <Badge tone={data.queue.failed ? "amber" : "blue"}>
               {data.queue.failed
                 ? text("需关注", "Attention")
                 : text("正常", "Healthy")}
@@ -355,7 +355,7 @@ export default function AdminPage() {
           </div>
           <div className="policy-row">
             <span>{text("公开注册", "Public registration")}</span>
-            <Badge tone={data.users.publicRegistration ? "amber" : "green"}>
+            <Badge tone={data.users.publicRegistration ? "amber" : "neutral"}>
               {data.users.publicRegistration
                 ? text("开启", "On")
                 : text("关闭", "Off")}
@@ -461,7 +461,7 @@ export default function AdminPage() {
               )}
             </p>
           </div>
-          <Badge tone="green">{text("已保护", "Protected")}</Badge>
+          <Badge tone="blue">{text("已保护", "Protected")}</Badge>
         </Card>
         <Card>
           <span className={styles.operationIconStandard}>
@@ -537,7 +537,7 @@ export default function AdminPage() {
                     </span>
                     <span>
                       <Badge
-                        tone={event.result === "success" ? "green" : "amber"}
+                        tone={event.result === "success" ? "blue" : "amber"}
                       >
                         {event.result}
                       </Badge>

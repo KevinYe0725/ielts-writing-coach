@@ -330,7 +330,7 @@ export default function PracticePaperPage({
               {text("查看详细批改", "View detailed feedback")}
             </ActionLink>
             {data.submittedAt ? (
-              <Badge tone={demoMode ? "neutral" : "green"}>
+              <Badge tone={demoMode ? "neutral" : "blue"}>
                 <FileCheck2 aria-hidden="true" size={14} />
                 {text("已交卷", "Submitted")}
               </Badge>
@@ -458,7 +458,7 @@ export default function PracticePaperPage({
                             ? "neutral"
                             : needsWork
                               ? "amber"
-                              : "green"
+                              : "blue"
                           : "blue"
                       }
                     >

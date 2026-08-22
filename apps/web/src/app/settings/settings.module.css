@@ -231,7 +231,7 @@
   display: grid;
   width: 27px;
   height: 27px;
-  color: var(--green);
+  color: var(--desk-blue);
   background: var(--desk-paper);
   border: 1px solid var(--line);
   border-radius: var(--desk-radius-md);
@@ -387,7 +387,7 @@
 :global(.connection-health-row) {
   display: flex;
   padding: var(--desk-space-3) var(--desk-space-1) 0;
-  color: var(--green);
+  color: var(--desk-blue);
   font-size: var(--desk-type-auxiliary);
   align-items: center;
   flex-wrap: wrap;

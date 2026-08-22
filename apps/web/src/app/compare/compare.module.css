@@ -37,7 +37,7 @@
 }
 :global(.score-bridge) {
   display: flex;
-  color: var(--green);
+  color: var(--desk-blue);
   text-align: center;
   align-items: center;
   justify-content: center;
@@ -101,11 +101,11 @@
   font-size: var(--desk-type-auxiliary);
 }
 :global(.criterion-delta > strong) {
-  color: var(--green);
+  color: var(--desk-blue);
   font-size: var(--desk-type-body);
 }
 :global(.criterion-delta > strong.negative) {
-  color: var(--red);
+  color: var(--desk-amber);
 }
 :global(.recurrence-metric) {
   display: flex;
@@ -163,7 +163,7 @@
   border: 1px solid var(--desk-line-strong);
 }
 :global(.sentence-after) {
-  background: var(--desk-green-soft);
+  background: var(--desk-blue-soft);
   border: 1px solid var(--desk-line-strong);
 }
 :global(.sentence-before > span),

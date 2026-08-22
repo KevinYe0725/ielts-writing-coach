@@ -83,6 +83,21 @@ async function expectComputedStyles(
   expect(computedStyles).toEqual(expectedStyles);
 }
 
+async function expectColorUsesToken(
+  locator: Locator,
+  token: "--desk-blue",
+): Promise<void> {
+  const colors = await locator.evaluate((element, cssToken) => {
+    const probe = document.createElement("span");
+    probe.style.color = `var(${cssToken})`;
+    element.ownerDocument.body.append(probe);
+    const expected = window.getComputedStyle(probe).color;
+    probe.remove();
+    return { actual: window.getComputedStyle(element).color, expected };
+  }, token);
+  expect(colors.actual).toBe(colors.expected);
+}
+
 test.describe("annotation desk redesign contracts", () => {
   test.skip(
     !deterministicDemo,
@@ -240,6 +255,21 @@ test.describe("annotation desk redesign contracts", () => {
     await expect(desk.locator(".next-task-card")).toHaveCount(1);
     await expect(desk.locator("[data-today-learning-thread]")).toBeVisible();
     await expect(desk.locator("[data-today-evidence]")).toBeVisible();
+  });
+
+  test("Today keeps time and first-draft submission on neutral blue", async ({
+    page,
+  }) => {
+    await page.goto("/today");
+
+    for (const label of ["已记录学习时长", "已提交首稿"]) {
+      const icon = page
+        .getByText(label, { exact: true })
+        .locator("..")
+        .locator("..")
+        .locator(".stat-icon");
+      await expectColorUsesToken(icon, "--desk-blue");
+    }
   });
 
   test("writing desk reserves the prompt paper beside the editor", async ({

@@ -122,9 +122,9 @@
   place-items: center;
 }
 :global(.cycle-step-done .cycle-node) {
-  color: var(--desk-paper);
-  background: var(--green);
-  border-color: var(--green);
+  color: var(--desk-blue);
+  background: var(--desk-blue-soft);
+  border-color: var(--desk-blue);
 }
 :global(.cycle-step-current .cycle-node) {
   color: var(--desk-paper);

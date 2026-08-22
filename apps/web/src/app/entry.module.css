@@ -62,12 +62,12 @@
   box-shadow: none;
 }
 :where(.surface) :global(.setup-steps li.done) {
-  color: var(--green);
+  color: var(--desk-blue);
 }
 :where(.surface) :global(.setup-steps li.done > span) {
   color: var(--desk-paper);
-  background: var(--green);
-  border-color: var(--green);
+  background: var(--desk-blue);
+  border-color: var(--desk-blue);
 }
 
 :where(.surface) :global(.setup-panel) {
@@ -176,7 +176,7 @@
   gap: var(--desk-space-2);
 }
 :where(.surface) :global(.privacy-note svg) {
-  color: var(--green);
+  color: var(--desk-blue);
   flex: none;
 }
 :where(.surface) :global(.privacy-note p) {
@@ -393,9 +393,9 @@
   width: 78px;
   height: 78px;
   margin-bottom: var(--desk-space-4);
-  color: var(--green);
-  background: var(--green-soft);
-  border: 8px solid var(--desk-green-soft);
+  color: var(--desk-blue);
+  background: var(--desk-blue-soft);
+  border: 8px solid var(--desk-blue-soft);
   border-radius: var(--desk-radius-round);
   place-items: center;
 }

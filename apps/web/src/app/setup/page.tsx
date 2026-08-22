@@ -226,7 +226,7 @@ export default function SetupPage() {
               <span className="setup-choice-copy">
                 <span className="setup-choice-title">
                   <strong>{text("仅我使用", "Just me")}</strong>
-                  <Badge tone="green">{text("推荐", "Recommended")}</Badge>
+                  <Badge tone="blue">{text("推荐", "Recommended")}</Badge>
                 </span>
                 <span>
                   {text(
@@ -735,7 +735,7 @@ export default function SetupPage() {
           <span className="success-orbit" aria-hidden="true">
             <CheckCircle2 size={42} />
           </span>
-          <Badge tone="green">{text("系统已就绪", "System ready")}</Badge>
+          <Badge tone="blue">{text("系统已就绪", "System ready")}</Badge>
           <h1 id="setup-success-title">
             {text("可以开始第一篇写作了", "You are ready for your first essay")}
           </h1>
@@ -762,7 +762,7 @@ export default function SetupPage() {
                   )}
                 </small>
               </div>
-              <Badge tone="green">{text("正常", "Healthy")}</Badge>
+              <Badge tone="blue">{text("正常", "Healthy")}</Badge>
             </Card>
           ) : (
             <Card className="connection-success-card">

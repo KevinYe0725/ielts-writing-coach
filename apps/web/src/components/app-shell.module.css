@@ -138,7 +138,7 @@
 :global(.system-mini-card) {
   display: flex;
   padding: var(--desk-space-3);
-  background: var(--desk-green-soft);
+  background: var(--desk-blue-soft);
   border: 1px solid var(--desk-line-strong);
   border-radius: var(--desk-radius-lg);
   align-items: center;
@@ -149,7 +149,7 @@
   display: grid;
   width: 31px;
   height: 31px;
-  color: var(--green);
+  color: var(--desk-blue);
   background: var(--desk-paper);
   border-radius: var(--desk-radius-md);
   place-items: center;
@@ -179,7 +179,7 @@
   width: 6px;
   height: 6px;
   margin-right: var(--desk-space-1);
-  background: var(--desk-green);
+  background: var(--desk-blue);
   border-radius: var(--desk-radius-round);
 }
 

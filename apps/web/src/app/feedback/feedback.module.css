@@ -117,8 +117,8 @@
   max-width: 800px;
   padding: var(--desk-space-3);
   margin: 0;
-  color: var(--desk-green);
-  background: color-mix(in srgb, var(--desk-green) 7%, var(--desk-paper));
+  color: var(--desk-blue);
+  background: color-mix(in srgb, var(--desk-blue) 7%, var(--desk-paper));
   border-radius: var(--desk-radius-sm);
   font-size: var(--desk-type-meta);
   line-height: 1.55;
@@ -128,7 +128,7 @@
 
 .strengthLine svg {
   margin-top: var(--desk-space-1);
-  color: var(--desk-green);
+  color: var(--desk-blue);
   flex: none;
 }
 

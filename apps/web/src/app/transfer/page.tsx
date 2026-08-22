@@ -199,14 +199,16 @@ export default function TransferPage({
     : result?.outcome === "PASS"
       ? "green"
       : result?.outcome === "FAIL"
-        ? "red"
+        ? "amber"
         : "neutral";
   const resultEvidenceState =
     result?.mockLanguageScoring || result?.outcome === "NO_OPPORTUNITY"
       ? "unavailable"
       : result?.outcome === "PASS"
         ? "verified"
-        : "error";
+        : result?.outcome === "FAIL"
+          ? "revision"
+          : "unavailable";
 
   return (
     <div
@@ -257,7 +259,7 @@ export default function TransferPage({
                 "目标技能、提示和原题答案均已隐藏",
                 "Target skill, hints, and previous answer stay hidden",
               )}
-              state="verified"
+              state="active"
             >
               <span data-auxiliary>
                 01 · {text("闭卷开始", "Closed-book start")}

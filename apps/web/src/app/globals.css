@@ -514,8 +514,8 @@ h3 {
   width: 21px;
   height: 21px;
   margin-top: var(--desk-space-1);
-  color: var(--green);
-  background: var(--green-soft);
+  color: var(--desk-blue);
+  background: var(--desk-blue-soft);
   border-radius: var(--desk-radius-round);
   flex: none;
   place-items: center;
@@ -576,11 +576,6 @@ h3 {
   color: var(--blue);
   background: var(--blue-soft);
 }
-.stat-icon.green {
-  color: var(--green);
-  background: var(--green-soft);
-}
-
 .modal-backdrop {
   position: fixed;
   z-index: 100;
@@ -642,9 +637,9 @@ h3 {
   width: 72px;
   height: 72px;
   margin-bottom: var(--desk-space-4);
-  color: var(--green);
-  background: var(--green-soft);
-  border: 7px solid var(--desk-green-soft);
+  color: var(--desk-blue);
+  background: var(--desk-blue-soft);
+  border: 7px solid var(--desk-blue-soft);
   border-radius: var(--desk-radius-round);
   place-items: center;
 }
@@ -709,8 +704,8 @@ h3 {
   gap: var(--desk-space-3);
 }
 .inline-probe.success {
-  color: var(--desk-green);
-  background: var(--green-soft);
+  color: var(--desk-blue);
+  background: var(--desk-blue-soft);
 }
 .inline-probe.error {
   color: var(--desk-error);

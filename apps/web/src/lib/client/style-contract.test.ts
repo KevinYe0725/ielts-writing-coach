@@ -84,7 +84,6 @@ const remainingGlobalClassInventory = [
   "field-hint",
   "field-label",
   "form-field",
-  "green",
   "icon-button",
   "inline-probe",
   "modal-actions",

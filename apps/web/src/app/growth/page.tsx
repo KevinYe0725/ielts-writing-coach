@@ -180,7 +180,7 @@ export default function GrowthPage() {
           </div>
         </Card>
         <Card>
-          <span className="stat-icon green">
+          <span className="stat-icon blue">
             <Clock3 aria-hidden="true" size={19} />
           </span>
           <div>
@@ -233,7 +233,7 @@ export default function GrowthPage() {
               </h2>
             </div>
             {scoreChange === null ? null : (
-              <Badge tone={scoreChange >= 0 ? "green" : "amber"}>
+              <Badge tone={scoreChange >= 0 ? "blue" : "amber"}>
                 <TrendingUp aria-hidden="true" size={13} />
                 {scoreChange > 0 ? "+" : ""}
                 {scoreChange.toFixed(1)}

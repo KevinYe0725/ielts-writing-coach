@@ -911,7 +911,7 @@ export default function SettingsPage() {
                       )}
                     </small>
                   </span>
-                  <Badge tone="green">{text("已关闭", "Off")}</Badge>
+                  <Badge tone="neutral">{text("已关闭", "Off")}</Badge>
                 </div>
                 <div className="danger-row">
                   <span>
@@ -1283,7 +1283,7 @@ function AiSettings({
                   )}
                 </p>
               </div>
-              <Badge tone={connected ? "green" : "red"}>
+              <Badge tone={connected ? "blue" : "red"}>
                 {connected
                   ? text("连接正常", "Connected")
                   : text("未连接", "Not connected")}

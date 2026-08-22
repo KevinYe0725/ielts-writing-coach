@@ -193,12 +193,30 @@
   background: var(--desk-green);
 }
 
-.stateRecord[data-evidence-state="error"]::before {
-  background: var(--desk-error);
+.stateRecord[data-evidence-state="revision"]::before {
+  background: var(--desk-amber);
 }
 
 .stateRecord[data-evidence-state="unavailable"]::before {
   background: var(--desk-evidence-muted);
+}
+
+.stateRecord[data-evidence-state="verified"] :global(.completion-icon) {
+  color: var(--desk-green);
+  background: var(--desk-green-soft);
+  border-color: var(--desk-green-soft);
+}
+
+.stateRecord[data-evidence-state="revision"] :global(.completion-icon) {
+  color: var(--desk-amber);
+  background: var(--desk-amber-soft);
+  border-color: var(--desk-amber-soft);
+}
+
+.stateRecord[data-evidence-state="unavailable"] :global(.completion-icon) {
+  color: var(--desk-evidence-muted);
+  background: var(--desk-canvas);
+  border-color: var(--desk-canvas);
 }
 
 .answerRecord :global(textarea) {

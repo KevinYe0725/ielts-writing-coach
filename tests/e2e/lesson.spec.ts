@@ -431,7 +431,11 @@ async function expectAbove(first: Locator, second: Locator): Promise<void> {
 
 async function expectTrackUsesToken(
   locator: Locator,
-  token: "--desk-error" | "--desk-evidence-muted" | "--desk-green",
+  token:
+    | "--desk-amber"
+    | "--desk-blue"
+    | "--desk-evidence-muted"
+    | "--desk-green",
 ): Promise<void> {
   const colors = await locator.evaluate((element, cssToken) => {
     const probe = document.createElement("span");
@@ -445,6 +449,21 @@ async function expectTrackUsesToken(
     };
   }, token);
   expect(colors.track).toBe(colors.expected);
+}
+
+async function expectColorUsesToken(
+  locator: Locator,
+  token: "--desk-amber" | "--desk-blue" | "--desk-green",
+): Promise<void> {
+  const colors = await locator.evaluate((element, cssToken) => {
+    const probe = document.createElement("span");
+    probe.style.color = `var(${cssToken})`;
+    element.ownerDocument.body.append(probe);
+    const expected = window.getComputedStyle(probe).color;
+    probe.remove();
+    return { actual: window.getComputedStyle(element).color, expected };
+  }, token);
+  expect(colors.actual).toBe(colors.expected);
 }
 
 async function navigationLink(
@@ -1626,6 +1645,15 @@ test.describe("compare, transfer, and growth evidence records", () => {
     await expect(record).toContainText("90–140 词");
     await expect(record).toContainText("只提示篇幅，不参与本地判分");
     await expect(record).toContainText("目标技能、提示和原题答案均已隐藏");
+    const protocolStart = record
+      .locator("[data-transfer-protocol] li")
+      .first()
+      .locator("[data-evidence-state]");
+    await expect(protocolStart).toHaveAttribute(
+      "data-evidence-state",
+      "active",
+    );
+    await expectColorUsesToken(protocolStart, "--desk-blue");
     for (const state of ["PROCESSING", "PASS", "FAIL", "NO_OPPORTUNITY"]) {
       await expect(record.getByText(state, { exact: true })).toBeVisible();
     }
@@ -1723,14 +1751,14 @@ test.describe("evidence states over the public HTTP contract", () => {
       const state = page.locator(`[data-transfer-state="${outcome}"]`);
       await expect(state).toHaveAttribute(
         "data-evidence-state",
-        outcome === "pass" ? "verified" : "error",
+        outcome === "pass" ? "verified" : "revision",
       );
       await expectTrackUsesToken(
         state,
-        outcome === "pass" ? "--desk-green" : "--desk-error",
+        outcome === "pass" ? "--desk-green" : "--desk-amber",
       );
       await expect(state.locator(".badge")).toHaveClass(
-        outcome === "pass" ? /badge-green/ : /badge-red/,
+        outcome === "pass" ? /badge-green/ : /badge-amber/,
       );
       await expect(state).toContainText(`服务器结果：${outcome.toUpperCase()}`);
       await expect(state).toContainText("A frozen first-answer span.");
@@ -1796,6 +1824,48 @@ test.describe("evidence states over the public HTTP contract", () => {
     await expect(page.locator(".chart-column")).toHaveCount(0);
   });
 
+  test("growth keeps ordinary learning time and score movement blue", async ({
+    page,
+  }) => {
+    await page.route("**/api/v1/**", async (route) => {
+      const { pathname } = new URL(route.request().url());
+      if (pathname === "/api/v1/auth/get-session") {
+        await route.fulfill({ contentType: "application/json", body: "null" });
+        return;
+      }
+      if (pathname === "/api/v1/growth") {
+        await route.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify({
+            score_history: [{ score: 5.5 }, { score: 6 }],
+            skills: [],
+            summary: {
+              current_estimated_band: 6,
+              essays_completed: 2,
+              independent_non_recurrence_rate: 25,
+              recorded_learning_minutes: 45,
+              target_band: 7,
+            },
+          }),
+        });
+        return;
+      }
+      await route.fulfill({ status: 404, body: "Not found" });
+    });
+
+    await page.goto("/growth");
+    const timeIcon = page
+      .getByText("已记录学习", { exact: true })
+      .locator("..")
+      .locator("..")
+      .locator(".stat-icon");
+    await expectColorUsesToken(timeIcon, "--desk-blue");
+    const movement = page.locator(".score-trend-card .badge");
+    await expect(movement).toHaveClass(/badge-blue/);
+    await expectColorUsesToken(movement, "--desk-blue");
+    await expectColorUsesToken(page.locator(".north-star-icon"), "--desk-blue");
+  });
+
   test("compare with missing canonical span evidence never awards retained", async ({
     page,
   }) => {
@@ -1847,6 +1917,15 @@ test.describe("tutorial answer analysis over the public HTTP contract", () => {
     });
 
     await page.goto(httpPaperUrl);
+    await expect(page.getByText("已交卷", { exact: true })).toHaveClass(
+      /badge-blue/,
+    );
+    await expect(
+      page.locator(".practice-paper-question .badge-green"),
+    ).toHaveCount(0);
+    await expect(
+      page.locator(".practice-paper-question .badge-blue"),
+    ).toHaveCount(6);
     await expect(page.getByText("已达标", { exact: true })).toHaveCount(6);
     await expect(page.getByText("需要解析", { exact: true })).toHaveCount(2);
     await expect(
