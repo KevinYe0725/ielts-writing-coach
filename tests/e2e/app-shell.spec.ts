@@ -236,6 +236,76 @@ test.describe("desktop learning workspace", () => {
     ).toHaveAttribute("href", "/feedback?cycle=cycle-demo");
   });
 
+  test("updates the feedback context after same-route Link navigation", async ({
+    page,
+  }, testInfo) => {
+    test.skip(
+      testInfo.project.name === "mobile",
+      "The touch project uses mobile navigation instead of the desktop sidebar Link.",
+    );
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto("/feedback?cycle=old");
+
+    const sidebarLink = page
+      .locator("#primary-sidebar")
+      .getByRole("link", { name: /批改|feedback/i });
+    const contextLink = page
+      .locator("[data-context-topbar]")
+      .getByRole("link", { name: /批改|feedback/i });
+    await expect(contextLink).toHaveAttribute("href", "/feedback?cycle=old");
+
+    await page.evaluate(() => {
+      const key = "iwc:learning-navigation:v1";
+      const stored = JSON.parse(window.sessionStorage.getItem(key) ?? "{}");
+      window.sessionStorage.setItem(
+        key,
+        JSON.stringify({ ...stored, feedback: "/feedback?cycle=new" }),
+      );
+      window.dispatchEvent(new Event("iwc:learning-navigation"));
+    });
+    await expect(sidebarLink).toHaveAttribute("href", "/feedback?cycle=new");
+
+    await sidebarLink.click();
+    await expect(page).toHaveURL(/\/feedback\?cycle=new$/);
+    await expect(contextLink).toHaveAttribute("href", "/feedback?cycle=new");
+    await expect(contextLink).toHaveAttribute("aria-current", "page");
+  });
+
+  test("updates the compare context after same-route Link navigation", async ({
+    page,
+  }, testInfo) => {
+    test.skip(
+      testInfo.project.name === "mobile",
+      "The touch project uses mobile navigation instead of the desktop sidebar Link.",
+    );
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto("/compare?cycle=old");
+
+    const sidebarLink = page
+      .locator("#primary-sidebar")
+      .getByRole("link", { name: /对比|compare/i });
+    const contextLink = page
+      .locator("[data-context-topbar]")
+      .getByRole("link", { name: /对比|compare/i });
+    await expect(contextLink).toHaveAttribute("href", "/compare?cycle=old");
+
+    await page.evaluate(() => {
+      const key = "iwc:learning-navigation:v1";
+      const stored = JSON.parse(window.sessionStorage.getItem(key) ?? "{}");
+      window.sessionStorage.setItem(
+        key,
+        JSON.stringify({ ...stored, compare: "/compare?cycle=new" }),
+      );
+      window.dispatchEvent(new Event("iwc:learning-navigation"));
+    });
+    await expect(sidebarLink).toHaveAttribute("href", "/compare?cycle=new");
+
+    await sidebarLink.click();
+    await expect(page).toHaveURL(/\/compare\?cycle=new$/);
+    await expect(contextLink).toHaveAttribute("href", "/compare?cycle=new");
+    await expect(contextLink).toHaveAttribute("aria-current", "page");
+  });
+
   test("maps transfer, account, and administration to their real current context", async ({
     page,
   }, testInfo) => {

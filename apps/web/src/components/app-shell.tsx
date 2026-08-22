@@ -1,12 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
+  Suspense,
   useEffect,
   useState,
   useSyncExternalStore,
+  type Dispatch,
   type ReactNode,
+  type SetStateAction,
 } from "react";
 import {
   BarChart3,
@@ -330,19 +333,21 @@ function MobileHeader({
   );
 }
 
+interface TopbarProps {
+  destinations: LearningDestinations;
+  currentHref: string;
+  pathname: string;
+  sidebarExpanded: boolean;
+  onToggleSidebar: () => void;
+}
+
 function Topbar({
   destinations,
   currentHref,
   pathname,
   sidebarExpanded,
   onToggleSidebar,
-}: {
-  destinations: LearningDestinations;
-  currentHref: string;
-  pathname: string;
-  sidebarExpanded: boolean;
-  onToggleSidebar: () => void;
-}) {
+}: TopbarProps) {
   const { messages, text } = useLocale();
   const activeItem = navItems.find((item) => itemIsActive(pathname, item));
   const activeUtility = utilityItems.find((item) => pathname === item.href);
@@ -451,13 +456,39 @@ function Topbar({
   );
 }
 
+interface CurrentRouteIdentity {
+  href: string;
+  pathname: string;
+}
+
+function CurrentRouteObserver({
+  onChange,
+  pathname,
+}: {
+  onChange: Dispatch<SetStateAction<CurrentRouteIdentity>>;
+  pathname: string;
+}) {
+  const searchParams = useSearchParams();
+  const search = searchParams.toString();
+  const currentHref = search ? `${pathname}?${search}` : pathname;
+  useEffect(() => {
+    onChange((current) =>
+      current.href === currentHref && current.pathname === pathname
+        ? current
+        : { href: currentHref, pathname },
+    );
+  }, [currentHref, onChange, pathname]);
+  return null;
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const currentHref = useSyncExternalStore(
-    () => () => undefined,
-    () => `${window.location.pathname}${window.location.search}`,
-    () => pathname,
-  );
+  const [currentRoute, setCurrentRoute] = useState<CurrentRouteIdentity>({
+    href: pathname,
+    pathname,
+  });
+  const currentHref =
+    currentRoute.pathname === pathname ? currentRoute.href : pathname;
   const { text } = useLocale();
   const destinations = useLearningDestinations(pathname);
   const layoutVariant = layoutVariantForPathname(pathname);
@@ -505,6 +536,12 @@ export function AppShell({ children }: { children: ReactNode }) {
       <Sidebar destinations={destinations} hidden={sidebarCollapsed} />
       <div className={cn("app-column", styles.appColumn)}>
         <MobileHeader destinations={destinations} />
+        <Suspense fallback={null}>
+          <CurrentRouteObserver
+            onChange={setCurrentRoute}
+            pathname={pathname}
+          />
+        </Suspense>
         <Topbar
           currentHref={currentHref}
           destinations={destinations}
