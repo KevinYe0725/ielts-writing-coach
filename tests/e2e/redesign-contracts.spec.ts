@@ -724,3 +724,79 @@ test.describe("annotation desk redesign contracts", () => {
     });
   }
 });
+
+test.describe("essay workspace limit over the public HTTP contract", () => {
+  test.skip(
+    deterministicDemo,
+    "Run with NEXT_PUBLIC_DEMO_MODE=false and an HTTP-mode web server.",
+  );
+
+  test("keeps all eight active essays and requires completion before another", async ({
+    page,
+  }) => {
+    await page.route("**/api/v1/auth/get-session", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          session: { token: "essay-limit-http-fixture" },
+          user: {
+            id: "essay-limit-user",
+            email: "learner@example.com",
+            name: "Learner",
+            role: "learner",
+          },
+        }),
+      });
+    });
+    await page.route("**/api/v1/essays", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          active_count: 8,
+          active_limit: 8,
+          essays: Array.from({ length: 8 }, (_, index) => {
+            const cycleId = `cycle-limit-${index + 1}`;
+            return {
+              id: cycleId,
+              prompt: `HTTP boundary essay ${index + 1}`,
+              topic: "education",
+              status: "QUESTION_READY",
+              updated_at: "2026-08-22T08:00:00.000Z",
+              next_action: {
+                kind: "START_ATTEMPT_1",
+                entity_id: cycleId,
+                reason: "The first timed draft is ready.",
+                due_at: null,
+                overdue: false,
+              },
+              resources: {
+                cycle_id: cycleId,
+                writing_available: false,
+                feedback_available: false,
+                lesson_id: null,
+                rewrite_task_id: null,
+                comparison_available: false,
+                transfer_task_id: null,
+              },
+            };
+          }),
+        }),
+      });
+    });
+
+    await page.goto("/essays");
+
+    const workspace = page.locator('[data-essay-workspace="full"]');
+    await expect(workspace).toHaveAttribute("data-active-limit", "8");
+    await expect(workspace).toContainText("进行中 8 / 8 篇");
+    await expect(workspace.locator("[data-essay-card]")).toHaveCount(8);
+    await expect(
+      workspace.getByText(
+        "已达到同时进行上限；完成其中一篇后可再开始新的作文。",
+      ),
+    ).toBeVisible();
+    await expect(
+      workspace.getByRole("link", { name: "开始新作文" }),
+    ).toHaveCount(0);
+  });
+});
