@@ -1,0 +1,53 @@
+@import "@fontsource-variable/noto-sans-sc/wght.css";
+@import "@fontsource-variable/source-serif-4/wght.css";
+@import "@fontsource-variable/ibm-plex-sans/wght.css";
+@import "./tokens.css";
+
+:root {
+  --desk-font-body: "Noto Sans SC Variable", "PingFang SC", sans-serif;
+  --desk-font-reading: "Source Serif 4 Variable", "Songti SC", serif;
+  --desk-font-utility: "IBM Plex Sans Variable", "Noto Sans SC Variable",
+    sans-serif;
+}
+
+html {
+  background: var(--desk-canvas);
+}
+
+body {
+  color: var(--desk-ink);
+  background: var(--desk-canvas);
+  font-family: var(--desk-font-body);
+  font-variation-settings: "wght" 440;
+}
+
+button,
+input,
+textarea,
+select {
+  font-family: inherit;
+}
+
+::selection {
+  color: var(--desk-ink);
+  background: color-mix(in srgb, var(--desk-blue) 18%, white);
+}
+
+:focus-visible {
+  outline-color: color-mix(in srgb, var(--desk-blue) 44%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

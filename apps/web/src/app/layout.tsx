@@ -5,6 +5,7 @@ import { AppShell } from "@/components/app-shell";
 import { LocaleProvider } from "@/components/locale-provider";
 
 import "./globals.css";
+import "../styles/foundations.css";
 
 export const metadata: Metadata = {
   title: {
@@ -17,7 +18,7 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   colorScheme: "light",
-  themeColor: "#f5f7fb",
+  themeColor: "#eef1f5",
 };
 
 export default function RootLayout({

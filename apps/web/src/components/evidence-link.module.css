@@ -1,0 +1,87 @@
+.evidenceLink {
+  --evidence-color: var(--desk-blue);
+
+  display: inline-flex;
+  max-width: 100%;
+  color: var(--evidence-color);
+  align-items: baseline;
+  gap: var(--desk-space-2);
+  font-family: var(--desk-font-utility);
+  font-size: 0.75rem;
+  font-variation-settings: "wght" 560;
+  letter-spacing: 0.025em;
+}
+
+.subject,
+.label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.subject {
+  color: var(--desk-ink);
+  font-family: var(--desk-font-body);
+  font-size: 0.875rem;
+  font-variation-settings: "wght" 560;
+  letter-spacing: 0;
+}
+
+.line {
+  position: relative;
+  min-width: 28px;
+  height: 1px;
+  border-top: 1px solid currentColor;
+  flex: 1 1 48px;
+  transform: translateY(-0.2em);
+}
+
+.line::after {
+  position: absolute;
+  top: -3px;
+  right: -1px;
+  width: 5px;
+  height: 5px;
+  background: currentColor;
+  border-radius: 50%;
+  content: "";
+}
+
+.verified {
+  --evidence-color: var(--desk-green);
+}
+
+.revision {
+  --evidence-color: var(--desk-amber);
+}
+
+.unavailable {
+  --evidence-color: var(--desk-error);
+}
+
+.unavailable .line {
+  border-top-style: dashed;
+}
+
+.disabled {
+  --evidence-color: color-mix(in srgb, var(--desk-ink) 48%, transparent);
+}
+
+.disabled .subject {
+  color: inherit;
+}
+
+@media (max-width: 520px) {
+  .evidenceLink {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: var(--desk-space-1);
+  }
+
+  .line {
+    display: none;
+  }
+
+  .label {
+    grid-column: 2;
+  }
+}

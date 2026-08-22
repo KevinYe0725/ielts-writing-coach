@@ -1,0 +1,19 @@
+:root {
+  --desk-ink: #172033;
+  --desk-paper: #fcfbf8;
+  --desk-canvas: #eef1f5;
+  --desk-blue: #1d56a0;
+  --desk-green: #2f6d5a;
+  --desk-amber: #7c531b;
+  --desk-error: #b4474c;
+  --desk-space-1: 4px;
+  --desk-space-2: 8px;
+  --desk-space-3: 12px;
+  --desk-space-4: 16px;
+  --desk-space-6: 24px;
+  --desk-space-8: 32px;
+  --desk-space-12: 48px;
+  --desk-radius-sm: 6px;
+  --desk-radius-md: 10px;
+  --desk-radius-lg: 16px;
+}

@@ -10,6 +10,9 @@ import { ArrowRight, Check, ChevronRight, LoaderCircle } from "lucide-react";
 
 import { cn } from "@/components/utils";
 
+export { EvidenceLink } from "@/components/evidence-link";
+export type { EvidenceLinkState } from "@/components/evidence-link";
+
 export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return <div className={cn("card", className)} {...props} />;
 }

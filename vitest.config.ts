@@ -14,7 +14,10 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "json-summary", "html"],
     },
-    include: ["packages/**/src/**/*.test.ts", "apps/**/src/**/*.test.ts"],
+    include: [
+      "packages/**/src/**/*.test.{ts,tsx}",
+      "apps/**/src/**/*.test.{ts,tsx}",
+    ],
     passWithNoTests: false,
   },
 });
