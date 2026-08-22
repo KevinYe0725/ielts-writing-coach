@@ -9,7 +9,6 @@ import {
   resetDemoState,
 } from "./support";
 
-const adminStatusFixtureKey = "iwc.demo.admin-status-fixture";
 const exactBackupConfirmation = "CREATE ENCRYPTED INSTANCE BACKUP";
 
 type AdminStatusFixture = {
@@ -18,6 +17,8 @@ type AdminStatusFixture = {
   mailState?: "ready" | "missing" | "unverified" | "error";
   migrationsCurrent?: boolean;
 };
+
+const adminFixtures = new WeakMap<Page, AdminStatusFixture>();
 
 type CssColor = {
   alpha: number;
@@ -94,10 +95,109 @@ async function useAdminStatusFixture(
   page: Page,
   fixture: AdminStatusFixture,
 ): Promise<void> {
-  await page.addInitScript(
-    ([key, value]) => localStorage.setItem(key, JSON.stringify(value)),
-    [adminStatusFixtureKey, fixture] as const,
-  );
+  adminFixtures.set(page, { ...adminFixtures.get(page), ...fixture });
+}
+
+async function installAdminHttpFixtures(page: Page): Promise<void> {
+  adminFixtures.set(page, {});
+  await page.route("**/api/v1/**", async (route) => {
+    const request = route.request();
+    const { pathname } = new URL(request.url());
+    const fixture = adminFixtures.get(page) ?? {};
+
+    if (pathname === "/api/v1/auth/get-session") {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          session: { token: "test-only-admin-session" },
+          user: {
+            id: `fixture-${fixture.actorRole ?? "owner"}`,
+            email: `${fixture.actorRole ?? "owner"}@example.test`,
+            name: "Fixture operator",
+            role: fixture.actorRole ?? "owner",
+          },
+        }),
+      });
+      return;
+    }
+
+    if (pathname === "/api/v1/providers") {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ providers: [] }),
+      });
+      return;
+    }
+
+    if (pathname === "/api/v1/admin/status") {
+      if (fixture.access === "forbidden") {
+        await route.fulfill({
+          status: 403,
+          contentType: "application/problem+json",
+          body: JSON.stringify({
+            code: "FORBIDDEN",
+            detail: "Administrator access is required.",
+            status: 403,
+            title: "Forbidden",
+          }),
+        });
+        return;
+      }
+      if (fixture.access === "failed") {
+        await route.fulfill({
+          status: 503,
+          contentType: "application/problem+json",
+          body: JSON.stringify({
+            code: "STATUS_UNAVAILABLE",
+            detail: "System status is temporarily unavailable.",
+            status: 503,
+            title: "Status unavailable",
+          }),
+        });
+        return;
+      }
+      const mailState = fixture.mailState ?? "ready";
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          actor_role: fixture.actorRole ?? "owner",
+          audit_event_count: 18,
+          database: {
+            healthy: true,
+            migrations_current: fixture.migrationsCurrent ?? true,
+          },
+          deployment_mode: "personal",
+          jobs: { FAILED: 0, QUEUED: 2, RUNNING: 1 },
+          pending_invitations: 1,
+          recent_audit: [
+            {
+              action: "provider.test",
+              id: "fixture-audit-1",
+              occurred_at: "2026-08-12T12:00:00.000Z",
+              result: "success",
+              target_id: "fixture-provider",
+              target_type: "provider_connection",
+            },
+          ],
+          smtp_configured: mailState !== "missing",
+          smtp_state:
+            mailState === "ready"
+              ? "verified"
+              : mailState === "unverified"
+                ? "configured_unverified"
+                : mailState === "error"
+                  ? "verification_failed"
+                  : "missing",
+          task_executor: { healthy: true },
+          users: 4,
+          versions: { application: "1.0.0-test" },
+        }),
+      });
+      return;
+    }
+
+    await route.fulfill({ status: 404, body: "Not found" });
+  });
 }
 
 async function openBackup(page: Page): Promise<void> {
@@ -112,11 +212,14 @@ async function completeBackupForm(page: Page): Promise<void> {
 
 test.describe("secure administration surfaces", () => {
   test.skip(
-    !deterministicDemo,
-    "Run with NEXT_PUBLIC_DEMO_MODE=true and a demo-mode web server.",
+    deterministicDemo,
+    "Run with NEXT_PUBLIC_DEMO_MODE=false and an HTTP-mode web server.",
   );
 
-  test.beforeEach(async ({ page }) => resetDemoState(page));
+  test.beforeEach(async ({ page }) => {
+    await resetDemoState(page);
+    await installAdminHttpFixtures(page);
+  });
 
   test("learner navigation has no administration entry and forbidden status reveals no operations", async ({
     page,

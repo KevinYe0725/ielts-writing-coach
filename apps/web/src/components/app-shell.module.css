@@ -170,7 +170,7 @@
 
 :global(.system-mini-card span),
 :global(.account-trigger-copy span) {
-  color: var(--ink-faint);
+  color: var(--desk-ink);
   font-size: var(--desk-type-auxiliary);
 }
 
