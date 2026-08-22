@@ -176,6 +176,16 @@ function itemIsActive(pathname: string, item: (typeof navItems)[number]) {
   );
 }
 
+function itemUsesCurrentResourceIdentity(item: (typeof navItems)[number]) {
+  return (
+    item.key === "write" ||
+    item.key === "feedback" ||
+    item.key === "lesson" ||
+    item.key === "rewrite" ||
+    item.key === "compare"
+  );
+}
+
 function Navigation({
   compact = false,
   destinations,
@@ -339,7 +349,7 @@ function Topbar({
   const routeContext =
     pathname === "/transfer"
       ? {
-          href: destinations.transfer ?? currentHref,
+          href: currentHref,
           icon: Sparkles,
           label: text("陌生题迁移", "Transfer"),
         }
@@ -364,7 +374,9 @@ function Topbar({
             : null;
   const context = activeItem
     ? {
-        href: destinationForItem(activeItem, destinations) ?? activeItem.href,
+        href: itemUsesCurrentResourceIdentity(activeItem)
+          ? currentHref
+          : (destinationForItem(activeItem, destinations) ?? activeItem.href),
         icon: activeItem.icon,
         label: messages.nav[activeItem.key],
         current: true,

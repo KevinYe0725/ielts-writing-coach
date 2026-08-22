@@ -209,20 +209,31 @@ test.describe("desktop learning workspace", () => {
     }
   });
 
-  test("keeps the active learning step and cycle-safe destination in the context topbar", async ({
+  test("keeps the current feedback identity in the topbar when stored navigation is stale", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
+    await page.addInitScript(() => {
+      window.sessionStorage.setItem(
+        "iwc:learning-navigation:v1",
+        JSON.stringify({
+          feedback: "/feedback?cycle=old-cycle&lesson=old-lesson",
+        }),
+      );
+    });
     await page.goto(feedbackUrl);
 
     const contextLink = page
       .locator("[data-context-topbar]")
       .getByRole("link", { name: /批改|feedback/i });
     await expect(contextLink).toBeVisible();
-    await expect(contextLink).toHaveAttribute(
-      "href",
-      "/feedback?cycle=cycle-demo",
-    );
+    await expect(contextLink).toHaveAttribute("href", feedbackUrl);
+    await expect(contextLink).toHaveAttribute("aria-current", "page");
+    await expect(
+      page.locator("#primary-sidebar").getByRole("link", {
+        name: /批改|feedback/i,
+      }),
+    ).toHaveAttribute("href", "/feedback?cycle=cycle-demo");
   });
 
   test("maps transfer, account, and administration to their real current context", async ({
@@ -237,16 +248,16 @@ test.describe("desktop learning workspace", () => {
       window.sessionStorage.setItem(
         "iwc:learning-navigation:v1",
         JSON.stringify({
-          transfer: "/transfer?cycle=cycle-demo&task=transfer-task",
+          transfer: "/transfer?cycle=old&task=old",
         }),
       );
     });
 
     for (const [path, name, href] of [
       [
-        "/transfer?cycle=cycle-demo&task=transfer-task",
+        "/transfer?cycle=new&task=new",
         /陌生题迁移|transfer/i,
-        "/transfer?cycle=cycle-demo&task=transfer-task",
+        "/transfer?cycle=new&task=new",
       ],
       ["/account", /账户|account/i, "/account"],
       ["/admin", /系统状态|system status/i, "/admin"],
