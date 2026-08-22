@@ -62,7 +62,7 @@ const STORAGE_KEYS = {
 } as const;
 
 type DemoAdminStatusFixture = {
-  access?: "forbidden";
+  access?: "failed" | "forbidden";
   actorRole?: "owner" | "admin";
   mailState?: SystemStatus["mailState"];
   migrationsCurrent?: boolean;
@@ -2185,6 +2185,15 @@ export class MockLearningClient implements LearningClient {
         code: "FORBIDDEN",
         status: 403,
       });
+    }
+    if (fixture.access === "failed") {
+      throw new LearningClientError(
+        "System status is temporarily unavailable.",
+        {
+          code: "STATUS_UNAVAILABLE",
+          status: 503,
+        },
+      );
     }
     return {
       actorRole: fixture.actorRole ?? "owner",

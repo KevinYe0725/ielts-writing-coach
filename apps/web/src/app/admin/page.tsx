@@ -25,7 +25,7 @@ import {
   Skeleton,
 } from "@/components/ui";
 import { useDemoResource } from "@/components/use-demo-resource";
-import { learningClient } from "@/lib/client";
+import { LearningClientError, learningClient } from "@/lib/client";
 
 import styles from "./admin.module.css";
 
@@ -45,12 +45,53 @@ export default function AdminPage() {
       <Skeleton label={text("正在检查系统状态…", "Checking system status…")} />
     );
   if (error || !data) {
+    const denied =
+      error instanceof LearningClientError &&
+      (error.status === 401 || error.status === 403);
     return (
-      <div className={styles.accessDenied} data-admin-access="denied">
-        <Skeleton
-          label={text("正在检查系统状态…", "Checking system status…")}
-        />
-      </div>
+      <section
+        className={styles.accessState}
+        data-admin-access={denied ? "denied" : "error"}
+        role="alert"
+      >
+        <span className={styles.accessStateIcon} aria-hidden="true">
+          <AlertTriangle size={22} />
+        </span>
+        <div className={styles.accessStateCopy}>
+          <p className="eyebrow">
+            {denied
+              ? text("权限边界", "Access boundary")
+              : text("状态不可用", "Status unavailable")}
+          </p>
+          <h1>
+            {denied
+              ? text("无管理权限", "No administrator access")
+              : text("无法读取系统状态", "Could not read system status")}
+          </h1>
+          <p data-admin-auxiliary>
+            {denied
+              ? text(
+                  "当前账户不能查看系统状态或执行管理操作。",
+                  "This account cannot view system status or perform administrative operations.",
+                )
+              : text(
+                  "暂时无法连接管理状态服务。请重试或安全返回今日计划。",
+                  "The administration status service is temporarily unavailable. Try again or return safely to Today.",
+                )}
+          </p>
+        </div>
+        <div className={styles.accessStateActions}>
+          {!denied ? (
+            <Button onClick={retry} variant="secondary">
+              <RefreshCw aria-hidden="true" size={16} />
+              {text("重新检查", "Refresh")}
+            </Button>
+          ) : null}
+          <ActionLink href="/today" variant="secondary">
+            {text("返回今日计划", "Return to Today")}
+          </ActionLink>
+        </div>
+      </section>
     );
   }
 

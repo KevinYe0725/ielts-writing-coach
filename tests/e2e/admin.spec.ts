@@ -12,11 +12,82 @@ const adminStatusFixtureKey = "iwc.demo.admin-status-fixture";
 const exactBackupConfirmation = "CREATE ENCRYPTED INSTANCE BACKUP";
 
 type AdminStatusFixture = {
-  access?: "forbidden";
+  access?: "failed" | "forbidden";
   actorRole?: "owner" | "admin";
   mailState?: "ready" | "missing" | "unverified" | "error";
   migrationsCurrent?: boolean;
 };
+
+type CssColor = {
+  alpha: number;
+  blue: number;
+  green: number;
+  red: number;
+};
+
+function parseCssColor(value: string): CssColor {
+  const rgb = value.match(
+    /^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:\s*[,/]\s*([\d.]+))?\s*\)$/u,
+  );
+  if (rgb) {
+    return {
+      red: Number(rgb[1]),
+      green: Number(rgb[2]),
+      blue: Number(rgb[3]),
+      alpha: rgb[4] === undefined ? 1 : Number(rgb[4]),
+    };
+  }
+
+  const srgb = value.match(
+    /^color\(srgb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)(?:\s*\/\s*([\d.]+))?\)$/u,
+  );
+  if (srgb) {
+    return {
+      red: Number(srgb[1]) * 255,
+      green: Number(srgb[2]) * 255,
+      blue: Number(srgb[3]) * 255,
+      alpha: srgb[4] === undefined ? 1 : Number(srgb[4]),
+    };
+  }
+
+  throw new Error(`Unsupported CSS color: ${value}`);
+}
+
+function composite(foreground: CssColor, background: CssColor): CssColor {
+  const alpha = foreground.alpha + background.alpha * (1 - foreground.alpha);
+  const channel = (front: number, back: number) =>
+    (front * foreground.alpha +
+      back * background.alpha * (1 - foreground.alpha)) /
+    alpha;
+  return {
+    red: channel(foreground.red, background.red),
+    green: channel(foreground.green, background.green),
+    blue: channel(foreground.blue, background.blue),
+    alpha,
+  };
+}
+
+function relativeLuminance(color: CssColor): number {
+  const linear = (channel: number) => {
+    const normalized = channel / 255;
+    return normalized <= 0.04045
+      ? normalized / 12.92
+      : ((normalized + 0.055) / 1.055) ** 2.4;
+  };
+  return (
+    linear(color.red) * 0.2126 +
+    linear(color.green) * 0.7152 +
+    linear(color.blue) * 0.0722
+  );
+}
+
+function contrastRatio(first: CssColor, second: CssColor): number {
+  const [lighter, darker] = [
+    relativeLuminance(first),
+    relativeLuminance(second),
+  ].sort((left, right) => right - left);
+  return (lighter + 0.05) / (darker + 0.05);
+}
 
 async function useAdminStatusFixture(
   page: Page,
@@ -62,9 +133,38 @@ test.describe("secure administration surfaces", () => {
 
     await useAdminStatusFixture(page, { access: "forbidden" });
     await page.goto("/admin");
-    await expect(page.locator('[data-admin-access="denied"]')).toBeVisible();
+    const denied = page.locator('[data-admin-access="denied"]');
+    await expect(denied).toBeVisible();
+    await expect(denied).toHaveAttribute("role", "alert");
+    await expect(
+      page.getByRole("heading", { name: "无管理权限" }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("当前账户不能查看系统状态或执行管理操作。"),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "返回今日计划" }),
+    ).toBeVisible();
+    await expect(denied.locator('[aria-busy="true"]')).toHaveCount(0);
     await expect(page.getByText("后台任务", { exact: true })).toHaveCount(0);
     await expect(page.getByRole("link", { name: "创建备份" })).toHaveCount(0);
+  });
+
+  test("recoverable status failures show an error state with retry", async ({
+    page,
+  }) => {
+    await useAdminStatusFixture(page, { access: "failed" });
+    await page.goto("/admin");
+
+    const failure = page.locator('[data-admin-access="error"]');
+    await expect(failure).toBeVisible();
+    await expect(failure).toHaveAttribute("role", "alert");
+    await expect(
+      page.getByRole("heading", { name: "无法读取系统状态" }),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "重新检查" })).toBeVisible();
+    await expect(failure.locator('[aria-busy="true"]')).toHaveCount(0);
+    await expect(page.getByText("后台任务", { exact: true })).toHaveCount(0);
   });
 
   test("health copy reflects the canonical migration state", async ({
@@ -182,6 +282,52 @@ test.describe("secure administration surfaces", () => {
     await expect(submit).toBeEnabled();
   });
 
+  test("backup control boundaries meet WCAG 1.4.11 contrast", async ({
+    page,
+  }) => {
+    await openBackup(page);
+    await page.evaluate(() => {
+      const fields = document.querySelector(
+        '[data-backup-desk="secure-export"] .settings-fields',
+      );
+      if (!fields) throw new Error("Backup settings fields are unavailable.");
+      const select = document.createElement("select");
+      select.setAttribute("aria-label", "Test-only backup select");
+      select.append(new Option("fixture", "fixture"));
+      const textarea = document.createElement("textarea");
+      textarea.setAttribute("aria-label", "Test-only backup textarea");
+      fields.append(select, textarea);
+    });
+
+    const panelBackground = parseCssColor(
+      await page
+        .locator('[data-backup-desk="secure-export"] .card')
+        .evaluate(
+          (element) => window.getComputedStyle(element).backgroundColor,
+        ),
+    );
+    const controls = page.locator(
+      '[data-backup-desk="secure-export"] input, [data-backup-desk="secure-export"] select, [data-backup-desk="secure-export"] textarea',
+    );
+    await expect(controls).toHaveCount(4);
+
+    for (const control of await controls.all()) {
+      const colors = await control.evaluate((element) => {
+        const style = window.getComputedStyle(element);
+        return {
+          background: style.backgroundColor,
+          border: style.borderTopColor,
+        };
+      });
+      const controlBackground = parseCssColor(colors.background);
+      const border = parseCssColor(colors.border);
+      const ratios = [controlBackground, panelBackground].map((background) =>
+        contrastRatio(composite(border, background), background),
+      );
+      expect(Math.min(...ratios)).toBeGreaterThanOrEqual(3);
+    }
+  });
+
   test("failed backup keeps both secrets and uses the error state", async ({
     page,
   }) => {
@@ -268,9 +414,7 @@ test.describe("secure administration surfaces", () => {
         await page.goto(path);
         await expectNoHorizontalOverflow(page);
         await expectBasicAccessibility(page);
-        const axe = await new AxeBuilder({ page })
-          .disableRules(["color-contrast"])
-          .analyze();
+        const axe = await new AxeBuilder({ page }).analyze();
         expect(axe.violations).toEqual([]);
 
         const auxiliaryFontSizes = await page

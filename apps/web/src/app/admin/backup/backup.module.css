@@ -51,29 +51,29 @@
 }
 
 .archiveCard :global(.form-field label),
-.archiveCard :global(input),
+.archiveCard :global(:is(input, select, textarea)),
 .archiveCard [data-admin-auxiliary] {
   font-size: max(0.8rem, 12px);
 }
 
-.archiveCard :global(input) {
+.archiveCard :global(:is(input, select, textarea)) {
   width: 100%;
   min-height: 46px;
-  padding: 10px 12px;
-  background: #fff;
-  border: 1px solid color-mix(in srgb, var(--desk-ink) 24%, transparent);
+  padding: var(--desk-space-2) var(--desk-space-3);
+  background: var(--desk-paper);
+  border: 1px solid color-mix(in srgb, var(--desk-ink) 52%, var(--desk-paper));
   border-radius: var(--desk-radius-sm);
 }
 
-.archiveCard :global(input:focus) {
+.archiveCard :global(:is(input, select, textarea):focus) {
   border-color: var(--desk-blue);
-  outline: 3px solid color-mix(in srgb, var(--desk-blue) 20%, transparent);
+  outline: 3px solid color-mix(in srgb, var(--desk-blue) 42%, var(--desk-paper));
 }
 
 .downloadOrder {
   padding: var(--desk-space-3);
   margin: var(--desk-space-4) 0 0;
-  color: var(--desk-evidence-muted);
+  color: var(--desk-ink);
   background: color-mix(
     in srgb,
     var(--desk-evidence-muted) 7%,

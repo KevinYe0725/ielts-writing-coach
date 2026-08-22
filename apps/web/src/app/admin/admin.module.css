@@ -153,8 +153,48 @@
   );
 }
 
-.accessDenied {
-  min-height: 240px;
+.accessState {
+  display: grid;
+  width: min(760px, 100%);
+  min-height: 220px;
+  padding: var(--desk-space-6);
+  margin: 0 auto;
+  color: var(--desk-ink);
+  background: var(--desk-paper);
+  border: 1px solid color-mix(in srgb, var(--desk-error) 38%, var(--desk-paper));
+  border-radius: var(--desk-radius-md);
+  grid-template-columns: auto minmax(0, 1fr);
+  align-content: center;
+  gap: var(--desk-space-4);
+}
+
+.accessStateIcon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  color: var(--desk-error);
+  background: color-mix(in srgb, var(--desk-error) 10%, var(--desk-paper));
+  border-radius: var(--desk-radius-sm);
+  place-items: center;
+}
+
+.accessStateCopy h1 {
+  margin-bottom: var(--desk-space-2);
+}
+
+.accessStateCopy > p:last-child {
+  max-width: 62ch;
+  margin: 0;
+  color: color-mix(in srgb, var(--desk-ink) 74%, var(--desk-paper));
+  font-size: max(0.8rem, 12px);
+}
+
+.accessStateActions {
+  display: flex;
+  padding-top: var(--desk-space-2);
+  grid-column: 2;
+  flex-wrap: wrap;
+  gap: var(--desk-space-2);
 }
 
 @media (max-width: 900px) {
@@ -191,5 +231,18 @@
 
   .desk :global(.operations-list .card) {
     padding: var(--desk-space-4);
+  }
+
+  .accessState {
+    padding: var(--desk-space-4);
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .accessStateActions {
+    grid-column: 1;
+  }
+
+  .accessStateActions :global(.button) {
+    width: 100%;
   }
 }
