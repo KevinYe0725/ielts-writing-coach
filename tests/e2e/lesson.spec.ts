@@ -1730,6 +1730,24 @@ test.describe("tutorial answer analysis over the public HTTP contract", () => {
       analysis.locator("[data-teaching-comparison-point]"),
     ).toHaveCount(1);
     const immutable = prompt.locator("[data-teaching-submitted-answer]");
+    const evidence = analysis.locator("[data-teaching-evidence]").first();
+    const [headingFamily, answerFamily, evidenceFamily] = await Promise.all([
+      page
+        .getByRole("heading", { name: "把因果链中间的一步写清楚" })
+        .evaluate((element) => window.getComputedStyle(element).fontFamily),
+      immutable.evaluate(
+        (element) => window.getComputedStyle(element).fontFamily,
+      ),
+      evidence.evaluate(
+        (element) => window.getComputedStyle(element).fontFamily,
+      ),
+    ]);
+    expect(headingFamily).toContain("Noto Sans SC");
+    expect(headingFamily).not.toContain("Source Serif 4");
+    for (const family of [answerFamily, evidenceFamily]) {
+      expect(family).toContain("Source Serif 4");
+      expect(family).not.toContain("Noto Sans SC");
+    }
     for (const evidence of await analysis
       .locator("[data-teaching-evidence]")
       .allTextContents()) {

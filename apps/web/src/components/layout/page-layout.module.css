@@ -21,7 +21,6 @@
 .reading {
   width: min(100%, 840px);
   padding: var(--desk-space-12) var(--desk-space-8);
-  font-family: var(--desk-font-reading);
 }
 
 .workspace {

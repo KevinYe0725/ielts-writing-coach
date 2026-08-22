@@ -2,6 +2,7 @@
   width: min(1040px, calc(100vw - 296px));
   max-width: none;
   padding: 0;
+  font-family: var(--desk-font-body);
 }
 
 :global([data-sidebar-state="collapsed"]) .readingPage {
@@ -13,6 +14,10 @@
   container-name: teaching-article;
   container-type: inline-size;
   min-width: 0;
+}
+
+.article :lang(en) {
+  font-family: var(--desk-font-reading);
 }
 
 .articleHeader {

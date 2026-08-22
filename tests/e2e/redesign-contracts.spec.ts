@@ -253,6 +253,53 @@ test.describe("annotation desk redesign contracts", () => {
     });
   }
 
+  test("teaching keeps Chinese UI in Noto Sans and reserves Source Serif for English evidence", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 960 });
+    await page.goto(
+      "/lesson?cycle=cycle-demo&lesson=lesson-collocation-perspective",
+    );
+
+    const chineseHeading = page.getByRole("heading", {
+      name: "别让论证从原因直接跳到结果",
+    });
+    const chineseProse = page.locator("[data-teaching-prose] p").first();
+    const chineseToc = page.locator("[data-teaching-toc] a").first();
+    const uiButton = page.locator("[data-teaching-practice-submit]").first();
+    const uiTextarea = page
+      .locator("[data-teaching-practice] textarea")
+      .first();
+    const englishExample = page
+      .locator('[data-teaching-block="MARKDOWN"] blockquote')
+      .first();
+    const englishPrompt = page
+      .locator("[data-teaching-practice] [lang='en']")
+      .first();
+
+    await expect(englishExample).toHaveAttribute("lang", "en");
+    for (const chineseText of [
+      chineseHeading,
+      chineseProse,
+      chineseToc,
+      uiButton,
+      uiTextarea,
+    ]) {
+      const family = await chineseText.evaluate(
+        (element) => window.getComputedStyle(element).fontFamily,
+      );
+      expect(family).toContain("Noto Sans SC");
+      expect(family).not.toContain("Source Serif 4");
+    }
+    for (const englishText of [englishExample, englishPrompt]) {
+      const family = await englishText.evaluate(
+        (element) => window.getComputedStyle(element).fontFamily,
+      );
+      expect(family).toContain("Source Serif 4");
+      expect(family).not.toContain("Noto Sans SC");
+    }
+  });
+
   for (const viewport of [
     { label: "desktop", width: 1440, height: 960 },
     { label: "390px mobile", width: 390, height: 844 },

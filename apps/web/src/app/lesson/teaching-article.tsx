@@ -460,7 +460,15 @@ function MarkdownSection({ section }: { section: TeachingSectionMarkdown }) {
       data-teaching-block="MARKDOWN"
       data-teaching-prose
     >
-      <Markdown>{section.markdown}</Markdown>
+      <Markdown
+        components={{
+          blockquote: ({ children }) => (
+            <blockquote lang="en">{children}</blockquote>
+          ),
+        }}
+      >
+        {section.markdown}
+      </Markdown>
     </div>
   );
 }
