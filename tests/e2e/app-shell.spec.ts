@@ -128,6 +128,8 @@ test.describe("desktop learning workspace", () => {
 
     const workspace = page.locator("[data-essay-workspace]");
     await expect(workspace).toBeVisible();
+    await expect(workspace).toHaveAttribute("data-active-limit", "8");
+    await expect(workspace).toContainText("进行中 2 / 8 篇");
     await expect(workspace.locator("[data-essay-card]")).toHaveCount(2);
     await expect(
       workspace
@@ -155,6 +157,23 @@ test.describe("desktop learning workspace", () => {
     await expect(
       page.locator('[data-essay-workspace="compact"]'),
     ).toBeVisible();
+  });
+
+  test("lays essays out as readable rows before there is room for two columns", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/essays");
+
+    const grid = page.locator('[data-essay-workspace="full"] [role="list"]');
+    expect(await gridColumnCount(grid)).toBe(1);
+    await expect(grid.locator("[data-essay-card]")).toHaveCount(2);
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBeLessThanOrEqual(390);
+
+    await page.setViewportSize({ width: 1280, height: 900 });
+    expect(await gridColumnCount(grid)).toBe(2);
   });
 
   test("keeps the active learning step and cycle-safe destination in the context topbar", async ({

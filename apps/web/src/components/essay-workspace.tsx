@@ -54,6 +54,7 @@ export function EssayWorkspaceContent({
     <section
       aria-labelledby="essay-workspace-title"
       className={compact ? styles.compact : styles.workspace}
+      data-active-limit={workspace.activeLimit}
       data-essay-workspace={compact ? "compact" : "full"}
     >
       {compact ? (
@@ -102,9 +103,13 @@ export function EssayWorkspaceContent({
         ) : null}
       </div>
 
-      <div className={styles.grid} role="list">
+      <div
+        aria-label={text("进行中的作文", "Essays in progress")}
+        className={styles.grid}
+        role="list"
+      >
         {workspace.essays.map((essay) => (
-          <Card
+          <article
             className={styles.card}
             data-essay-card
             key={essay.id}
@@ -136,7 +141,7 @@ export function EssayWorkspaceContent({
             <ActionLink href={essay.nextTask.href} size="sm">
               {text(essay.nextTask.actionZh, essay.nextTask.actionEn)}
             </ActionLink>
-          </Card>
+          </article>
         ))}
       </div>
 

@@ -35,11 +35,14 @@ import {
 } from "@/components/ui";
 import { useDemoResource } from "@/components/use-demo-resource";
 import { EssayWorkspace } from "@/components/essay-workspace";
+import { PageLayout } from "@/components/layout/page-layout";
 import { cn } from "@/components/utils";
 import { learningClient } from "@/lib/client";
 import type { QuestionOption, QuestionTopic, QuestionType } from "@/lib/client";
 import { learningRouteHref } from "@/lib/client/learning-route";
 import { saveLearningDestinations } from "@/lib/client/learning-navigation";
+
+import styles from "./today.module.css";
 
 const questionTypes: Array<{ id: QuestionType; zh: string; en: string }> = [
   { id: "opinion", zh: "同意 / 不同意", en: "Opinion" },
@@ -250,432 +253,450 @@ export default function TodayPage() {
 
   const task = data.nextTask;
   return (
-    <>
-      <PageHeader
-        eyebrow={text("今日计划", "Today’s plan")}
-        title={text(data.greetingZh, data.greetingEn)}
-        description={text(
-          "系统已经替你选好优先级。完成眼前这一步，其余任务会自动排程。",
-          "The system has set the priorities. Complete this action and everything else is scheduled automatically.",
-        )}
-      />
+    <PageLayout variant="focus">
+      <div className={styles.desk} data-today-desk="focus">
+        <PageHeader
+          eyebrow={text("今日计划", "Today’s plan")}
+          title={text(data.greetingZh, data.greetingEn)}
+          description={text(
+            "系统已经替你选好优先级。完成眼前这一步，其余任务会自动排程。",
+            "The system has set the priorities. Complete this action and everything else is scheduled automatically.",
+          )}
+        />
 
-      {data.aiState !== "connected" ? (
-        <div className="status-banner status-banner-warning" role="status">
-          <CloudOff aria-hidden="true" size={21} />
-          <div>
-            <strong>
-              {text(
-                "AI 尚未连接，但写作不会被阻塞",
-                "AI is not connected, but writing remains available",
-              )}
-            </strong>
-            <p>
-              {text(
-                "计时、自动保存与历史记录照常工作；批改可以等待 AI 恢复后再运行。",
-                "Timing, autosave, and history continue to work; feedback can run when AI is restored.",
-              )}
-            </p>
-          </div>
-          <ActionLink href="/settings" size="sm" variant="secondary">
-            {text("配置 AI", "Configure AI")}
-          </ActionLink>
-        </div>
-      ) : null}
-
-      {feedbackWaitingNotice &&
-      data.pendingJob &&
-      !["FAILED", "AI_BLOCKED"].includes(data.pendingJob.status) ? (
-        <div className="status-banner status-banner-warning" role="status">
-          <CloudOff aria-hidden="true" size={21} />
-          <div>
-            <strong>
-              {text(
-                "作文已提交并锁定，批改正在排队",
-                "Your essay is submitted and locked; feedback is queued",
-              )}
-            </strong>
-            <p>
-              {data.aiState === "connected"
-                ? text(
-                    "AI 连接正常，批改处理中；完成后今日计划会自动更新。",
-                    "The AI connection is healthy; feedback is processing and Today updates automatically.",
-                  )
-                : text(
-                    "批改需要先配置 AI 连接。在设置中保存可用的 AI 后，批改会自动开始，无需重写作文。",
-                    "Feedback starts automatically once a working AI connection is saved in Settings; you do not need to rewrite the essay.",
-                  )}
-            </p>
-          </div>
-          {data.aiState !== "connected" ? (
-            <ActionLink href="/settings" size="sm">
+        {data.aiState !== "connected" ? (
+          <div className="status-banner status-banner-warning" role="status">
+            <CloudOff aria-hidden="true" size={21} />
+            <div>
+              <strong>
+                {text(
+                  "AI 尚未连接，但写作不会被阻塞",
+                  "AI is not connected, but writing remains available",
+                )}
+              </strong>
+              <p>
+                {text(
+                  "计时、自动保存与历史记录照常工作；批改可以等待 AI 恢复后再运行。",
+                  "Timing, autosave, and history continue to work; feedback can run when AI is restored.",
+                )}
+              </p>
+            </div>
+            <ActionLink href="/settings" size="sm" variant="secondary">
               {text("配置 AI", "Configure AI")}
             </ActionLink>
-          ) : null}
-        </div>
-      ) : null}
-
-      {data.blockedJobNotice ? (
-        <div className="status-banner status-banner-warning" role="status">
-          <CloudOff aria-hidden="true" size={21} />
-          <div>
-            <strong>
-              {text(
-                "前一步已完成，但后续 AI 任务没有跑完",
-                "The previous step finished, but a follow-up AI task did not",
-              )}
-            </strong>
-            <p>
-              {data.blockedJobNotice.errorSafeMessage
-                ? `${data.blockedJobNotice.errorSafeMessage} `
-                : ""}
-              {data.blockedJobNotice.status === "AI_BLOCKED"
-                ? text(
-                    "更新或更换 AI 密钥后任务会自动恢复。",
-                    "Tasks resume automatically after the AI key is updated or replaced.",
-                  )
-                : text(
-                    "点击重试即可继续；已经完成的批改不会受影响。",
-                    "Retry to continue; the completed feedback is unaffected.",
-                  )}
-            </p>
-            {retryError ? <p role="alert">{retryError}</p> : null}
           </div>
-          {data.blockedJobNotice.status === "AI_BLOCKED" ? (
-            <ActionLink href="/settings" size="sm">
-              {text("检查 AI 连接", "Review AI connection")}
-            </ActionLink>
-          ) : (
-            <Button
-              disabled={retryingJob}
-              onClick={() => void retryPendingJob()}
-              size="sm"
-            >
-              {retryingJob ? (
-                <LoaderCircle aria-hidden="true" className="spin" size={17} />
-              ) : (
-                text("重试", "Retry")
-              )}
-            </Button>
-          )}
-        </div>
-      ) : null}
+        ) : null}
 
-      {retryError ? (
-        <p className="inline-probe error" role="alert">
-          {retryError}
-        </p>
-      ) : null}
-
-      <Card className="next-task-card">
-        <div className="next-task-accent" aria-hidden="true" />
-        <div className="next-task-topline">
-          <Badge tone="blue">
-            <Sparkles aria-hidden="true" size={13} />
-            {text(task.eyebrowZh, task.eyebrowEn)}
-          </Badge>
-          <span className="due-label">
-            <CalendarClock aria-hidden="true" size={15} />
-            {text(task.dueLabelZh, task.dueLabelEn)}
-          </span>
-        </div>
-        <div className="next-task-body">
-          <div className="next-task-copy">
-            <h2>{text(task.titleZh, task.titleEn)}</h2>
-            <p>{text(task.descriptionZh, task.descriptionEn)}</p>
-            <div className="task-meta">
-              <span>
-                <Clock3 aria-hidden="true" size={16} />
-                {task.durationMinutes} {messages.common.minutes}
-              </span>
-              <span>
-                <Target aria-hidden="true" size={16} />
-                {text("闭卷独立输出", "Closed-book production")}
-              </span>
-            </div>
-          </div>
-          {needsQuestion ? (
-            <Button
-              disabled={questionLoading || !selectedQuestionId}
-              onClick={() => void beginSelectedQuestion()}
-              size="lg"
-            >
-              {questionLoading ? (
-                <LoaderCircle aria-hidden="true" className="spin" size={17} />
-              ) : (
-                <PenLine aria-hidden="true" size={17} />
-              )}
-              {text("用这道题开始", "Start with this question")}
-            </Button>
-          ) : data.pendingJobAction === "retry" ? (
-            <Button
-              disabled={retryingJob}
-              onClick={() => void retryPendingJob()}
-              size="lg"
-            >
-              {retryingJob ? (
-                <LoaderCircle aria-hidden="true" className="spin" size={17} />
-              ) : (
-                <Sparkles aria-hidden="true" size={17} />
-              )}
-              {text(task.actionZh, task.actionEn)}
-            </Button>
-          ) : data.pendingJobAction === "review-connection" ? (
-            <ActionLink href="/settings" size="lg">
-              {text("检查 AI 连接", "Review AI connection")}
-            </ActionLink>
-          ) : (
-            <ActionLink href={task.href} size="lg">
-              {text(task.actionZh, task.actionEn)}
-            </ActionLink>
-          )}
-        </div>
-      </Card>
-
-      {needsQuestion ? (
-        <section aria-labelledby="question-picker-title">
-          <SectionHeader
-            title={text("先选一道题", "Choose a question first")}
-            description={text(
-              "120 道原创开放题可直接使用；你粘贴的题目只保存在自己的私有题库。",
-              "Use one of 120 original open questions, or save a pasted task privately.",
-            )}
-          />
-          <Card className="setup-form-card">
-            {questionLoading && questions.length === 0 ? (
-              <p role="status">{messages.common.loading}</p>
-            ) : (
-              <div className="form-grid">
-                <div className="form-field form-field-wide">
-                  <label htmlFor="question-choice">
-                    <LibraryBig aria-hidden="true" size={16} />{" "}
-                    {text("题库", "Question bank")}
-                  </label>
-                  <select
-                    className="select-input"
-                    id="question-choice"
-                    onChange={(event) =>
-                      setSelectedQuestionId(event.target.value)
-                    }
-                    value={selectedQuestionId}
-                  >
-                    {questions.map((question) => (
-                      <option key={question.id} value={question.id}>
-                        {optionLabel(topics, question.topic, locale)} ·{" "}
-                        {optionLabel(questionTypes, question.type, locale)} —{" "}
-                        {question.prompt.slice(0, 110)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                {selectedQuestion ? (
-                  <div className="form-field form-field-wide">
-                    <p className="field-hint" lang="en">
-                      {selectedQuestion.prompt}
-                    </p>
-                    <div className="task-meta">
-                      <Badge tone="neutral">
-                        {optionLabel(topics, selectedQuestion.topic, locale)}
-                      </Badge>
-                      <Badge tone="neutral">
-                        {optionLabel(
-                          questionTypes,
-                          selectedQuestion.type,
-                          locale,
-                        )}
-                      </Badge>
-                      {selectedQuestion.visibility === "private" ? (
-                        <Badge tone="violet">
-                          {text("仅自己可见", "Private")}
-                        </Badge>
-                      ) : null}
-                    </div>
-                  </div>
-                ) : null}
-                <div className="form-field form-field-wide">
-                  <Button
-                    onClick={() => setCustomOpen((value) => !value)}
-                    type="button"
-                    variant="secondary"
-                  >
-                    <PenLine aria-hidden="true" size={16} />
-                    {text("粘贴我自己的题目", "Paste my own task")}
-                  </Button>
-                </div>
-                {customOpen ? (
-                  <>
-                    <div className="form-field form-field-wide">
-                      <label htmlFor="custom-question">
-                        {text("完整英文题目", "Full English task")}
-                      </label>
-                      <textarea
-                        className="exercise-textarea"
-                        id="custom-question"
-                        lang="en"
-                        minLength={30}
-                        onChange={(event) =>
-                          setCustomPrompt(event.target.value)
-                        }
-                        placeholder="Paste the complete Task 2 prompt and instruction…"
-                        value={customPrompt}
-                      />
-                    </div>
-                    <div className="form-field">
-                      <label htmlFor="custom-question-type">
-                        {text("题型", "Type")}
-                      </label>
-                      <select
-                        className="select-input"
-                        id="custom-question-type"
-                        onChange={(event) =>
-                          setCustomType(event.target.value as QuestionType)
-                        }
-                        value={customType}
-                      >
-                        {questionTypes.map((value) => (
-                          <option key={value.id} value={value.id}>
-                            {text(value.zh, value.en)}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="form-field">
-                      <label htmlFor="custom-question-topic">
-                        {text("话题", "Topic")}
-                      </label>
-                      <select
-                        className="select-input"
-                        id="custom-question-topic"
-                        onChange={(event) =>
-                          setCustomTopic(event.target.value as QuestionTopic)
-                        }
-                        value={customTopic}
-                      >
-                        {topics.map((value) => (
-                          <option key={value.id} value={value.id}>
-                            {text(value.zh, value.en)}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="form-field">
-                      <label htmlFor="custom-question-track">IELTS</label>
-                      <select
-                        className="select-input"
-                        id="custom-question-track"
-                        onChange={(event) =>
-                          setCustomTrack(
-                            event.target.value as
-                              | "academic"
-                              | "general_training",
-                          )
-                        }
-                        value={customTrack}
-                      >
-                        <option value="academic">Academic</option>
-                        <option value="general_training">
-                          General Training
-                        </option>
-                      </select>
-                    </div>
-                    <div className="form-field">
-                      <Button
-                        disabled={
-                          questionLoading || customPrompt.trim().length < 30
-                        }
-                        onClick={() => void saveCustomQuestion()}
-                        type="button"
-                      >
-                        {text("保存到私有题库", "Save privately")}
-                      </Button>
-                    </div>
-                  </>
-                ) : null}
-              </div>
-            )}
-            {questionError ? (
-              <p className="inline-probe error" role="alert">
-                {questionError}
+        {feedbackWaitingNotice &&
+        data.pendingJob &&
+        !["FAILED", "AI_BLOCKED"].includes(data.pendingJob.status) ? (
+          <div className="status-banner status-banner-warning" role="status">
+            <CloudOff aria-hidden="true" size={21} />
+            <div>
+              <strong>
+                {text(
+                  "作文已提交并锁定，批改正在排队",
+                  "Your essay is submitted and locked; feedback is queued",
+                )}
+              </strong>
+              <p>
+                {data.aiState === "connected"
+                  ? text(
+                      "AI 连接正常，批改处理中；完成后今日计划会自动更新。",
+                      "The AI connection is healthy; feedback is processing and Today updates automatically.",
+                    )
+                  : text(
+                      "批改需要先配置 AI 连接。在设置中保存可用的 AI 后，批改会自动开始，无需重写作文。",
+                      "Feedback starts automatically once a working AI connection is saved in Settings; you do not need to rewrite the essay.",
+                    )}
               </p>
+            </div>
+            {data.aiState !== "connected" ? (
+              <ActionLink href="/settings" size="sm">
+                {text("配置 AI", "Configure AI")}
+              </ActionLink>
             ) : null}
+          </div>
+        ) : null}
+
+        {data.blockedJobNotice ? (
+          <div className="status-banner status-banner-warning" role="status">
+            <CloudOff aria-hidden="true" size={21} />
+            <div>
+              <strong>
+                {text(
+                  "前一步已完成，但后续 AI 任务没有跑完",
+                  "The previous step finished, but a follow-up AI task did not",
+                )}
+              </strong>
+              <p>
+                {data.blockedJobNotice.errorSafeMessage
+                  ? `${data.blockedJobNotice.errorSafeMessage} `
+                  : ""}
+                {data.blockedJobNotice.status === "AI_BLOCKED"
+                  ? text(
+                      "更新或更换 AI 密钥后任务会自动恢复。",
+                      "Tasks resume automatically after the AI key is updated or replaced.",
+                    )
+                  : text(
+                      "点击重试即可继续；已经完成的批改不会受影响。",
+                      "Retry to continue; the completed feedback is unaffected.",
+                    )}
+              </p>
+              {retryError ? <p role="alert">{retryError}</p> : null}
+            </div>
+            {data.blockedJobNotice.status === "AI_BLOCKED" ? (
+              <ActionLink href="/settings" size="sm">
+                {text("检查 AI 连接", "Review AI connection")}
+              </ActionLink>
+            ) : (
+              <Button
+                disabled={retryingJob}
+                onClick={() => void retryPendingJob()}
+                size="sm"
+              >
+                {retryingJob ? (
+                  <LoaderCircle aria-hidden="true" className="spin" size={17} />
+                ) : (
+                  text("重试", "Retry")
+                )}
+              </Button>
+            )}
+          </div>
+        ) : null}
+
+        {retryError ? (
+          <p className="inline-probe error" role="alert">
+            {retryError}
+          </p>
+        ) : null}
+
+        <section
+          className={cn("next-task-card", styles.primaryAction)}
+          data-today-primary
+        >
+          <div className="next-task-accent" aria-hidden="true" />
+          <div className="next-task-topline">
+            <Badge tone="blue">
+              <Sparkles aria-hidden="true" size={13} />
+              {text(task.eyebrowZh, task.eyebrowEn)}
+            </Badge>
+            <span className="due-label">
+              <CalendarClock aria-hidden="true" size={15} />
+              {text(task.dueLabelZh, task.dueLabelEn)}
+            </span>
+          </div>
+          <div className="next-task-body">
+            <div className="next-task-copy">
+              <h2>{text(task.titleZh, task.titleEn)}</h2>
+              <p>{text(task.descriptionZh, task.descriptionEn)}</p>
+              <div className="task-meta">
+                <span>
+                  <Clock3 aria-hidden="true" size={16} />
+                  {task.durationMinutes} {messages.common.minutes}
+                </span>
+                <span>
+                  <Target aria-hidden="true" size={16} />
+                  {text("闭卷独立输出", "Closed-book production")}
+                </span>
+              </div>
+            </div>
+            {needsQuestion ? (
+              <Button
+                disabled={questionLoading || !selectedQuestionId}
+                onClick={() => void beginSelectedQuestion()}
+                size="lg"
+              >
+                {questionLoading ? (
+                  <LoaderCircle aria-hidden="true" className="spin" size={17} />
+                ) : (
+                  <PenLine aria-hidden="true" size={17} />
+                )}
+                {text("用这道题开始", "Start with this question")}
+              </Button>
+            ) : data.pendingJobAction === "retry" ? (
+              <Button
+                disabled={retryingJob}
+                onClick={() => void retryPendingJob()}
+                size="lg"
+              >
+                {retryingJob ? (
+                  <LoaderCircle aria-hidden="true" className="spin" size={17} />
+                ) : (
+                  <Sparkles aria-hidden="true" size={17} />
+                )}
+                {text(task.actionZh, task.actionEn)}
+              </Button>
+            ) : data.pendingJobAction === "review-connection" ? (
+              <ActionLink href="/settings" size="lg">
+                {text("检查 AI 连接", "Review AI connection")}
+              </ActionLink>
+            ) : (
+              <ActionLink href={task.href} size="lg">
+                {text(task.actionZh, task.actionEn)}
+              </ActionLink>
+            )}
+          </div>
+        </section>
+
+        {needsQuestion ? (
+          <section aria-labelledby="question-picker-title">
+            <SectionHeader
+              title={text("先选一道题", "Choose a question first")}
+              description={text(
+                "120 道原创开放题可直接使用；你粘贴的题目只保存在自己的私有题库。",
+                "Use one of 120 original open questions, or save a pasted task privately.",
+              )}
+            />
+            <Card className="setup-form-card">
+              {questionLoading && questions.length === 0 ? (
+                <p role="status">{messages.common.loading}</p>
+              ) : (
+                <div className="form-grid">
+                  <div className="form-field form-field-wide">
+                    <label htmlFor="question-choice">
+                      <LibraryBig aria-hidden="true" size={16} />{" "}
+                      {text("题库", "Question bank")}
+                    </label>
+                    <select
+                      className="select-input"
+                      id="question-choice"
+                      onChange={(event) =>
+                        setSelectedQuestionId(event.target.value)
+                      }
+                      value={selectedQuestionId}
+                    >
+                      {questions.map((question) => (
+                        <option key={question.id} value={question.id}>
+                          {optionLabel(topics, question.topic, locale)} ·{" "}
+                          {optionLabel(questionTypes, question.type, locale)} —{" "}
+                          {question.prompt.slice(0, 110)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {selectedQuestion ? (
+                    <div className="form-field form-field-wide">
+                      <p className="field-hint" lang="en">
+                        {selectedQuestion.prompt}
+                      </p>
+                      <div className="task-meta">
+                        <Badge tone="neutral">
+                          {optionLabel(topics, selectedQuestion.topic, locale)}
+                        </Badge>
+                        <Badge tone="neutral">
+                          {optionLabel(
+                            questionTypes,
+                            selectedQuestion.type,
+                            locale,
+                          )}
+                        </Badge>
+                        {selectedQuestion.visibility === "private" ? (
+                          <Badge tone="violet">
+                            {text("仅自己可见", "Private")}
+                          </Badge>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : null}
+                  <div className="form-field form-field-wide">
+                    <Button
+                      onClick={() => setCustomOpen((value) => !value)}
+                      type="button"
+                      variant="secondary"
+                    >
+                      <PenLine aria-hidden="true" size={16} />
+                      {text("粘贴我自己的题目", "Paste my own task")}
+                    </Button>
+                  </div>
+                  {customOpen ? (
+                    <>
+                      <div className="form-field form-field-wide">
+                        <label htmlFor="custom-question">
+                          {text("完整英文题目", "Full English task")}
+                        </label>
+                        <textarea
+                          className="exercise-textarea"
+                          id="custom-question"
+                          lang="en"
+                          minLength={30}
+                          onChange={(event) =>
+                            setCustomPrompt(event.target.value)
+                          }
+                          placeholder="Paste the complete Task 2 prompt and instruction…"
+                          value={customPrompt}
+                        />
+                      </div>
+                      <div className="form-field">
+                        <label htmlFor="custom-question-type">
+                          {text("题型", "Type")}
+                        </label>
+                        <select
+                          className="select-input"
+                          id="custom-question-type"
+                          onChange={(event) =>
+                            setCustomType(event.target.value as QuestionType)
+                          }
+                          value={customType}
+                        >
+                          {questionTypes.map((value) => (
+                            <option key={value.id} value={value.id}>
+                              {text(value.zh, value.en)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="form-field">
+                        <label htmlFor="custom-question-topic">
+                          {text("话题", "Topic")}
+                        </label>
+                        <select
+                          className="select-input"
+                          id="custom-question-topic"
+                          onChange={(event) =>
+                            setCustomTopic(event.target.value as QuestionTopic)
+                          }
+                          value={customTopic}
+                        >
+                          {topics.map((value) => (
+                            <option key={value.id} value={value.id}>
+                              {text(value.zh, value.en)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="form-field">
+                        <label htmlFor="custom-question-track">IELTS</label>
+                        <select
+                          className="select-input"
+                          id="custom-question-track"
+                          onChange={(event) =>
+                            setCustomTrack(
+                              event.target.value as
+                                | "academic"
+                                | "general_training",
+                            )
+                          }
+                          value={customTrack}
+                        >
+                          <option value="academic">Academic</option>
+                          <option value="general_training">
+                            General Training
+                          </option>
+                        </select>
+                      </div>
+                      <div className="form-field">
+                        <Button
+                          disabled={
+                            questionLoading || customPrompt.trim().length < 30
+                          }
+                          onClick={() => void saveCustomQuestion()}
+                          type="button"
+                        >
+                          {text("保存到私有题库", "Save privately")}
+                        </Button>
+                      </div>
+                    </>
+                  ) : null}
+                </div>
+              )}
+              {questionError ? (
+                <p className="inline-probe error" role="alert">
+                  {questionError}
+                </p>
+              ) : null}
+            </Card>
+          </section>
+        ) : null}
+
+        <EssayWorkspace compact />
+
+        <section className={styles.learningThread} data-today-learning-thread>
+          <SectionHeader
+            title={text("本篇训练闭环", "This learning loop")}
+            description={data.cycleTitle}
+          />
+          <Card className={cn("cycle-timeline-card", styles.timelineCard)}>
+            <ol className="cycle-timeline">
+              {data.timeline.map((step, index) => (
+                <li
+                  className={cn("cycle-step", `cycle-step-${step.state}`)}
+                  key={step.id}
+                >
+                  <span className="cycle-node" aria-hidden="true">
+                    {step.state === "done" ? <Check size={15} /> : index + 1}
+                  </span>
+                  <div>
+                    <strong>{text(step.labelZh, step.labelEn)}</strong>
+                    <span>{step.dateLabel}</span>
+                  </div>
+                  {index < data.timeline.length - 1 ? (
+                    <span className="cycle-line" aria-hidden="true" />
+                  ) : null}
+                </li>
+              ))}
+            </ol>
           </Card>
         </section>
-      ) : null}
 
-      <EssayWorkspace compact />
-
-      <SectionHeader
-        title={text("本篇训练闭环", "This learning loop")}
-        description={data.cycleTitle}
-      />
-      <Card className="cycle-timeline-card">
-        <ol className="cycle-timeline">
-          {data.timeline.map((step, index) => (
-            <li
-              className={cn("cycle-step", `cycle-step-${step.state}`)}
-              key={step.id}
-            >
-              <span className="cycle-node" aria-hidden="true">
-                {step.state === "done" ? <Check size={15} /> : index + 1}
+        <section className={styles.evidenceSummary} data-today-evidence>
+          <div
+            aria-label={text("本周学习证据", "This week’s learning evidence")}
+            className={styles.evidenceList}
+            role="list"
+          >
+            <div className={styles.evidenceItem} role="listitem">
+              <span className="stat-icon blue">
+                <Clock3 aria-hidden="true" size={19} />
               </span>
               <div>
-                <strong>{text(step.labelZh, step.labelEn)}</strong>
-                <span>{step.dateLabel}</span>
+                <span>{text("已记录学习时长", "Recorded learning time")}</span>
+                <strong>
+                  {data.week.focusedMinutes ?? "—"}
+                  {data.week.focusedMinutes === null ? null : (
+                    <small> min</small>
+                  )}
+                </strong>
               </div>
-              {index < data.timeline.length - 1 ? (
-                <span className="cycle-line" aria-hidden="true" />
-              ) : null}
-            </li>
-          ))}
-        </ol>
-      </Card>
+            </div>
+            <div className={styles.evidenceItem} role="listitem">
+              <span className="stat-icon green">
+                <Gauge aria-hidden="true" size={19} />
+              </span>
+              <div>
+                <span>{text("已提交首稿", "First drafts submitted")}</span>
+                <strong>{data.week.completedActions ?? "—"}</strong>
+              </div>
+            </div>
+            <div className={styles.evidenceItem} role="listitem">
+              <span className="stat-icon violet">
+                <Target aria-hidden="true" size={19} />
+              </span>
+              <div>
+                <span>
+                  {text(
+                    "独立复测未复发",
+                    "No recurrence in independent checks",
+                  )}
+                </span>
+                <strong>
+                  {data.week.repeatedErrorReduction ?? "—"}
+                  {data.week.repeatedErrorReduction === null ? null : (
+                    <small>%</small>
+                  )}
+                </strong>
+              </div>
+            </div>
+          </div>
 
-      <div className="stat-grid today-stat-grid">
-        <Card className="stat-card">
-          <span className="stat-icon blue">
-            <Clock3 aria-hidden="true" size={19} />
-          </span>
-          <div>
-            <span>{text("已记录学习时长", "Recorded learning time")}</span>
-            <strong>
-              {data.week.focusedMinutes ?? "—"}
-              {data.week.focusedMinutes === null ? null : <small> min</small>}
-            </strong>
+          <div className={styles.refreshAction}>
+            <Button onClick={retry} size="sm" variant="secondary">
+              {text("刷新计划", "Refresh plan")}
+              <ArrowRight aria-hidden="true" size={15} />
+            </Button>
           </div>
-        </Card>
-        <Card className="stat-card">
-          <span className="stat-icon green">
-            <Gauge aria-hidden="true" size={19} />
-          </span>
-          <div>
-            <span>{text("已提交首稿", "First drafts submitted")}</span>
-            <strong>{data.week.completedActions ?? "—"}</strong>
-          </div>
-        </Card>
-        <Card className="stat-card">
-          <span className="stat-icon violet">
-            <Target aria-hidden="true" size={19} />
-          </span>
-          <div>
-            <span>
-              {text("独立复测未复发", "No recurrence in independent checks")}
-            </span>
-            <strong>
-              {data.week.repeatedErrorReduction ?? "—"}
-              {data.week.repeatedErrorReduction === null ? null : (
-                <small>%</small>
-              )}
-            </strong>
-          </div>
-        </Card>
+        </section>
       </div>
-
-      <div className="quiet-footer">
-        <Button onClick={retry} size="sm" variant="ghost">
-          {text("刷新计划", "Refresh plan")}
-          <ArrowRight aria-hidden="true" size={15} />
-        </Button>
-      </div>
-    </>
+    </PageLayout>
   );
 }

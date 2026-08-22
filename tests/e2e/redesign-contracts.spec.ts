@@ -47,6 +47,18 @@ test.describe("annotation desk redesign contracts", () => {
     );
   });
 
+  test("Today composes the focus layout as a writing desk", async ({
+    page,
+  }) => {
+    await page.goto("/today");
+
+    const desk = page.locator('[data-today-desk="focus"]');
+    await expect(desk).toBeVisible();
+    await expect(desk.locator(".next-task-card")).toHaveCount(1);
+    await expect(desk.locator("[data-today-learning-thread]")).toBeVisible();
+    await expect(desk.locator("[data-today-evidence]")).toBeVisible();
+  });
+
   for (const [route, layout] of routeMatrix) {
     test(`${route} uses ${layout}`, async ({ page }) => {
       await page.goto(route);

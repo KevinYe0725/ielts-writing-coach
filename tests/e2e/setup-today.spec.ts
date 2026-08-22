@@ -68,6 +68,55 @@ test.describe("deterministic setup and Today experience", () => {
     await expectBasicAccessibility(page);
   });
 
+  test("Today has one primary action and retains every existing utility", async ({
+    page,
+  }) => {
+    await page.goto("/today");
+
+    await expect(page.locator(".next-task-card")).toHaveCount(1);
+    const evidence = page.getByRole("list", {
+      name: "本周学习证据",
+    });
+    await expect(evidence.getByText("已记录学习时长")).toBeVisible();
+    await expect(evidence.getByText("已提交首稿")).toBeVisible();
+    await expect(evidence.getByText("独立复测未复发")).toBeVisible();
+    await expect(page.getByRole("button", { name: "刷新计划" })).toBeVisible();
+  });
+
+  test("new-essay keeps public and custom question controls reachable", async ({
+    page,
+  }) => {
+    await page.goto("/today?new-essay=1");
+
+    await expect(page).toHaveURL(/\/today\?new-essay=1$/);
+    await expect(
+      page.getByRole("heading", { name: "先选一道题" }),
+    ).toBeVisible();
+    await expect(page.getByLabel("题库")).not.toHaveValue("");
+    await page.getByRole("button", { name: "粘贴我自己的题目" }).click();
+    await expect(page.getByLabel("完整英文题目")).toBeVisible();
+    await expect(page.getByLabel("题型")).toBeVisible();
+    await expect(page.getByLabel("话题")).toBeVisible();
+    await expect(
+      page.getByLabel("IELTS").locator('option[value="academic"]'),
+    ).toHaveCount(1);
+    await expect(
+      page.getByLabel("IELTS").locator('option[value="general_training"]'),
+    ).toHaveCount(1);
+  });
+
+  test("Today preserves mixed-review and waiting-notice query identities", async ({
+    page,
+  }) => {
+    await page.goto("/today?mixed-review=1");
+    await expect(page).toHaveURL(/\/today\?mixed-review=1$/);
+    await expect(page.locator(".next-task-card")).toHaveCount(1);
+
+    await page.goto("/today?notice=feedback-waiting-ai");
+    await expect(page).toHaveURL(/\/today\?notice=feedback-waiting-ai$/);
+    await expect(page.locator(".next-task-card")).toHaveCount(1);
+  });
+
   test("the whole interface switches language without translating the task", async ({
     page,
   }) => {
