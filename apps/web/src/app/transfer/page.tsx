@@ -199,8 +199,14 @@ export default function TransferPage({
     : result?.outcome === "PASS"
       ? "green"
       : result?.outcome === "FAIL"
-        ? "amber"
-        : "blue";
+        ? "red"
+        : "neutral";
+  const resultEvidenceState =
+    result?.mockLanguageScoring || result?.outcome === "NO_OPPORTUNITY"
+      ? "unavailable"
+      : result?.outcome === "PASS"
+        ? "verified"
+        : "error";
 
   return (
     <div
@@ -337,6 +343,7 @@ export default function TransferPage({
         <Card
           aria-live="polite"
           className={`transfer-result-card ${styles.stateRecord}`}
+          data-evidence-state={resultEvidenceState}
           data-transfer-state={
             result.outcome === "NO_OPPORTUNITY"
               ? "no-opportunity"

@@ -429,6 +429,24 @@ async function expectAbove(first: Locator, second: Locator): Promise<void> {
   expect(firstBox!.y + firstBox!.height).toBeLessThanOrEqual(secondBox!.y + 2);
 }
 
+async function expectTrackUsesToken(
+  locator: Locator,
+  token: "--desk-error" | "--desk-evidence-muted" | "--desk-green",
+): Promise<void> {
+  const colors = await locator.evaluate((element, cssToken) => {
+    const probe = document.createElement("span");
+    probe.style.color = `var(${cssToken})`;
+    element.ownerDocument.body.append(probe);
+    const expected = window.getComputedStyle(probe).color;
+    probe.remove();
+    return {
+      expected,
+      track: window.getComputedStyle(element, "::before").backgroundColor,
+    };
+  }, token);
+  expect(colors.track).toBe(colors.expected);
+}
+
 async function navigationLink(
   page: import("@playwright/test").Page,
   name: string,
@@ -1327,13 +1345,16 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
 
 async function installHttpTransferApi(
   page: Page,
-  state: "processing" | "pass" | "fail" | "evaluation-error",
+  state: "processing" | "pass" | "fail" | "no-opportunity" | "evaluation-error",
 ) {
   const taskId = `transfer-${state}`;
   const task = {
     id: taskId,
     source_cycle_id: "cycle-http-transfer",
-    status: state === "pass" || state === "fail" ? "COMPLETED" : "READY",
+    status:
+      state === "pass" || state === "fail" || state === "no-opportunity"
+        ? "COMPLETED"
+        : "READY",
     available_at: "2026-08-23T00:00:00.000Z",
     expires_at: "2026-08-25T00:00:00.000Z",
     target_hint_hidden: true,
@@ -1355,21 +1376,36 @@ async function installHttpTransferApi(
           },
         }
       : {}),
-    ...(state === "pass" || state === "fail"
+    ...(state === "pass" || state === "fail" || state === "no-opportunity"
       ? {
           result: {
-            outcome: state.toUpperCase(),
-            confidence: 0.91,
+            outcome:
+              state === "no-opportunity"
+                ? "NO_OPPORTUNITY"
+                : state.toUpperCase(),
+            confidence: state === "no-opportunity" ? null : 0.91,
             feedback_zh:
-              state === "pass" ? "服务端证据通过。" : "服务端证据尚未通过。",
+              state === "pass"
+                ? "服务端证据通过。"
+                : state === "no-opportunity"
+                  ? "本次没有自然迁移机会。"
+                  : "服务端证据尚未通过。",
             feedback_en:
               state === "pass"
                 ? "The server evidence passed."
-                : "The server evidence did not pass.",
-            evidence: "A frozen first-answer span.",
-            status: state === "pass" ? "QUALIFYING" : "INSUFFICIENT",
+                : state === "no-opportunity"
+                  ? "No natural transfer opportunity was available."
+                  : "The server evidence did not pass.",
+            evidence:
+              state === "no-opportunity" ? "" : "A frozen first-answer span.",
+            status:
+              state === "pass"
+                ? "QUALIFYING"
+                : state === "no-opportunity"
+                  ? "NO_OPPORTUNITY"
+                  : "INSUFFICIENT",
             transferred: state === "pass",
-            gate_missing: state === "pass" ? [] : ["independent use"],
+            gate_missing: state === "fail" ? ["independent use"] : [],
             mock_language_scoring: false,
           },
         }
@@ -1393,6 +1429,103 @@ async function installHttpTransferApi(
   });
 
   return `/transfer?cycle=cycle-http-transfer&task=${taskId}`;
+}
+
+async function installHttpMissingComparisonApi(page: Page) {
+  const scoringVersion = {
+    schemaVersion: "1.0.0",
+    promptVersion: "1.0.0",
+    rubricVersion: "iwc-task2-rubric-1.0.0",
+    model: "frozen-model",
+  };
+  const assessment = (overallBand: number, issue = false) => ({
+    schemaVersion: scoringVersion.schemaVersion,
+    overallBand,
+    criterionScores: {
+      taskResponse: overallBand,
+      coherenceCohesion: overallBand,
+      lexicalResource: overallBand,
+      grammar: overallBand,
+    },
+    issues: issue
+      ? [
+          {
+            id: "issue-missing-span",
+            skillId: "comparison_target",
+            excerpt: "better than the older",
+          },
+        ]
+      : [],
+    versionSnapshot: {
+      task: "ielts_assessment",
+      promptVersion: scoringVersion.promptVersion,
+      rubricVersion: scoringVersion.rubricVersion,
+      model: scoringVersion.model,
+    },
+  });
+
+  await page.route("**/api/v1/**", async (route) => {
+    const { pathname } = new URL(route.request().url());
+    if (pathname === "/api/v1/auth/get-session") {
+      await route.fulfill({ contentType: "application/json", body: "null" });
+      return;
+    }
+    if (pathname === "/api/v1/training-cycles/cycle-missing-evidence") {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          cycle: {
+            id: "cycle-missing-evidence",
+            question: { prompt: "A canonical missing-evidence comparison." },
+            transferTasks: [{ id: "transfer-missing-evidence" }],
+            writingAttempts: [
+              {
+                id: "attempt-v1-missing",
+                kind: "version_1",
+                content: "Version one.",
+                wordCount: 250,
+                assessment: assessment(6, true),
+              },
+              {
+                id: "attempt-v2-missing",
+                kind: "version_2",
+                content: "Version two.",
+                wordCount: 270,
+                assessment: assessment(6.5),
+              },
+            ],
+            comparisonEvidence: {
+              valid: false,
+              payload: {
+                comparisonMetrics: {
+                  scoringVersion,
+                  overall: { v1: 6, v2: 6.5, delta: 0.5 },
+                  criteria: {
+                    TR: { v1: 6, v2: 6.5, delta: 0.5 },
+                    CC: { v1: 6, v2: 6.5, delta: 0.5 },
+                    LR: { v1: 6, v2: 6.5, delta: 0.5 },
+                    GRA: { v1: 6, v2: 6.5, delta: 0.5 },
+                  },
+                  wordCounts: { v1: 250, v2: 270 },
+                  coreIssueRecurrence: {
+                    v1Occurrences: 1,
+                    v2Occurrences: 0,
+                    v1Per100Words: 0.4,
+                    v2Per100Words: 0,
+                    deltaPer100Words: -0.4,
+                    recurred: false,
+                    evidenceVerified: false,
+                  },
+                },
+              },
+            },
+          },
+        }),
+      });
+      return;
+    }
+    await route.fulfill({ status: 404, body: "Not found" });
+  });
 }
 
 test.describe("compare, transfer, and growth evidence records", () => {
@@ -1457,6 +1590,12 @@ test.describe("compare, transfer, and growth evidence records", () => {
     await expect(
       page.locator('[data-transfer-state="mock-result"]'),
     ).toBeVisible();
+    const mockResult = page.locator('[data-transfer-state="mock-result"]');
+    await expect(mockResult).toHaveAttribute(
+      "data-evidence-state",
+      "unavailable",
+    );
+    await expectTrackUsesToken(mockResult, "--desk-evidence-muted");
     await expect(page.getByLabel("你的英文答案")).toHaveCount(0);
     expect(
       await page.evaluate(() =>
@@ -1475,6 +1614,8 @@ test.describe("compare, transfer, and growth evidence records", () => {
     await page.getByRole("button", { name: "这道题没有自然机会" }).click();
 
     const result = page.locator('[data-transfer-state="no-opportunity"]');
+    await expect(result).toHaveAttribute("data-evidence-state", "unavailable");
+    await expectTrackUsesToken(result, "--desk-evidence-muted");
     await expect(result).toContainText("NO_OPPORTUNITY");
     await expect(result).toContainText("不会计为失败");
   });
@@ -1500,7 +1641,7 @@ test.describe("compare, transfer, and growth evidence records", () => {
   });
 });
 
-test.describe("transfer evidence states over the public HTTP contract", () => {
+test.describe("evidence states over the public HTTP contract", () => {
   test.skip(
     deterministicDemo,
     "Run with NEXT_PUBLIC_DEMO_MODE=false and an HTTP-mode web server.",
@@ -1523,10 +1664,32 @@ test.describe("transfer evidence states over the public HTTP contract", () => {
       const url = await installHttpTransferApi(page, outcome);
       await page.goto(url);
       const state = page.locator(`[data-transfer-state="${outcome}"]`);
+      await expect(state).toHaveAttribute(
+        "data-evidence-state",
+        outcome === "pass" ? "verified" : "error",
+      );
+      await expectTrackUsesToken(
+        state,
+        outcome === "pass" ? "--desk-green" : "--desk-error",
+      );
+      await expect(state.locator(".badge")).toHaveClass(
+        outcome === "pass" ? /badge-green/ : /badge-red/,
+      );
       await expect(state).toContainText(`服务器结果：${outcome.toUpperCase()}`);
       await expect(state).toContainText("A frozen first-answer span.");
     });
   }
+
+  test("transfer keeps NO_OPPORTUNITY neutral instead of verifying migration", async ({
+    page,
+  }) => {
+    const url = await installHttpTransferApi(page, "no-opportunity");
+    await page.goto(url);
+    const state = page.locator('[data-transfer-state="no-opportunity"]');
+    await expect(state).toHaveAttribute("data-evidence-state", "unavailable");
+    await expectTrackUsesToken(state, "--desk-evidence-muted");
+    await expect(state.locator(".badge").first()).toHaveClass(/badge-neutral/);
+  });
 
   test("transfer says a saved answer with evaluation failure is not learning failure", async ({
     page,
@@ -1574,6 +1737,23 @@ test.describe("transfer evidence states over the public HTTP contract", () => {
       page.getByText("暂无可比较的同量表估分，不生成趋势。"),
     ).toBeVisible();
     await expect(page.locator(".chart-column")).toHaveCount(0);
+  });
+
+  test("compare with missing canonical span evidence never awards retained", async ({
+    page,
+  }) => {
+    await installHttpMissingComparisonApi(page);
+    await page.goto("/compare?cycle=cycle-missing-evidence");
+
+    const record = page.locator('[data-evidence-record="comparison"]');
+    await expect(record).toContainText("跨度证据待复核");
+    await expect(record).toContainText("本次只记录完成，不授予 retained");
+    await expect(record).not.toContainText("闭卷证据达到保留门槛");
+    await expect(record).not.toContainText("已保持");
+    await expect(page.getByRole("link", { name: "查看安排" })).toHaveAttribute(
+      "href",
+      "/transfer?cycle=cycle-missing-evidence&task=transfer-missing-evidence",
+    );
   });
 });
 

@@ -7,7 +7,7 @@
   align-items: baseline;
   gap: var(--desk-space-2);
   font-family: var(--desk-font-utility);
-  font-size: 0.75rem;
+  font-size: 12px;
   font-variation-settings: "wght" 560;
   letter-spacing: 0.025em;
 }

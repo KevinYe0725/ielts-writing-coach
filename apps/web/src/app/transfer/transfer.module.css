@@ -98,17 +98,22 @@
   content: "";
 }
 
-.stateRecord[data-transfer-state="pass"]::before,
-.stateRecord[data-transfer-state="mock-result"]::before,
-.stateRecord[data-transfer-state="no-opportunity"]::before {
-  background: var(--desk-green);
-}
-
-.stateRecord[data-transfer-state="fail"]::before,
 .stateRecord[data-transfer-state="expired"]::before,
 .stateRecord[data-transfer-state="evaluation-error"]::before,
 .stateRecord[data-transfer-state="processing"]::before {
   background: var(--desk-amber);
+}
+
+.stateRecord[data-evidence-state="verified"]::before {
+  background: var(--desk-green);
+}
+
+.stateRecord[data-evidence-state="error"]::before {
+  background: var(--desk-error);
+}
+
+.stateRecord[data-evidence-state="unavailable"]::before {
+  background: var(--desk-evidence-muted);
 }
 
 .answerRecord :global(textarea) {

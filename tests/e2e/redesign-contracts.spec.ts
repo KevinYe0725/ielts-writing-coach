@@ -482,6 +482,42 @@ test.describe("annotation desk redesign contracts", () => {
     expect(subjectBox!.y).toBeLessThan(noteBox!.y);
   });
 
+  test("growth keeps status evidence on readable lines at 1440px", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 960 });
+    await page.goto("/growth");
+
+    const table = page.getByRole("table", { name: "能力状态表" });
+    for (const label of ["已保持", "临时通过"]) {
+      const subject = table.getByText(label, { exact: true });
+      const evidence = subject.locator("..");
+      const evidenceLabel = evidence.locator(":scope > span").last();
+      const geometry = await Promise.all(
+        [subject, evidenceLabel].map((locator) =>
+          locator.evaluate((element) => {
+            const style = window.getComputedStyle(element);
+            const fontSize = Number.parseFloat(style.fontSize);
+            const parsedLineHeight = Number.parseFloat(style.lineHeight);
+            const lineHeight = Number.isFinite(parsedLineHeight)
+              ? parsedLineHeight
+              : fontSize * 1.5;
+            return {
+              height: element.getBoundingClientRect().height,
+              lineHeight,
+            };
+          }),
+        ),
+      );
+      for (const item of geometry) {
+        expect(item.height).toBeLessThanOrEqual(item.lineHeight * 1.25);
+      }
+      const evidenceBox = await evidence.boundingBox();
+      expect(evidenceBox).not.toBeNull();
+      expect(evidenceBox!.width).toBeGreaterThanOrEqual(170);
+    }
+  });
+
   for (const viewport of [
     { label: "desktop", width: 1440, height: 960 },
     { label: "390px mobile", width: 390, height: 844 },
@@ -505,6 +541,13 @@ test.describe("annotation desk redesign contracts", () => {
           .locator("[data-evidence-record] [data-auxiliary]")
           .all()) {
           await expectFontSizeAtLeast(auxiliary, 12);
+        }
+        for (const evidenceLabel of await page
+          .locator(
+            "[data-evidence-record] span[data-evidence-state] > span:last-child",
+          )
+          .all()) {
+          await expectFontSizeAtLeast(evidenceLabel, 12);
         }
       }
     });
