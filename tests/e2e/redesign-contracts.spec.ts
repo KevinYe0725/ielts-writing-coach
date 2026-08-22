@@ -293,6 +293,90 @@ test.describe("annotation desk redesign contracts", () => {
     }
   });
 
+  test("practice paper keeps all mobile question targets below the app header", async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(
+      "/lesson/paper?cycle=cycle-demo&lesson=lesson-collocation-perspective",
+    );
+
+    const mobileHeader = page.locator(".mobile-header");
+    const navigation = page.locator("[data-paper-question-nav]");
+    const questionEight = page.locator("#paper-question-demo-paper-question-8");
+    const links = navigation.getByRole("link");
+    await navigation.getByRole("link", { name: "8" }).click();
+    await expect(questionEight).toBeFocused();
+
+    await expect
+      .poll(async () => {
+        const [navigationRect, questionRect] = await Promise.all([
+          navigation.boundingBox(),
+          questionEight.boundingBox(),
+        ]);
+        if (!navigationRect || !questionRect) return Number.NEGATIVE_INFINITY;
+        return questionRect.y - (navigationRect.y + navigationRect.height);
+      })
+      .toBeGreaterThanOrEqual(8);
+
+    const focusedAnswer = questionEight.getByRole("textbox");
+    await focusedAnswer.focus();
+    await expect(focusedAnswer).toBeFocused();
+    await expect(focusedAnswer).toBeInViewport();
+
+    await expect
+      .poll(async () => {
+        const [headerBox, navigationBox] = await Promise.all([
+          mobileHeader.boundingBox(),
+          navigation.boundingBox(),
+        ]);
+        if (!headerBox || !navigationBox) return Number.NEGATIVE_INFINITY;
+        return navigationBox.y - (headerBox.y + headerBox.height);
+      })
+      .toBeGreaterThanOrEqual(8);
+
+    const navigationBox = await navigation.boundingBox();
+    expect(navigationBox).not.toBeNull();
+    await expect(links).toHaveCount(8);
+    for (let index = 0; index < 8; index += 1) {
+      const target = links.nth(index);
+      await expect(target).toBeInViewport();
+      const targetBox = await target.boundingBox();
+      expect(targetBox).not.toBeNull();
+      expect(targetBox!.height).toBeGreaterThanOrEqual(40);
+      expect(targetBox!.y).toBeGreaterThanOrEqual(navigationBox!.y);
+      expect(targetBox!.y + targetBox!.height).toBeLessThanOrEqual(
+        navigationBox!.y + navigationBox!.height,
+      );
+    }
+  });
+
+  test("practice paper keeps its desktop question rail below the sticky topbar", async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.setViewportSize({ width: 1440, height: 960 });
+    await page.goto(
+      "/lesson/paper?cycle=cycle-demo&lesson=lesson-collocation-perspective",
+    );
+
+    const topbar = page.locator(".topbar");
+    const navigation = page.locator("[data-paper-question-nav]");
+    await navigation.getByRole("link", { name: "4" }).click();
+
+    await expect
+      .poll(async () => {
+        const [topbarBox, navigationBox] = await Promise.all([
+          topbar.boundingBox(),
+          navigation.boundingBox(),
+        ]);
+        if (!topbarBox || !navigationBox) return Number.NEGATIVE_INFINITY;
+        return navigationBox.y - (topbarBox.y + topbarBox.height);
+      })
+      .toBeGreaterThanOrEqual(12);
+  });
+
   test("teaching keeps Chinese UI in Noto Sans and reserves Source Serif for English evidence", async ({
     page,
   }) => {

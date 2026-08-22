@@ -144,7 +144,7 @@
 .questionNavigation {
   position: sticky;
   z-index: 4;
-  top: var(--desk-space-6);
+  top: calc(72px + var(--desk-space-3));
   padding: var(--desk-space-3);
   background: color-mix(in srgb, var(--desk-paper) 96%, transparent);
   border: 1px solid color-mix(in srgb, var(--desk-ink) 14%, transparent);
@@ -225,9 +225,7 @@
   border-bottom: 1px solid color-mix(in srgb, var(--desk-ink) 13%, transparent);
   border-radius: 0;
   box-shadow: none;
-  scroll-margin-top: calc(
-    var(--desk-space-12) + var(--desk-space-12) + var(--desk-space-4)
-  );
+  scroll-margin-top: calc(72px + var(--desk-space-3));
   scroll-margin-bottom: calc(
     var(--desk-space-12) + var(--desk-space-12) + var(--desk-space-12)
   );
@@ -545,7 +543,7 @@
   }
 
   .questionNavigation {
-    top: var(--desk-space-2);
+    top: calc(66px + var(--desk-space-2));
     padding: var(--desk-space-2);
   }
 
@@ -568,7 +566,9 @@
 
   .page .question {
     padding: var(--desk-space-6) var(--desk-space-4) var(--desk-space-8);
-    scroll-margin-top: 92px;
+    scroll-margin-top: calc(
+      66px + var(--desk-space-2) + 88px + var(--desk-space-2)
+    );
   }
 
   .questionHeader {
