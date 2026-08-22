@@ -300,6 +300,20 @@ test.describe("annotation desk redesign contracts", () => {
     }
   });
 
+  test("reading shell leaves generic page typography in the body UI family", async ({
+    page,
+  }) => {
+    await page.goto("/growth");
+
+    const main = page.getByRole("main");
+    await expect(main).toHaveAttribute("data-page-layout", "reading");
+    const family = await main.evaluate(
+      (element) => window.getComputedStyle(element).fontFamily,
+    );
+    expect(family).toContain("Noto Sans SC");
+    expect(family).not.toContain("Source Serif 4");
+  });
+
   for (const viewport of [
     { label: "desktop", width: 1440, height: 960 },
     { label: "390px mobile", width: 390, height: 844 },

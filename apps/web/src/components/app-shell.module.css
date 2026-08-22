@@ -125,7 +125,6 @@
 
 .mainContent[data-page-layout="reading"] {
   max-width: 960px;
-  font-family: var(--desk-font-reading);
 }
 
 .mainContent[data-page-layout="workspace"] {
