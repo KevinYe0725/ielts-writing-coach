@@ -12,9 +12,9 @@ controller assigns that re-review separately.
 | ------------------------------ | ------------------------------------------------------------------------------------ |
 | Whole-range base               | `5547b656e30f4a83b0b6617855fc4145e8847a2a`                                           |
 | Scoped re-review base          | `7639225a2b146d9f51da78e0f6e5c0ef1a66a30a`                                           |
-| Reviewed code/test HEAD        | `9b7f0cb8952ab3a5e12f655e51acd42591c945eb`                                           |
-| Whole range                    | `5547b656e30f4a83b0b6617855fc4145e8847a2a..9b7f0cb8952ab3a5e12f655e51acd42591c945eb` |
-| Diff size                      | 32 files changed, 1681 insertions, 374 deletions                                     |
+| Reviewed code/test HEAD        | `7c464ce42a04c4dc136dd13a507b35c7802c1160`                                           |
+| Whole range                    | `5547b656e30f4a83b0b6617855fc4145e8847a2a..7c464ce42a04c4dc136dd13a507b35c7802c1160` |
+| Diff size                      | 33 files changed, 1736 insertions, 379 deletions                                     |
 | Automated gate status          | green; see `docs/quality/annotation-desk-v1-evidence.md`                             |
 | Real account                   | `EXTERNAL_PENDING`                                                                   |
 | Actual rendered 200%/400% zoom | `EXTERNAL_PENDING`                                                                   |
@@ -30,21 +30,27 @@ b4d8757 fix: close typography contract bypasses
 708deb1 test: wait for rendered browser state
 7639225 docs: verify final review remediation
 9b7f0cb fix: close rendered typography review gaps
+219a076 docs: record final rendered fix evidence
+a4bb564 chore: keep task reports untracked
+7c464ce fix: verify rendered learner vocabulary
 ```
 
-The final code/test commit changes only three CSS modules and the executable
-redesign contract. It does not modify an API, route, state machine, prompt,
-scoring rule, or persistence key.
+The rendered-typography commit changes three CSS modules and the executable
+redesign contract. The final vocabulary commit changes one learner-visible
+Feedback label and the E2E lifecycle that verifies both rendered pages. Neither
+commit modifies an API, route, state machine, prompt, scoring rule, or
+persistence key.
 
 ## Final scoped re-review findings
 
-| #   | Finding                                                                                   | RED evidence                                                                                                       | GREEN evidence                                                                                                                                       |
-| --- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Rendered typography could bypass same-rule AST family/weight pairing through inheritance. | Paper option computed Noto Sans SC / 700; injected Lesson English Markdown `strong` computed Source Serif 4 / 700. | Paper option and English emphasis now compute Source Serif 4 / 600; Chinese Markdown `strong` remains Noto Sans SC / 700; four-surface audit passes. |
-| 2   | `expectNoErrorToken` inspected only host background color/image despite its broader name. | A real host `color: var(--desk-error)` mutation incorrectly resolved instead of being rejected.                    | Host and `::before`/`::after` text, background, four borders, outline, and shadow are inspected; 27 mutation classes are rejected.                   |
+| #   | Finding                                                                                                                                                        | RED evidence                                                                                                                                                                                 | GREEN evidence                                                                                                                                                  |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Rendered typography could bypass same-rule AST family/weight pairing through inheritance.                                                                      | Paper option computed Noto Sans SC / 700; injected Lesson English Markdown `strong` computed Source Serif 4 / 700.                                                                           | Paper option and English emphasis now compute Source Serif 4 / 600; Chinese Markdown `strong` remains Noto Sans SC / 700; four-surface audit passes.            |
+| 2   | `expectNoErrorToken` inspected only host background color/image despite its broader name.                                                                      | A real host `color: var(--desk-error)` mutation incorrectly resolved instead of being rejected.                                                                                              | Host and `::before`/`::after` text, background, four borders, outline, and shadow are inspected; 27 mutation classes are rejected.                              |
+| 3   | The backend-vocabulary test scanned skeletons and coupled Feedback's late hydration navigation to Lesson; the rendered Feedback page also exposed `AI 优化段`. | Controller full E2E: Lesson `goto` interrupted by the old Feedback URL. Deterministic ready-state RED: Feedback workbench absent when the old assertion ran; rendered RED then matched `AI`. | Feedback and Lesson use isolated pages, wait for their real surfaces, scan the complete main, and render `参考改写`; 20/20 focused and 614/218 full Demo GREEN. |
 
-The scoped reviewer should verify both rows against
-`7639225a2b146d9f51da78e0f6e5c0ef1a66a30a..9b7f0cb8952ab3a5e12f655e51acd42591c945eb`
+The scoped reviewer should verify all three rows against
+`7639225a2b146d9f51da78e0f6e5c0ef1a66a30a..7c464ce42a04c4dc136dd13a507b35c7802c1160`
 and record `PASS` or `FAIL` without treating automated evidence as the verdict.
 
 ## Earlier five residual review questions
@@ -68,7 +74,7 @@ boundaries.
 
 ## Whole-range manifest
 
-The whole range changes 32 files:
+The whole range changes 33 files:
 
 ```text
 M apps/web/package.json
@@ -76,6 +82,7 @@ M apps/web/src/app/account/account.module.css
 M apps/web/src/app/compare/compare.module.css
 M apps/web/src/app/entry.module.css
 M apps/web/src/app/feedback/feedback.module.css
+M apps/web/src/app/feedback/page.tsx
 M apps/web/src/app/globals.css
 M apps/web/src/app/growth/growth.module.css
 M apps/web/src/app/growth/page.tsx
@@ -109,30 +116,31 @@ Recreate the package with:
 
 ```bash
 git log --oneline --reverse \
-  5547b656e30f4a83b0b6617855fc4145e8847a2a..9b7f0cb8952ab3a5e12f655e51acd42591c945eb
+  5547b656e30f4a83b0b6617855fc4145e8847a2a..7c464ce42a04c4dc136dd13a507b35c7802c1160
 git diff --stat \
-  5547b656e30f4a83b0b6617855fc4145e8847a2a..9b7f0cb8952ab3a5e12f655e51acd42591c945eb
+  5547b656e30f4a83b0b6617855fc4145e8847a2a..7c464ce42a04c4dc136dd13a507b35c7802c1160
 git diff --name-status \
-  5547b656e30f4a83b0b6617855fc4145e8847a2a..9b7f0cb8952ab3a5e12f655e51acd42591c945eb
+  5547b656e30f4a83b0b6617855fc4145e8847a2a..7c464ce42a04c4dc136dd13a507b35c7802c1160
 git diff --check \
-  5547b656e30f4a83b0b6617855fc4145e8847a2a..9b7f0cb8952ab3a5e12f655e51acd42591c945eb
+  5547b656e30f4a83b0b6617855fc4145e8847a2a..7c464ce42a04c4dc136dd13a507b35c7802c1160
 git diff --no-ext-diff \
-  5547b656e30f4a83b0b6617855fc4145e8847a2a..9b7f0cb8952ab3a5e12f655e51acd42591c945eb
+  5547b656e30f4a83b0b6617855fc4145e8847a2a..7c464ce42a04c4dc136dd13a507b35c7802c1160
 ```
 
 ## Gate summary
 
-| Gate                                              | Result                                            |
-| ------------------------------------------------- | ------------------------------------------------- |
-| Format / lint / typecheck                         | pass; lint 0 errors / 4 existing warnings         |
-| Isolated PostgreSQL 17 migration + complete tests | 77 files / 631 passed / 0 skipped                 |
-| Web / Worker build                                | Web 44/44 pages; Worker two ESM entries and maps  |
-| Complete four-project Demo                        | 614 passed / 218 intentional skips / 0 failed     |
-| Chromium non-Demo HTTP                            | 51/51 passed                                      |
-| Four-project Admin/Backup                         | 48/48 passed                                      |
-| Focused computed typography/Error helper          | 28/28 passed                                      |
-| Complete accessibility/axe file                   | 49 passed / 3 intentional mobile skips / 0 failed |
-| Range whitespace                                  | `git diff --check`, pass                          |
+| Gate                                               | Result                                            |
+| -------------------------------------------------- | ------------------------------------------------- |
+| Format / lint / typecheck                          | pass; lint 0 errors / 4 existing warnings         |
+| Isolated PostgreSQL 17 migration + complete tests  | 77 files / 631 passed / 0 skipped                 |
+| Web / Worker build                                 | Web 44/44 pages; Worker two ESM entries and maps  |
+| Complete four-project Demo                         | 614 passed / 218 intentional skips / 0 failed     |
+| Chromium non-Demo HTTP                             | 51/51 passed                                      |
+| Four-project Admin/Backup                          | 48/48 passed                                      |
+| Focused computed typography/Error helper           | 28/28 passed                                      |
+| Complete accessibility/axe file                    | 49 passed / 3 intentional mobile skips / 0 failed |
+| Rendered Feedback/Lesson vocabulary, WebKit/mobile | 20/20 passed                                      |
+| Range whitespace                                   | `git diff --check`, pass                          |
 
 ## Visual package
 
@@ -148,12 +156,13 @@ All files are under `output/playwright/annotation-desk-review-remediation/`.
 | Shell   | `e82a6620ca98a5f9d419842d4f8301f17db0da7f87897ad5d8f2c29858cb08e1` | `a603fe950057ff48b961a1bf274d795267b601afa58e0a787703f6f1c7561df1` |
 
 These images were captured at the earlier `708deb1` code/test HEAD and were not
-reissued for `9b7f0cb`; they are historical visual evidence, not proof of the
-final font-role changes. Capture metrics at that earlier HEAD were 12/12
-correct dimensions, `fonts=loaded`, zero document overflow, no page errors,
-and at most one visible primary button. Account uses a read-only synthetic
-session fixture and must not be mistaken for the pending real-account
-traversal.
+reissued for `7c464ce`; they are historical visual evidence. Their SHA-256
+values are unchanged because Feedback is not one of the 12 captured surfaces
+and none of those routes changed in the final vocabulary commit. Capture
+metrics at that earlier HEAD were 12/12 correct dimensions, `fonts=loaded`,
+zero document overflow, no page errors, and at most one visible primary button.
+Account uses a read-only synthetic session fixture and must not be mistaken for
+the pending real-account traversal.
 
 ## Independent verdict record
 
@@ -164,6 +173,7 @@ Reviewer:
 Reviewed HEAD:
 Final typography finding — PASS/FAIL — evidence:
 Final Error-helper finding — PASS/FAIL — evidence:
+Rendered vocabulary/lifecycle finding — PASS/FAIL — evidence:
 Earlier residual questions 1–5 — PASS/FAIL — evidence:
 New breakage — NONE / list:
 External-boundary handling — PASS/FAIL:

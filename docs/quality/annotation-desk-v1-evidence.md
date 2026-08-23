@@ -5,7 +5,7 @@
 **Status: GATES_VERIFIED_SCOPED_RE_REVIEW_PENDING_WITH_EXTERNAL_PENDING.**
 
 All repository-controlled automated gates are green on the code and test tree
-at `9b7f0cb8952ab3a5e12f655e51acd42591c945eb`. The controller-owned scoped
+at `7c464ce42a04c4dc136dd13a507b35c7802c1160`. The controller-owned scoped
 re-review is not represented as complete in this file. Two checks remain
 outside repository control:
 
@@ -15,17 +15,18 @@ outside repository control:
 Both remain `EXTERNAL_PENDING`. Demo fixtures, HTTP fixtures, viewport reflow,
 and static analysis are not presented as substitutes.
 
-This evidence refreshes the review package committed at
-`7639225a2b146d9f51da78e0f6e5c0ef1a66a30a`. That package referenced
-`708deb18e5ba52c7017bf25d6732dbb04f5dd564` and did not yet cover the rendered
-inheritance/UA typography bypass or the full Error-token helper surface.
+This evidence refreshes the rendered-fix record committed at
+`219a076`. That record referenced
+`9b7f0cb8952ab3a5e12f655e51acd42591c945eb` and did not yet cover the
+Feedback-to-Lesson page-lifecycle race or the learner-visible `AI` label that
+the original skeleton-only vocabulary scan missed.
 
 ## Version and environment
 
 | Item                                | Observed value                                                                            |
 | ----------------------------------- | ----------------------------------------------------------------------------------------- |
 | Branch                              | `codex/frontend-redesign`                                                                 |
-| Verified code and test HEAD         | `9b7f0cb8952ab3a5e12f655e51acd42591c945eb`                                                |
+| Verified code and test HEAD         | `7c464ce42a04c4dc136dd13a507b35c7802c1160`                                                |
 | Remediation implementation baseline | `4263cc91970ff9c2e60c6ab213dfdc76669cbedd`                                                |
 | Final-review findings base          | `7639225a2b146d9f51da78e0f6e5c0ef1a66a30a`                                                |
 | Whole-review range base             | `5547b656e30f4a83b0b6617855fc4145e8847a2a`                                                |
@@ -44,9 +45,11 @@ data directory.
 
 ## Complete repository gates
 
-All commands below were rerun on `9b7f0cb8952ab3a5e12f655e51acd42591c945eb`
-unless a row explicitly describes a production build whose production inputs
-are identical at that test-only commit.
+Format, lint, typecheck, focused browser gates, Web unit tests, and the complete
+four-project Demo matrix were rerun on
+`7c464ce42a04c4dc136dd13a507b35c7802c1160`. PostgreSQL, complete workspace
+tests, and production builds remain the green `9b7f0cb` evidence below; the
+follow-up changes one rendered label and one E2E lifecycle only.
 
 | Command                                                                              | Result                                                                                    |
 | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
@@ -70,12 +73,12 @@ The DB-backed package total is 2 email, 8 config, 11 learning-contract, 89 AI,
 ```bash
 PATH=/opt/homebrew/opt/node@24/bin:$PATH \
   NEXT_PUBLIC_DEMO_MODE=true \
-  PLAYWRIGHT_BASE_URL=http://127.0.0.1:3220 \
+  PLAYWRIGHT_BASE_URL=http://127.0.0.1:3234 \
   pnpm exec playwright test --reporter=dot
 ```
 
 Result: **VERIFIED**, 832 enumerated, 614 passed, 218 intentional skips, 0
-failed, about 3.2 minutes. Chromium, Firefox, WebKit, and mobile all ran. The
+failed, about 2.9 minutes. Chromium, Firefox, WebKit, and mobile all ran. The
 28 additional passes are the seven new computed typography/Error-helper
 contracts across all four projects.
 
@@ -150,6 +153,35 @@ The retained non-failing logs are the existing `NO_COLOR`/`FORCE_COLOR`
 warning, Next smooth-scroll advisory, and the known mobile `<details open>`
 hydration advisory after navigation tests intentionally open the menu.
 
+### Rendered vocabulary and page-lifecycle remediation
+
+The controller's complete matrix at `a4bb564` recorded 613 passes, 218
+intentional skips, and one WebKit failure: the second `page.goto(lessonUrl)` in
+the Feedback/Lesson vocabulary test was interrupted by a late navigation to
+the first Feedback URL.
+
+Investigation showed that the old negative assertion completed against each
+route's skeleton without waiting for either real surface. A WebKit single-
+worker repeat passed 10/10, while its trace confirmed both vocabulary scans ran
+before `[data-feedback-workbench]` or `article[data-teaching-article]` was
+ready. An immediate ready-state regression then failed deterministically on
+Feedback. Once the scan waited for the real workbench, it exposed the existing
+learner-visible label `AI 优化段`, which correctly matched the protected
+backend-vocabulary pattern.
+
+Commit `7c464ce`:
+
+- gives Feedback and Lesson separate Playwright pages, so a cold first-page
+  hydration/reload cannot interrupt the second route;
+- waits for each route's real ready selector before scanning the complete
+  learner-visible `main`;
+- changes `AI 优化段` to the learner-facing `参考改写` without changing the
+  English `Polished revision` label or any data/API behavior.
+
+Fresh GREEN evidence is 20/20 targeted passes (10 WebKit and 10 mobile), 32
+Web test files / 280 passed with 12 files / 57 DB-gated tests intentionally
+skipped in that non-DB run, and the complete 832-test result above.
+
 ## Fresh-gate test assertion defects
 
 The earlier `708deb1` complete Demo run exposed a WebKit pre-hydration locale
@@ -187,17 +219,18 @@ Manual inspection found no wrong shell, development toolbar, horizontal
 clipping, decorative Error red, or missing Demo/non-evaluation notice.
 
 They are retained as historical viewport evidence and are not claimed as a
-fresh screenshot package for `9b7f0cb`. The final fix changes rendered font
-roles on Paper, Lesson, and Transfer; current evidence for those changes is the
-four-project computed-style matrix above. The screenshots never prove actual
-rendered browser zoom.
+fresh screenshot package for `7c464ce`. Their SHA-256 values remain unchanged:
+Feedback is not one of the 12 package surfaces, and none of those six captured
+routes changed in `7c464ce`. Current rendered Feedback evidence is the focused
+and complete browser matrix above. The screenshots never prove actual rendered
+browser zoom.
 
 ## Remaining boundaries
 
 - `SCOPED_RE_REVIEW_PENDING` — controller-owned review of
-  `7639225a2b146d9f51da78e0f6e5c0ef1a66a30a..9b7f0cb8952ab3a5e12f655e51acd42591c945eb`;
+  `7639225a2b146d9f51da78e0f6e5c0ef1a66a30a..7c464ce42a04c4dc136dd13a507b35c7802c1160`;
   the whole remediation history remains
-  `5547b656e30f4a83b0b6617855fc4145e8847a2a..9b7f0cb8952ab3a5e12f655e51acd42591c945eb`.
+  `5547b656e30f4a83b0b6617855fc4145e8847a2a..7c464ce42a04c4dc136dd13a507b35c7802c1160`.
 - `EXTERNAL_PENDING` — read-only traversal with a user-authorized real learner
   account. No credentials were requested, entered, stored, or transmitted.
 - `EXTERNAL_PENDING` — actual rendered 200%/400% content inspection in an
