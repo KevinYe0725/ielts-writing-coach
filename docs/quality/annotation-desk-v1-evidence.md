@@ -2,12 +2,12 @@
 
 ## Decision
 
-**Status: GATES_VERIFIED_REVIEW_PENDING_WITH_EXTERNAL_PENDING.**
+**Status: GATES_VERIFIED_SCOPED_RE_REVIEW_PENDING_WITH_EXTERNAL_PENDING.**
 
 All repository-controlled automated gates are green on the code and test tree
-at `708deb18e5ba52c7017bf25d6732dbb04f5dd564`. The independent whole-range
-review is controller-owned and is not represented as complete in this file.
-Two checks remain outside repository control:
+at `9b7f0cb8952ab3a5e12f655e51acd42591c945eb`. The controller-owned scoped
+re-review is not represented as complete in this file. Two checks remain
+outside repository control:
 
 1. read-only traversal with a user-authorized real learner account;
 2. usable-content inspection at actual rendered 200% and 400% browser zoom.
@@ -15,26 +15,27 @@ Two checks remain outside repository control:
 Both remain `EXTERNAL_PENDING`. Demo fixtures, HTTP fixtures, viewport reflow,
 and static analysis are not presented as substitutes.
 
-This evidence supersedes the earlier final-fix snapshot committed at
-`5547b656e30f4a83b0b6617855fc4145e8847a2a`, including its older
-`83ac08b39509b8e54ccd868facdafd20f5acfd1e` verified-code reference and its
-unqualified “all findings closed” conclusion.
+This evidence refreshes the review package committed at
+`7639225a2b146d9f51da78e0f6e5c0ef1a66a30a`. That package referenced
+`708deb18e5ba52c7017bf25d6732dbb04f5dd564` and did not yet cover the rendered
+inheritance/UA typography bypass or the full Error-token helper surface.
 
 ## Version and environment
 
-| Item                                | Observed value                                                                                |
-| ----------------------------------- | --------------------------------------------------------------------------------------------- |
-| Branch                              | `codex/frontend-redesign`                                                                     |
-| Verified code and test HEAD         | `708deb18e5ba52c7017bf25d6732dbb04f5dd564`                                                    |
-| Remediation implementation baseline | `4263cc91970ff9c2e60c6ab213dfdc76669cbedd`                                                    |
-| Whole-review range base             | `5547b656e30f4a83b0b6617855fc4145e8847a2a`                                                    |
-| Pre-redesign rollback point         | `e13e97fee3006f9bd080b060350ba811556c187d`                                                    |
-| Node                                | `v24.19.0` via `PATH=/opt/homebrew/opt/node@24/bin:$PATH`                                     |
-| pnpm                                | `11.16.0`                                                                                     |
-| Playwright                          | `1.62.1`                                                                                      |
-| PostgreSQL                          | `17.6`, local image `postgres:17.6-bookworm`                                                  |
-| Database isolation                  | `iwc-remediation3-pg17-ab68`, tmpfs data directory, `Mounts=[]`, random loopback port `50506` |
-| Database cleanup                    | container removed after the final DB-backed run; no Docker volume command executed            |
+| Item                                | Observed value                                                                            |
+| ----------------------------------- | ----------------------------------------------------------------------------------------- |
+| Branch                              | `codex/frontend-redesign`                                                                 |
+| Verified code and test HEAD         | `9b7f0cb8952ab3a5e12f655e51acd42591c945eb`                                                |
+| Remediation implementation baseline | `4263cc91970ff9c2e60c6ab213dfdc76669cbedd`                                                |
+| Final-review findings base          | `7639225a2b146d9f51da78e0f6e5c0ef1a66a30a`                                                |
+| Whole-review range base             | `5547b656e30f4a83b0b6617855fc4145e8847a2a`                                                |
+| Pre-redesign rollback point         | `e13e97fee3006f9bd080b060350ba811556c187d`                                                |
+| Node                                | `v24.19.0` via `PATH=/opt/homebrew/opt/node@24/bin:$PATH`                                 |
+| pnpm                                | `11.16.0`                                                                                 |
+| Playwright                          | `1.62.1`                                                                                  |
+| PostgreSQL                          | `17.6`, local image `postgres:17.6-bookworm`                                              |
+| Database isolation                  | `iwc-finalfix-pg17-ab68`, tmpfs data directory, `Mounts=[]`, random loopback port `54991` |
+| Database cleanup                    | container removed after the final DB-backed run; no Docker volume command executed        |
 
 No database/API schema, worker task, AI prompt, scoring rule, learning-state
 transition, route identity, or persistent storage key changed in the review
@@ -43,7 +44,7 @@ data directory.
 
 ## Complete repository gates
 
-All commands below were rerun on `708deb18e5ba52c7017bf25d6732dbb04f5dd564`
+All commands below were rerun on `9b7f0cb8952ab3a5e12f655e51acd42591c945eb`
 unless a row explicitly describes a production build whose production inputs
 are identical at that test-only commit.
 
@@ -73,8 +74,10 @@ PATH=/opt/homebrew/opt/node@24/bin:$PATH \
   pnpm exec playwright test --reporter=dot
 ```
 
-Result: **VERIFIED**, 804 enumerated, 586 passed, 218 intentional skips, 0
-failed, about 2.7 minutes. Chromium, Firefox, WebKit, and mobile all ran.
+Result: **VERIFIED**, 832 enumerated, 614 passed, 218 intentional skips, 0
+failed, about 3.2 minutes. Chromium, Firefox, WebKit, and mobile all ran. The
+28 additional passes are the seven new computed typography/Error-helper
+contracts across all four projects.
 
 The skip count is ownership-based: Admin/Backup runs in the non-Demo matrix;
 HTTP fixture suites run with Demo disabled; touch/mobile projects skip
@@ -118,26 +121,30 @@ Result: **VERIFIED**, 48/48 passed across Chromium, Firefox, WebKit, and
 mobile. Recovery-link, SMTP, archive, and checksum responses were Playwright
 HTTP fixtures; no real side effect occurred.
 
-### Affected keyboard, axe, font, and responsive contracts
+### Focused rendered typography, Error-token, and accessibility contracts
 
 ```bash
 PATH=/opt/homebrew/opt/node@24/bin:$PATH \
   NEXT_PUBLIC_DEMO_MODE=true \
   PLAYWRIGHT_BASE_URL=http://127.0.0.1:3223 \
-  pnpm exec playwright test \
-  tests/e2e/accessibility.spec.ts \
-  tests/e2e/account.spec.ts \
-  tests/e2e/lesson.spec.ts \
-  tests/e2e/redesign-contracts.spec.ts \
-  --grep 'axe|accessible|auxiliary text|type scale|typography|font|overflow|responsive|keyboard|focus|skip link|Demo language stays explicit' \
-  --reporter=dot
+  pnpm exec playwright test tests/e2e/redesign-contracts.spec.ts \
+  --grep 'Paper English option labels|Lesson Markdown maps|Error-token helper rejects|keeps every visible explicit English evidence descendant' \
+  --reporter=line
+
+PATH=/opt/homebrew/opt/node@24/bin:$PATH \
+  NEXT_PUBLIC_DEMO_MODE=true \
+  PLAYWRIGHT_BASE_URL=http://127.0.0.1:3223 \
+  pnpm exec playwright test tests/e2e/accessibility.spec.ts --reporter=dot
+
+PATH=/opt/homebrew/opt/node@24/bin:$PATH \
+  pnpm exec vitest run apps/web/src/lib/client/style-contract.test.ts
 ```
 
-Result: **VERIFIED**, 284 enumerated, 272 passed, 12 intentional
-hardware/project skips, 0 failed. This independently exercises keyboard and
-focus behavior, serious/critical axe checks, explicit language semantics,
-font roles and minimum sizes, computed presentation contracts, and viewport
-overflow/reflow.
+Results: **VERIFIED**, 28/28 four-project computed typography/Error-token
+contracts; 49 accessibility/axe/keyboard passes plus 3 intentional mobile
+hardware-keyboard skips; 20/20 static typography/token contracts. The complete
+832-test Demo matrix independently covers the remaining responsive, focus,
+language, and presentation contracts on the same code/test HEAD.
 
 The retained non-failing logs are the existing `NO_COLOR`/`FORCE_COLOR`
 warning, Next smooth-scroll advisory, and the known mobile `<details open>`
@@ -145,10 +152,11 @@ hydration advisory after navigation tests intentionally open the menu.
 
 ## Fresh-gate test assertion defects
 
-The first complete Demo run exposed a WebKit pre-hydration locale click. Later
-complete runs exposed the same readiness class in newly added presentation
-contracts and an Account font scan whose execution context changed during
-navigation. Production behavior reproduced correctly in isolated runs.
+The earlier `708deb1` complete Demo run exposed a WebKit pre-hydration locale
+click. Later complete runs exposed the same readiness class in newly added
+presentation contracts and an Account font scan whose execution context
+changed during navigation. Production behavior reproduced correctly in
+isolated runs.
 
 Commit `708deb1` changes tests only:
 
@@ -160,12 +168,14 @@ Commit `708deb1` changes tests only:
 
 Focused proof was 10/10 WebKit locale repetitions, 48/48 affected contracts
 across all four projects with three repetitions, and 10/10 WebKit Account font
-repetitions. The subsequent complete 804-test matrix is the green result above.
+repetitions. The subsequent 804-test matrix was the historical green result at
+that commit; the current complete matrix is the 832-test result above.
 
 ## Screenshot evidence
 
-Twelve exact-viewport PNGs were refreshed from a production-mode Demo build
-under `output/playwright/annotation-desk-review-remediation/`:
+Twelve exact-viewport PNGs were last refreshed for the earlier
+`708deb18e5ba52c7017bf25d6732dbb04f5dd564` production-mode Demo build under
+`output/playwright/annotation-desk-review-remediation/`:
 
 - Compare, Growth, Paper, Account, Entry, and Shell at 1440x900;
 - the same six surfaces at 390x844.
@@ -176,13 +186,18 @@ read-only synthetic `get-session` fixture; it is not real-account evidence.
 Manual inspection found no wrong shell, development toolbar, horizontal
 clipping, decorative Error red, or missing Demo/non-evaluation notice.
 
-These screenshots prove exact viewport rendering and responsive reflow only.
-They are not actual rendered browser-zoom evidence.
+They are retained as historical viewport evidence and are not claimed as a
+fresh screenshot package for `9b7f0cb`. The final fix changes rendered font
+roles on Paper, Lesson, and Transfer; current evidence for those changes is the
+four-project computed-style matrix above. The screenshots never prove actual
+rendered browser zoom.
 
 ## Remaining boundaries
 
-- `INDEPENDENT_REVIEW_PENDING` — controller-owned review of
-  `5547b656e30f4a83b0b6617855fc4145e8847a2a..708deb18e5ba52c7017bf25d6732dbb04f5dd564`.
+- `SCOPED_RE_REVIEW_PENDING` — controller-owned review of
+  `7639225a2b146d9f51da78e0f6e5c0ef1a66a30a..9b7f0cb8952ab3a5e12f655e51acd42591c945eb`;
+  the whole remediation history remains
+  `5547b656e30f4a83b0b6617855fc4145e8847a2a..9b7f0cb8952ab3a5e12f655e51acd42591c945eb`.
 - `EXTERNAL_PENDING` — read-only traversal with a user-authorized real learner
   account. No credentials were requested, entered, stored, or transmitted.
 - `EXTERNAL_PENDING` — actual rendered 200%/400% content inspection in an

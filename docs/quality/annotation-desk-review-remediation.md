@@ -2,18 +2,19 @@
 
 ## Package status
 
-**READY_FOR_INDEPENDENT_REVIEW.**
+**READY_FOR_SCOPED_RE_REVIEW.**
 
-This document packages the complete review range and fresh gate evidence. It
-does not self-issue the independent verdict; the controller assigns that
-review separately.
+This document packages the complete review range, the final unified fix wave,
+and fresh gate evidence. It does not self-issue the scoped verdict; the
+controller assigns that re-review separately.
 
 | Item                           | Value                                                                                |
 | ------------------------------ | ------------------------------------------------------------------------------------ |
-| Range base                     | `5547b656e30f4a83b0b6617855fc4145e8847a2a`                                           |
-| Reviewed code/test HEAD        | `708deb18e5ba52c7017bf25d6732dbb04f5dd564`                                           |
-| Range                          | `5547b656e30f4a83b0b6617855fc4145e8847a2a..708deb18e5ba52c7017bf25d6732dbb04f5dd564` |
-| Diff size                      | 30 files changed, 1044 insertions, 213 deletions                                     |
+| Whole-range base               | `5547b656e30f4a83b0b6617855fc4145e8847a2a`                                           |
+| Scoped re-review base          | `7639225a2b146d9f51da78e0f6e5c0ef1a66a30a`                                           |
+| Reviewed code/test HEAD        | `9b7f0cb8952ab3a5e12f655e51acd42591c945eb`                                           |
+| Whole range                    | `5547b656e30f4a83b0b6617855fc4145e8847a2a..9b7f0cb8952ab3a5e12f655e51acd42591c945eb` |
+| Diff size                      | 32 files changed, 1681 insertions, 374 deletions                                     |
 | Automated gate status          | green; see `docs/quality/annotation-desk-v1-evidence.md`                             |
 | Real account                   | `EXTERNAL_PENDING`                                                                   |
 | Actual rendered 200%/400% zoom | `EXTERNAL_PENDING`                                                                   |
@@ -27,13 +28,26 @@ c90524f fix: enforce typography role tokens
 b4d8757 fix: close typography contract bypasses
 4263cc9 fix: close final presentation semantics
 708deb1 test: wait for rendered browser state
+7639225 docs: verify final review remediation
+9b7f0cb fix: close rendered typography review gaps
 ```
 
-The last commit contains only assertion-readiness changes found by the fresh
-four-project gate. It does not change product behavior or weaken typography,
-axe, responsive, keyboard, or language-semantic expectations.
+The final code/test commit changes only three CSS modules and the executable
+redesign contract. It does not modify an API, route, state machine, prompt,
+scoring rule, or persistence key.
 
-## Five residual review questions
+## Final scoped re-review findings
+
+| #   | Finding                                                                                   | RED evidence                                                                                                       | GREEN evidence                                                                                                                                       |
+| --- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Rendered typography could bypass same-rule AST family/weight pairing through inheritance. | Paper option computed Noto Sans SC / 700; injected Lesson English Markdown `strong` computed Source Serif 4 / 700. | Paper option and English emphasis now compute Source Serif 4 / 600; Chinese Markdown `strong` remains Noto Sans SC / 700; four-surface audit passes. |
+| 2   | `expectNoErrorToken` inspected only host background color/image despite its broader name. | A real host `color: var(--desk-error)` mutation incorrectly resolved instead of being rejected.                    | Host and `::before`/`::after` text, background, four borders, outline, and shadow are inspected; 27 mutation classes are rejected.                   |
+
+The scoped reviewer should verify both rows against
+`7639225a2b146d9f51da78e0f6e5c0ef1a66a30a..9b7f0cb8952ab3a5e12f655e51acd42591c945eb`
+and record `PASS` or `FAIL` without treating automated evidence as the verdict.
+
+## Earlier five residual review questions
 
 The independent reviewer must record `PASS` or `FAIL` for each item and cite a
 file/test observation. The gate evidence below is supporting evidence, not the
@@ -54,7 +68,7 @@ boundaries.
 
 ## Whole-range manifest
 
-The range changes 30 files:
+The whole range changes 32 files:
 
 ```text
 M apps/web/package.json
@@ -80,6 +94,8 @@ M apps/web/src/components/writing-room.module.css
 M apps/web/src/lib/client/style-contract.test.ts
 M apps/web/src/styles/foundations.css
 M apps/web/src/styles/tokens.css
+A docs/quality/annotation-desk-review-remediation.md
+M docs/quality/annotation-desk-v1-evidence.md
 A docs/superpowers/plans/2026-08-23-annotation-desk-review-remediation.md
 M pnpm-lock.yaml
 M tests/e2e/accessibility.spec.ts
@@ -93,29 +109,30 @@ Recreate the package with:
 
 ```bash
 git log --oneline --reverse \
-  5547b656e30f4a83b0b6617855fc4145e8847a2a..708deb18e5ba52c7017bf25d6732dbb04f5dd564
+  5547b656e30f4a83b0b6617855fc4145e8847a2a..9b7f0cb8952ab3a5e12f655e51acd42591c945eb
 git diff --stat \
-  5547b656e30f4a83b0b6617855fc4145e8847a2a..708deb18e5ba52c7017bf25d6732dbb04f5dd564
+  5547b656e30f4a83b0b6617855fc4145e8847a2a..9b7f0cb8952ab3a5e12f655e51acd42591c945eb
 git diff --name-status \
-  5547b656e30f4a83b0b6617855fc4145e8847a2a..708deb18e5ba52c7017bf25d6732dbb04f5dd564
+  5547b656e30f4a83b0b6617855fc4145e8847a2a..9b7f0cb8952ab3a5e12f655e51acd42591c945eb
 git diff --check \
-  5547b656e30f4a83b0b6617855fc4145e8847a2a..708deb18e5ba52c7017bf25d6732dbb04f5dd564
+  5547b656e30f4a83b0b6617855fc4145e8847a2a..9b7f0cb8952ab3a5e12f655e51acd42591c945eb
 git diff --no-ext-diff \
-  5547b656e30f4a83b0b6617855fc4145e8847a2a..708deb18e5ba52c7017bf25d6732dbb04f5dd564
+  5547b656e30f4a83b0b6617855fc4145e8847a2a..9b7f0cb8952ab3a5e12f655e51acd42591c945eb
 ```
 
 ## Gate summary
 
-| Gate                                              | Result                                           |
-| ------------------------------------------------- | ------------------------------------------------ |
-| Format / lint / typecheck                         | pass; lint 0 errors / 4 existing warnings        |
-| Isolated PostgreSQL 17 migration + complete tests | 77 files / 631 passed / 0 skipped                |
-| Web / Worker build                                | Web 44/44 pages; Worker two ESM entries and maps |
-| Complete four-project Demo                        | 586 passed / 218 intentional skips / 0 failed    |
-| Chromium non-Demo HTTP                            | 51/51 passed                                     |
-| Four-project Admin/Backup                         | 48/48 passed                                     |
-| Affected keyboard/axe/font/responsive             | 272 passed / 12 intentional skips / 0 failed     |
-| Range whitespace                                  | `git diff --check`, pass                         |
+| Gate                                              | Result                                            |
+| ------------------------------------------------- | ------------------------------------------------- |
+| Format / lint / typecheck                         | pass; lint 0 errors / 4 existing warnings         |
+| Isolated PostgreSQL 17 migration + complete tests | 77 files / 631 passed / 0 skipped                 |
+| Web / Worker build                                | Web 44/44 pages; Worker two ESM entries and maps  |
+| Complete four-project Demo                        | 614 passed / 218 intentional skips / 0 failed     |
+| Chromium non-Demo HTTP                            | 51/51 passed                                      |
+| Four-project Admin/Backup                         | 48/48 passed                                      |
+| Focused computed typography/Error helper          | 28/28 passed                                      |
+| Complete accessibility/axe file                   | 49 passed / 3 intentional mobile skips / 0 failed |
+| Range whitespace                                  | `git diff --check`, pass                          |
 
 ## Visual package
 
@@ -130,10 +147,13 @@ All files are under `output/playwright/annotation-desk-review-remediation/`.
 | Paper   | `da98af2767ae543e114341c931cd6070d59ce40f5bc15018549089bdbef0a08c` | `112c9b4d4b3128d49b5687f009842acd4b434d926e78f500cf151c842d973d5f` |
 | Shell   | `e82a6620ca98a5f9d419842d4f8301f17db0da7f87897ad5d8f2c29858cb08e1` | `a603fe950057ff48b961a1bf274d795267b601afa58e0a787703f6f1c7561df1` |
 
-Capture metrics: 12/12 correct dimensions, `fonts=loaded`, zero document
-overflow, no page errors, and at most one visible primary button. Account uses
-a read-only synthetic session fixture and must not be mistaken for the pending
-real-account traversal.
+These images were captured at the earlier `708deb1` code/test HEAD and were not
+reissued for `9b7f0cb`; they are historical visual evidence, not proof of the
+final font-role changes. Capture metrics at that earlier HEAD were 12/12
+correct dimensions, `fonts=loaded`, zero document overflow, no page errors,
+and at most one visible primary button. Account uses a read-only synthetic
+session fixture and must not be mistaken for the pending real-account
+traversal.
 
 ## Independent verdict record
 
@@ -142,11 +162,9 @@ To be completed by the controller-assigned reviewer:
 ```text
 Reviewer:
 Reviewed HEAD:
-Finding 1 — PASS/FAIL — evidence:
-Finding 2 — PASS/FAIL — evidence:
-Finding 3 — PASS/FAIL — evidence:
-Finding 4 — PASS/FAIL — evidence:
-Finding 5 — PASS/FAIL — evidence:
+Final typography finding — PASS/FAIL — evidence:
+Final Error-helper finding — PASS/FAIL — evidence:
+Earlier residual questions 1–5 — PASS/FAIL — evidence:
 New breakage — NONE / list:
 External-boundary handling — PASS/FAIL:
 Final verdict — APPROVE / REQUEST_CHANGES:
