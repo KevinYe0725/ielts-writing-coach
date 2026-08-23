@@ -2,6 +2,8 @@ import { readdirSync, readFileSync } from "node:fs";
 import { extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { parse, type Root } from "postcss";
+import valueParser from "postcss-value-parser";
 import { describe, expect, it } from "vitest";
 
 const globals = readFileSync(
@@ -17,6 +19,8 @@ const foundationsPath = fileURLToPath(
   new URL("../../styles/foundations.css", import.meta.url),
 );
 
+type CssDocument = { path: string; root?: Root; source: string };
+
 function filesBelow(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const path = join(directory, entry.name);
@@ -27,41 +31,49 @@ function filesBelow(directory: string): string[] {
 const cssFiles = filesBelow(sourceRoot)
   .filter((path) => extname(path) === ".css")
   .sort();
-const cssDocuments = cssFiles.map((path) => ({
-  path,
-  source: readFileSync(path, "utf8"),
-}));
+const cssDocuments = cssFiles.map((path) => {
+  const source = readFileSync(path, "utf8");
+  return { path, root: parse(source, { from: path }), source };
+});
 const tokens = readFileSync(tokensPath, "utf8");
 const foundations = readFileSync(foundationsPath, "utf8");
+const globalsRoot = parse(globals, { from: "globals.css" });
+const tokensRoot = parse(tokens, { from: tokensPath });
+const foundationsRoot = parse(foundations, { from: foundationsPath });
 
-function customProperties(source: string): Map<string, string> {
-  return new Map(
-    [...source.matchAll(/(--[\w-]+)\s*:\s*([^;]+);/gu)].map((match) => [
-      match[1]!,
-      match[2]!.trim().replace(/\s+/gu, " "),
-    ]),
-  );
+function documentRoot(document: CssDocument): Root {
+  return document.root ?? parse(document.source, { from: document.path });
+}
+
+function customProperties(root: Root): Map<string, string> {
+  const properties = new Map<string, string>();
+  root.walkDecls((declaration) => {
+    if (!declaration.prop.startsWith("--")) return;
+    properties.set(
+      declaration.prop,
+      declaration.value.trim().replace(/\s+/gu, " "),
+    );
+  });
+  return properties;
 }
 
 function declarations(
-  source: string,
+  root: Root,
   propertyPattern: string,
 ): Array<{ property: string; value: string }> {
-  const pattern = new RegExp(
-    `(?:^|[;{])\\s*(${propertyPattern})\\s*:\\s*([^;}]+)`,
-    "gmu",
-  );
-  return [...source.matchAll(pattern)].map((match) => ({
-    property: match[1]!,
-    value: match[2]!.trim(),
-  }));
+  const pattern = new RegExp(`^(?:${propertyPattern})$`, "u");
+  const matches: Array<{ property: string; value: string }> = [];
+  root.walkDecls((declaration) => {
+    const property = declaration.prop.toLowerCase();
+    if (!pattern.test(property)) return;
+    matches.push({ property, value: declaration.value.trim() });
+  });
+  return matches;
 }
 
 function cssFileLabel(path: string): string {
   return path.startsWith(sourceRoot) ? path.slice(sourceRoot.length) : path;
 }
-
-type CssDocument = { path: string; source: string };
 
 // CSS custom properties have no implicit platform exemption. A missing
 // property is allowed only when this exact name is audited here and its use
@@ -71,8 +83,37 @@ const allowedUndefinedFallbackProperties = new Set<string>();
 // value has an audited use.
 const allowedFontShorthandValues = new Set(["inherit"]);
 
-function executableCss(source: string): string {
-  return source.replace(/\/\*[\s\S]*?\*\//gu, "");
+function customPropertyUses(root: Root): Array<{
+  hasFallback: boolean;
+  property: string;
+}> {
+  const uses: Array<{ hasFallback: boolean; property: string }> = [];
+  const inspectValue = (value: string) => {
+    valueParser(value).walk((node) => {
+      if (node.type !== "function" || node.value.toLowerCase() !== "var") {
+        return;
+      }
+      const firstArgument = node.nodes.find(
+        (child) => child.type !== "space" && child.type !== "comment",
+      );
+      if (
+        firstArgument?.type !== "word" ||
+        !firstArgument.value.startsWith("--")
+      ) {
+        return;
+      }
+      uses.push({
+        hasFallback: node.nodes.some(
+          (child) => child.type === "div" && child.value === ",",
+        ),
+        property: firstArgument.value,
+      });
+    });
+  };
+
+  root.walkDecls((declaration) => inspectValue(declaration.value));
+  root.walkAtRules((atRule) => inspectValue(atRule.params));
+  return uses;
 }
 
 function undefinedCustomProperties(
@@ -80,23 +121,19 @@ function undefinedCustomProperties(
   allowedUndefinedFallbacks = allowedUndefinedFallbackProperties,
 ): string[] {
   const definitions = new Set(
-    documents
-      .flatMap(({ source }) => [
-        ...executableCss(source).matchAll(/(--[\w-]+)\s*:/gu),
-      ])
-      .map((match) => match[1]!),
+    documents.flatMap((document) => [
+      ...customProperties(documentRoot(document)).keys(),
+    ]),
   );
   const violations = new Set<string>();
 
-  for (const { path, source } of documents) {
-    for (const match of executableCss(source).matchAll(
-      /var\(\s*(--[\w-]+)\s*(,)?/gu,
+  for (const document of documents) {
+    for (const { hasFallback, property } of customPropertyUses(
+      documentRoot(document),
     )) {
-      const property = match[1]!;
-      const hasFallback = match[2] === ",";
       if (definitions.has(property)) continue;
       if (hasFallback && allowedUndefinedFallbacks.has(property)) continue;
-      violations.add(`${cssFileLabel(path)}: ${property}`);
+      violations.add(`${cssFileLabel(document.path)}: ${property}`);
     }
   }
 
@@ -107,11 +144,17 @@ function fontShorthandViolations(
   documents: readonly CssDocument[],
   allowedValues = allowedFontShorthandValues,
 ): string[] {
+  const normalizedAllowedValues = new Set(
+    [...allowedValues].map((value) => value.trim().toLowerCase()),
+  );
   return documents
-    .flatMap(({ path, source }) =>
-      declarations(executableCss(source), "font")
-        .filter(({ value }) => !allowedValues.has(value))
-        .map(({ value }) => `${cssFileLabel(path)}: font: ${value}`),
+    .flatMap((document) =>
+      declarations(documentRoot(document), "font")
+        .filter(
+          ({ value }) =>
+            !normalizedAllowedValues.has(value.trim().toLowerCase()),
+        )
+        .map(({ value }) => `${cssFileLabel(document.path)}: font: ${value}`),
     )
     .sort();
 }
@@ -280,7 +323,7 @@ describe("annotation desk token contract", () => {
       {
         path: "mutation.css",
         source:
-          "/* --desk-bule: hotpink; */ :root { --desk-blue: #1d56a0; } .fixture { color: var(--desk-bule); }",
+          '/* --desk-bule: hotpink; */ :root { --desk-blue: #1d56a0; } .fixture::before { content: "--desk-bule: hotpink"; color: var(--desk-bule); }',
       },
     ];
 
@@ -322,8 +365,22 @@ describe("annotation desk token contract", () => {
     ]);
   });
 
+  it("normalizes mixed-case font properties and inherit values", () => {
+    const mutation = [
+      {
+        path: "mixed-case.css",
+        source:
+          ".safe { FoNt: InHeRiT; } .unsafe { FONT: 650 16px/1.5 var(--desk-font-body); }",
+      },
+    ];
+
+    expect(fontShorthandViolations(mutation)).toEqual([
+      "mixed-case.css: font: 650 16px/1.5 var(--desk-font-body)",
+    ]);
+  });
+
   it("declares the complete approved role and scale tokens", () => {
-    const defined = customProperties(tokens);
+    const defined = customProperties(tokensRoot);
     const expected = {
       "--desk-ink": "#172033",
       "--desk-paper": "#fcfbf8",
@@ -416,51 +473,61 @@ describe("annotation desk token contract", () => {
     const typographyDefinition =
       /^--(?:font-(?:sans|serif)|desk-(?:font-(?:body|reading|utility)|weight-[\w-]+|(?:body|reading|utility)-weight-[\w-]+))$/u;
     const typographyDefinitionsOutsideTokens = cssDocuments.flatMap(
-      ({ path, source }) => {
+      ({ path, root }) => {
         if (path === tokensPath) return [];
-        return [...customProperties(source).keys()]
+        return [...customProperties(root).keys()]
           .filter((property) => typographyDefinition.test(property))
           .map((property) => `${cssFileLabel(path)}: ${property}`);
       },
     );
     const tokenTypography = Object.fromEntries(
-      [...customProperties(tokens)].filter(([property]) =>
+      [...customProperties(tokensRoot)].filter(([property]) =>
         typographyDefinition.test(property),
       ),
     );
-    const variationSettings = cssDocuments.flatMap(({ path, source }) =>
-      declarations(source, "font-variation-settings").map(
+    const variationSettings = cssDocuments.flatMap(({ path, root }) =>
+      declarations(root, "font-variation-settings").map(
         ({ value }) =>
           `${cssFileLabel(path)}: font-variation-settings: ${value}`,
       ),
     );
-    const familyViolations = cssDocuments.flatMap(({ path, source }) =>
-      declarations(source, "font-family")
+    const familyViolations = cssDocuments.flatMap(({ path, root }) =>
+      declarations(root, "font-family")
         .filter(({ value }) => !approvedFamilies.has(value))
         .map(({ value }) => `${cssFileLabel(path)}: font-family: ${value}`),
     );
-    const weightViolations = cssDocuments.flatMap(({ path, source }) =>
-      declarations(source, "font-weight")
+    const weightViolations = cssDocuments.flatMap(({ path, root }) =>
+      declarations(root, "font-weight")
         .filter(({ value }) => !approvedWeights.has(value))
         .map(({ value }) => `${cssFileLabel(path)}: font-weight: ${value}`),
     );
-    const fontRoleMismatches = cssDocuments.flatMap(({ path, source }) =>
-      [...source.matchAll(/([^{}]+)\{([^{}]*)\}/gsu)].flatMap((match) => {
-        const selector = match[1]!.trim().replace(/\s+/gu, " ");
-        const body = match[2]!;
-        const family = declarations(body, "font-family")[0]?.value;
-        const weight = declarations(body, "font-weight")[0]?.value;
+    const fontRoleMismatches = cssDocuments.flatMap(({ path, root }) => {
+      const violations: string[] = [];
+      root.walkRules((rule) => {
+        let family: string | undefined;
+        let weight: string | undefined;
+        for (const node of rule.nodes ?? []) {
+          if (node.type !== "decl") continue;
+          const property = node.prop.toLowerCase();
+          if (property === "font-family") family = node.value.trim();
+          if (property === "font-weight") weight = node.value.trim();
+        }
         const role = family?.match(
           /^var\(--desk-font-(body|reading|utility)\)$/u,
         )?.[1];
-        if (!role || !weight || weight === "inherit") return [];
-        return weight.startsWith(`var(--desk-${role}-weight-`)
-          ? []
-          : [`${cssFileLabel(path)}: ${selector}: ${family} + ${weight}`];
-      }),
-    );
+        if (!role || !weight || weight === "inherit") return;
+        if (weight.startsWith(`var(--desk-${role}-weight-`)) return;
+        const selector = rule.selector.trim().replace(/\s+/gu, " ");
+        violations.push(
+          `${cssFileLabel(path)}: ${selector}: ${family} + ${weight}`,
+        );
+      });
+      return violations;
+    });
 
-    const foundationTypographyDefinitions = [...customProperties(foundations)]
+    const foundationTypographyDefinitions = [
+      ...customProperties(foundationsRoot),
+    ]
       .map(([property]) => property)
       .filter((property) => typographyDefinition.test(property));
 
@@ -506,8 +573,14 @@ describe("annotation desk token contract", () => {
   });
 
   it("keeps every legacy global variable as an alias to an approved desk token", () => {
-    const root = globals.match(/:root\s*\{([^}]*)\}/su)?.[1] ?? "";
-    const legacy = customProperties(root);
+    const legacy = new Map<string, string>();
+    globalsRoot.walkRules((rule) => {
+      if (rule.selector !== ":root") return;
+      for (const node of rule.nodes ?? []) {
+        if (node.type !== "decl" || !node.prop.startsWith("--")) continue;
+        legacy.set(node.prop, node.value.trim().replace(/\s+/gu, " "));
+      }
+    });
     expect(legacy.size).toBeGreaterThan(0);
     for (const [property, value] of legacy) {
       expect(value, property).toMatch(/^var\(--desk-[\w-]+\)$/u);
@@ -528,8 +601,8 @@ describe("annotation desk token contract", () => {
   });
 
   it("uses approved typography roles for every declared size", () => {
-    const violations = cssDocuments.flatMap(({ path, source }) => [
-      ...declarations(source, "font-size")
+    const violations = cssDocuments.flatMap(({ path, root }) => [
+      ...declarations(root, "font-size")
         .filter(({ property, value }) => {
           if (value === "inherit") return false;
           return !/^var\(--desk-type-[\w-]+\)$/u.test(value);
@@ -545,9 +618,9 @@ describe("annotation desk token contract", () => {
 
   it("keeps spacing, radii, and shadows on the approved executable scales", () => {
     const approvedSpacing = new Set([0, 4, 8, 12, 16, 24, 32, 48, 64, 80]);
-    const spacingViolations = cssDocuments.flatMap(({ path, source }) =>
+    const spacingViolations = cssDocuments.flatMap(({ path, root }) =>
       declarations(
-        source,
+        root,
         "gap|row-gap|column-gap|padding(?:-(?:top|right|bottom|left|inline|block))?|margin(?:-(?:top|right|bottom|left|inline|block))?",
       ).flatMap(({ property, value }) =>
         [...value.matchAll(/(-?[\d.]+)(px|rem|em)\b/gu)]
@@ -566,8 +639,8 @@ describe("annotation desk token contract", () => {
           ),
       ),
     );
-    const radiusViolations = cssDocuments.flatMap(({ path, source }) =>
-      declarations(source, "border-radius")
+    const radiusViolations = cssDocuments.flatMap(({ path, root }) =>
+      declarations(root, "border-radius")
         .filter(
           ({ value }) =>
             !/^var\(--desk-radius-(?:sm|md|lg|pill|round)\)$/u.test(value) &&
@@ -578,8 +651,8 @@ describe("annotation desk token contract", () => {
             `${path.slice(sourceRoot.length + 1)}: border-radius: ${value}`,
         ),
     );
-    const shadowViolations = cssDocuments.flatMap(({ path, source }) =>
-      declarations(source, "box-shadow")
+    const shadowViolations = cssDocuments.flatMap(({ path, root }) =>
+      declarations(root, "box-shadow")
         .filter(
           ({ value }) =>
             value !== "none" && value !== "var(--desk-shadow-floating)",
