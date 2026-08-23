@@ -55,7 +55,7 @@
 :global(.settings-nav button.active) {
   color: var(--blue-dark);
   background: var(--blue-soft);
-  font-weight: var(--desk-weight-bold);
+  font-weight: var(--desk-body-weight-bold);
 }
 :global(.settings-content) {
   min-width: 0;
@@ -113,7 +113,7 @@
   color: var(--desk-paper);
   background: var(--blue);
   border-color: var(--blue);
-  font-weight: var(--desk-weight-bold);
+  font-weight: var(--desk-body-weight-bold);
 }
 :global(.notification-email) {
   max-width: 430px;
@@ -151,7 +151,7 @@
   color: var(--ink-soft);
   background: var(--surface-muted);
   border-radius: var(--desk-radius-md);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--desk-font-utility);
   font-size: var(--desk-type-auxiliary);
 }
 
@@ -186,7 +186,7 @@
   border: 2px solid var(--desk-paper);
   border-radius: var(--desk-radius-md);
   font-size: var(--desk-type-auxiliary);
-  font-weight: var(--desk-weight-bold);
+  font-weight: var(--desk-body-weight-bold);
   text-align: center;
 }
 :global(.notification-panel) {
@@ -225,7 +225,7 @@
   flex: 1;
   color: var(--ink);
   font-size: var(--desk-type-auxiliary);
-  font-weight: var(--desk-weight-emphasis);
+  font-weight: var(--desk-body-weight-semibold);
 }
 :global(.notification-panel li button) {
   display: grid;
@@ -339,7 +339,7 @@
   margin: var(--desk-space-1) 0 0;
   overflow: hidden;
   font-size: var(--desk-type-auxiliary);
-  font-weight: var(--desk-weight-bold);
+  font-weight: var(--desk-body-weight-bold);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -422,7 +422,7 @@
   align-items: center;
   justify-content: space-between;
   font-size: var(--desk-type-meta);
-  font-weight: var(--desk-weight-bold);
+  font-weight: var(--desk-body-weight-bold);
 }
 :global(.routing-details > div) {
   padding: 0 0 var(--desk-space-1);

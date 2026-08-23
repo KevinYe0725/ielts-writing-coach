@@ -80,7 +80,7 @@
   margin: var(--desk-space-1) 0 var(--desk-space-3);
   font-family: var(--desk-font-reading);
   font-size: var(--desk-type-section-title);
-  font-weight: var(--desk-weight-reading-semibold);
+  font-weight: var(--desk-reading-weight-semibold);
   line-height: 1.45;
 }
 
@@ -100,7 +100,7 @@
 .scoreBadge strong {
   font-family: var(--desk-font-utility);
   font-size: var(--desk-type-page-title);
-  font-variation-settings: "wght" 650;
+  font-weight: var(--desk-utility-weight-semibold);
   line-height: 1;
   letter-spacing: -0.05em;
 }
@@ -234,7 +234,7 @@
   margin: var(--desk-space-1) 0 0;
   font-family: var(--desk-font-reading);
   font-size: var(--desk-type-subheading);
-  font-weight: var(--desk-weight-reading-semibold);
+  font-weight: var(--desk-reading-weight-semibold);
 }
 
 .documentHeader > span {
@@ -258,7 +258,7 @@
   border-radius: var(--desk-radius-sm);
   font-family: var(--desk-font-utility);
   font-size: var(--desk-type-meta);
-  font-weight: var(--desk-weight-bold);
+  font-weight: var(--desk-utility-weight-semibold);
   place-items: center;
 }
 
@@ -275,7 +275,7 @@
   color: var(--desk-blue);
   font-family: var(--desk-font-utility);
   font-size: var(--desk-type-auxiliary);
-  font-weight: var(--desk-weight-bold);
+  font-weight: var(--desk-utility-weight-semibold);
   letter-spacing: 0.04em;
 }
 
@@ -440,7 +440,7 @@
   margin: 0 0 var(--desk-space-1);
   color: var(--desk-amber);
   font-size: var(--desk-type-auxiliary);
-  font-weight: var(--desk-weight-bold);
+  font-weight: var(--desk-body-weight-bold);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -539,7 +539,7 @@
   border-radius: var(--desk-radius-sm);
   font-family: var(--desk-font-utility);
   font-size: var(--desk-type-meta);
-  font-weight: var(--desk-weight-bold);
+  font-weight: var(--desk-utility-weight-semibold);
   place-items: center;
 }
 
@@ -570,7 +570,7 @@
   border-radius: var(--desk-radius-sm);
   font-family: var(--desk-font-utility);
   font-size: var(--desk-type-meta);
-  font-weight: var(--desk-weight-emphasis);
+  font-weight: var(--desk-utility-weight-semibold);
   align-items: center;
   gap: var(--desk-space-1);
 }
@@ -631,7 +631,7 @@
   color: color-mix(in srgb, var(--desk-ink) 68%, transparent);
   font-family: var(--desk-font-utility);
   font-size: var(--desk-type-meta);
-  font-weight: var(--desk-weight-emphasis);
+  font-weight: var(--desk-utility-weight-semibold);
   align-items: center;
   gap: var(--desk-space-1);
 }
@@ -680,7 +680,7 @@
   border: 1px solid color-mix(in srgb, var(--desk-blue) 34%, transparent);
   border-radius: var(--desk-radius-sm);
   font-size: var(--desk-type-meta);
-  font-weight: var(--desk-weight-emphasis);
+  font-weight: var(--desk-body-weight-semibold);
   cursor: pointer;
   align-items: center;
   gap: var(--desk-space-2);
@@ -765,7 +765,7 @@
 .leakCheck li b {
   color: var(--desk-ink);
   font-family: var(--desk-font-reading);
-  font-weight: var(--desk-weight-reading-semibold);
+  font-weight: var(--desk-reading-weight-semibold);
 }
 
 .leakCheck > p {
@@ -952,7 +952,7 @@
     border: 0;
     border-radius: var(--desk-radius-sm);
     font-size: var(--desk-type-meta);
-    font-weight: var(--desk-weight-bold);
+    font-weight: var(--desk-body-weight-bold);
     cursor: pointer;
     align-items: center;
     justify-content: center;

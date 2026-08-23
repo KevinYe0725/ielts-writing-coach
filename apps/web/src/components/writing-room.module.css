@@ -24,7 +24,7 @@
 :global(.writing-title-group > strong) {
   color: var(--ink-soft);
   font-size: var(--desk-type-meta);
-  font-weight: var(--desk-weight-reading-semibold);
+  font-weight: var(--desk-utility-weight-semibold);
 }
 :global(.writing-controls) {
   display: flex;
@@ -130,13 +130,13 @@
   padding: 0;
   margin: 0 0 var(--desk-space-4);
   color: var(--desk-ink);
-  font-family: var(--font-serif);
+  font-family: var(--desk-font-reading);
   font-size: var(--desk-type-subheading);
   line-height: 1.62;
 }
 :global(.prompt-instruction) {
-  font-family: var(--font-serif);
-  font-weight: var(--desk-weight-bold);
+  font-family: var(--desk-font-reading);
+  font-weight: var(--desk-reading-weight-semibold);
 }
 :global(.exam-rules) {
   display: grid;
@@ -208,7 +208,7 @@
 :global(.editor-heading label) {
   color: var(--ink-soft);
   font-size: var(--desk-type-meta);
-  font-weight: var(--desk-weight-bold);
+  font-weight: var(--desk-utility-weight-semibold);
 }
 :global(.word-count) {
   color: var(--ink-faint);
@@ -217,7 +217,7 @@
 }
 :global(.word-count.complete) {
   color: var(--desk-blue);
-  font-weight: var(--desk-weight-bold);
+  font-weight: var(--desk-utility-weight-semibold);
 }
 :global(.essay-editor) {
   width: 100%;
@@ -227,7 +227,7 @@
   background: transparent;
   border: 0;
   outline: 0;
-  font-family: var(--font-serif);
+  font-family: var(--desk-font-reading);
   font-size: var(--desk-type-reading);
   line-height: 1.85;
   resize: none;

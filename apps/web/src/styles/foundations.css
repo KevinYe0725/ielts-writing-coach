@@ -3,13 +3,6 @@
 @import "@fontsource-variable/ibm-plex-sans/wght.css";
 @import "./tokens.css";
 
-:root {
-  --desk-font-body: "Noto Sans SC Variable", "PingFang SC", sans-serif;
-  --desk-font-reading: "Source Serif 4 Variable", "Songti SC", serif;
-  --desk-font-utility:
-    "IBM Plex Sans Variable", "Noto Sans SC Variable", sans-serif;
-}
-
 html {
   background: var(--desk-canvas);
 }
@@ -18,7 +11,7 @@ body {
   color: var(--desk-ink);
   background: var(--desk-canvas);
   font-family: var(--desk-font-body);
-  font-variation-settings: "wght" 440;
+  font-weight: var(--desk-body-weight-regular);
 }
 
 button,

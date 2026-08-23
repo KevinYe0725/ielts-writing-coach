@@ -40,7 +40,7 @@
 .heading h1 {
   margin: var(--desk-space-3) 0 var(--desk-space-2);
   color: var(--ink);
-  font-family: var(--font-serif), Georgia, serif;
+  font-family: var(--desk-font-body);
   font-size: var(--desk-type-page-title);
   letter-spacing: -0.035em;
 }
@@ -105,7 +105,7 @@
   color: var(--desk-paper);
   background: var(--desk-ink);
   border-radius: var(--desk-radius-lg);
-  font-weight: var(--desk-weight-bold);
+  font-weight: var(--desk-body-weight-bold);
   place-items: center;
 }
 

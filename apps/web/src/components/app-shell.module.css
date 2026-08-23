@@ -86,7 +86,7 @@
   margin: 0 var(--desk-space-2) var(--desk-space-1);
   color: var(--ink-faint);
   font-size: var(--desk-type-auxiliary);
-  font-weight: var(--desk-weight-bold);
+  font-weight: var(--desk-body-weight-bold);
   letter-spacing: 0.09em;
   text-transform: uppercase;
 }
@@ -113,7 +113,7 @@
 :global(.nav-link-active) {
   color: var(--desk-blue);
   background: var(--desk-blue-soft);
-  font-weight: var(--desk-weight-emphasis);
+  font-weight: var(--desk-body-weight-semibold);
 }
 
 :global(.nav-link-disabled) {
@@ -247,7 +247,7 @@
   overflow: hidden;
   color: var(--ink);
   font-size: var(--desk-type-label);
-  font-weight: var(--desk-weight-emphasis);
+  font-weight: var(--desk-body-weight-semibold);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -311,7 +311,7 @@
   background: var(--desk-ink);
   border-radius: var(--desk-radius-md);
   font-size: var(--desk-type-meta);
-  font-weight: var(--desk-weight-bold);
+  font-weight: var(--desk-body-weight-bold);
   place-items: center;
 }
 
@@ -352,7 +352,7 @@
   border: 1px solid var(--line);
   border-radius: var(--desk-radius-md);
   font-size: var(--desk-type-auxiliary);
-  font-weight: var(--desk-weight-bold);
+  font-weight: var(--desk-body-weight-bold);
   cursor: pointer;
   align-items: center;
   gap: var(--desk-space-2);
@@ -390,7 +390,7 @@
   border: 1px solid var(--line);
   border-radius: var(--desk-radius-md);
   font-size: var(--desk-type-meta);
-  font-weight: var(--desk-weight-bold);
+  font-weight: var(--desk-utility-weight-semibold);
   align-items: center;
   justify-content: center;
   gap: var(--desk-space-1);
@@ -624,7 +624,7 @@
   color: var(--desk-evidence-muted);
   font-family: var(--desk-font-utility);
   font-size: var(--desk-type-auxiliary);
-  font-weight: var(--desk-weight-emphasis);
+  font-weight: var(--desk-utility-weight-semibold);
   letter-spacing: 0.08em;
   align-items: center;
   gap: var(--desk-space-1);
@@ -642,7 +642,7 @@
   border-radius: var(--desk-radius-sm);
   box-shadow: none;
   font-size: var(--desk-type-meta);
-  font-weight: var(--desk-weight-emphasis);
+  font-weight: var(--desk-body-weight-semibold);
   align-items: center;
   gap: var(--desk-space-2);
 }

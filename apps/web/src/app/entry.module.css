@@ -44,13 +44,13 @@
   border: 1px solid var(--line-strong);
   border-radius: var(--desk-radius-round);
   font-size: var(--desk-type-auxiliary);
-  font-weight: var(--desk-weight-bold);
+  font-weight: var(--desk-body-weight-bold);
   place-items: center;
 }
 
 :where(.surface) :global(.setup-steps li strong) {
   font-size: var(--desk-type-auxiliary);
-  font-weight: var(--desk-weight-emphasis);
+  font-weight: var(--desk-body-weight-semibold);
 }
 :where(.surface) :global(.setup-steps li.current) {
   color: var(--blue-dark);
@@ -240,7 +240,7 @@
   margin-bottom: var(--desk-space-2);
   color: var(--desk-ink);
   font-size: var(--desk-type-meta);
-  font-weight: var(--desk-weight-bold);
+  font-weight: var(--desk-body-weight-bold);
 }
 :where(.surface) :global(.save-mode label) {
   display: flex;
@@ -276,7 +276,7 @@
   color: var(--blue-dark);
   cursor: pointer;
   font-size: var(--desk-type-meta);
-  font-weight: var(--desk-weight-bold);
+  font-weight: var(--desk-body-weight-bold);
 }
 :where(.surface) :global(.advanced-disclosure p) {
   margin: var(--desk-space-2) 0 0;

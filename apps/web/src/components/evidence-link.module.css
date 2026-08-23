@@ -8,7 +8,7 @@
   gap: var(--desk-space-2);
   font-family: var(--desk-font-utility);
   font-size: var(--desk-type-auxiliary);
-  font-variation-settings: "wght" 560;
+  font-weight: var(--desk-utility-weight-medium);
   letter-spacing: 0.025em;
 }
 
@@ -22,7 +22,7 @@
   color: var(--desk-ink);
   font-family: var(--desk-font-body);
   font-size: var(--desk-type-label);
-  font-variation-settings: "wght" 560;
+  font-weight: var(--desk-body-weight-medium);
   letter-spacing: 0;
 }
 

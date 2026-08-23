@@ -62,6 +62,22 @@ describe("annotation desk primitives", () => {
     expect(unavailableLineRule).toContain("dashed");
   });
 
+  it("binds evidence copy to utility and body typography roles", () => {
+    const evidenceRule = evidenceLinkCss.match(
+      /\.evidenceLink\s*\{([^}]*)\}/,
+    )?.[1];
+    const subjectRule = evidenceLinkCss.match(/\.subject\s*\{([^}]*)\}/)?.[1];
+
+    expect(evidenceRule).toContain("font-family: var(--desk-font-utility)");
+    expect(evidenceRule).toContain(
+      "font-weight: var(--desk-utility-weight-medium)",
+    );
+    expect(subjectRule).toContain("font-family: var(--desk-font-body)");
+    expect(subjectRule).toContain(
+      "font-weight: var(--desk-body-weight-medium)",
+    );
+  });
+
   it("retains a three-pixel evidence track on narrow screens", () => {
     const mobileRules = evidenceLinkCss.slice(
       evidenceLinkCss.indexOf("@media (max-width: 520px)"),

@@ -56,7 +56,7 @@
   margin-bottom: var(--desk-space-1);
   color: var(--ink-soft);
   font-size: var(--desk-type-auxiliary);
-  font-weight: var(--desk-weight-bold);
+  font-weight: var(--desk-body-weight-bold);
 }
 :global(.chart-bar-track) {
   display: flex;
@@ -134,7 +134,7 @@
   background: var(--surface-muted);
   border-bottom: 1px solid var(--line);
   font-size: var(--desk-type-auxiliary);
-  font-weight: var(--desk-weight-bold);
+  font-weight: var(--desk-body-weight-bold);
   text-transform: uppercase;
 }
 :global(.skill-table-row) {

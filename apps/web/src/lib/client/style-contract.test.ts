@@ -13,6 +13,9 @@ const sourceRoot = fileURLToPath(new URL("../../", import.meta.url));
 const tokensPath = fileURLToPath(
   new URL("../../styles/tokens.css", import.meta.url),
 );
+const foundationsPath = fileURLToPath(
+  new URL("../../styles/foundations.css", import.meta.url),
+);
 
 function filesBelow(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -29,6 +32,7 @@ const cssDocuments = cssFiles.map((path) => ({
   source: readFileSync(path, "utf8"),
 }));
 const tokens = readFileSync(tokensPath, "utf8");
+const foundations = readFileSync(foundationsPath, "utf8");
 
 function customProperties(source: string): Map<string, string> {
   return new Map(
@@ -51,6 +55,10 @@ function declarations(
     property: match[1]!,
     value: match[2]!.trim(),
   }));
+}
+
+function cssFileLabel(path: string): string {
+  return path.startsWith(sourceRoot) ? path.slice(sourceRoot.length) : path;
 }
 
 const remainingGlobalClassInventory = [
@@ -243,11 +251,17 @@ describe("annotation desk token contract", () => {
       "--desk-type-subheading": "20px",
       "--desk-type-section-title": "clamp(24px, 3vw, 28px)",
       "--desk-type-page-title": "clamp(30px, 4vw, 40px)",
-      "--desk-weight-regular": "400",
-      "--desk-weight-medium": "500",
-      "--desk-weight-reading-semibold": "600",
-      "--desk-weight-emphasis": "650",
-      "--desk-weight-bold": "700",
+      "--desk-font-body": '"Noto Sans SC Variable", "PingFang SC", sans-serif',
+      "--desk-font-reading": '"Source Serif 4 Variable", Georgia, serif',
+      "--desk-font-utility": '"IBM Plex Sans Variable", "Segoe UI", sans-serif',
+      "--desk-body-weight-regular": "400",
+      "--desk-body-weight-medium": "500",
+      "--desk-body-weight-semibold": "650",
+      "--desk-body-weight-bold": "700",
+      "--desk-reading-weight-regular": "400",
+      "--desk-reading-weight-semibold": "600",
+      "--desk-utility-weight-medium": "500",
+      "--desk-utility-weight-semibold": "600",
       "--desk-space-1": "4px",
       "--desk-space-2": "8px",
       "--desk-space-3": "12px",
@@ -292,6 +306,116 @@ describe("annotation desk token contract", () => {
     }
   });
 
+  it("keeps all typography roles in the approved token system", () => {
+    const approvedFamilies = new Set([
+      "inherit",
+      "var(--desk-font-body)",
+      "var(--desk-font-reading)",
+      "var(--desk-font-utility)",
+    ]);
+    const approvedWeights = new Set([
+      "inherit",
+      "var(--desk-body-weight-regular)",
+      "var(--desk-body-weight-medium)",
+      "var(--desk-body-weight-semibold)",
+      "var(--desk-body-weight-bold)",
+      "var(--desk-reading-weight-regular)",
+      "var(--desk-reading-weight-semibold)",
+      "var(--desk-utility-weight-medium)",
+      "var(--desk-utility-weight-semibold)",
+    ]);
+    const typographyDefinition =
+      /^--(?:font-(?:sans|serif)|desk-(?:font-(?:body|reading|utility)|weight-[\w-]+|(?:body|reading|utility)-weight-[\w-]+))$/u;
+    const typographyDefinitionsOutsideTokens = cssDocuments.flatMap(
+      ({ path, source }) => {
+        if (path === tokensPath) return [];
+        return [...customProperties(source).keys()]
+          .filter((property) => typographyDefinition.test(property))
+          .map((property) => `${cssFileLabel(path)}: ${property}`);
+      },
+    );
+    const tokenTypography = Object.fromEntries(
+      [...customProperties(tokens)].filter(([property]) =>
+        typographyDefinition.test(property),
+      ),
+    );
+    const variationSettings = cssDocuments.flatMap(({ path, source }) =>
+      declarations(source, "font-variation-settings").map(
+        ({ value }) =>
+          `${cssFileLabel(path)}: font-variation-settings: ${value}`,
+      ),
+    );
+    const familyViolations = cssDocuments.flatMap(({ path, source }) =>
+      declarations(source, "font-family")
+        .filter(({ value }) => !approvedFamilies.has(value))
+        .map(({ value }) => `${cssFileLabel(path)}: font-family: ${value}`),
+    );
+    const weightViolations = cssDocuments.flatMap(({ path, source }) =>
+      declarations(source, "font-weight")
+        .filter(({ value }) => !approvedWeights.has(value))
+        .map(({ value }) => `${cssFileLabel(path)}: font-weight: ${value}`),
+    );
+    const fontRoleMismatches = cssDocuments.flatMap(({ path, source }) =>
+      [...source.matchAll(/([^{}]+)\{([^{}]*)\}/gsu)].flatMap((match) => {
+        const selector = match[1]!.trim().replace(/\s+/gu, " ");
+        const body = match[2]!;
+        const family = declarations(body, "font-family")[0]?.value;
+        const weight = declarations(body, "font-weight")[0]?.value;
+        const role = family?.match(
+          /^var\(--desk-font-(body|reading|utility)\)$/u,
+        )?.[1];
+        if (!role || !weight || weight === "inherit") return [];
+        return weight.startsWith(`var(--desk-${role}-weight-`)
+          ? []
+          : [`${cssFileLabel(path)}: ${selector}: ${family} + ${weight}`];
+      }),
+    );
+
+    const foundationTypographyDefinitions = [...customProperties(foundations)]
+      .map(([property]) => property)
+      .filter((property) => typographyDefinition.test(property));
+
+    expect({
+      familyViolations,
+      fontRoleMismatches,
+      foundationConsumesBodyFamily: foundations.includes(
+        "font-family: var(--desk-font-body)",
+      ),
+      foundationConsumesBodyWeight: foundations.includes(
+        "font-weight: var(--desk-body-weight-regular)",
+      ),
+      foundationTypographyDefinitions,
+      tokenTypography,
+      typographyDefinitionsOutsideTokens,
+      variationSettings,
+      weightViolations,
+    }).toEqual({
+      familyViolations: [],
+      fontRoleMismatches: [],
+      foundationConsumesBodyFamily: true,
+      foundationConsumesBodyWeight: true,
+      foundationTypographyDefinitions: [],
+      tokenTypography: {
+        "--desk-font-body":
+          '"Noto Sans SC Variable", "PingFang SC", sans-serif',
+        "--desk-font-reading": '"Source Serif 4 Variable", Georgia, serif',
+        "--desk-font-utility":
+          '"IBM Plex Sans Variable", "Segoe UI", sans-serif',
+        "--desk-body-weight-regular": "400",
+        "--desk-body-weight-medium": "500",
+        "--desk-body-weight-semibold": "650",
+        "--desk-body-weight-bold": "700",
+        "--desk-reading-weight-regular": "400",
+        "--desk-reading-weight-semibold": "600",
+        "--desk-utility-weight-medium": "500",
+        "--desk-utility-weight-semibold": "600",
+      },
+      typographyDefinitionsOutsideTokens: [],
+      variationSettings: [],
+      weightViolations: [],
+    });
+  });
+
   it("keeps every legacy global variable as an alias to an approved desk token", () => {
     const root = globals.match(/:root\s*\{([^}]*)\}/su)?.[1] ?? "";
     const legacy = customProperties(root);
@@ -314,14 +438,12 @@ describe("annotation desk token contract", () => {
     expect(violations).toEqual([]);
   });
 
-  it("uses approved typography roles for every declared size and weight", () => {
+  it("uses approved typography roles for every declared size", () => {
     const violations = cssDocuments.flatMap(({ path, source }) => [
-      ...declarations(source, "font-size|font-weight")
+      ...declarations(source, "font-size")
         .filter(({ property, value }) => {
           if (value === "inherit") return false;
-          return property === "font-size"
-            ? !/^var\(--desk-type-[\w-]+\)$/u.test(value)
-            : !/^var\(--desk-weight-[\w-]+\)$/u.test(value);
+          return !/^var\(--desk-type-[\w-]+\)$/u.test(value);
         })
         .map(
           ({ property, value }) =>

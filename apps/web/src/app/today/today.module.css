@@ -118,7 +118,7 @@
   border: 1px solid var(--line-strong);
   border-radius: var(--desk-radius-round);
   font-size: var(--desk-type-auxiliary);
-  font-weight: var(--desk-weight-bold);
+  font-weight: var(--desk-body-weight-bold);
   place-items: center;
 }
 :global(.cycle-step-done .cycle-node) {
@@ -326,7 +326,7 @@
   color: var(--desk-ink);
   font-family: var(--desk-font-utility);
   font-size: var(--desk-type-subheading);
-  font-variation-settings: "wght" 620;
+  font-weight: var(--desk-utility-weight-semibold);
 }
 
 .evidenceItem small {

@@ -130,7 +130,7 @@
   margin-bottom: var(--desk-space-4);
   color: var(--ink-faint);
   font-size: var(--desk-type-meta);
-  font-weight: var(--desk-weight-bold);
+  font-weight: var(--desk-body-weight-bold);
   align-items: center;
   gap: var(--desk-space-3);
 }
@@ -201,7 +201,7 @@
 .sectionHeading > span {
   color: var(--blue);
   font-size: var(--desk-type-meta);
-  font-weight: var(--desk-weight-bold);
+  font-weight: var(--desk-body-weight-bold);
   letter-spacing: 0.08em;
 }
 
@@ -245,7 +245,7 @@
 .prose h4 {
   margin: var(--desk-space-6) 0 var(--desk-space-2);
   font-size: var(--desk-type-reading);
-  font-weight: var(--desk-weight-bold);
+  font-weight: var(--desk-body-weight-bold);
 }
 
 .prose h3:first-child,
@@ -280,7 +280,7 @@
 }
 
 .prose strong {
-  font-weight: var(--desk-weight-bold);
+  font-weight: var(--desk-body-weight-bold);
 }
 
 .keyPoint {
@@ -304,7 +304,7 @@
 .articleActions span {
   color: var(--ink-faint);
   font-size: var(--desk-type-auxiliary);
-  font-weight: var(--desk-weight-bold);
+  font-weight: var(--desk-body-weight-bold);
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
@@ -341,7 +341,7 @@
   margin-bottom: var(--desk-space-2);
   color: var(--ink-faint);
   font-size: var(--desk-type-auxiliary);
-  font-weight: var(--desk-weight-bold);
+  font-weight: var(--desk-body-weight-bold);
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
@@ -366,7 +366,7 @@
   color: var(--blue-dark);
   border-left: 2px solid var(--blue);
   font-size: var(--desk-type-reading);
-  font-weight: var(--desk-weight-bold);
+  font-weight: var(--desk-body-weight-bold);
   line-height: 1.7;
 }
 
@@ -407,7 +407,7 @@
   border: 1px solid var(--desk-line-strong);
   border-radius: var(--desk-radius-pill);
   font-size: var(--desk-type-auxiliary);
-  font-weight: var(--desk-weight-bold);
+  font-weight: var(--desk-body-weight-bold);
   place-items: center;
 }
 
@@ -421,7 +421,7 @@
   margin: var(--desk-space-4) 0 0;
   color: var(--desk-blue);
   background: var(--desk-blue-soft);
-  font-weight: var(--desk-weight-emphasis);
+  font-weight: var(--desk-body-weight-semibold);
   line-height: 1.7;
 }
 
@@ -445,7 +445,7 @@
   background: var(--desk-blue-soft);
   border-radius: var(--desk-radius-sm);
   font-size: var(--desk-type-body);
-  font-weight: var(--desk-weight-bold);
+  font-weight: var(--desk-body-weight-bold);
 }
 
 .toolList p {
@@ -482,7 +482,7 @@
 .pitfallList > section > div span {
   color: var(--desk-blue);
   font-size: var(--desk-type-auxiliary);
-  font-weight: var(--desk-weight-bold);
+  font-weight: var(--desk-body-weight-bold);
   text-transform: uppercase;
 }
 
@@ -561,7 +561,7 @@
 .shortAnswer > span {
   color: var(--ink-faint);
   font-size: var(--desk-type-auxiliary);
-  font-weight: var(--desk-weight-bold);
+  font-weight: var(--desk-body-weight-bold);
 }
 
 .shortAnswer textarea {
@@ -610,7 +610,7 @@
   margin-bottom: var(--desk-space-1);
   color: var(--ink-faint);
   font-size: var(--desk-type-auxiliary);
-  font-weight: var(--desk-weight-bold);
+  font-weight: var(--desk-body-weight-bold);
   letter-spacing: 0.045em;
   text-transform: uppercase;
 }
@@ -742,7 +742,7 @@
 .analysisSummary {
   color: var(--desk-ink);
   font-size: var(--desk-type-reading);
-  font-weight: var(--desk-weight-emphasis);
+  font-weight: var(--desk-body-weight-semibold);
 }
 
 .analysisSection {
@@ -940,7 +940,7 @@
   margin: 0 0 var(--desk-space-3) var(--desk-space-3);
   color: var(--ink-faint);
   font-size: var(--desk-type-auxiliary);
-  font-weight: var(--desk-weight-bold);
+  font-weight: var(--desk-body-weight-bold);
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -974,13 +974,13 @@
   color: var(--blue-dark);
   background: var(--desk-blue-soft);
   border-left-color: var(--blue);
-  font-weight: var(--desk-weight-bold);
+  font-weight: var(--desk-body-weight-bold);
 }
 
 .contents a > span {
   padding-top: var(--desk-space-1);
   font-size: var(--desk-type-auxiliary);
-  font-weight: var(--desk-weight-bold);
+  font-weight: var(--desk-body-weight-bold);
 }
 
 .article :is(a, button, textarea, input, h2):focus-visible {
@@ -1018,7 +1018,7 @@
     background: var(--surface-muted);
     border: 1px solid var(--line);
     border-radius: var(--desk-radius-md);
-    font-weight: var(--desk-weight-bold);
+    font-weight: var(--desk-body-weight-bold);
     align-items: center;
     justify-content: space-between;
   }

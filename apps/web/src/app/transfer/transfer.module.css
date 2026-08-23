@@ -19,7 +19,7 @@
 :global(.transfer-check-card blockquote) {
   margin: var(--desk-space-6) 0;
   color: var(--desk-ink);
-  font-family: var(--font-serif);
+  font-family: var(--desk-font-reading);
   font-size: var(--desk-type-subheading);
   line-height: 1.65;
 }
@@ -52,7 +52,7 @@
   background: var(--desk-paper);
   border: 1px solid var(--line-strong);
   border-radius: var(--desk-radius-md);
-  font-family: var(--font-serif);
+  font-family: var(--desk-font-reading);
   font-size: var(--desk-type-body);
   line-height: 1.7;
   resize: vertical;
@@ -154,7 +154,7 @@
   border: 1px solid color-mix(in srgb, var(--desk-blue) 24%, transparent);
   border-radius: var(--desk-radius-sm);
   font-family: var(--desk-font-utility);
-  font-variation-settings: "wght" 650;
+  font-weight: var(--desk-utility-weight-semibold);
   letter-spacing: 0.03em;
 }
 

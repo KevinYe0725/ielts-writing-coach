@@ -33,6 +33,17 @@
   );
 
   /* Typography roles. The 12px auxiliary role is the absolute visible floor. */
+  --desk-font-body: "Noto Sans SC Variable", "PingFang SC", sans-serif;
+  --desk-font-reading: "Source Serif 4 Variable", Georgia, serif;
+  --desk-font-utility: "IBM Plex Sans Variable", "Segoe UI", sans-serif;
+  --desk-body-weight-regular: 400;
+  --desk-body-weight-medium: 500;
+  --desk-body-weight-semibold: 650;
+  --desk-body-weight-bold: 700;
+  --desk-reading-weight-regular: 400;
+  --desk-reading-weight-semibold: 600;
+  --desk-utility-weight-medium: 500;
+  --desk-utility-weight-semibold: 600;
   --desk-type-auxiliary: 12px;
   --desk-type-meta: 13px;
   --desk-type-label: 14px;
@@ -41,11 +52,6 @@
   --desk-type-subheading: 20px;
   --desk-type-section-title: clamp(24px, 3vw, 28px);
   --desk-type-page-title: clamp(30px, 4vw, 40px);
-  --desk-weight-regular: 400;
-  --desk-weight-medium: 500;
-  --desk-weight-reading-semibold: 600;
-  --desk-weight-emphasis: 650;
-  --desk-weight-bold: 700;
   --desk-leading-compact: 1.2;
   --desk-leading-body: 1.7;
   --desk-leading-reading: 1.82;

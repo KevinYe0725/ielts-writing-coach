@@ -103,7 +103,7 @@
 :global(.practice-paper-question > header p) {
   margin: 0;
   font-size: var(--desk-type-auxiliary);
-  font-weight: var(--desk-weight-bold);
+  font-weight: var(--desk-body-weight-bold);
 }
 :global(.practice-paper-question h2) {
   margin-bottom: var(--desk-space-2);
@@ -120,11 +120,11 @@
   background: var(--surface-muted);
   border-left: 3px solid var(--desk-evidence-muted);
   border-radius: var(--desk-radius-md);
-  font-family: var(--font-serif);
+  font-family: var(--desk-font-reading);
   line-height: 1.65;
 }
 :global(.practice-paper-prompt) {
-  font-family: var(--font-serif);
+  font-family: var(--desk-font-reading);
   font-size: var(--desk-type-reading);
   line-height: 1.65;
 }
@@ -178,7 +178,7 @@
   background: var(--desk-paper);
   border: 1px solid var(--line-strong);
   border-radius: var(--desk-radius-md);
-  font-family: var(--font-serif);
+  font-family: var(--desk-font-reading);
   font-size: var(--desk-type-body);
   line-height: 1.65;
   resize: vertical;
@@ -305,7 +305,7 @@
 .page :global(.page-header h1) {
   max-width: 780px;
   font-family: var(--desk-font-reading);
-  font-weight: var(--desk-weight-reading-semibold);
+  font-weight: var(--desk-reading-weight-semibold);
 }
 
 .page :global(.page-header .eyebrow),
@@ -414,7 +414,7 @@
   margin: var(--desk-space-1) 0 var(--desk-space-2);
   font-family: var(--desk-font-reading);
   font-size: var(--desk-type-subheading);
-  font-weight: var(--desk-weight-reading-semibold);
+  font-weight: var(--desk-reading-weight-semibold);
 }
 
 .resultSummary p:last-child {
@@ -475,7 +475,7 @@
   border-radius: var(--desk-radius-sm);
   font-family: var(--desk-font-utility);
   font-size: var(--desk-type-meta);
-  font-weight: var(--desk-weight-emphasis);
+  font-weight: var(--desk-utility-weight-semibold);
   place-items: center;
 }
 
@@ -552,7 +552,7 @@
   margin-bottom: var(--desk-space-2);
   font-family: var(--desk-font-reading);
   font-size: var(--desk-type-subheading);
-  font-weight: var(--desk-weight-reading-semibold);
+  font-weight: var(--desk-reading-weight-semibold);
 }
 
 .instruction {
@@ -694,7 +694,7 @@
   margin-top: 0;
   font-family: var(--desk-font-reading);
   font-size: var(--desk-type-subheading);
-  font-weight: var(--desk-weight-reading-semibold);
+  font-weight: var(--desk-reading-weight-semibold);
 }
 
 .analysis > div {

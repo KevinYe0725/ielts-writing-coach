@@ -26,8 +26,6 @@
   --radius-md: var(--desk-radius-md);
   --radius-lg: var(--desk-radius-lg);
   --sidebar-width: var(--desk-layout-sidebar);
-  --font-sans: var(--desk-font-body);
-  --font-serif: var(--desk-font-reading);
 }
 
 * {
@@ -44,7 +42,7 @@ body {
   margin: 0;
   color: var(--ink);
   background: var(--bg);
-  font-family: var(--font-sans);
+  font-family: var(--desk-font-body);
   font-size: var(--desk-type-body);
   line-height: 1.55;
   text-rendering: optimizeLegibility;
@@ -173,7 +171,7 @@ h3 {
   margin-bottom: var(--desk-space-2);
   color: var(--blue);
   font-size: var(--desk-type-auxiliary);
-  font-weight: var(--desk-weight-bold);
+  font-weight: var(--desk-body-weight-bold);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -209,7 +207,7 @@ h3 {
   padding: var(--desk-space-2) var(--desk-space-4);
   border: 1px solid transparent;
   border-radius: var(--desk-radius-md);
-  font-weight: var(--desk-weight-emphasis);
+  font-weight: var(--desk-body-weight-semibold);
   line-height: 1.2;
   align-items: center;
   justify-content: center;
@@ -298,7 +296,7 @@ h3 {
   padding: var(--desk-space-1) var(--desk-space-2);
   border-radius: var(--desk-radius-pill);
   font-size: var(--desk-type-auxiliary);
-  font-weight: var(--desk-weight-bold);
+  font-weight: var(--desk-body-weight-bold);
   align-items: center;
   gap: var(--desk-space-1);
 }
@@ -333,7 +331,7 @@ h3 {
 .field-label {
   color: var(--desk-ink);
   font-size: var(--desk-type-meta);
-  font-weight: var(--desk-weight-bold);
+  font-weight: var(--desk-body-weight-bold);
 }
 
 .field-hint {
@@ -622,7 +620,7 @@ h3 {
   background: var(--desk-paper);
   border: 1px solid var(--line-strong);
   border-radius: var(--desk-radius-md);
-  font-family: var(--font-serif);
+  font-family: var(--desk-font-reading);
   font-size: var(--desk-type-body);
   line-height: 1.65;
   resize: vertical;
@@ -685,7 +683,7 @@ h3 {
 
 .transfer-result-card .rewrite-locked-message {
   font-size: var(--desk-type-subheading);
-  font-weight: var(--desk-weight-reading-semibold);
+  font-weight: var(--desk-body-weight-semibold);
   line-height: 1.7;
   color: var(--ink);
 }

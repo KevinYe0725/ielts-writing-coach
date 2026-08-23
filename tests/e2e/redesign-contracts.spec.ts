@@ -640,6 +640,43 @@ test.describe("annotation desk redesign contracts", () => {
     expect(family).not.toContain("Source Serif 4");
   });
 
+  test("typography authority keeps UI, reading, and utility families distinct", async ({
+    page,
+  }) => {
+    await page.route("**/api/v1/auth/get-session", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          user: { email: "learner@example.com", role: "learner" },
+        }),
+      });
+    });
+
+    await page.goto("/account");
+    const accountHeadingFamily = await page
+      .getByRole("heading", { name: "账户与安全" })
+      .evaluate((element) => window.getComputedStyle(element).fontFamily);
+    expect(accountHeadingFamily).toContain("Noto Sans SC");
+    expect(accountHeadingFamily).not.toContain("Source Serif 4");
+
+    await page.goto(
+      "/feedback?cycle=cycle-demo&lesson=lesson-collocation-perspective",
+    );
+    const manuscriptFamily = await page
+      .locator("[data-feedback-essay]")
+      .evaluate((element) => window.getComputedStyle(element).fontFamily);
+    expect(manuscriptFamily).toContain("Source Serif 4");
+    expect(manuscriptFamily).not.toContain("Noto Sans SC");
+
+    const evidenceLabelFamily = await page
+      .locator("[data-feedback-evidence] [data-evidence-state]")
+      .first()
+      .locator(":scope > span")
+      .last()
+      .evaluate((element) => window.getComputedStyle(element).fontFamily);
+    expect(evidenceLabelFamily).toContain("IBM Plex Sans");
+  });
+
   test("growth displays every level without overstating evidence", async ({
     page,
   }) => {

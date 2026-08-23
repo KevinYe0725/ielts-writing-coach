@@ -31,7 +31,7 @@
 .limitCopy {
   max-width: 52ch;
   color: var(--desk-amber);
-  font-weight: var(--desk-weight-emphasis);
+  font-weight: var(--desk-utility-weight-semibold);
   text-align: right;
 }
 
@@ -92,7 +92,7 @@
   color: var(--desk-ink);
   font-family: var(--desk-font-reading);
   font-size: var(--desk-type-reading);
-  font-variation-settings: "wght" 440;
+  font-weight: var(--desk-reading-weight-regular);
   line-height: 1.55;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
