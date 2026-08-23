@@ -45,6 +45,14 @@ const growthLevels: SkillState[] = [
   "transferred",
 ];
 
+const levelPresentation = {
+  diagnosed: { zh: "诊断级别", en: "Diagnosed" },
+  practicing: { zh: "练习级别", en: "Practising" },
+  applied: { zh: "应用级别", en: "Applied" },
+  retained: { zh: "保留级别", en: "Retained" },
+  transferred: { zh: "迁移级别", en: "Transferred" },
+} as const;
+
 export default function GrowthPage() {
   const { text } = useLocale();
   const loader = useCallback(() => learningClient.getGrowth(), []);
@@ -56,7 +64,7 @@ export default function GrowthPage() {
     );
 
   const demoMode = learningClientDemoMode;
-  const skillState = (state: SkillState) => {
+  const skillResultPresentation = (state: SkillState) => {
     const states = {
       diagnosed: { zh: "已诊断", en: "Diagnosed", tone: "neutral" as const },
       practicing: { zh: "练习中", en: "Practising", tone: "amber" as const },
@@ -115,7 +123,7 @@ export default function GrowthPage() {
         </div>
         <ol className={styles.levels}>
           {growthLevels.map((level) => {
-            const presentation = skillState(level);
+            const presentation = levelPresentation[level];
             return (
               <li data-growth-level={level} key={level}>
                 <EvidenceLink
@@ -148,20 +156,14 @@ export default function GrowthPage() {
                   }
                   state={demoMode ? "unavailable" : growthEvidenceState[level]}
                 >
-                  {demoMode
-                    ? text(
-                        level === "diagnosed"
-                          ? "诊断级别（未评价）"
-                          : level === "practicing"
-                            ? "练习级别（未评价）"
-                            : level === "applied"
-                              ? "应用级别（未评价）"
-                              : level === "retained"
-                                ? "保留级别（未评价）"
-                                : "迁移级别（未评价）",
-                        `${presentation.en} level (not evaluated)`,
-                      )
-                    : text(presentation.zh, presentation.en)}
+                  {demoMode ? (
+                    <>
+                      <span>{text(presentation.zh, presentation.en)}</span>
+                      <span>{text("（未评价）", " (not evaluated)")}</span>
+                    </>
+                  ) : (
+                    text(presentation.zh, presentation.en)
+                  )}
                 </EvidenceLink>
               </li>
             );
@@ -318,7 +320,7 @@ export default function GrowthPage() {
           <span role="columnheader">{text("下一次证据", "Next evidence")}</span>
         </div>
         {data.skills.map((skill) => {
-          const state = skillState(skill.state);
+          const state = skillResultPresentation(skill.state);
           return (
             <div
               className="skill-table-row"

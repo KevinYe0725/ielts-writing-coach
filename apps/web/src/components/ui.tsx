@@ -160,8 +160,16 @@ export function DemoLanguageEvidenceNotice() {
     >
       <Info aria-hidden="true" size={20} />
       <div>
-        <strong>虚构演示数据 · Fictional demo data</strong>
-        <p>不是语言评估 · Not a language evaluation</p>
+        <strong>
+          <span lang="zh-CN">虚构演示数据</span>
+          <span aria-hidden="true"> · </span>
+          <span lang="en">Fictional demo data</span>
+        </strong>
+        <p>
+          <span lang="zh-CN">不是语言评估</span>
+          <span aria-hidden="true"> · </span>
+          <span lang="en">Not a language evaluation</span>
+        </p>
       </div>
     </aside>
   );

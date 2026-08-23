@@ -1335,6 +1335,39 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
     expect(submittedAnswers["demo-paper-question-8"]).toBe("");
   });
 
+  test("final review semantics: Demo paper records the saved submission in both locales", async ({
+    page,
+  }) => {
+    await page.goto(paperUrl);
+    await page.getByText("A", { exact: true }).last().click();
+    await page.getByRole("button", { name: "交卷" }).click();
+
+    await expect(
+      page.getByText("交卷记录已保存", { exact: true }),
+    ).toBeVisible();
+    const demoNotice = page.locator("[data-demo-language-evidence]");
+    await expect(
+      demoNotice.locator('[lang="zh-CN"]').getByText("不是语言评估", {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(
+      demoNotice
+        .locator('[lang="en"]')
+        .getByText("Not a language evaluation", { exact: true }),
+    ).toBeVisible();
+    const switcher = page.locator(".locale-switch:visible");
+    await expect(switcher).toHaveAccessibleName("切换到英文界面");
+    await switcher.click();
+    await expect(page.locator("html")).toHaveAttribute("lang", "en");
+    await expect(
+      page.getByText("Submission saved", { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByText("Review saved", { exact: true })).toHaveCount(
+      0,
+    );
+  });
+
   test("locks editing at the time limit but retains an incomplete sheet for submission", async ({
     page,
   }) => {

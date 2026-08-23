@@ -42,6 +42,15 @@ async function expectAxeRoute(
   }).toPass({ timeout: 15_000 });
 }
 
+async function switchToEnglish(
+  page: import("@playwright/test").Page,
+): Promise<void> {
+  const switcher = page.locator(".locale-switch:visible");
+  await expect(switcher).toHaveAccessibleName("切换到英文界面");
+  await switcher.click();
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+}
+
 test.describe("cross-browser accessibility smoke checks", () => {
   test.skip(
     !deterministicDemo,
@@ -49,6 +58,57 @@ test.describe("cross-browser accessibility smoke checks", () => {
   );
 
   test.beforeEach(async ({ page }) => resetDemoState(page));
+
+  test("Demo language stays explicit across final review surfaces and locales", async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    const routes = [
+      "/compare?cycle=cycle-demo",
+      "/growth",
+      "/lesson/paper?cycle=cycle-demo&lesson=lesson-collocation-perspective",
+      "/signin",
+    ] as const;
+
+    for (const locale of ["zh-CN", "en"] as const) {
+      if (locale === "en") {
+        await page.goto(routes[0]);
+        await switchToEnglish(page);
+      }
+
+      for (const route of routes) {
+        await page.goto(route);
+        await expect(page.locator("html")).toHaveAttribute("lang", locale);
+
+        const notice = page.locator("[data-demo-language-evidence]");
+        if (route.startsWith("/compare") || route === "/growth") {
+          await expect(notice).toBeVisible();
+          await expect(
+            notice.locator('[lang="zh-CN"]').getByText("虚构演示数据", {
+              exact: true,
+            }),
+          ).toBeVisible();
+          await expect(
+            notice.locator('[lang="en"]').getByText("Fictional demo data", {
+              exact: true,
+            }),
+          ).toBeVisible();
+          await expect(
+            notice.locator('[lang="zh-CN"]').getByText("不是语言评估", {
+              exact: true,
+            }),
+          ).toBeVisible();
+          await expect(
+            notice
+              .locator('[lang="en"]')
+              .getByText("Not a language evaluation", { exact: true }),
+          ).toBeVisible();
+        }
+
+        await expectAxeRoute(page, route);
+      }
+    }
+  });
 
   for (const route of coreRoutes) {
     test(`${route} has stable landmarks, names, labels, and IDs`, async ({

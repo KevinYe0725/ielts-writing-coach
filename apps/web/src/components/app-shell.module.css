@@ -703,7 +703,7 @@
     linear-gradient(
       90deg,
       transparent 0 47px,
-      color-mix(in srgb, var(--desk-error) 18%, transparent) 48px 49px,
+      color-mix(in srgb, var(--desk-blue) 18%, transparent) 48px 49px,
       transparent 50px
     ),
     var(--desk-canvas);

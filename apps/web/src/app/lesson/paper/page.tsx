@@ -561,7 +561,7 @@ export default function PracticePaperPage({
         {data.result ? (
           <>
             <div>
-              <strong>{text("解析已保存", "Review saved")}</strong>
+              <strong>{text("交卷记录已保存", "Submission saved")}</strong>
               <span>
                 {text(
                   "下一步是24小时后的闭卷重写。",

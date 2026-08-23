@@ -1,4 +1,4 @@
-import { expect, test, type Locator } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import {
   deterministicDemo,
@@ -98,6 +98,45 @@ async function expectColorUsesToken(
   expect(colors.actual).toBe(colors.expected);
 }
 
+async function expectNoErrorToken(locator: Locator): Promise<void> {
+  await expect(locator).toBeVisible();
+  const colors = await locator.evaluate((element) => {
+    const probe = document.createElement("span");
+    element.ownerDocument.body.append(probe);
+    const resolveBackground = (value: string) => {
+      probe.style.background = value;
+      return window.getComputedStyle(probe).backgroundColor;
+    };
+    const style = window.getComputedStyle(element);
+    const result = {
+      actualBackground: style.backgroundColor,
+      actualImage: style.backgroundImage,
+      error: resolveBackground("var(--desk-error)"),
+      errorLine: resolveBackground(
+        "color-mix(in srgb, var(--desk-error) 18%, transparent)",
+      ),
+      errorSoft: resolveBackground("var(--desk-error-soft)"),
+    };
+    probe.remove();
+    return result;
+  });
+
+  expect(colors.actualBackground).not.toBe(colors.error);
+  expect(colors.actualBackground).not.toBe(colors.errorSoft);
+  expect(colors.actualImage).not.toContain(colors.error);
+  expect(colors.actualImage).not.toContain(colors.errorLine);
+  expect(colors.actualImage).not.toContain(colors.errorSoft);
+}
+
+async function switchToEnglish(page: Page): Promise<void> {
+  if ((await page.locator("html").getAttribute("lang")) !== "en") {
+    const switcher = page.locator(".locale-switch:visible");
+    await expect(switcher).toHaveAccessibleName("切换到英文界面");
+    await switcher.click();
+  }
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+}
+
 test.describe("annotation desk redesign contracts", () => {
   test.skip(
     !deterministicDemo,
@@ -116,6 +155,41 @@ test.describe("annotation desk redesign contracts", () => {
       "data-page-layout",
       "focus",
     );
+  });
+
+  test("final review semantics: Version 1 comparison never uses Error decoration", async ({
+    page,
+  }) => {
+    await page.goto("/compare?cycle=cycle-demo");
+
+    await expectNoErrorToken(page.locator(".sentence-before").first());
+  });
+
+  test("final review semantics: Entry desk decoration never uses Error red", async ({
+    page,
+  }) => {
+    await page.goto("/signin");
+
+    await expectNoErrorToken(page.locator(".setup-shell"));
+  });
+
+  test("final review semantics: English Demo keeps every canonical Growth level name", async ({
+    page,
+  }) => {
+    await page.goto("/growth");
+    await switchToEnglish(page);
+
+    for (const [state, label] of [
+      ["diagnosed", "Diagnosed"],
+      ["practicing", "Practising"],
+      ["applied", "Applied"],
+      ["retained", "Retained"],
+      ["transferred", "Transferred"],
+    ] as const) {
+      const level = page.locator(`[data-growth-level="${state}"]`);
+      await expect(level.getByText(label, { exact: true })).toBeVisible();
+      await expect(level).toContainText("not evaluated");
+    }
   });
 
   for (const viewport of [
