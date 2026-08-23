@@ -114,8 +114,9 @@
   min-width: 0;
 }
 
-.article :lang(en) {
+.article [lang="en"] {
   font-family: var(--desk-font-reading);
+  font-weight: var(--desk-reading-weight-regular);
 }
 
 .articleHeader {

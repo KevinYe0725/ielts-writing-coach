@@ -61,6 +61,61 @@ function cssFileLabel(path: string): string {
   return path.startsWith(sourceRoot) ? path.slice(sourceRoot.length) : path;
 }
 
+type CssDocument = { path: string; source: string };
+
+// CSS custom properties have no implicit platform exemption. A missing
+// property is allowed only when this exact name is audited here and its use
+// supplies a fallback. Shipped CSS currently needs no such exception.
+const allowedUndefinedFallbackProperties = new Set<string>();
+// The shipped reset needs `font: inherit`; no other CSS-wide or shorthand
+// value has an audited use.
+const allowedFontShorthandValues = new Set(["inherit"]);
+
+function executableCss(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//gu, "");
+}
+
+function undefinedCustomProperties(
+  documents: readonly CssDocument[],
+  allowedUndefinedFallbacks = allowedUndefinedFallbackProperties,
+): string[] {
+  const definitions = new Set(
+    documents
+      .flatMap(({ source }) => [
+        ...executableCss(source).matchAll(/(--[\w-]+)\s*:/gu),
+      ])
+      .map((match) => match[1]!),
+  );
+  const violations = new Set<string>();
+
+  for (const { path, source } of documents) {
+    for (const match of executableCss(source).matchAll(
+      /var\(\s*(--[\w-]+)\s*(,)?/gu,
+    )) {
+      const property = match[1]!;
+      const hasFallback = match[2] === ",";
+      if (definitions.has(property)) continue;
+      if (hasFallback && allowedUndefinedFallbacks.has(property)) continue;
+      violations.add(`${cssFileLabel(path)}: ${property}`);
+    }
+  }
+
+  return [...violations].sort();
+}
+
+function fontShorthandViolations(
+  documents: readonly CssDocument[],
+  allowedValues = allowedFontShorthandValues,
+): string[] {
+  return documents
+    .flatMap(({ path, source }) =>
+      declarations(executableCss(source), "font")
+        .filter(({ value }) => !allowedValues.has(value))
+        .map(({ value }) => `${cssFileLabel(path)}: font: ${value}`),
+    )
+    .sort();
+}
+
 const remainingGlobalClassInventory = [
   "amber",
   "badge",
@@ -217,20 +272,54 @@ describe("global style ownership", () => {
 
 describe("annotation desk token contract", () => {
   it("defines every custom property consumed by shipped CSS", () => {
-    const definitions = new Set(
-      cssDocuments
-        .flatMap(({ source }) => [...source.matchAll(/(--[\w-]+)\s*:/gu)])
-        .map((match) => match[1]!),
-    );
-    const uses = new Set(
-      cssDocuments
-        .flatMap(({ source }) => [...source.matchAll(/var\(\s*(--[\w-]+)/gu)])
-        .map((match) => match[1]!),
-    );
+    expect(undefinedCustomProperties(cssDocuments)).toEqual([]);
+  });
 
+  it("detects a misspelled custom property in a mutation fixture", () => {
+    const mutation = [
+      {
+        path: "mutation.css",
+        source:
+          "/* --desk-bule: hotpink; */ :root { --desk-blue: #1d56a0; } .fixture { color: var(--desk-bule); }",
+      },
+    ];
+
+    expect(undefinedCustomProperties(mutation)).toEqual([
+      "mutation.css: --desk-bule",
+    ]);
+  });
+
+  it("requires an explicit allowlist for an undefined property with fallback", () => {
+    const fallbackFixture = [
+      {
+        path: "fallback.css",
+        source: ".fixture { color: var(--host-accent, currentColor); }",
+      },
+    ];
+
+    expect(undefinedCustomProperties(fallbackFixture)).toEqual([
+      "fallback.css: --host-accent",
+    ]);
     expect(
-      [...uses].filter((property) => !definitions.has(property)).sort(),
+      undefinedCustomProperties(fallbackFixture, new Set(["--host-accent"])),
     ).toEqual([]);
+  });
+
+  it("allows only the audited inherit font shorthand in shipped CSS", () => {
+    expect(fontShorthandViolations(cssDocuments)).toEqual([]);
+  });
+
+  it("detects a non-inherit font shorthand in a mutation fixture", () => {
+    const mutation = [
+      {
+        path: "mutation.css",
+        source: ".fixture { font: 650 16px/1.5 var(--desk-font-body); }",
+      },
+    ];
+
+    expect(fontShorthandViolations(mutation)).toEqual([
+      "mutation.css: font: 650 16px/1.5 var(--desk-font-body)",
+    ]);
   });
 
   it("declares the complete approved role and scale tokens", () => {

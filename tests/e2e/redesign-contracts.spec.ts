@@ -626,6 +626,51 @@ test.describe("annotation desk redesign contracts", () => {
     }
   });
 
+  test("English locale typography keeps UI roles separate from explicit English evidence", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 960 });
+    await page.goto(
+      "/lesson?cycle=cycle-demo&lesson=lesson-collocation-perspective",
+    );
+    await page.locator(".topbar .locale-switch").click();
+    await expect(page.locator("html")).toHaveAttribute("lang", "en");
+
+    const articleMeta = page.getByText("Focused writing tutorial", {
+      exact: true,
+    });
+    const articleHeading = page.getByRole("heading", {
+      name: "Build the missing link in a causal argument",
+    });
+    const uiButton = page.locator("[data-teaching-practice-submit]").first();
+    const englishQuote = page
+      .locator('[data-teaching-block="MARKDOWN"] blockquote[lang="en"]')
+      .first();
+    const englishPrompt = page
+      .locator('[data-teaching-practice] p[lang="en"]')
+      .first();
+
+    for (const uiText of [articleMeta, articleHeading, uiButton]) {
+      const font = await uiText.evaluate((element) => {
+        const style = window.getComputedStyle(element);
+        return { family: style.fontFamily, weight: style.fontWeight };
+      });
+      expect(font.family).toContain("Noto Sans SC");
+      expect(font.family).not.toContain("Source Serif 4");
+      expect(["400", "500", "650", "700"]).toContain(font.weight);
+    }
+
+    for (const englishText of [englishQuote, englishPrompt]) {
+      const font = await englishText.evaluate((element) => {
+        const style = window.getComputedStyle(element);
+        return { family: style.fontFamily, weight: style.fontWeight };
+      });
+      expect(font.family).toContain("Source Serif 4");
+      expect(font.family).not.toContain("Noto Sans SC");
+      expect(["400", "600"]).toContain(font.weight);
+    }
+  });
+
   test("reading shell leaves generic page typography in the body UI family", async ({
     page,
   }) => {
