@@ -45,7 +45,12 @@ async function expectAxeRoute(
 async function switchToEnglish(
   page: import("@playwright/test").Page,
 ): Promise<void> {
-  const switcher = page.locator(".locale-switch:visible");
+  const switcher = page.locator(
+    (page.viewportSize()?.width ?? 1280) <= 960
+      ? ".mobile-header .locale-switch"
+      : ".topbar .locale-switch",
+  );
+  await expect(switcher).toBeVisible();
   await expect(switcher).toHaveAccessibleName("切换到英文界面");
   await switcher.click();
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
@@ -73,6 +78,9 @@ test.describe("cross-browser accessibility smoke checks", () => {
     for (const locale of ["zh-CN", "en"] as const) {
       if (locale === "en") {
         await page.goto(routes[0]);
+        await expect(
+          page.locator('[data-evidence-record="comparison"]'),
+        ).toBeVisible();
         await switchToEnglish(page);
       }
 

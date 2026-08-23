@@ -352,6 +352,13 @@ test.describe("desktop learning workspace", () => {
     );
     await page.goto("/today");
 
+    // The locale button is present in the server-rendered shell before its
+    // click handler is attached. Wait for Today's client-loaded workspace so
+    // a busy four-project run cannot mistake a pre-hydration click for a user
+    // interaction.
+    await expect(
+      page.locator('[data-essay-workspace="compact"]'),
+    ).toBeVisible();
     await page.locator(".topbar .locale-switch").click();
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
     await expect

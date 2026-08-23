@@ -71,16 +71,19 @@ async function expectComputedStyles(
   expectedStyles: Record<string, string>,
 ): Promise<void> {
   await expect(locator).toBeAttached();
-  const computedStyles = await locator.evaluate((element, properties) => {
-    const style = window.getComputedStyle(element);
-    return Object.fromEntries(
-      Object.keys(properties).map((property) => [
-        property,
-        style.getPropertyValue(property),
-      ]),
-    );
-  }, expectedStyles);
-  expect(computedStyles).toEqual(expectedStyles);
+  await expect
+    .poll(() =>
+      locator.evaluate((element, properties) => {
+        const style = window.getComputedStyle(element);
+        return Object.fromEntries(
+          Object.keys(properties).map((property) => [
+            property,
+            style.getPropertyValue(property),
+          ]),
+        );
+      }, expectedStyles),
+    )
+    .toEqual(expectedStyles);
 }
 
 async function expectColorUsesToken(
@@ -130,7 +133,12 @@ async function expectNoErrorToken(locator: Locator): Promise<void> {
 
 async function switchToEnglish(page: Page): Promise<void> {
   if ((await page.locator("html").getAttribute("lang")) !== "en") {
-    const switcher = page.locator(".locale-switch:visible");
+    const switcher = page.locator(
+      (page.viewportSize()?.width ?? 1280) <= 960
+        ? ".mobile-header .locale-switch"
+        : ".topbar .locale-switch",
+    );
+    await expect(switcher).toBeVisible();
     await expect(switcher).toHaveAccessibleName("切换到英文界面");
     await switcher.click();
   }
@@ -177,6 +185,7 @@ test.describe("annotation desk redesign contracts", () => {
     page,
   }) => {
     await page.goto("/growth");
+    await expect(page.locator('[data-evidence-record="growth"]')).toBeVisible();
     await switchToEnglish(page);
 
     for (const [state, label] of [
@@ -707,8 +716,8 @@ test.describe("annotation desk redesign contracts", () => {
     await page.goto(
       "/lesson?cycle=cycle-demo&lesson=lesson-collocation-perspective",
     );
-    await page.locator(".topbar .locale-switch").click();
-    await expect(page.locator("html")).toHaveAttribute("lang", "en");
+    await expect(page.locator("[data-teaching-article]")).toBeVisible();
+    await switchToEnglish(page);
 
     const articleMeta = page.getByText("Focused writing tutorial", {
       exact: true,

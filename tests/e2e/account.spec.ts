@@ -9,30 +9,26 @@ async function expectAllVisibleFontsAtLeast(
   minimumPixels = 12,
 ) {
   await expect(locator.first()).toBeVisible();
-  await expect
-    .poll(
-      () =>
-        locator.evaluateAll(
-          (elements, minimum) =>
-            elements
-              .map((element) => ({
-                fontSize: Number.parseFloat(
-                  window.getComputedStyle(element).fontSize,
-                ),
-                text:
-                  element.getAttribute("aria-label") ||
-                  element.textContent?.trim().slice(0, 80) ||
-                  element.tagName.toLowerCase(),
-              }))
-              .filter(
-                ({ fontSize }) =>
-                  !Number.isFinite(fontSize) || fontSize < minimum,
-              ),
-          minimumPixels,
-        ),
-      { message: state },
-    )
-    .toEqual([]);
+  await expect(async () => {
+    const undersized = await locator.evaluateAll(
+      (elements, minimum) =>
+        elements
+          .map((element) => ({
+            fontSize: Number.parseFloat(
+              window.getComputedStyle(element).fontSize,
+            ),
+            text:
+              element.getAttribute("aria-label") ||
+              element.textContent?.trim().slice(0, 80) ||
+              element.tagName.toLowerCase(),
+          }))
+          .filter(
+            ({ fontSize }) => !Number.isFinite(fontSize) || fontSize < minimum,
+          ),
+      minimumPixels,
+    );
+    expect(undersized, state).toEqual([]);
+  }).toPass({ timeout: 10_000 });
 }
 
 async function expectAxeRoute(
