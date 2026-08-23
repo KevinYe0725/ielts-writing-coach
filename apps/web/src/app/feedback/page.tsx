@@ -599,7 +599,7 @@ export default function FeedbackPage({
                         paragraphFeedback.revisionEn ? (
                           <div className={styles.paragraphRevision}>
                             <p className="eyebrow">
-                              {text("AI 优化段", "Polished revision")}
+                              {text("参考改写", "Polished revision")}
                             </p>
                             <blockquote lang="en">
                               {text(

@@ -859,11 +859,28 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
   });
 
   test("does not expose backend vocabulary in feedback or focused teaching", async ({
-    page,
+    context,
   }) => {
-    for (const url of [feedbackUrl, lessonUrl]) {
-      await page.goto(url);
-      await expect(page.getByRole("main")).not.toContainText(backendVocabulary);
+    for (const [url, readySelector] of [
+      [feedbackUrl, "[data-feedback-workbench]"],
+      [lessonUrl, "article[data-teaching-article]"],
+    ] as const) {
+      // Keep each route's hydration lifecycle on its own page. A cold Feedback
+      // render may still reload while settling, but it cannot interrupt the
+      // Lesson navigation or let either vocabulary scan pass on a skeleton.
+      const surfacePage = await context.newPage();
+      try {
+        await surfacePage.goto(url);
+        await expect(
+          surfacePage.locator(readySelector),
+          `${url} rendered surface`,
+        ).toBeVisible();
+        await expect(surfacePage.getByRole("main")).not.toContainText(
+          backendVocabulary,
+        );
+      } finally {
+        await surfacePage.close();
+      }
     }
   });
 
