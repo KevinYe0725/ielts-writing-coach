@@ -284,6 +284,11 @@
   font-weight: var(--desk-body-weight-bold);
 }
 
+.prose :is(strong, b)[lang="en"],
+.prose [lang="en"] :is(strong, b) {
+  font-weight: var(--desk-reading-weight-semibold);
+}
+
 .keyPoint {
   display: flex;
   padding: var(--desk-space-4) var(--desk-space-4);

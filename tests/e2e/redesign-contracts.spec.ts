@@ -86,6 +86,94 @@ async function expectComputedStyles(
     .toEqual(expectedStyles);
 }
 
+async function expectReadingTypography(
+  locator: Locator,
+  allowedWeights: readonly string[],
+): Promise<void> {
+  await expect(locator).toBeVisible();
+  const font = await locator.evaluate((element) => {
+    const style = window.getComputedStyle(element);
+    return { family: style.fontFamily, weight: style.fontWeight };
+  });
+
+  expect(font.family).toContain("Source Serif 4");
+  expect(font.family).not.toContain("Noto Sans SC");
+  expect(allowedWeights).toContain(font.weight);
+}
+
+async function expectExplicitEnglishEvidenceTypography(
+  targets: Locator,
+  surface: string,
+): Promise<void> {
+  const inspect = () =>
+    targets.evaluateAll((elements) => {
+      const inspected = [...new Set(elements)].filter((element) => {
+        if (
+          element.closest(
+            ".sr-only, [aria-hidden='true'], [hidden], input[type='hidden']",
+          )
+        ) {
+          return false;
+        }
+        const style = window.getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        const visible =
+          style.display !== "none" &&
+          style.visibility !== "hidden" &&
+          Number.parseFloat(style.opacity || "1") > 0 &&
+          rect.width > 0 &&
+          rect.height > 0;
+        if (!visible) return false;
+        const ownsText = Array.from(element.childNodes).some(
+          (node) =>
+            node.nodeType === Node.TEXT_NODE &&
+            Boolean(node.textContent?.trim()),
+        );
+        return ownsText || element.matches("input, textarea, select");
+      });
+      const records = inspected.map((element) => {
+        const style = window.getComputedStyle(element);
+        return {
+          family: style.fontFamily,
+          tag: element.tagName.toLowerCase(),
+          text:
+            (element as HTMLInputElement).placeholder ||
+            element.textContent?.trim().slice(0, 100) ||
+            element.tagName.toLowerCase(),
+          weight: style.fontWeight,
+        };
+      });
+      return {
+        count: records.length,
+        violations: records.filter(
+          ({ family, weight }) =>
+            !family.includes("Source Serif 4") ||
+            family.includes("Noto Sans SC") ||
+            !["400", "600"].includes(weight),
+        ),
+      };
+    });
+
+  let audit = await inspect();
+  await expect
+    .poll(
+      async () => {
+        audit = await inspect();
+        return audit.count;
+      },
+      { message: `${surface}: rendered English evidence` },
+    )
+    .toBeGreaterThan(0);
+
+  expect(
+    audit.count,
+    `${surface}: explicit English evidence coverage`,
+  ).toBeGreaterThan(0);
+  expect(audit.violations, `${surface}: English reading typography`).toEqual(
+    [],
+  );
+}
+
 async function expectColorUsesToken(
   locator: Locator,
   token: "--desk-blue",
@@ -103,32 +191,64 @@ async function expectColorUsesToken(
 
 async function expectNoErrorToken(locator: Locator): Promise<void> {
   await expect(locator).toBeVisible();
-  const colors = await locator.evaluate((element) => {
+  const report = await locator.evaluate((element) => {
     const probe = document.createElement("span");
     element.ownerDocument.body.append(probe);
     const resolveBackground = (value: string) => {
+      probe.style.background = "";
       probe.style.background = value;
       return window.getComputedStyle(probe).backgroundColor;
     };
-    const style = window.getComputedStyle(element);
-    const result = {
-      actualBackground: style.backgroundColor,
-      actualImage: style.backgroundImage,
-      error: resolveBackground("var(--desk-error)"),
-      errorLine: resolveBackground(
-        "color-mix(in srgb, var(--desk-error) 18%, transparent)",
-      ),
-      errorSoft: resolveBackground("var(--desk-error-soft)"),
+    const resolveColor = (value: string) => {
+      probe.style.color = "";
+      probe.style.color = value;
+      return window.getComputedStyle(probe).color;
     };
+    const errorTokens = [
+      "var(--desk-error)",
+      "color-mix(in srgb, var(--desk-error) 18%, transparent)",
+      "var(--desk-error-soft)",
+    ];
+    const forbiddenColors = [
+      ...new Set(
+        errorTokens.flatMap((token) => [
+          resolveBackground(token),
+          resolveColor(token),
+        ]),
+      ),
+    ].filter(Boolean);
+    const styles = [
+      ["host", window.getComputedStyle(element)],
+      ["::before", window.getComputedStyle(element, "::before")],
+      ["::after", window.getComputedStyle(element, "::after")],
+    ] as const;
+    const properties = [
+      ["color", "color"],
+      ["background-color", "backgroundColor"],
+      ["background-image", "backgroundImage"],
+      ["border-top-color", "borderTopColor"],
+      ["border-right-color", "borderRightColor"],
+      ["border-bottom-color", "borderBottomColor"],
+      ["border-left-color", "borderLeftColor"],
+      ["outline-color", "outlineColor"],
+      ["box-shadow", "boxShadow"],
+    ] as const;
+    const violations = styles.flatMap(([pseudo, style]) =>
+      properties.flatMap(([property, key]) => {
+        const value = style[key];
+        return forbiddenColors.some(
+          (forbidden) => value === forbidden || value.includes(forbidden),
+        )
+          ? [`${pseudo} ${property}: ${value}`]
+          : [];
+      }),
+    );
     probe.remove();
-    return result;
+    return { forbiddenColors, violations };
   });
 
-  expect(colors.actualBackground).not.toBe(colors.error);
-  expect(colors.actualBackground).not.toBe(colors.errorSoft);
-  expect(colors.actualImage).not.toContain(colors.error);
-  expect(colors.actualImage).not.toContain(colors.errorLine);
-  expect(colors.actualImage).not.toContain(colors.errorSoft);
+  expect(report.forbiddenColors.length).toBeGreaterThanOrEqual(3);
+  expect(report.violations).toEqual([]);
 }
 
 async function switchToEnglish(page: Page): Promise<void> {
@@ -179,6 +299,131 @@ test.describe("annotation desk redesign contracts", () => {
     await page.goto("/signin");
 
     await expectNoErrorToken(page.locator(".setup-shell"));
+  });
+
+  test("Error-token helper rejects host and pseudo-element color mutations", async ({
+    page,
+  }) => {
+    await page.setContent(`
+      <style>
+        :root {
+          --desk-ink: #172033;
+          --desk-paper: #fcfbf8;
+          --desk-blue: #1d56a0;
+          --desk-line: color-mix(in srgb, var(--desk-ink) 14%, transparent);
+          --desk-error: #b4474c;
+          --desk-error-soft: color-mix(in srgb, var(--desk-error) 10%, var(--desk-paper));
+        }
+      </style>
+      <main>Computed Error-token mutation fixtures</main>
+    `);
+    const mutations = [
+      "host-background-color",
+      "host-background-image",
+      "host-color",
+      "host-border-top",
+      "host-border-right",
+      "host-border-bottom",
+      "host-border-left",
+      "host-outline",
+      "host-shadow",
+      "before-background-color",
+      "before-background-image",
+      "before-color",
+      "before-border-top",
+      "before-border-right",
+      "before-border-bottom",
+      "before-border-left",
+      "before-outline",
+      "before-shadow",
+      "after-background-color",
+      "after-background-image",
+      "after-color",
+      "after-border-top",
+      "after-border-right",
+      "after-border-bottom",
+      "after-border-left",
+      "after-outline",
+      "after-shadow",
+    ] as const;
+
+    await page.evaluate((names) => {
+      const style = document.createElement("style");
+      style.textContent = `
+        [data-error-token-mutation] {
+          display: block;
+          width: 12px;
+          height: 12px;
+          color: var(--desk-ink);
+          background-color: var(--desk-paper);
+          border: 1px solid var(--desk-line);
+          outline: 1px solid var(--desk-blue);
+          box-shadow: 0 0 0 1px var(--desk-line);
+        }
+        [data-error-token-mutation="host-background-color"] { background-color: var(--desk-error-soft); }
+        [data-error-token-mutation="host-background-image"] { background-image: linear-gradient(var(--desk-error), var(--desk-error)); }
+        [data-error-token-mutation="host-color"] { color: var(--desk-error); }
+        [data-error-token-mutation="host-border-top"] { border-top-color: var(--desk-error); }
+        [data-error-token-mutation="host-border-right"] { border-right-color: var(--desk-error); }
+        [data-error-token-mutation="host-border-bottom"] { border-bottom-color: var(--desk-error); }
+        [data-error-token-mutation="host-border-left"] { border-left-color: var(--desk-error); }
+        [data-error-token-mutation="host-outline"] { outline-color: var(--desk-error); }
+        [data-error-token-mutation="host-shadow"] { box-shadow: 0 0 0 2px var(--desk-error); }
+        [data-error-token-mutation^="before-"]::before,
+        [data-error-token-mutation^="after-"]::after {
+          display: block;
+          width: 4px;
+          height: 4px;
+          color: var(--desk-ink);
+          background-color: var(--desk-paper);
+          border: 1px solid var(--desk-line);
+          outline: 1px solid var(--desk-blue);
+          box-shadow: 0 0 0 1px var(--desk-line);
+          content: "mutation";
+        }
+        [data-error-token-mutation="before-background-color"]::before,
+        [data-error-token-mutation="after-background-color"]::after { background-color: var(--desk-error-soft); }
+        [data-error-token-mutation="before-background-image"]::before,
+        [data-error-token-mutation="after-background-image"]::after { background-image: linear-gradient(color-mix(in srgb, var(--desk-error) 18%, transparent), transparent); }
+        [data-error-token-mutation="before-color"]::before,
+        [data-error-token-mutation="after-color"]::after { color: var(--desk-error); }
+        [data-error-token-mutation="before-border-top"]::before,
+        [data-error-token-mutation="after-border-top"]::after { border-top-color: var(--desk-error); }
+        [data-error-token-mutation="before-border-right"]::before,
+        [data-error-token-mutation="after-border-right"]::after { border-right-color: var(--desk-error); }
+        [data-error-token-mutation="before-border-bottom"]::before,
+        [data-error-token-mutation="after-border-bottom"]::after { border-bottom-color: var(--desk-error); }
+        [data-error-token-mutation="before-border-left"]::before,
+        [data-error-token-mutation="after-border-left"]::after { border-left-color: var(--desk-error); }
+        [data-error-token-mutation="before-outline"]::before,
+        [data-error-token-mutation="after-outline"]::after { outline-color: var(--desk-error); }
+        [data-error-token-mutation="before-shadow"]::before,
+        [data-error-token-mutation="after-shadow"]::after { box-shadow: 0 0 0 2px var(--desk-error); }
+      `;
+      document.head.append(style);
+      for (const name of names) {
+        const fixture = document.createElement("span");
+        fixture.dataset.errorTokenMutation = name;
+        fixture.textContent = name;
+        document.body.append(fixture);
+      }
+      const safe = document.createElement("span");
+      safe.dataset.errorTokenMutation = "safe";
+      safe.textContent = "safe";
+      document.body.append(safe);
+    }, mutations);
+
+    await expectNoErrorToken(
+      page.locator('[data-error-token-mutation="safe"]'),
+    );
+    for (const mutation of mutations) {
+      await expect(
+        expectNoErrorToken(
+          page.locator(`[data-error-token-mutation="${mutation}"]`),
+        ),
+        `${mutation} must be rejected`,
+      ).rejects.toThrow();
+    }
   });
 
   test("final review semantics: English Demo keeps every canonical Growth level name", async ({
@@ -753,6 +998,95 @@ test.describe("annotation desk redesign contracts", () => {
       expect(["400", "600"]).toContain(font.weight);
     }
   });
+
+  test("Paper English option labels render in the semibold reading role", async ({
+    page,
+  }) => {
+    await page.goto(
+      "/lesson/paper?cycle=cycle-demo&lesson=lesson-collocation-perspective",
+    );
+
+    await expectReadingTypography(
+      page.locator('.practice-paper-options strong[lang="en"]').first(),
+      ["600"],
+    );
+  });
+
+  test("Lesson Markdown maps English emphasis to reading semibold without changing Chinese emphasis", async ({
+    page,
+  }) => {
+    await page.goto(
+      "/lesson?cycle=cycle-demo&lesson=lesson-collocation-perspective",
+    );
+
+    const englishQuote = page
+      .locator('[data-teaching-block="MARKDOWN"] blockquote[lang="en"]')
+      .first();
+    await expect(englishQuote).toBeVisible();
+    const englishFont = await page.evaluate(() => {
+      const quote = document.querySelector<HTMLElement>(
+        '[data-teaching-block="MARKDOWN"] blockquote[lang="en"]',
+      );
+      if (!quote) throw new Error("Rendered English Markdown quote is missing");
+      const strong = document.createElement("strong");
+      strong.textContent = "A dynamically emphasized English clause.";
+      quote.append(strong);
+      const style = window.getComputedStyle(strong);
+      const font = { family: style.fontFamily, weight: style.fontWeight };
+      strong.remove();
+      return font;
+    });
+    expect(englishFont.family).toContain("Source Serif 4");
+    expect(englishFont.family).not.toContain("Noto Sans SC");
+    expect(englishFont.weight).toBe("600");
+
+    const chineseStrong = page
+      .locator('[data-teaching-block="MARKDOWN"] strong')
+      .filter({ hasText: "核心判断" })
+      .first();
+    await expect(chineseStrong).toBeVisible();
+    const chineseFont = await chineseStrong.evaluate((element) => {
+      const style = window.getComputedStyle(element);
+      return { family: style.fontFamily, weight: style.fontWeight };
+    });
+    expect(chineseFont.family).toContain("Noto Sans SC");
+    expect(chineseFont.family).not.toContain("Source Serif 4");
+    expect(chineseFont.weight).toBe("700");
+  });
+
+  for (const [surface, route, selector] of [
+    [
+      "Paper",
+      "/lesson/paper?cycle=cycle-demo&lesson=lesson-collocation-perspective",
+      '[data-paper-sheet] :is([lang="en"], [lang="en"] :is(strong, b))',
+    ],
+    [
+      "Lesson",
+      "/lesson?cycle=cycle-demo&lesson=lesson-collocation-perspective",
+      '[data-teaching-article] :is([lang="en"], [lang="en"] :is(strong, b))',
+    ],
+    [
+      "Feedback",
+      "/feedback?cycle=cycle-demo&lesson=lesson-collocation-perspective",
+      '[data-feedback-workbench] :is([lang="en"], [data-feedback-essay] > span, [data-feedback-essay] > mark, p[lang="en"] > :is(strong, b), blockquote[lang="en"] :is(strong, b))',
+    ],
+    [
+      "Transfer",
+      "/transfer?cycle=cycle-demo&task=transfer-task",
+      '[data-evidence-record="transfer"] :is([lang="en"], [lang="en"] :is(strong, b))',
+    ],
+  ] as const) {
+    test(`${surface} keeps every visible explicit English evidence descendant in the reading role`, async ({
+      page,
+    }) => {
+      await page.goto(route);
+
+      await expectExplicitEnglishEvidenceTypography(
+        page.locator(selector),
+        surface,
+      );
+    });
+  }
 
   test("reading shell leaves generic page typography in the body UI family", async ({
     page,

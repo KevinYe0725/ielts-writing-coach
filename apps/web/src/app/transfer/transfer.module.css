@@ -23,6 +23,9 @@
   font-size: var(--desk-type-subheading);
   line-height: 1.65;
 }
+:global(.transfer-check-card blockquote[lang="en"] :is(strong, b)) {
+  font-weight: var(--desk-reading-weight-semibold);
+}
 :global(.transfer-task-prompt) {
   display: flex;
   padding: var(--desk-space-3);

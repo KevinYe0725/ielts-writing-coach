@@ -626,6 +626,11 @@
   place-items: center;
 }
 
+.options label > strong {
+  font-family: var(--desk-font-reading);
+  font-weight: var(--desk-reading-weight-semibold);
+}
+
 .options input {
   position: absolute;
   opacity: 0;
