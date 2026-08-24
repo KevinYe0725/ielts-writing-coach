@@ -5,8 +5,7 @@ import type {
   SearchResult,
 } from "./types";
 
-const BRAVE_SEARCH_ENDPOINT =
-  "https://api.search.brave.com/res/v1/web/search";
+const BRAVE_SEARCH_ENDPOINT = "https://api.search.brave.com/res/v1/web/search";
 const DEFAULT_TIMEOUT_MS = 10_000;
 const MAX_TIMEOUT_MS = 60_000;
 const MAX_RESPONSE_BYTES = 256 * 1024;
@@ -31,20 +30,24 @@ type SafeSearchErrorCode =
   | "CONNECTION"
   | "INVALID_QUERY";
 
-type SafeSearchError = Error & {
-  code: SafeSearchErrorCode;
-  status?: number;
-};
+class SafeSearchError extends Error {
+  readonly code: SafeSearchErrorCode;
+  readonly status?: number;
+
+  constructor(code: SafeSearchErrorCode, message: string, status?: number) {
+    super(message);
+    this.name = "SafeSearchError";
+    this.code = code;
+    if (status !== undefined) this.status = status;
+  }
+}
 
 function searchError(
   code: SafeSearchErrorCode,
   message: string,
   status?: number,
 ): SafeSearchError {
-  const error = new Error(message) as SafeSearchError;
-  error.code = code;
-  if (status !== undefined) error.status = status;
-  return error;
+  return new SafeSearchError(code, message, status);
 }
 
 function boundedSignal(timeoutMs: number, signal?: AbortSignal): AbortSignal {
@@ -119,7 +122,9 @@ async function readBoundedJson(response: Response): Promise<unknown> {
   }
 
   try {
-    return JSON.parse(new TextDecoder().decode(bytes)) as unknown;
+    return JSON.parse(
+      new TextDecoder("utf-8", { fatal: true }).decode(bytes),
+    ) as unknown;
   } catch {
     throw searchError(
       "INVALID_RESPONSE",
@@ -129,12 +134,7 @@ async function readBoundedJson(response: Response): Promise<unknown> {
 }
 
 function isSafeSearchError(error: unknown): error is SafeSearchError {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    typeof (error as { code?: unknown }).code === "string"
-  );
+  return error instanceof SafeSearchError;
 }
 
 function normalizeUrl(value: unknown): string | undefined {
@@ -163,9 +163,19 @@ function normalizeResults(payload: unknown): readonly SearchResult[] {
     );
   }
   const web = (payload as { web?: unknown }).web;
-  if (typeof web !== "object" || web === null) return [];
+  if (typeof web !== "object" || web === null) {
+    throw searchError(
+      "INVALID_RESPONSE",
+      "Search provider returned an invalid response.",
+    );
+  }
   const results = (web as { results?: unknown }).results;
-  if (!Array.isArray(results)) return [];
+  if (!Array.isArray(results)) {
+    throw searchError(
+      "INVALID_RESPONSE",
+      "Search provider returned an invalid response.",
+    );
+  }
 
   const normalized: SearchResult[] = [];
   for (const result of results) {
@@ -191,7 +201,10 @@ function normalizeResults(payload: unknown): readonly SearchResult[] {
 
 function safeErrorFor(error: unknown, signal: AbortSignal): SafeSearchError {
   if (isSafeSearchError(error)) return error;
-  if (signal.aborted || (error instanceof DOMException && error.name === "AbortError")) {
+  if (
+    signal.aborted ||
+    (error instanceof DOMException && error.name === "AbortError")
+  ) {
     return searchError("TIMEOUT", "Search request timed out.");
   }
   const status =
@@ -302,7 +315,10 @@ export class BraveSearchAdapter implements SearchAdapter {
 
     try {
       const response = await this.#fetch(request);
-      if (response.redirected || (response.status >= 300 && response.status < 400)) {
+      if (
+        response.redirected ||
+        (response.status >= 300 && response.status < 400)
+      ) {
         throw searchError(
           "REDIRECT",
           "Search provider returned an unsafe redirect.",

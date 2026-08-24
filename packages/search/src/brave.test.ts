@@ -7,7 +7,8 @@ const MAX_RESPONSE_BYTES = 256 * 1024;
 function jsonBodyOfExactByteLength(bytes: number): string {
   const prefix = '{"web":{"results":[]},"padding":"';
   const suffix = '"}';
-  const paddingLength = bytes - new TextEncoder().encode(prefix + suffix).byteLength;
+  const paddingLength =
+    bytes - new TextEncoder().encode(prefix + suffix).byteLength;
   if (paddingLength < 0) throw new Error("Fixture length is too small.");
   const body = `${prefix}${"x".repeat(paddingLength)}${suffix}`;
   expect(new TextEncoder().encode(body).byteLength).toBe(bytes);
@@ -74,7 +75,10 @@ describe("BraveSearchAdapter", () => {
         new Promise<Response>((_resolve, reject) => {
           request.signal.addEventListener(
             "abort",
-            () => reject(new DOMException("provider reflected test-key", "AbortError")),
+            () =>
+              reject(
+                new DOMException("provider reflected test-key", "AbortError"),
+              ),
             { once: true },
           );
         }),
@@ -129,10 +133,77 @@ describe("BraveSearchAdapter", () => {
     );
   });
 
+  it.each(["transport", "reset", "cancel"])(
+    "never exposes a reflected secret from a %s fetch failure",
+    async (kind) => {
+      const secret = `fake-secret-${kind}`;
+      const fetch = async () => {
+        const error = new Error(`${kind} failed with ${secret}`) as Error & {
+          code: string;
+        };
+        error.code = "CONNECTION";
+        throw error;
+      };
+      const adapter = new BraveSearchAdapter({ apiKey: "test-key", fetch });
+
+      const thrown = await adapter
+        .search(defaultQuery)
+        .catch((error: unknown) => error);
+      expect(thrown).toBeInstanceOf(Error);
+      expect((thrown as Error).message).toBe("Search provider request failed.");
+      expect((thrown as Error).message).not.toContain(secret);
+
+      const validation = await new BraveSearchAdapter({
+        apiKey: "test-key",
+        fetch,
+      }).validateConnection();
+      expect(validation).toMatchObject({
+        ok: false,
+        safeMessage: "Search provider request failed.",
+      });
+      expect(validation.safeMessage).not.toContain(secret);
+    },
+  );
+
+  it("rejects malformed UTF-8 even when replacement decoding would yield JSON", async () => {
+    const encoder = new TextEncoder();
+    const bytes = new Uint8Array([
+      ...encoder.encode('{"web":{"results":[]},"padding":"'),
+      0x80,
+      ...encoder.encode('"}'),
+    ]);
+    const adapter = new BraveSearchAdapter({
+      apiKey: "test-key",
+      fetch: async () =>
+        new Response(bytes, {
+          headers: { "content-type": "application/json" },
+        }),
+    });
+
+    await expect(adapter.search(defaultQuery)).rejects.toThrow(
+      "Search provider returned an invalid response.",
+    );
+  });
+
+  it.each([{}, { web: {} }])(
+    "rejects an invalid JSON envelope: %j",
+    async (payload) => {
+      const adapter = new BraveSearchAdapter({
+        apiKey: "test-key",
+        fetch: async () => Response.json(payload),
+      });
+
+      await expect(adapter.search(defaultQuery)).rejects.toThrow(
+        "Search provider returned an invalid response.",
+      );
+    },
+  );
+
   it("accepts a JSON response at exactly the 256 KiB byte boundary", async () => {
     const adapter = new BraveSearchAdapter({
       apiKey: "test-key",
-      fetch: async () => jsonResponse(jsonBodyOfExactByteLength(MAX_RESPONSE_BYTES)),
+      fetch: async () =>
+        jsonResponse(jsonBodyOfExactByteLength(MAX_RESPONSE_BYTES)),
     });
 
     await expect(adapter.search(defaultQuery)).resolves.toEqual([]);
@@ -197,7 +268,8 @@ describe("BraveSearchAdapter", () => {
   it("reports connection failures through a safe validation result", async () => {
     const adapter = new BraveSearchAdapter({
       apiKey: "test-key",
-      fetch: async () => new Response("test-key reflected here", { status: 401 }),
+      fetch: async () =>
+        new Response("test-key reflected here", { status: 401 }),
     });
 
     await expect(adapter.validateConnection()).resolves.toMatchObject({
