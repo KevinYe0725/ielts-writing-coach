@@ -116,6 +116,9 @@ importers:
       '@iwc/question-bank':
         specifier: workspace:*
         version: link:../../packages/question-bank
+      '@iwc/search':
+        specifier: workspace:*
+        version: link:../../packages/search
       '@iwc/worker':
         specifier: workspace:*
         version: link:../worker
@@ -219,6 +222,9 @@ importers:
       '@iwc/learning-core':
         specifier: workspace:*
         version: link:../../packages/learning-core
+      '@iwc/search':
+        specifier: workspace:*
+        version: link:../../packages/search
       ajv:
         specifier: 'catalog:'
         version: 8.20.0
@@ -362,6 +368,12 @@ importers:
         version: 7.0.2
 
   packages/question-bank: {}
+
+  packages/search:
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
 
 packages:
 
@@ -5709,7 +5721,7 @@ snapshots:
       obug: 2.1.4
       std-env: 4.2.0
       tinyrainbow: 3.1.1
-      vitest: 4.1.10(@types/node@24.10.1)(@vitest/coverage-v8@4.1.10)(vite@8.2.1(@types/node@24.10.1)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12))
+      vitest: 4.1.10(@types/node@24.10.1)(@vitest/coverage-v8@4.1.10)(vite@8.2.1(@types/node@24.10.1)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.20.6))
 
   '@vitest/expect@4.1.10':
     dependencies:
@@ -5735,6 +5747,7 @@ snapshots:
       magic-string: 0.30.21
     optionalDependencies:
       vite: 8.2.1(@types/node@24.10.1)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)
+    optional: true
 
   '@vitest/pretty-format@4.1.10':
     dependencies:
@@ -7433,6 +7446,7 @@ snapshots:
       fsevents: 2.3.3
       jiti: 2.7.0
       tsx: 4.23.12
+    optional: true
 
   vitest@4.1.10(@types/node@24.10.1)(@vitest/coverage-v8@4.1.10)(vite@8.2.1(@types/node@24.10.1)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.20.6)):
     dependencies:
@@ -7489,6 +7503,7 @@ snapshots:
       '@vitest/coverage-v8': 4.1.10(vitest@4.1.10)
     transitivePeerDependencies:
       - msw
+    optional: true
 
   webidl-conversions@4.0.2: {}
 

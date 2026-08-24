@@ -23,6 +23,7 @@
     "@iwc/email": "workspace:*",
     "@iwc/learning-contracts": "workspace:*",
     "@iwc/learning-core": "workspace:*",
+    "@iwc/search": "workspace:*",
     "ajv": "catalog:",
     "drizzle-orm": "catalog:",
     "graphile-worker": "0.17.3",

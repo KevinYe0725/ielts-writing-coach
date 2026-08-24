@@ -23,6 +23,7 @@
     "@iwc/learning-contracts": "workspace:*",
     "@iwc/learning-core": "workspace:*",
     "@iwc/question-bank": "workspace:*",
+    "@iwc/search": "workspace:*",
     "@iwc/worker": "workspace:*",
     "@radix-ui/react-dialog": "1.1.15",
     "@radix-ui/react-progress": "1.1.8",
