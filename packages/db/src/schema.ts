@@ -96,6 +96,28 @@ export const notificationChannel = pgEnum("notification_channel", [
   "in_app",
   "email",
 ]);
+export const questionRecommendationAction = pgEnum(
+  "question_recommendation_action",
+  ["INITIAL", "SWAP"],
+);
+export const questionRecommendationStatusEnum = pgEnum(
+  "question_recommendation_status",
+  ["PENDING", "READY", "UNAVAILABLE"],
+);
+export const questionGenerationBatchStatusEnum = pgEnum(
+  "question_generation_batch_status",
+  ["QUEUED", "SEARCHING", "GENERATING", "VALIDATING", "SUCCEEDED", "FAILED"],
+);
+export const questionGenerationBatchMode = pgEnum(
+  "question_generation_batch_mode",
+  ["WEB_RESEARCH", "OFFLINE"],
+);
+export const searchConnectionKind = pgEnum("search_connection_kind", ["BRAVE"]);
+export const searchConnectionStatus = pgEnum("search_connection_status", [
+  "ACTIVE",
+  "INVALID",
+  "REVOKED",
+]);
 
 export type TeachingPracticeResponseMode = "CHOICE" | "SHORT_TEXT";
 export type TeachingPracticeResponseStatus =
@@ -104,6 +126,15 @@ export type TeachingPracticeResponseStatus =
   | "ANALYSIS_READY"
   | "ANALYSIS_UNAVAILABLE"
   | "DEMO_ONLY";
+export type QuestionRecommendationStatus = "PENDING" | "READY" | "UNAVAILABLE";
+export type QuestionRecommendationAction = "INITIAL" | "SWAP";
+export type QuestionGenerationBatchStatus =
+  | "QUEUED"
+  | "SEARCHING"
+  | "GENERATING"
+  | "VALIDATING"
+  | "SUCCEEDED"
+  | "FAILED";
 
 // Better Auth tables deliberately use text identifiers to remain adapter-compatible.
 export const user = pgTable(
@@ -317,6 +348,111 @@ export const aiJob = pgTable(
   ],
 );
 
+export const searchConnection = pgTable(
+  "search_connection",
+  {
+    id: domainId(),
+    configuredByUserId: text("configured_by_user_id").references(
+      () => user.id,
+      { onDelete: "set null" },
+    ),
+    kind: searchConnectionKind("kind").notNull(),
+    encryptedApiKey: text("encrypted_api_key").notNull(),
+    encryptionKeyVersion: integer("encryption_key_version").notNull(),
+    status: searchConnectionStatus("status").notNull().default("ACTIVE"),
+    testedAt: timestamp("tested_at", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [index("search_connection_status_idx").on(table.status)],
+);
+
+export const questionRecommendation = pgTable(
+  "question_recommendation",
+  {
+    id: domainId(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    questionExternalId: text("question_external_id"),
+    action: questionRecommendationAction("action").notNull(),
+    status: questionRecommendationStatusEnum("status").notNull(),
+    excludedExternalId: text("excluded_external_id"),
+    shownAt: timestamp("shown_at", { withTimezone: true }),
+    safeFailureCode: text("safe_failure_code"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    index("question_recommendation_user_shown_idx").on(
+      table.userId,
+      table.shownAt,
+    ),
+    index("question_recommendation_user_question_shown_idx").on(
+      table.userId,
+      table.questionExternalId,
+      table.shownAt,
+    ),
+    index("question_recommendation_status_updated_idx").on(
+      table.status,
+      table.updatedAt,
+    ),
+  ],
+);
+
+export const questionGenerationBatch = pgTable(
+  "question_generation_batch",
+  {
+    id: domainId(),
+    triggeredByUserId: text("triggered_by_user_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    status: questionGenerationBatchStatusEnum("status")
+      .notNull()
+      .default("QUEUED"),
+    mode: questionGenerationBatchMode("mode").notNull(),
+    targetMix: jsonb("target_mix")
+      .$type<
+        Array<{
+          questionType: string;
+          topic: string;
+          count: number;
+        }>
+      >()
+      .notNull(),
+    researchSources: jsonb("research_sources")
+      .$type<
+        Array<{
+          url: string;
+          title: string;
+          snippet: string;
+        }>
+      >()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    searchConnectionId: uuid("search_connection_id").references(
+      () => searchConnection.id,
+      { onDelete: "set null" },
+    ),
+    aiJobId: uuid("ai_job_id").references(() => aiJob.id, {
+      onDelete: "set null",
+    }),
+    promptVersion: text("prompt_version").notNull(),
+    rubricVersion: text("rubric_version").notNull(),
+    acceptedCount: integer("accepted_count").notNull().default(0),
+    rejectedCount: integer("rejected_count").notNull().default(0),
+    safeFailureCode: text("safe_failure_code"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    index("question_generation_batch_status_idx").on(
+      table.status,
+      table.updatedAt,
+    ),
+  ],
+);
+
 export const question = pgTable(
   "question",
   {
@@ -339,6 +475,10 @@ export const question = pgTable(
     promptZh: text("prompt_zh"),
     attribution: text("attribution"),
     bankVersion: text("bank_version").notNull().default("1.0.0"),
+    generationBatchId: uuid("generation_batch_id").references(
+      () => questionGenerationBatch.id,
+      { onDelete: "set null" },
+    ),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -1136,7 +1276,51 @@ export const auditEvent = pgTable(
   (table) => [index("audit_event_time_idx").on(table.occurredAt)],
 );
 
-export const questionRelations = relations(question, ({ many }) => ({
+export const searchConnectionRelations = relations(
+  searchConnection,
+  ({ one, many }) => ({
+    configuredByUser: one(user, {
+      fields: [searchConnection.configuredByUserId],
+      references: [user.id],
+    }),
+    generationBatches: many(questionGenerationBatch),
+  }),
+);
+
+export const questionRecommendationRelations = relations(
+  questionRecommendation,
+  ({ one }) => ({
+    user: one(user, {
+      fields: [questionRecommendation.userId],
+      references: [user.id],
+    }),
+  }),
+);
+
+export const questionGenerationBatchRelations = relations(
+  questionGenerationBatch,
+  ({ one, many }) => ({
+    triggeredByUser: one(user, {
+      fields: [questionGenerationBatch.triggeredByUserId],
+      references: [user.id],
+    }),
+    searchConnection: one(searchConnection, {
+      fields: [questionGenerationBatch.searchConnectionId],
+      references: [searchConnection.id],
+    }),
+    aiJob: one(aiJob, {
+      fields: [questionGenerationBatch.aiJobId],
+      references: [aiJob.id],
+    }),
+    questions: many(question),
+  }),
+);
+
+export const questionRelations = relations(question, ({ one, many }) => ({
+  generationBatch: one(questionGenerationBatch, {
+    fields: [question.generationBatchId],
+    references: [questionGenerationBatch.id],
+  }),
   trainingCycles: many(trainingCycle),
 }));
 
@@ -1318,11 +1502,17 @@ export const schema = {
   notification,
   providerConnection,
   question,
+  questionGenerationBatch,
+  questionGenerationBatchRelations,
   questionRelations,
+  questionRecommendation,
+  questionRecommendationRelations,
   rateLimitBucket,
   rewriteTask,
   rewriteTaskRelations,
   session,
+  searchConnection,
+  searchConnectionRelations,
   skillEvidenceEvent,
   teachingPracticeResponse,
   teachingPracticeResponseRelations,

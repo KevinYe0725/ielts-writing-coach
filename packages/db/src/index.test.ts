@@ -74,7 +74,7 @@ integration("PostgreSQL migrations and transaction semantics", () => {
          (select count(*)::text from information_schema.tables where table_schema = 'graphile_worker') as graphile_tables`,
     );
     expect(Number(result.rows[0]?.application_tables)).toBeGreaterThanOrEqual(
-      32,
+      37,
     );
     expect(Number(result.rows[0]?.graphile_tables)).toBeGreaterThan(0);
   });
