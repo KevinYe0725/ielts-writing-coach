@@ -1,6 +1,7 @@
 import { relations, sql } from "drizzle-orm";
 import {
   boolean,
+  check,
   index,
   integer,
   jsonb,
@@ -358,6 +359,7 @@ export const searchConnection = pgTable(
     ),
     kind: searchConnectionKind("kind").notNull(),
     encryptedApiKey: text("encrypted_api_key").notNull(),
+    encryptedApiKeyNonce: text("encrypted_api_key_nonce").notNull(),
     encryptionKeyVersion: integer("encryption_key_version").notNull(),
     status: searchConnectionStatus("status").notNull().default("ACTIVE"),
     testedAt: timestamp("tested_at", { withTimezone: true }),
@@ -450,6 +452,14 @@ export const questionGenerationBatch = pgTable(
       table.status,
       table.updatedAt,
     ),
+    check(
+      "question_generation_batch_research_sources_array_limit_check",
+      sql`jsonb_typeof(${table.researchSources}) = 'array' and jsonb_array_length(${table.researchSources}) <= 40`,
+    ),
+    check(
+      "question_generation_batch_research_sources_payload_limit_check",
+      sql`octet_length(${table.researchSources}::text) <= 262144`,
+    ),
   ],
 );
 
@@ -485,6 +495,10 @@ export const question = pgTable(
   (table) => [
     uniqueIndex("question_external_id_unique").on(table.externalId),
     index("question_taxonomy_idx").on(table.questionType, table.topic),
+    check(
+      "question_generated_owner_absent_check",
+      sql`${table.generationBatchId} is null or ${table.ownerId} is null`,
+    ),
   ],
 );
 

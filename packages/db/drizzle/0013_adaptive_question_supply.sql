@@ -19,7 +19,9 @@ CREATE TABLE "question_generation_batch" (
 	"rejected_count" integer DEFAULT 0 NOT NULL,
 	"safe_failure_code" text,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "question_generation_batch_research_sources_array_limit_check" CHECK (jsonb_typeof("question_generation_batch"."research_sources") = 'array' and jsonb_array_length("question_generation_batch"."research_sources") <= 40),
+	CONSTRAINT "question_generation_batch_research_sources_payload_limit_check" CHECK (octet_length("question_generation_batch"."research_sources"::text) <= 262144)
 );
 --> statement-breakpoint
 CREATE TABLE "question_recommendation" (
@@ -40,6 +42,7 @@ CREATE TABLE "search_connection" (
 	"configured_by_user_id" text,
 	"kind" "search_connection_kind" NOT NULL,
 	"encrypted_api_key" text NOT NULL,
+	"encrypted_api_key_nonce" text NOT NULL,
 	"encryption_key_version" integer NOT NULL,
 	"status" "search_connection_status" DEFAULT 'ACTIVE' NOT NULL,
 	"tested_at" timestamp with time zone,
@@ -58,4 +61,5 @@ CREATE INDEX "question_recommendation_user_shown_idx" ON "question_recommendatio
 CREATE INDEX "question_recommendation_user_question_shown_idx" ON "question_recommendation" USING btree ("user_id","question_external_id","shown_at");--> statement-breakpoint
 CREATE INDEX "question_recommendation_status_updated_idx" ON "question_recommendation" USING btree ("status","updated_at");--> statement-breakpoint
 CREATE INDEX "search_connection_status_idx" ON "search_connection" USING btree ("status");--> statement-breakpoint
-ALTER TABLE "question" ADD CONSTRAINT "question_generation_batch_id_question_generation_batch_id_fk" FOREIGN KEY ("generation_batch_id") REFERENCES "public"."question_generation_batch"("id") ON DELETE set null ON UPDATE no action;
+ALTER TABLE "question" ADD CONSTRAINT "question_generation_batch_id_question_generation_batch_id_fk" FOREIGN KEY ("generation_batch_id") REFERENCES "public"."question_generation_batch"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "question" ADD CONSTRAINT "question_generated_owner_absent_check" CHECK ("question"."generation_batch_id" is null or "question"."owner_id" is null);

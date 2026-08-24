@@ -1,5 +1,5 @@
 {
-  "id": "9e58f233-e47e-444c-b260-1b9a01628f47",
+  "id": "86512883-2610-4f94-9b4b-7b300f45b7ab",
   "prevId": "74cc4566-70b8-4fd2-924f-b3609bd2051a",
   "version": "7",
   "dialect": "postgresql",
@@ -2756,7 +2756,12 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "question_generated_owner_absent_check": {
+          "name": "question_generated_owner_absent_check",
+          "value": "\"question\".\"generation_batch_id\" is null or \"question\".\"owner_id\" is null"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.question_generation_batch": {
@@ -2929,7 +2934,16 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "question_generation_batch_research_sources_array_limit_check": {
+          "name": "question_generation_batch_research_sources_array_limit_check",
+          "value": "jsonb_typeof(\"question_generation_batch\".\"research_sources\") = 'array' and jsonb_array_length(\"question_generation_batch\".\"research_sources\") <= 40"
+        },
+        "question_generation_batch_research_sources_payload_limit_check": {
+          "name": "question_generation_batch_research_sources_payload_limit_check",
+          "value": "octet_length(\"question_generation_batch\".\"research_sources\"::text) <= 262144"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.question_recommendation": {
@@ -3324,6 +3338,12 @@
         },
         "encrypted_api_key": {
           "name": "encrypted_api_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "encrypted_api_key_nonce": {
+          "name": "encrypted_api_key_nonce",
           "type": "text",
           "primaryKey": false,
           "notNull": true
