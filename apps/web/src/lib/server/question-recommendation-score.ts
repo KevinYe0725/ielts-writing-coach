@@ -25,7 +25,7 @@ export function rankQuestionCandidates(input: {
   const usedQuestionIds = new Set(input.priorCycles.map((cycle) => cycle.id));
   const typeCounts = countBy(input.priorCycles, (cycle) => cycle.type);
   const topicCounts = countBy(input.priorCycles, (cycle) => cycle.topic);
-  const recent = input.recentCycles.slice(-3);
+  const recent = input.recentCycles;
   const recentTypes = new Set(recent.map((cycle) => cycle.type));
   const recentTopics = new Set(recent.map((cycle) => cycle.topic));
 

@@ -48,6 +48,20 @@ describe("question recommendation scoring", () => {
     expect(ranked[0]?.score).toBe(75);
   });
 
+  it("uses every recent cycle supplied by the caller", () => {
+    const ranked = rankQuestionCandidates({
+      candidates: [candidate("q1")],
+      priorCycles: [],
+      recentCycles: [
+        candidate("first", "discussion", "health"),
+        candidate("second", "opinion", "education"),
+        candidate("third", "opinion", "education"),
+        candidate("fourth", "opinion", "education"),
+      ],
+    });
+    expect(ranked[0]?.score).toBe(75);
+  });
+
   it("permanently excludes questions already used in prior cycles", () => {
     const ranked = rankQuestionCandidates({
       candidates: [candidate("used"), candidate("fresh", "opinion", "education")],
