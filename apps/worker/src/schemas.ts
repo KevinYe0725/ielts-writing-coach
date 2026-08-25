@@ -4,25 +4,12 @@ import {
   TEACHING_PRACTICE_IMPROVEMENT_CODES,
   TEACHING_PRACTICE_STRENGTH_CODES,
 } from "@iwc/learning-contracts";
+import { QUESTION_TYPES, TOPICS } from "@iwc/question-bank";
 
-export const GENERATED_QUESTION_TYPES = [
-  "opinion",
-  "discussion",
-  "advantages_disadvantages",
-  "problems_solutions",
-  "two_part",
-] as const;
-
-export const GENERATED_QUESTION_TOPICS = [
-  "education",
-  "technology",
-  "environment",
-  "health",
-  "government",
-  "work_economy",
-  "society_culture",
-  "urban_transport",
-] as const;
+export const questionGenerationTaxonomy = {
+  types: QUESTION_TYPES,
+  topics: TOPICS,
+} as const;
 
 const band = {
   type: "number",
@@ -37,8 +24,8 @@ const generatedQuestionProposal = {
   additionalProperties: false,
   required: ["type", "topic", "track", "prompt", "internalRationale"],
   properties: {
-    type: { type: "string", enum: [...GENERATED_QUESTION_TYPES] },
-    topic: { type: "string", enum: [...GENERATED_QUESTION_TOPICS] },
+    type: { type: "string", enum: [...questionGenerationTaxonomy.types] },
+    topic: { type: "string", enum: [...questionGenerationTaxonomy.topics] },
     track: { type: "string", enum: ["academic", "general_training"] },
     prompt: { type: "string", minLength: 40, maxLength: 900 },
     internalRationale: { type: "string", minLength: 1, maxLength: 300 },

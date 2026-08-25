@@ -3,14 +3,16 @@ import { createHash } from "node:crypto";
 import Ajv2020, { type AnySchemaObject } from "ajv/dist/2020.js";
 
 import {
-  GENERATED_QUESTION_TOPICS,
-  GENERATED_QUESTION_TYPES,
+  QUESTION_TYPES,
+  TOPICS,
+  type QuestionTopic,
+  type QuestionType,
+} from "@iwc/question-bank";
+
+import {
   questionBankRefillSchema,
   questionGenerationJudgmentSchema,
 } from "./schemas";
-
-export type QuestionType = (typeof GENERATED_QUESTION_TYPES)[number];
-export type QuestionTopic = (typeof GENERATED_QUESTION_TOPICS)[number];
 
 export interface GeneratedQuestionProposal {
   type: QuestionType;
@@ -40,6 +42,7 @@ export interface ExistingGeneratedQuestion {
 }
 
 export type QuestionGenerationRejectionReason =
+  | "BATCH_TOO_LARGE"
   | "SCHEMA_INVALID"
   | "TASK2_SURFACE_INVALID"
   | "PROMPT_LEAKAGE"
@@ -66,8 +69,12 @@ export interface ValidateGeneratedQuestionBatchInput {
   proposals: readonly unknown[];
   existingQuestions: readonly ExistingGeneratedQuestion[];
   researchSources: readonly QuestionGenerationResearchSource[];
-  /** Indexed to proposals that have an eligible same-type or same-topic shortlist. */
-  semanticJudgments?: readonly unknown[];
+  /**
+   * Semantic duplicate judgments keyed by the original provider proposal
+   * index. A candidate with a same-type or same-topic shortlist stays pending
+   * until its own index has a valid, high-confidence non-duplicate judgment.
+   */
+  semanticJudgments?: Readonly<Partial<Record<number, unknown>>>;
 }
 
 const ajv = new Ajv2020({ allErrors: true, strict: true });
@@ -77,20 +84,24 @@ const validateProposalBatch = ajv.compile(
 const validateDuplicateJudgment = ajv.compile(
   questionGenerationJudgmentSchema as AnySchemaObject,
 );
-const questionTypeSet = new Set<string>(GENERATED_QUESTION_TYPES);
-const questionTopicSet = new Set<string>(GENERATED_QUESTION_TOPICS);
+const questionTypeSet = new Set<string>(QUESTION_TYPES);
+const questionTopicSet = new Set<string>(TOPICS);
 const minimumSemanticConfidence = 0.8;
 
 function normalizedWords(value: string): string[] {
   return value.toLocaleLowerCase("en-US").match(/[a-z0-9]+/gu) ?? [];
 }
 
-function normalizedPrompt(value: string): string {
+/** Canonical text representation used by every exact prompt duplicate check. */
+export function normalizeQuestionPrompt(value: string): string {
   return normalizedWords(value).join(" ");
 }
 
-function promptHash(value: string): string {
-  return createHash("sha256").update(normalizedPrompt(value)).digest("hex");
+/** Stable SHA-256 identity for a canonical generated-question prompt. */
+export function questionPromptHash(value: string): string {
+  return createHash("sha256")
+    .update(normalizeQuestionPrompt(value))
+    .digest("hex");
 }
 
 function sentenceCount(value: string): number {
@@ -137,19 +148,28 @@ function hasRequiredTask2Surface(proposal: GeneratedQuestionProposal): boolean {
   const prompt = proposal.prompt;
   switch (proposal.type) {
     case "opinion":
-      return /\bdo you agree or disagree\?\s*$/iu.test(prompt);
+      return /(?:^|[.!?]\s+)Do you agree or disagree\?\s*$/iu.test(prompt);
     case "discussion":
-      return /\bdiscuss both views and give your own opinion\.?\s*$/iu.test(
+      return /(?:^|[.!?]\s+)Discuss both views and give your own opinion\.\s*$/iu.test(
         prompt,
       );
     case "advantages_disadvantages":
-      return /\badvantages?\b.*\bdisadvantages?\b/iu.test(prompt);
-    case "problems_solutions":
-      return /\bwhat problems?\b.*\b(measures|solutions?|address)\b/iu.test(
+      return /(?:^|[.!?]\s+)Do the advantages of this development outweigh the disadvantages\?\s*$/iu.test(
         prompt,
       );
-    case "two_part":
-      return (prompt.match(/\?/gu) ?? []).length >= 2;
+    case "problems_solutions":
+      return /(?:^|[.!?]\s+)What problems does this situation create, and what measures could address them\?\s*$/iu.test(
+        prompt,
+      );
+    case "two_part": {
+      const components = prompt.split("?");
+      return (
+        components.length === 3 &&
+        components[2]?.trim() === "" &&
+        (components[0]?.trim().split(/\s+/u).length ?? 0) >= 3 &&
+        (components[1]?.trim().split(/\s+/u).length ?? 0) >= 3
+      );
+    }
   }
 }
 
@@ -166,11 +186,11 @@ function hasSpecialistCurrentFactDependency(prompt: string): boolean {
 }
 
 function copiedResearchSpan(
-  prompt: string,
+  content: string,
   sources: readonly QuestionGenerationResearchSource[],
 ): boolean {
-  const promptWords = normalizedWords(prompt);
-  if (promptWords.length < 12) return false;
+  const contentWords = normalizedWords(content);
+  if (contentWords.length < 12) return false;
   const sourceSpans = new Set<string>();
   for (const source of sources) {
     const words = normalizedWords(`${source.title} ${source.snippet}`);
@@ -178,8 +198,8 @@ function copiedResearchSpan(
       sourceSpans.add(words.slice(index, index + 12).join(" "));
     }
   }
-  for (let index = 0; index <= promptWords.length - 12; index += 1) {
-    if (sourceSpans.has(promptWords.slice(index, index + 12).join(" ")))
+  for (let index = 0; index <= contentWords.length - 12; index += 1) {
+    if (sourceSpans.has(contentWords.slice(index, index + 12).join(" ")))
       return true;
   }
   return false;
@@ -203,11 +223,24 @@ function semanticShortlist(
 export function validateGeneratedQuestionBatch(
   input: ValidateGeneratedQuestionBatchInput,
 ): QuestionGenerationValidationResult {
+  if (input.proposals.length > 15) {
+    return {
+      accepted: [],
+      pendingSemanticReview: [],
+      rejected: input.proposals.map((proposal) => ({
+        proposal,
+        reason: "BATCH_TOO_LARGE" as const,
+      })),
+    };
+  }
   const accepted: GeneratedQuestionProposal[] = [];
   const pendingSemanticReview: GeneratedQuestionProposal[] = [];
   const rejected: RejectedGeneratedQuestion[] = [];
+  const priorAcceptedOrPending: GeneratedQuestionProposal[] = [];
   const knownHashes = new Set(
-    input.existingQuestions.map((question) => promptHash(question.prompt)),
+    input.existingQuestions.map((question) =>
+      questionPromptHash(question.prompt),
+    ),
   );
 
   input.proposals.forEach((candidate, index) => {
@@ -225,25 +258,29 @@ export function validateGeneratedQuestionBatch(
       rejected.push({ proposal: candidate, reason: "TASK2_SURFACE_INVALID" });
       return;
     }
-    if (hasPromptLeakage(candidate.prompt)) {
+    const authoredContent = `${candidate.prompt}\n${candidate.internalRationale}`;
+    if (hasPromptLeakage(authoredContent)) {
       rejected.push({ proposal: candidate, reason: "PROMPT_LEAKAGE" });
       return;
     }
-    if (hasSpecialistCurrentFactDependency(candidate.prompt)) {
+    if (hasSpecialistCurrentFactDependency(authoredContent)) {
       rejected.push({ proposal: candidate, reason: "CURRENT_FACT_DEPENDENCY" });
       return;
     }
-    const candidateHash = promptHash(candidate.prompt);
+    const candidateHash = questionPromptHash(candidate.prompt);
     if (knownHashes.has(candidateHash)) {
       rejected.push({ proposal: candidate, reason: "EXACT_DUPLICATE" });
       return;
     }
-    if (copiedResearchSpan(candidate.prompt, input.researchSources)) {
+    if (copiedResearchSpan(authoredContent, input.researchSources)) {
       rejected.push({ proposal: candidate, reason: "COPIED_RESEARCH_SPAN" });
       return;
     }
 
-    const shortlist = semanticShortlist(candidate, input.existingQuestions);
+    const shortlist = semanticShortlist(candidate, [
+      ...input.existingQuestions,
+      ...priorAcceptedOrPending,
+    ]);
     if (
       shortlist.some(
         (existing) =>
@@ -258,12 +295,14 @@ export function validateGeneratedQuestionBatch(
     if (shortlist.length === 0) {
       knownHashes.add(candidateHash);
       accepted.push(candidate);
+      priorAcceptedOrPending.push(candidate);
       return;
     }
     const semanticJudgment = input.semanticJudgments?.[index];
     if (semanticJudgment === undefined) {
       knownHashes.add(candidateHash);
       pendingSemanticReview.push(candidate);
+      priorAcceptedOrPending.push(candidate);
       return;
     }
     if (!validateDuplicateJudgment(semanticJudgment)) {
@@ -287,6 +326,7 @@ export function validateGeneratedQuestionBatch(
     }
     knownHashes.add(candidateHash);
     accepted.push(candidate);
+    priorAcceptedOrPending.push(candidate);
   });
 
   return { accepted, pendingSemanticReview, rejected };

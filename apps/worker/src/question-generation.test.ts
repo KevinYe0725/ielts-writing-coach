@@ -59,6 +59,21 @@ async function contract() {
 }
 
 describe("question-bank refill provider schema", () => {
+  it("consumes the canonical question-bank taxonomy", async () => {
+    const questionBank = await import("@iwc/question-bank").catch(
+      () => undefined,
+    );
+    expect(questionBank).toBeDefined();
+    expect(schemas).toHaveProperty("questionGenerationTaxonomy");
+    const taxonomy = (schemas as Record<string, unknown>)
+      .questionGenerationTaxonomy as {
+      types: unknown;
+      topics: unknown;
+    };
+    expect(taxonomy.types).toBe(questionBank?.QUESTION_TYPES);
+    expect(taxonomy.topics).toBe(questionBank?.TOPICS);
+  });
+
   it("has a closed, bounded public proposal shape without learner fields", () => {
     expect(schemas).toHaveProperty("questionBankRefillSchema");
     const schema = (schemas as Record<string, unknown>)
@@ -104,6 +119,16 @@ describe("question-bank refill provider schema", () => {
 });
 
 describe("generated question quality gate", () => {
+  it("exports the canonical prompt normalization and hash contract", async () => {
+    const { normalizeQuestionPrompt, questionPromptHash } = await contract();
+    const raw = "  Public LIBRARIES lend bicycles—how can this help?  ";
+    const normalized = "public libraries lend bicycles how can this help";
+
+    expect(normalizeQuestionPrompt(raw)).toBe(normalized);
+    expect(questionPromptHash(raw)).toBe(questionPromptHash(normalized));
+    expect(questionPromptHash(raw)).toMatch(/^[a-f0-9]{64}$/u);
+  });
+
   it("accepts one structurally suitable proposal for every Task 2 type", async () => {
     const { validateGeneratedQuestionBatch } = await contract();
     const result = validateGeneratedQuestionBatch({
@@ -114,6 +139,35 @@ describe("generated question quality gate", () => {
 
     expect(result.accepted).toEqual(Object.values(validProposals));
     expect(result.rejected).toEqual([]);
+  });
+
+  it("enforces the fifteen-proposal cap at the exported validation boundary", async () => {
+    const { validateGeneratedQuestionBatch } = await contract();
+    const proposals = Array.from({ length: 16 }, (_, index) => ({
+      ...validProposals.opinion,
+      prompt: `Local universities should fund community project option ${index} before graduation. Do you agree or disagree?`,
+    }));
+
+    const withinLimit = validateGeneratedQuestionBatch({
+      proposals: proposals.slice(0, 15),
+      existingQuestions: [],
+      researchSources: [],
+    });
+    expect(withinLimit.accepted).toHaveLength(1);
+    expect(withinLimit.pendingSemanticReview).toHaveLength(14);
+    expect(withinLimit.rejected).toEqual([]);
+
+    const oversized = validateGeneratedQuestionBatch({
+      proposals,
+      existingQuestions: [],
+      researchSources: [],
+    });
+    expect(oversized.accepted).toEqual([]);
+    expect(oversized.pendingSemanticReview).toEqual([]);
+    expect(oversized.rejected).toHaveLength(16);
+    expect(
+      oversized.rejected.every(({ reason }) => reason === "BATCH_TOO_LARGE"),
+    ).toBe(true);
   });
 
   it.each([
@@ -155,6 +209,60 @@ describe("generated question quality gate", () => {
     expect(result.rejected).toHaveLength(1);
   });
 
+  it.each([
+    [
+      "opinion instructions embedded inside another question",
+      {
+        ...validProposals.opinion,
+        prompt:
+          "Universities should require every student to complete a community project before graduation. Why do you agree or disagree?",
+      },
+    ],
+    [
+      "discussion instructions framed as advice",
+      {
+        ...validProposals.discussion,
+        prompt:
+          "Some people support strict regulation while others prefer company rules. You should discuss both views and give your own opinion.",
+      },
+    ],
+    [
+      "advantages instructions without the required development question",
+      {
+        ...validProposals.advantages_disadvantages,
+        prompt:
+          "Many towns are replacing grass verges with community gardens. Should the advantages outweigh the disadvantages?",
+      },
+    ],
+    [
+      "problems instructions with an altered task stem",
+      {
+        ...validProposals.problems_solutions,
+        prompt:
+          "Many employees struggle to take breaks during long working days. What problems can this situation create, and what measures could address them?",
+      },
+    ],
+    [
+      "two-part instructions with an empty second question",
+      {
+        ...validProposals.two_part,
+        prompt:
+          "Public libraries are beginning to lend bicycles as well as books. Why might communities introduce this service? ?",
+      },
+    ],
+  ])("rejects malformed %s", async (_name, proposal) => {
+    const { validateGeneratedQuestionBatch } = await contract();
+    const result = validateGeneratedQuestionBatch({
+      proposals: [proposal],
+      existingQuestions: [],
+      researchSources: [],
+    });
+
+    expect(result.rejected).toEqual([
+      { proposal, reason: "TASK2_SURFACE_INVALID" },
+    ]);
+  });
+
   it("rejects an exact normalized hash duplicate", async () => {
     const { validateGeneratedQuestionBatch } = await contract();
     const result = validateGeneratedQuestionBatch({
@@ -188,6 +296,97 @@ describe("generated question quality gate", () => {
 
     expect(result.accepted).toEqual([validProposals.opinion]);
     expect(result.rejected[0]?.reason).toBe("EXACT_DUPLICATE");
+  });
+
+  it("rejects a five-gram near duplicate of an earlier accepted proposal", async () => {
+    const { validateGeneratedQuestionBatch } = await contract();
+    const first = validProposals.discussion;
+    const nearDuplicate = {
+      ...first,
+      prompt: first.prompt.replace("strictly", "carefully"),
+    };
+    const result = validateGeneratedQuestionBatch({
+      proposals: [first, nearDuplicate],
+      existingQuestions: [],
+      researchSources: [],
+    });
+
+    expect(result.accepted).toEqual([first]);
+    expect(result.rejected).toEqual([
+      { proposal: nearDuplicate, reason: "FIVE_GRAM_DUPLICATE" },
+    ]);
+  });
+
+  it("rejects a semantic duplicate of an earlier same-batch proposal by proposal index", async () => {
+    const { validateGeneratedQuestionBatch } = await contract();
+    const first = validProposals.opinion;
+    const semanticDuplicate = {
+      ...first,
+      prompt:
+        "Public universities should require students to complete local service before receiving a degree. Do you agree or disagree?",
+    };
+    const result = validateGeneratedQuestionBatch({
+      proposals: [first, semanticDuplicate],
+      existingQuestions: [],
+      researchSources: [],
+      semanticJudgments: {
+        1: {
+          duplicate: true,
+          confidence: 0.9,
+          rationale: "The task asks for the same civic-service argument.",
+        },
+      },
+    });
+
+    expect(result.accepted).toEqual([first]);
+    expect(result.rejected).toEqual([
+      { proposal: semanticDuplicate, reason: "SEMANTIC_DUPLICATE" },
+    ]);
+  });
+
+  it("holds a same-batch semantic candidate pending when its judgment is absent", async () => {
+    const { validateGeneratedQuestionBatch } = await contract();
+    const first = validProposals.opinion;
+    const candidate = {
+      ...first,
+      prompt:
+        "Every university student should undertake a short community placement before graduation. Do you agree or disagree?",
+    };
+    const result = validateGeneratedQuestionBatch({
+      proposals: [first, candidate],
+      existingQuestions: [],
+      researchSources: [],
+    });
+
+    expect(result.accepted).toEqual([first]);
+    expect(result.pendingSemanticReview).toEqual([candidate]);
+    expect(result.rejected).toEqual([]);
+  });
+
+  it("rejects a near duplicate of an earlier pending same-batch proposal", async () => {
+    const { validateGeneratedQuestionBatch } = await contract();
+    const first = validProposals.opinion;
+    const pending = {
+      ...first,
+      topic: "work_economy",
+      prompt:
+        "Employees should be able to choose remote work for most of the week when their duties permit it. Do you agree or disagree?",
+    };
+    const nearPending = {
+      ...pending,
+      prompt: pending.prompt.replace("remote work", "flexible remote work"),
+    };
+    const result = validateGeneratedQuestionBatch({
+      proposals: [first, pending, nearPending],
+      existingQuestions: [],
+      researchSources: [],
+    });
+
+    expect(result.accepted).toEqual([first]);
+    expect(result.pendingSemanticReview).toEqual([pending]);
+    expect(result.rejected).toEqual([
+      { proposal: nearPending, reason: "FIVE_GRAM_DUPLICATE" },
+    ]);
   });
 
   it("enforces one through six sentences after schema validation", async () => {
@@ -229,12 +428,62 @@ describe("generated question quality gate", () => {
     expect(result.rejected[0]?.reason).toBe("COPIED_RESEARCH_SPAN");
   });
 
+  it.each([
+    [
+      "rationale answer or URL leakage",
+      {
+        ...validProposals.opinion,
+        internalRationale:
+          "Use the model answer at https://example.test before generating this prompt.",
+      },
+      [],
+      "PROMPT_LEAKAGE",
+    ],
+    [
+      "rationale specialist current-fact dependency",
+      {
+        ...validProposals.opinion,
+        internalRationale:
+          "The current national carbon policy makes this topic timely.",
+      },
+      [],
+      "CURRENT_FACT_DEPENDENCY",
+    ],
+    [
+      "rationale copied research span",
+      {
+        ...validProposals.opinion,
+        internalRationale:
+          "neighbourhood repair events help residents share practical skills and reduce household waste in local areas",
+      },
+      [
+        {
+          url: "https://example.test/repair",
+          title: "Repair events",
+          snippet:
+            "Local reports show that neighbourhood repair events help residents share practical skills and reduce household waste in several districts.",
+        },
+      ],
+      "COPIED_RESEARCH_SPAN",
+    ],
+  ])("rejects %s", async (_name, proposal, researchSources, reason) => {
+    const { validateGeneratedQuestionBatch } = await contract();
+    const result = validateGeneratedQuestionBatch({
+      proposals: [proposal],
+      existingQuestions: [],
+      researchSources,
+    });
+
+    expect(result.rejected).toEqual([{ proposal, reason }]);
+  });
+
   it("uses the documented five-gram Jaccard cut-off before semantic review", async () => {
     const { normalizedWordFiveGramJaccard, validateGeneratedQuestionBatch } =
       await contract();
     const words = Array.from({ length: 55 }, (_, index) => `token${index}`);
     const atThreshold = words.slice(0, 15).join(" ");
     const longerAtThreshold = words.slice(0, 24).join(" ");
+    const nearDuplicateWords = words.slice(0, 19).join(" ");
     const belowThreshold = words.slice(0, 32).join(" ");
     const longerBelowThreshold = words.slice(0, 55).join(" ");
 
@@ -245,27 +494,37 @@ describe("generated question quality gate", () => {
       normalizedWordFiveGramJaccard(belowThreshold, longerBelowThreshold),
     ).toBeCloseTo(0.549, 3);
 
+    const twoPartPrompt = (questionWords: string) =>
+      `Why do ${questionWords}? How does it change local travel?`;
     const candidate = {
       ...validProposals.two_part,
-      prompt: `${atThreshold}? ?`,
+      prompt: twoPartPrompt(atThreshold),
     };
     const atThresholdResult = validateGeneratedQuestionBatch({
       proposals: [candidate],
-      existingQuestions: [{ ...candidate, prompt: `${longerAtThreshold}? ?` }],
+      existingQuestions: [
+        { ...candidate, prompt: twoPartPrompt(nearDuplicateWords) },
+      ],
       researchSources: [],
     });
+    expect(
+      normalizedWordFiveGramJaccard(
+        candidate.prompt,
+        twoPartPrompt(nearDuplicateWords),
+      ),
+    ).toBeGreaterThanOrEqual(0.55);
     expect(atThresholdResult.rejected[0]?.reason).toBe("FIVE_GRAM_DUPLICATE");
 
     const belowThresholdCandidate = {
       ...validProposals.two_part,
-      prompt: `${belowThreshold}? ?`,
+      prompt: twoPartPrompt(belowThreshold),
     };
     const belowThresholdResult = validateGeneratedQuestionBatch({
       proposals: [belowThresholdCandidate],
       existingQuestions: [
         {
           ...belowThresholdCandidate,
-          prompt: `${longerBelowThreshold}? ?`,
+          prompt: twoPartPrompt(longerBelowThreshold),
         },
       ],
       researchSources: [],
@@ -292,7 +551,7 @@ describe("generated question quality gate", () => {
           },
         ],
         researchSources: [],
-        semanticJudgments: [semanticJudgment],
+        semanticJudgments: { 0: semanticJudgment },
       });
       expect(result.accepted).toEqual([]);
       expect(result.rejected).toHaveLength(1);
