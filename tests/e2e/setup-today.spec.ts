@@ -1253,6 +1253,143 @@ test.describe("Today query states at the HTTP boundary", () => {
     await accountB.close();
   });
 
+  test("cross-tab learning-data deletion cancels an unresolved cycle before a distinct new operation", async ({
+    page: accountA,
+  }) => {
+    test.skip(
+      !(await accountA.evaluate(() => typeof BroadcastChannel === "function")),
+      "This browser does not support BroadcastChannel.",
+    );
+    const accountB = await accountA.context().newPage();
+    const accountAKeys: string[] = [];
+    const accountBKeys: string[] = [];
+    const deletionKeys: string[] = [];
+    const pageErrors: Error[] = [];
+    let createdCyclesAfterDeletion = 0;
+    let dataDeleted = false;
+    let releaseAccountA!: () => void;
+    const accountAHold = new Promise<void>((resolve) => {
+      releaseAccountA = resolve;
+    });
+    accountA.on("pageerror", (error) => pageErrors.push(error));
+    await accountA.addInitScript(() => {
+      const messages: unknown[] = [];
+      const channel = new BroadcastChannel("iwc:account-boundary:v1");
+      channel.addEventListener("message", (event) => messages.push(event.data));
+      Object.assign(window, {
+        __iwcAccountBoundaryMessages: messages,
+        __iwcAccountBoundaryObserver: channel,
+      });
+    });
+    await routeTodayHttpFixture(accountA, "mixed-review");
+    await routeTodayHttpFixture(accountB, "mixed-review");
+    await accountA.route("**/api/v1/training-cycles", async (route) => {
+      if (route.request().method() !== "POST") return route.fallback();
+      accountAKeys.push(
+        route.request().headers()["idempotency-key"] ?? "missing",
+      );
+      await accountAHold;
+      await route.abort("failed").catch(() => undefined);
+    });
+    await accountB.route("**/api/v1/preferences", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          email: "learner@example.com",
+          preferences: {},
+          slots: [],
+          smtp_configured: false,
+          timezone: "Asia/Shanghai",
+        }),
+      });
+    });
+    await accountB.route("**/api/v1/data", async (route) => {
+      expect(route.request().method()).toBe("DELETE");
+      expect(route.request().postDataJSON()).toEqual({
+        confirmation: "DELETE MY LEARNING DATA",
+      });
+      deletionKeys.push(
+        route.request().headers()["idempotency-key"] ?? "missing",
+      );
+      dataDeleted = true;
+      await route.fulfill({ status: 204, body: "" });
+    });
+    await accountB.route("**/api/v1/training-cycles**", async (route) => {
+      if (route.request().method() === "GET") {
+        await route.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify({ cycles: [] }),
+        });
+        return;
+      }
+      accountBKeys.push(
+        route.request().headers()["idempotency-key"] ?? "missing",
+      );
+      expect(dataDeleted).toBe(true);
+      createdCyclesAfterDeletion += 1;
+      await route.fulfill({
+        contentType: "application/json",
+        status: 201,
+        body: JSON.stringify({ cycle: { id: "cycle-after-cross-tab-delete" } }),
+      });
+    });
+
+    await accountA.goto("/today?mixed-review=1");
+    await accountA.getByRole("button", { name: "用这道题开始写作" }).click();
+    await expect.poll(() => accountAKeys.length).toBe(1);
+
+    await accountB.goto("/settings");
+    await accountB.getByRole("button", { name: "数据与隐私" }).click();
+    await accountB.getByRole("button", { name: "删除…" }).click();
+    await accountB.getByLabel("确认短语").fill("DELETE MY LEARNING DATA");
+    await accountB.getByRole("button", { name: "永久删除" }).click();
+
+    await expect.poll(() => deletionKeys.length).toBe(1);
+    await expect(
+      accountB.getByText("全部学习数据已删除；账户和 AI 连接仍保留。", {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(
+      accountA.getByText(
+        "The account changed before this operation finished. Retry in the current account.",
+        { exact: true },
+      ),
+    ).toBeVisible();
+    releaseAccountA();
+
+    await accountB.goto("/today?mixed-review=1");
+    await accountB.getByRole("button", { name: "用这道题开始写作" }).click();
+    await expect(accountB).toHaveURL(
+      /\/write\?cycle=cycle-after-cross-tab-delete$/,
+    );
+
+    await expect.poll(() => accountBKeys.length).toBe(1);
+    expect(accountAKeys[0]).not.toBe("missing");
+    expect(deletionKeys[0]).not.toBe("missing");
+    expect(accountBKeys[0]).not.toBe("missing");
+    expect(accountBKeys[0]).not.toBe(accountAKeys[0]);
+    expect(createdCyclesAfterDeletion).toBe(1);
+    await accountA.waitForTimeout(100);
+    expect(accountAKeys).toHaveLength(1);
+    const boundaryMessages = await accountA.evaluate(
+      () =>
+        (
+          window as typeof window & {
+            __iwcAccountBoundaryMessages?: unknown[];
+          }
+        ).__iwcAccountBoundaryMessages ?? [],
+    );
+    expect(boundaryMessages).toEqual([
+      { kind: "ACCOUNT_BOUNDARY", version: 1 },
+    ]);
+    expect(JSON.stringify(boundaryMessages)).not.toMatch(
+      /learner@example|email|identity|token|user[_-]?id/iu,
+    );
+    expect(pageErrors).toEqual([]);
+    await accountB.close();
+  });
+
   test("synchronously dispatched swap events create one recommendation request", async ({
     page,
   }) => {

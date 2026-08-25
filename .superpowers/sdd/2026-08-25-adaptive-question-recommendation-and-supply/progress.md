@@ -268,4 +268,10 @@ after response.ok; fixed identity-free BroadcastChannel propagates boundary
 abort across tabs without persistence or rebroadcast; two-page signout/signin
 fidelity proves A cancellation and B new key; 95 files / 930 tests green on
 Node 24.19.0 with fresh PostgreSQL 17.6; reload boundary remains documented)
-Fifth final broad review: in progress at ef04c7f
+Fifth final broad review: changes requested at ef04c7f (project-before-clear
+and cross-tab account boundary); both closed in H1 Fix Round 3
+Sixth final broad review: Minor 1 closed after 00088f9 (two-page same-context
+learning-data deletion fidelity passes Chromium and WebKit; tab A stale cycle
+aborts with ACCOUNT_CONTEXT_CHANGED and cannot retry/repopulate/recreate after
+tab B's confirmed DELETE; tab B identical operation uses a distinct key; exact
+identity-free boundary payload observed; no production defect or change)

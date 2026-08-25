@@ -239,4 +239,33 @@ GREEN after the change:
 - full Web on fresh PostgreSQL 17.6: 55 files / 519 passed;
 - full repository on the same fresh database: 95 files / 930 passed.
 
+## Final Minor 1 — two-page learning-data deletion
+
+No production defect was reproduced and no production file changed. A final
+two-page, same-browser-context fidelity regression now holds an unresolved
+opted-in cycle in tab A while tab B follows the real Settings data-and-privacy
+flow, enters the destructive confirmation phrase, and receives a confirmed
+204 from `DELETE /api/v1/data` through `HttpLearningClient`.
+
+The confirmed deletion broadcasts exactly one
+`{ kind: "ACCOUNT_BOUNDARY", version: 1 }` message. Tab A rejects with the
+fixed `ACCOUNT_CONTEXT_CHANGED` error, makes no stale retry, and cannot
+repopulate or recreate a cycle after deletion. Releasing its held route creates
+nothing. Tab B then starts the identical question with a distinct key and is
+the only tab to create one post-deletion cycle. The observed channel payload
+contains no email, identity, token, or user ID.
+
+Focused evidence on Node 24.19.0:
+
+- Chromium two-page deletion boundary: 1/1 passed;
+- WebKit two-page deletion boundary: 1/1 passed;
+- BroadcastChannel feature check is explicit; unsupported engines skip rather
+  than claim cross-tab coverage;
+- mobile was not treated as a separate multi-tab platform because the same
+  browser-context contract is covered in both desktop engines;
+- existing HTTP/account boundary client suite and typecheck remain green.
+
+The live-client recovery limit is unchanged: an unresolved key is not
+persisted across a full reload or browser restart.
+
 Commit: the commit containing this report.
