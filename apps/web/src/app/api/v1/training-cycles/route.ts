@@ -6,6 +6,7 @@ import { mixedReviewTask, trainingCycle, user } from "@iwc/db";
 
 import { getServerContext } from "@/lib/server/context";
 import { ApiProblem, apiRoute } from "@/lib/server/problem";
+import { assertRecommendationForCycle } from "@/lib/server/question-recommendation";
 import { resolveQuestion } from "@/lib/server/questions";
 import { ianaTimezoneSchema, parseJsonBody } from "@/lib/server/request";
 import { requireSession } from "@/lib/server/session";
@@ -19,6 +20,7 @@ import {
 const createCycleSchema = z
   .object({
     question_id: z.string().trim().min(1).max(200),
+    recommendation_id: z.uuid().optional(),
     timezone: ianaTimezoneSchema,
   })
   .strict();
@@ -50,6 +52,14 @@ export const POST = apiRoute(async (request) => {
   );
   if (reservation.replay) return reservation.replay;
   try {
+    if (payload.recommendation_id) {
+      await assertRecommendationForCycle(
+        db,
+        actor.id,
+        payload.recommendation_id,
+        payload.question_id,
+      );
+    }
     const selectedQuestion = await resolveQuestion(
       db,
       actor.id,

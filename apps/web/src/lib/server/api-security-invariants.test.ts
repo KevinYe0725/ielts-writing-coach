@@ -71,6 +71,31 @@ describe("API security architecture", () => {
     }
   });
 
+  it("keeps recommendation polling free of supply and ranking internals", () => {
+    const recommendationRoute = readFileSync(
+      join(apiRoot, "question-recommendations/[id]/route.ts"),
+      "utf8",
+    );
+    for (const forbidden of [
+      "generationBatchId",
+      "aiJobId",
+      "searchConnectionId",
+      "researchSources",
+      "score",
+    ]) {
+      expect(recommendationRoute).not.toContain(forbidden);
+    }
+  });
+
+  it("rate-limits recommendation creation at the authenticated actor boundary", () => {
+    const recommendationRoute = readFileSync(
+      join(apiRoot, "question-recommendations/route.ts"),
+      "utf8",
+    );
+    expect(recommendationRoute).toContain("enforceRateLimit(request");
+    expect(recommendationRoute).toContain("identity: actor.id");
+  });
+
   it("keeps provider and model-route technical metadata privileged", () => {
     for (const relativePath of [
       "providers/route.ts",

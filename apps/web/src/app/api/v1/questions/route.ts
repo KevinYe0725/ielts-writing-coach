@@ -2,15 +2,11 @@ import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { newDomainId, question } from "@iwc/db";
-import {
-  QUESTION_BANK,
-  QUESTION_TYPES,
-  TOPICS,
-  listQuestions,
-} from "@iwc/question-bank";
+import { QUESTION_BANK, QUESTION_TYPES, TOPICS } from "@iwc/question-bank";
 
 import { getServerContext } from "@/lib/server/context";
 import { apiRoute } from "@/lib/server/problem";
+import { listPublicQuestionCatalog } from "@/lib/server/question-recommendation";
 import { parseJsonBody } from "@/lib/server/request";
 import { requireSession } from "@/lib/server/session";
 import {
@@ -44,31 +40,52 @@ export const GET = apiRoute(async (request) => {
     topic: url.searchParams.get("topic") ?? undefined,
   });
   const { db } = getServerContext();
-  const [privateQuestions] = await Promise.all([
-    db
-      .select({
-        externalId: question.externalId,
-        questionType: question.questionType,
-        topic: question.topic,
-        prompt: question.prompt,
-        ieltsTrack: question.ieltsTrack,
-        source: question.source,
-        visibility: question.visibility,
-      })
-      .from(question)
-      .where(
-        and(eq(question.ownerId, actor.id), eq(question.visibility, "private")),
-      )
-      .orderBy(desc(question.createdAt)),
-  ]);
-  const original = listQuestions({
+  const privateQuestions = await db
+    .select({
+      externalId: question.externalId,
+      questionType: question.questionType,
+      topic: question.topic,
+      prompt: question.prompt,
+      ieltsTrack: question.ieltsTrack,
+      source: question.source,
+      visibility: question.visibility,
+    })
+    .from(question)
+    .where(
+      and(
+        eq(question.ownerId, actor.id),
+        eq(question.visibility, "private"),
+        filters.type === undefined
+          ? undefined
+          : eq(question.questionType, filters.type),
+        filters.topic === undefined
+          ? undefined
+          : eq(question.topic, filters.topic),
+      ),
+    )
+    .orderBy(desc(question.createdAt));
+  const publicCatalog = await listPublicQuestionCatalog(db, {
     ...(filters.type === undefined ? {} : { type: filters.type }),
     ...(filters.topic === undefined ? {} : { topic: filters.topic }),
-  }).map((item) => ({ ...item, ieltsTrack: "academic", visibility: "public" }));
+  });
+  const publicQuestions = publicCatalog.map(({ source, ...item }) => ({
+    ...item,
+    origin:
+      source === "AI_GENERATED" || source === "AI_RESEARCHED"
+        ? "iwc_validated"
+        : source,
+  }));
   return Response.json({
-    questions: [...privateQuestions, ...original],
+    questions: [...privateQuestions, ...publicQuestions],
     taxonomy: { types: QUESTION_TYPES, topics: TOPICS },
-    bank: { version: "1.0.0", original_count: QUESTION_BANK.length },
+    bank: {
+      version: "1.0.0",
+      original_count: QUESTION_BANK.length,
+      dynamic_count: publicCatalog.filter(
+        (item) =>
+          item.source === "AI_GENERATED" || item.source === "AI_RESEARCHED",
+      ).length,
+    },
   });
 });
 
