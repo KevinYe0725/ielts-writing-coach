@@ -88,6 +88,7 @@ export const POST = apiRoute(async (request) => {
           transaction,
           actor.id,
           payload.abandon_recommendation_id,
+          selectedQuestion.externalId,
         );
       }
 

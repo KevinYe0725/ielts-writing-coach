@@ -206,3 +206,7 @@ Final remediation F1: fix round 1/5 complete (removed standalone exposure reset;
 cycle POST now atomically transitions READY to STARTED or PENDING/READY to
 ABANDONED under the learner lock; shown READY exposure remains cooled for 72h;
 Today and Demo couple manual/private fallback to the one cycle request)
+Final remediation F1: fix round 2/5 complete (fallback disposition is resolved
+against the cycle question so exact READY use becomes STARTED; every recent
+SWAP row cools excluded_external_id by created_at independent of status; two
+PostgreSQL barriers force both recommended-vs-fallback commit orderings)

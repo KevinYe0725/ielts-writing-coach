@@ -1598,7 +1598,13 @@ export class MockLearningClient implements LearningClient {
         );
       writeStorage(
         STORAGE_KEYS.questionRecommendationActive,
-        JSON.stringify({ ...active, status: "ABANDONED" }),
+        JSON.stringify({
+          ...active,
+          status:
+            active.status === "READY" && active.question?.id === questionId
+              ? "STARTED"
+              : "ABANDONED",
+        }),
       );
     }
     writeStorage(STORAGE_KEYS.selectedQuestion, questionId);

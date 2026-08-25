@@ -119,6 +119,36 @@ describe("browser-only Demo administration boundary", () => {
     expect(next.id).not.toBe(first.id);
   });
 
+  it("records Demo use of the exact READY question as STARTED even with the fallback field", async () => {
+    const localStorage = testStorage({});
+    vi.stubGlobal("window", {
+      localStorage,
+      sessionStorage: testStorage({}),
+      setTimeout,
+    });
+    const client = new MockLearningClient();
+    const ready = await client.requestQuestionRecommendation({
+      action: "INITIAL",
+    });
+    expect(ready.state).toBe("READY");
+    if (ready.state !== "READY") return;
+
+    await client.startTrainingCycle(ready.question.id, {
+      abandonRecommendationId: ready.id,
+    });
+
+    expect(
+      JSON.parse(
+        localStorage.getItem("iwc.demo.question-recommendation-active") ??
+          "null",
+      ),
+    ).toMatchObject({
+      id: ready.id,
+      status: "STARTED",
+      question: { id: ready.question.id },
+    });
+  });
+
   it("marks a Demo recommended start terminal STARTED inside cycle creation", async () => {
     const localStorage = testStorage({});
     vi.stubGlobal("window", {

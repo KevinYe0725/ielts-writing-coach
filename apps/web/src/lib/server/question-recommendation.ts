@@ -449,6 +449,7 @@ export async function abandonRecommendationForCycle(
   transaction: DatabaseTransaction,
   actorId: string,
   recommendationId: string,
+  cycleQuestionExternalId: string,
 ): Promise<void> {
   const [stored] = await lockOwnedRecommendation(
     transaction,
@@ -465,9 +466,14 @@ export async function abandonRecommendationForCycle(
         "This recommendation has already reached a terminal state. Request a new recommendation before starting another essay.",
     });
   }
+  const terminalStatus =
+    stored.status === "READY" &&
+    stored.questionExternalId === cycleQuestionExternalId
+      ? "STARTED"
+      : "ABANDONED";
   await transaction
     .update(questionRecommendation)
-    .set({ status: "ABANDONED" })
+    .set({ status: terminalStatus })
     .where(
       and(
         eq(questionRecommendation.id, recommendationId),
@@ -711,25 +717,8 @@ async function selectForLearner(
           ),
           and(
             eq(questionRecommendation.action, "SWAP"),
-            or(
-              inArray(questionRecommendation.status, [
-                "PENDING",
-                "UNAVAILABLE",
-              ]),
-              and(
-                inArray(questionRecommendation.status, [
-                  "READY",
-                  "ABANDONED",
-                  "STARTED",
-                ]),
-                isNotNull(questionRecommendation.shownAt),
-              ),
-            ),
             isNotNull(questionRecommendation.excludedExternalId),
-            gt(
-              sql`coalesce(${questionRecommendation.shownAt}, ${questionRecommendation.createdAt})`,
-              exposureCutoff(input.now),
-            ),
+            gt(questionRecommendation.createdAt, exposureCutoff(input.now)),
           ),
         ),
       ),

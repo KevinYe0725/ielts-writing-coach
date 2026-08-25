@@ -143,6 +143,7 @@ integration("question recommendation service (PostgreSQL)", () => {
         transaction: RecommendationTransaction,
         actorId: string,
         recommendationId: string,
+        cycleQuestionExternalId: string,
       ) => Promise<void>;
       assertRecommendationForCycle?: (
         transaction: RecommendationTransaction,
@@ -585,8 +586,8 @@ integration("question recommendation service (PostgreSQL)", () => {
     expect(next.question).toBeNull();
   });
 
-  it.each(["PENDING", "UNAVAILABLE"] as const)(
-    "uses a recent %s SWAP record to cool down its excluded question",
+  it.each(["PENDING", "READY", "UNAVAILABLE", "ABANDONED", "STARTED"] as const)(
+    "uses recent SWAP createdAt to cool its excluded question regardless of %s status",
     async (status) => {
       const learnerId = await createLearner(
         `recommend-swap-cooldown-${status}`,
@@ -615,6 +616,31 @@ integration("question recommendation service (PostgreSQL)", () => {
       expect(next.question).toBeNull();
     },
   );
+
+  it("admits a SWAP excluded question at the exact open 72-hour createdAt boundary", async () => {
+    const learnerId = await createLearner("recommend-swap-created-boundary");
+    const original = QUESTION_BANK[0]!;
+    await exposeAllExcept(learnerId, [original.id]);
+    await database.db.insert(questionRecommendation).values({
+      userId: learnerId,
+      action: "SWAP",
+      status: "ABANDONED",
+      excludedExternalId: original.id,
+      createdAt: new Date(now.getTime() - 72 * 60 * 60 * 1_000),
+    });
+
+    await expect(
+      createQuestionRecommendation(
+        database.db,
+        learnerId,
+        { action: "INITIAL" },
+        options,
+      ),
+    ).resolves.toMatchObject({
+      status: "READY",
+      question: { id: original.id },
+    });
+  });
 
   it("serializes concurrent INITIAL calls into distinct exposure rows", async () => {
     const learnerId = await createLearner("recommend-concurrent");
@@ -1119,8 +1145,9 @@ integration("question recommendation service (PostgreSQL)", () => {
     if (!abandon) return;
     const learnerId = await createLearner("recommend-abandon-ready");
     const candidate = QUESTION_BANK[0]!;
+    const manualExternalId = `manual-ready-fallback-${newDomainId()}`;
     const manualQuestionId = await insertStoredQuestion({
-      externalId: `manual-ready-fallback-${newDomainId()}`,
+      externalId: manualExternalId,
       ownerId: learnerId,
       visibility: "private",
     });
@@ -1138,7 +1165,7 @@ integration("question recommendation service (PostgreSQL)", () => {
 
     await database.db.transaction(async (transaction) => {
       await lockLearnerAndAssertActiveCycleCapacity(transaction, learnerId);
-      await abandon(transaction, learnerId, ready.id);
+      await abandon(transaction, learnerId, ready.id, manualExternalId);
       await transaction.insert(trainingCycle).values({
         userId: learnerId,
         questionId: manualQuestionId,
@@ -1160,7 +1187,7 @@ integration("question recommendation service (PostgreSQL)", () => {
     await expect(
       database.db.transaction(async (transaction) => {
         await lockLearnerAndAssertActiveCycleCapacity(transaction, learnerId);
-        await abandon(transaction, learnerId, ready.id);
+        await abandon(transaction, learnerId, ready.id, manualExternalId);
       }),
     ).rejects.toMatchObject({
       problem: { code: "RECOMMENDATION_NOT_ABANDONABLE", status: 409 },
@@ -1175,14 +1202,45 @@ integration("question recommendation service (PostgreSQL)", () => {
     expect(next.question).toBeNull();
   });
 
+  it("treats fallback use of the exact READY question as STARTED, never ABANDONED", async () => {
+    const abandon = cycleRecommendationApi().abandonRecommendationForCycle;
+    expect(abandon).toEqual(expect.any(Function));
+    if (!abandon) return;
+    const learnerId = await createLearner("recommend-fallback-same-question");
+    const candidate = QUESTION_BANK[0]!;
+    await exposeAllExcept(learnerId, [candidate.id]);
+    const ready = await createQuestionRecommendation(
+      database.db,
+      learnerId,
+      { action: "INITIAL" },
+      options,
+    );
+
+    await database.db.transaction(async (transaction) => {
+      await lockLearnerAndAssertActiveCycleCapacity(transaction, learnerId);
+      await abandon(transaction, learnerId, ready.id, candidate.id);
+    });
+
+    await expect(
+      database.db.query.questionRecommendation.findFirst({
+        where: eq(questionRecommendation.id, ready.id),
+      }),
+    ).resolves.toMatchObject({
+      status: "STARTED",
+      questionExternalId: candidate.id,
+      shownAt: now,
+    });
+  });
+
   it("couples PENDING fallback for its owner without creating an exposure", async () => {
     const abandon = cycleRecommendationApi().abandonRecommendationForCycle;
     expect(abandon).toEqual(expect.any(Function));
     if (!abandon) return;
     const learnerId = await createLearner("recommend-abandon-pending");
     const otherId = await createLearner("recommend-abandon-other");
+    const manualExternalId = `manual-pending-fallback-${newDomainId()}`;
     const manualQuestionId = await insertStoredQuestion({
-      externalId: `manual-pending-fallback-${newDomainId()}`,
+      externalId: manualExternalId,
       ownerId: learnerId,
       visibility: "private",
     });
@@ -1199,12 +1257,12 @@ integration("question recommendation service (PostgreSQL)", () => {
     await expect(
       database.db.transaction(async (transaction) => {
         await lockLearnerAndAssertActiveCycleCapacity(transaction, otherId);
-        await abandon(transaction, otherId, pending.id);
+        await abandon(transaction, otherId, pending.id, manualExternalId);
       }),
     ).rejects.toMatchObject({ problem: { status: 404 } });
     await database.db.transaction(async (transaction) => {
       await lockLearnerAndAssertActiveCycleCapacity(transaction, learnerId);
-      await abandon(transaction, learnerId, pending.id);
+      await abandon(transaction, learnerId, pending.id, manualExternalId);
       await transaction.insert(trainingCycle).values({
         userId: learnerId,
         questionId: manualQuestionId,
@@ -1244,6 +1302,62 @@ integration("question recommendation service (PostgreSQL)", () => {
     });
   });
 
+  it("keeps the swapped-away question cooled after PENDING SWAP becomes ABANDONED", async () => {
+    const abandon = cycleRecommendationApi().abandonRecommendationForCycle;
+    expect(abandon).toEqual(expect.any(Function));
+    if (!abandon) return;
+    const learnerId = await createLearner("recommend-abandoned-pending-swap");
+    const original = QUESTION_BANK[0]!;
+    const recommendationId = newDomainId();
+    const manualExternalId = `manual-abandoned-swap-${newDomainId()}`;
+    const manualQuestionId = await insertStoredQuestion({
+      externalId: manualExternalId,
+      ownerId: learnerId,
+      visibility: "private",
+    });
+    await exposeAllExcept(learnerId, [original.id]);
+    await database.db.insert(questionRecommendation).values({
+      id: recommendationId,
+      userId: learnerId,
+      action: "SWAP",
+      status: "PENDING",
+      excludedExternalId: original.id,
+      createdAt: now,
+    });
+
+    await database.db.transaction(async (transaction) => {
+      await lockLearnerAndAssertActiveCycleCapacity(transaction, learnerId);
+      await abandon(transaction, learnerId, recommendationId, manualExternalId);
+      await transaction.insert(trainingCycle).values({
+        userId: learnerId,
+        questionId: manualQuestionId,
+        status: "QUESTION_READY",
+        schemaVersion: "1.0.0",
+        timezone: "UTC",
+      });
+    });
+
+    await expect(
+      database.db.query.questionRecommendation.findFirst({
+        where: eq(questionRecommendation.id, recommendationId),
+      }),
+    ).resolves.toMatchObject({
+      status: "ABANDONED",
+      questionExternalId: null,
+      shownAt: null,
+      excludedExternalId: original.id,
+      createdAt: now,
+    });
+    const next = await createQuestionRecommendation(
+      database.db,
+      learnerId,
+      { action: "INITIAL" },
+      options,
+    );
+    expect(next.status).not.toBe("READY");
+    expect(next.question).toBeNull();
+  });
+
   it("rolls back abandonment when the coupled cycle transaction fails", async () => {
     const abandon = cycleRecommendationApi().abandonRecommendationForCycle;
     expect(abandon).toEqual(expect.any(Function));
@@ -1261,7 +1375,12 @@ integration("question recommendation service (PostgreSQL)", () => {
     await expect(
       database.db.transaction(async (transaction) => {
         await lockLearnerAndAssertActiveCycleCapacity(transaction, learnerId);
-        await abandon(transaction, learnerId, ready.id);
+        await abandon(
+          transaction,
+          learnerId,
+          ready.id,
+          "manual-rollback-question",
+        );
         throw new Error("cycle insert failed");
       }),
     ).rejects.toThrow("cycle insert failed");
@@ -1282,13 +1401,192 @@ integration("question recommendation service (PostgreSQL)", () => {
     ).resolves.toHaveLength(0);
   });
 
+  it("forces recommended STARTED first so fallback fails and no second cycle commits", async () => {
+    const assertForCycle =
+      cycleRecommendationApi().assertRecommendationForCycle;
+    const abandon = cycleRecommendationApi().abandonRecommendationForCycle;
+    expect(assertForCycle).toEqual(expect.any(Function));
+    expect(abandon).toEqual(expect.any(Function));
+    if (!assertForCycle || !abandon) return;
+    const learnerId = await createLearner("recommend-started-first");
+    const recommendedExternalId = `started-first-recommended-${newDomainId()}`;
+    const manualExternalId = `started-first-manual-${newDomainId()}`;
+    const recommendedQuestionId = await insertStoredQuestion({
+      externalId: recommendedExternalId,
+      ownerId: learnerId,
+      visibility: "private",
+    });
+    const manualQuestionId = await insertStoredQuestion({
+      externalId: manualExternalId,
+      ownerId: learnerId,
+      visibility: "private",
+    });
+    const recommendationId = newDomainId();
+    await database.db.insert(questionRecommendation).values({
+      id: recommendationId,
+      userId: learnerId,
+      questionExternalId: recommendedExternalId,
+      action: "INITIAL",
+      status: "READY",
+      shownAt: now,
+    });
+    let reached!: () => void;
+    const atCommit = new Promise<void>((resolve) => {
+      reached = resolve;
+    });
+    let release!: () => void;
+    const released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const startingDatabase = databaseWithCommitBarrier({
+      reached,
+      release: () => released,
+    });
+
+    const started = startingDatabase.transaction(async (transaction) => {
+      await lockLearnerAndAssertActiveCycleCapacity(transaction, learnerId);
+      await assertForCycle(
+        transaction,
+        learnerId,
+        recommendationId,
+        recommendedExternalId,
+      );
+      await transaction.insert(trainingCycle).values({
+        userId: learnerId,
+        questionId: recommendedQuestionId,
+        status: "QUESTION_READY",
+        schemaVersion: "1.0.0",
+        timezone: "UTC",
+      });
+    });
+    await atCommit;
+    const fallback = database.db.transaction(async (transaction) => {
+      await lockLearnerAndAssertActiveCycleCapacity(transaction, learnerId);
+      await abandon(transaction, learnerId, recommendationId, manualExternalId);
+      await transaction.insert(trainingCycle).values({
+        userId: learnerId,
+        questionId: manualQuestionId,
+        status: "QUESTION_READY",
+        schemaVersion: "1.0.0",
+        timezone: "UTC",
+      });
+    });
+    await waitForLockWaiter();
+    release();
+
+    await expect(started).resolves.toBeUndefined();
+    await expect(fallback).rejects.toMatchObject({
+      problem: { code: "RECOMMENDATION_NOT_ABANDONABLE", status: 409 },
+    });
+    await expect(
+      database.db.query.questionRecommendation.findFirst({
+        where: eq(questionRecommendation.id, recommendationId),
+      }),
+    ).resolves.toMatchObject({ status: "STARTED" });
+    await expect(
+      database.db.query.trainingCycle.findMany({
+        where: eq(trainingCycle.userId, learnerId),
+      }),
+    ).resolves.toHaveLength(1);
+  });
+
+  it("forces different-question fallback ABANDONED first so recommended start fails and no second cycle commits", async () => {
+    const assertForCycle =
+      cycleRecommendationApi().assertRecommendationForCycle;
+    const abandon = cycleRecommendationApi().abandonRecommendationForCycle;
+    expect(assertForCycle).toEqual(expect.any(Function));
+    expect(abandon).toEqual(expect.any(Function));
+    if (!assertForCycle || !abandon) return;
+    const learnerId = await createLearner("recommend-abandoned-first");
+    const recommendedExternalId = `abandoned-first-recommended-${newDomainId()}`;
+    const manualExternalId = `abandoned-first-manual-${newDomainId()}`;
+    const recommendedQuestionId = await insertStoredQuestion({
+      externalId: recommendedExternalId,
+      ownerId: learnerId,
+      visibility: "private",
+    });
+    const manualQuestionId = await insertStoredQuestion({
+      externalId: manualExternalId,
+      ownerId: learnerId,
+      visibility: "private",
+    });
+    const recommendationId = newDomainId();
+    await database.db.insert(questionRecommendation).values({
+      id: recommendationId,
+      userId: learnerId,
+      questionExternalId: recommendedExternalId,
+      action: "INITIAL",
+      status: "READY",
+      shownAt: now,
+    });
+    let reached!: () => void;
+    const atCommit = new Promise<void>((resolve) => {
+      reached = resolve;
+    });
+    let release!: () => void;
+    const released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const fallbackDatabase = databaseWithCommitBarrier({
+      reached,
+      release: () => released,
+    });
+
+    const fallback = fallbackDatabase.transaction(async (transaction) => {
+      await lockLearnerAndAssertActiveCycleCapacity(transaction, learnerId);
+      await abandon(transaction, learnerId, recommendationId, manualExternalId);
+      await transaction.insert(trainingCycle).values({
+        userId: learnerId,
+        questionId: manualQuestionId,
+        status: "QUESTION_READY",
+        schemaVersion: "1.0.0",
+        timezone: "UTC",
+      });
+    });
+    await atCommit;
+    const started = database.db.transaction(async (transaction) => {
+      await lockLearnerAndAssertActiveCycleCapacity(transaction, learnerId);
+      await assertForCycle(
+        transaction,
+        learnerId,
+        recommendationId,
+        recommendedExternalId,
+      );
+      await transaction.insert(trainingCycle).values({
+        userId: learnerId,
+        questionId: recommendedQuestionId,
+        status: "QUESTION_READY",
+        schemaVersion: "1.0.0",
+        timezone: "UTC",
+      });
+    });
+    await waitForLockWaiter();
+    release();
+
+    await expect(fallback).resolves.toBeUndefined();
+    await expect(started).rejects.toMatchObject({
+      problem: { code: "RECOMMENDATION_NOT_READY", status: 409 },
+    });
+    await expect(
+      database.db.query.questionRecommendation.findFirst({
+        where: eq(questionRecommendation.id, recommendationId),
+      }),
+    ).resolves.toMatchObject({ status: "ABANDONED" });
+    await expect(
+      database.db.query.trainingCycle.findMany({
+        where: eq(trainingCycle.userId, learnerId),
+      }),
+    ).resolves.toHaveLength(1);
+  });
+
   it("linearizes poll finalization before coupled fallback and preserves the READY exposure", async () => {
     const abandon = cycleRecommendationApi().abandonRecommendationForCycle;
     expect(abandon).toEqual(expect.any(Function));
     if (!abandon) return;
     const learnerId = await createLearner("recommend-finalize-before-abandon");
+    const manualExternalId = `manual-finalize-first-${newDomainId()}`;
     const manualQuestionId = await insertStoredQuestion({
-      externalId: `manual-finalize-first-${newDomainId()}`,
+      externalId: manualExternalId,
       ownerId: learnerId,
       visibility: "private",
     });
@@ -1336,7 +1634,7 @@ integration("question recommendation service (PostgreSQL)", () => {
     await atCommit;
     const fallback = database.db.transaction(async (transaction) => {
       await lockLearnerAndAssertActiveCycleCapacity(transaction, learnerId);
-      await abandon(transaction, learnerId, pending.id);
+      await abandon(transaction, learnerId, pending.id, manualExternalId);
       await transaction.insert(trainingCycle).values({
         userId: learnerId,
         questionId: manualQuestionId,
@@ -1371,8 +1669,9 @@ integration("question recommendation service (PostgreSQL)", () => {
     expect(abandon).toEqual(expect.any(Function));
     if (!abandon) return;
     const learnerId = await createLearner("recommend-abandon-before-finalize");
+    const manualExternalId = `manual-abandon-first-${newDomainId()}`;
     const manualQuestionId = await insertStoredQuestion({
-      externalId: `manual-abandon-first-${newDomainId()}`,
+      externalId: manualExternalId,
       ownerId: learnerId,
       visibility: "private",
     });
@@ -1413,7 +1712,7 @@ integration("question recommendation service (PostgreSQL)", () => {
 
     const fallback = abandoningDatabase.transaction(async (transaction) => {
       await lockLearnerAndAssertActiveCycleCapacity(transaction, learnerId);
-      await abandon(transaction, learnerId, pending.id);
+      await abandon(transaction, learnerId, pending.id, manualExternalId);
       await transaction.insert(trainingCycle).values({
         userId: learnerId,
         questionId: manualQuestionId,

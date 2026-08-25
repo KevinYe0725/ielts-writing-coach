@@ -23,8 +23,9 @@ back both mutations.
 
 - Recommended start requires owned READY with the exact external question ID
   and transitions it to terminal STARTED.
-- Fallback requires owned PENDING or READY and transitions it to terminal
-  ABANDONED.
+- Fallback requires owned PENDING or READY. PENDING becomes ABANDONED. READY
+  becomes STARTED when its question is the cycle question; only a genuinely
+  different cycle question makes READY become ABANDONED.
 - STARTED and ABANDONED cannot be transitioned or finalized again. Owner GET
   projects either as the existing generic unavailable state.
 - A READY row that becomes STARTED or ABANDONED retains its
@@ -35,10 +36,11 @@ back both mutations.
 - Refill workers still update only PENDING rows, so neither terminal status can
   be finalized by a later batch.
 
-This is the explicit resolution of “no invisible READY”: the row becomes
-terminal ABANDONED, so it cannot appear as usable READY or finalize later, but
-its already-incurred shown exposure is conservatively retained. Manual fallback
-cannot be used to reset the three-day cooldown.
+This is the explicit resolution of “no invisible READY”: a different-question
+fallback makes the row terminal ABANDONED, so it cannot appear as usable READY
+or finalize later, but its already-incurred shown exposure is conservatively
+retained. Exact-question use becomes STARTED even if a client labels the field
+as abandonment. Manual fallback cannot be used to reset the three-day cooldown.
 
 ## Today and Demo flow
 
@@ -52,8 +54,8 @@ then creates its cycle with the same abandonment ID. It never sends
 If the coupled cycle request fails, the database transaction leaves the
 recommendation unchanged. Today renders locale-owned actionable copy; a saved
 private question remains available in the bank for retry. Demo mode mirrors
-READY/PENDING → ABANDONED and READY → STARTED only inside cycle creation while
-preserving READY exposure.
+PENDING → ABANDONED and question-aware READY → STARTED/ABANDONED only inside
+cycle creation while preserving READY exposure.
 
 ## Strict RED → GREEN evidence
 
@@ -79,6 +81,31 @@ exactly one cycle. Tests also cover transaction rollback, other-user 404,
 mutually exclusive IDs, READY cooldown, PENDING without exposure, terminal
 replay rejection, and idempotent recommended/fallback HTTP replay.
 
+## Fix Round 2 — question-aware fallback and deterministic races
+
+The fallback transition now receives the resolved cycle question external ID.
+A natural bank selection of the same READY question—and a malicious payload
+trying to mark that exact use abandoned—both commit STARTED. A different
+question still commits ABANDONED; PENDING remains ABANDONED.
+
+SWAP cooldown is independent of recommendation status. Every recent SWAP row
+uses its immutable `created_at` with the strict open `> 72h cutoff` predicate
+to exclude `excluded_external_id`. Thus a PENDING SWAP that becomes ABANDONED
+has no exposure to an unshown recommendation, while the question the learner
+swapped away remains cooled. The exact 72-hour boundary is eligible.
+
+The previous nondeterministic `Promise.all` contention check was replaced by
+two real-PostgreSQL commit barriers:
+
+- STARTED commits first; fallback receives terminal 409 and no second cycle.
+- Different-question ABANDONED commits first; recommended start receives
+  terminal 409 and no second cycle.
+
+Fix Round 2 strict RED produced seven intended failures: same-question server,
+route, and Demo state were ABANDONED; READY/ABANDONED/STARTED SWAP rows did not
+all preserve excluded-question cooldown; and PENDING SWAP → ABANDONED released
+the swapped-away question. Focused GREEN is 55/55.
+
 ## Migration identity and full gates
 
 Unreleased migration `0013_adaptive_question_supply` was regenerated from the
@@ -90,7 +117,7 @@ chain under Node 24.19.0.
 ```text
 @iwc/db: 2 files / 12 passed
 @iwc/worker: 14 files / 212 passed
-@iwc/web: 54 files / 465 passed
+@iwc/web: 54 files / 474 passed
 format: pass
 lint: pass, 0 errors / 4 existing Fast Refresh warnings
 typecheck: pass
