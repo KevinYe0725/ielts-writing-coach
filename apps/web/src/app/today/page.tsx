@@ -679,6 +679,25 @@ export default function TodayPage() {
                 <LoaderCircle aria-hidden="true" className="spin" size={18} />
                 {text("正在为你准备一题…", "Preparing a question for you…")}
               </p>
+            ) : !recommendation && questionError ? (
+              <div className={styles.unavailable}>
+                <p>
+                  {text(
+                    "上一次请求的结果无法确认。请使用同一次安全操作重新获取推荐题。",
+                    "The previous result could not be confirmed. Retry the same safe operation to recover the recommendation.",
+                  )}
+                </p>
+                <Button
+                  disabled={recommendationBusy}
+                  onClick={() =>
+                    void requestRecommendation({ action: "INITIAL" })
+                  }
+                  type="button"
+                  variant="secondary"
+                >
+                  {text("重新获取推荐题", "Retry recommendation")}
+                </Button>
+              </div>
             ) : recommendation?.state === "READY" ? (
               <>
                 <div className={styles.promptBody}>

@@ -936,18 +936,34 @@ test.describe("Today query states at the HTTP boundary", () => {
     await expect.poll(() => starts).toBe(1);
   });
 
-  test("exhausted same-key cycle transport retries release Today for an actionable retry", async ({
+  test("a committed recommended STARTED cycle replays on the next user click with the same logical key", async ({
     page,
   }) => {
     const idempotencyKeys: string[] = [];
+    const cycleBodies: Array<Record<string, unknown>> = [];
+    const storedCycles = new Map<string, string>();
+    let createdCycles = 0;
     const pageErrors: Error[] = [];
     page.on("pageerror", (error) => pageErrors.push(error));
     await routeTodayHttpFixture(page, "mixed-review");
     await page.route("**/api/v1/training-cycles", async (route) => {
-      idempotencyKeys.push(
-        route.request().headers()["idempotency-key"] ?? "missing",
-      );
-      await route.abort("timedout");
+      const key = route.request().headers()["idempotency-key"] ?? "missing";
+      idempotencyKeys.push(key);
+      cycleBodies.push(route.request().postDataJSON());
+      if (!storedCycles.has(key)) {
+        createdCycles += 1;
+        storedCycles.set(key, "cycle-committed-started");
+      }
+      if (idempotencyKeys.length <= 6) {
+        await route.abort("timedout");
+        return;
+      }
+      await route.fulfill({
+        contentType: "application/json",
+        status: 201,
+        headers: { "idempotency-replayed": "true" },
+        body: JSON.stringify({ cycle: { id: storedCycles.get(key) } }),
+      });
     });
     await page.goto("/today?mixed-review=1");
     const start = page.getByRole("button", { name: "用这道题开始写作" });
@@ -970,15 +986,153 @@ test.describe("Today query states at the HTTP boundary", () => {
 
     await start.click();
 
-    await expect.poll(() => idempotencyKeys.length).toBe(12);
-    await expect(start).toBeEnabled();
+    await expect.poll(() => idempotencyKeys.length).toBe(7);
+    await expect(page).toHaveURL(/\/write\?cycle=cycle-committed-started$/);
     const secondOperationKey = idempotencyKeys[6];
     expect(new Set(idempotencyKeys.slice(6))).toEqual(
       new Set([secondOperationKey as string]),
     );
-    expect(secondOperationKey).not.toBe(firstOperationKey);
+    expect(secondOperationKey).toBe(firstOperationKey);
     expect(secondOperationKey).not.toBe("missing");
+    expect(createdCycles).toBe(1);
+    expect(new Set(storedCycles.values())).toEqual(
+      new Set(["cycle-committed-started"]),
+    );
+    expect(cycleBodies).toHaveLength(7);
+    expect(cycleBodies).toEqual(
+      Array(7).fill(
+        expect.objectContaining({
+          question_id: "http-question-education",
+          recommendation_id: "recommendation-http",
+        }),
+      ),
+    );
     expect(pageErrors).toEqual([]);
+  });
+
+  test("a committed fallback ABANDONED cycle replays without a duplicate or conflict", async ({
+    page,
+  }) => {
+    const idempotencyKeys: string[] = [];
+    const cycleBodies: Array<Record<string, unknown>> = [];
+    const storedCycles = new Map<string, string>();
+    let createdCycles = 0;
+    await routeTodayHttpFixture(page, "mixed-review");
+    await page.route("**/api/v1/training-cycles", async (route) => {
+      const key = route.request().headers()["idempotency-key"] ?? "missing";
+      idempotencyKeys.push(key);
+      cycleBodies.push(route.request().postDataJSON());
+      if (!storedCycles.has(key)) {
+        createdCycles += 1;
+        storedCycles.set(key, "cycle-committed-abandoned");
+      }
+      if (idempotencyKeys.length <= 6) {
+        await route.abort("timedout");
+        return;
+      }
+      await route.fulfill({
+        contentType: "application/json",
+        status: 201,
+        headers: { "idempotency-replayed": "true" },
+        body: JSON.stringify({ cycle: { id: storedCycles.get(key) } }),
+      });
+    });
+    await page.goto("/today?mixed-review=1");
+    await page.getByText("浏览全部题库").click();
+    await page.getByLabel("题库").selectOption("http-question-education");
+    const fallbackStart = page
+      .getByLabel("题库")
+      .locator("..")
+      .locator("..")
+      .getByRole("button", { name: "用这道题开始写作" });
+
+    await fallbackStart.click();
+    await expect.poll(() => idempotencyKeys.length).toBe(6);
+    await expect(
+      page.getByText("未能安全关闭当前推荐题，请重试后再开始写作。", {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(fallbackStart).toBeEnabled();
+    await fallbackStart.click();
+
+    await expect.poll(() => idempotencyKeys.length).toBe(7);
+    await expect(page).toHaveURL(/\/write\?cycle=cycle-committed-abandoned$/);
+    expect(new Set(idempotencyKeys)).toEqual(new Set([idempotencyKeys[0]]));
+    expect(idempotencyKeys[0]).not.toBe("missing");
+    expect(createdCycles).toBe(1);
+    expect(cycleBodies).toEqual(
+      Array(7).fill(
+        expect.objectContaining({
+          question_id: "http-question-education",
+          abandon_recommendation_id: "recommendation-http",
+        }),
+      ),
+    );
+    expect(cycleBodies[0]).not.toHaveProperty("recommendation_id");
+  });
+
+  test("a committed initial recommendation reuses its exposure key through the actionable UI retry", async ({
+    page,
+  }) => {
+    const idempotencyKeys: string[] = [];
+    const storedRecommendations = new Map<string, string>();
+    let createdExposures = 0;
+    await routeTodayHttpFixture(page, "mixed-review");
+    await page.route("**/api/v1/question-recommendations", async (route) => {
+      if (route.request().method() !== "POST") return route.fallback();
+      const key = route.request().headers()["idempotency-key"] ?? "missing";
+      idempotencyKeys.push(key);
+      if (!storedRecommendations.has(key)) {
+        createdExposures += 1;
+        storedRecommendations.set(key, "recommendation-committed-initial");
+      }
+      if (idempotencyKeys.length <= 6) {
+        await route.abort("timedout");
+        return;
+      }
+      await route.fulfill({
+        contentType: "application/json",
+        headers: { "idempotency-replayed": "true" },
+        body: JSON.stringify({
+          recommendation: {
+            id: storedRecommendations.get(key),
+            status: "READY",
+            question: {
+              id: "question-committed-initial",
+              prompt:
+                "Some people believe schools should teach financial literacy. To what extent do you agree or disagree?",
+              type: "opinion",
+              topic: "education",
+              ielts_track: "academic",
+              visibility: "public",
+            },
+          },
+        }),
+      });
+    });
+    await page.goto("/today?mixed-review=1");
+
+    await expect.poll(() => idempotencyKeys.length).toBe(6);
+    await expect(
+      page.getByText("The IELTS Writing server could not be reached.", {
+        exact: true,
+      }),
+    ).toBeVisible();
+    const retryInitial = page.getByRole("button", {
+      name: "重新获取推荐题",
+    });
+    await expect(retryInitial).toBeVisible();
+    await retryInitial.click();
+
+    await expect.poll(() => idempotencyKeys.length).toBe(7);
+    await expect(page.locator("[data-recommendation-prompt]")).toBeVisible();
+    expect(new Set(idempotencyKeys)).toEqual(new Set([idempotencyKeys[0]]));
+    expect(idempotencyKeys[0]).not.toBe("missing");
+    expect(createdExposures).toBe(1);
+    expect(new Set(storedRecommendations.values())).toEqual(
+      new Set(["recommendation-committed-initial"]),
+    );
   });
 
   test("synchronously dispatched swap events create one recommendation request", async ({

@@ -5,6 +5,10 @@ import {
   type ApiProblemDetails,
 } from "./errors";
 import {
+  fingerprintLogicalOperation,
+  LogicalOperationRegistry,
+} from "./logical-operation-registry";
+import {
   projectTeachingPracticeResponse,
   unavailableTeachingPracticeResponse,
 } from "./teaching-practice-projection";
@@ -67,6 +71,8 @@ import type {
   UserPreferences,
   WritingPrompt,
 } from "./types";
+
+export { fingerprintLogicalOperation } from "./logical-operation-registry";
 
 // Keep this browser-only wire guard independent of the server learning-core
 // barrel, which also exports Ajv-backed validators that cannot run under the
@@ -1860,6 +1866,7 @@ export class HttpLearningClient implements LearningClient {
   private readonly draftQueues = new Map<string, Promise<void>>();
   private readonly lessonIndexes = new Map<string, number>();
   private readonly lessonLengths = new Map<string, number>();
+  private readonly logicalOperations: LogicalOperationRegistry;
   private readonly clientId = `web-${randomId()}`;
 
   constructor(options: HttpLearningClientOptions = {}) {
@@ -1868,6 +1875,10 @@ export class HttpLearningClient implements LearningClient {
     this.idempotencyKey = options.idempotencyKey ?? randomId;
     this.maxJobWaitMs = options.maxJobWaitMs ?? 2 * 60 * 1000;
     this.now = options.now ?? (() => new Date());
+    this.logicalOperations = new LogicalOperationRegistry(
+      this.idempotencyKey,
+      () => this.now().getTime(),
+    );
     this.origin = options.origin ?? this.detectOrigin();
     this.pollIntervalMs = options.pollIntervalMs ?? 1_000;
     this.requestTimeoutMs =
@@ -1921,10 +1932,19 @@ export class HttpLearningClient implements LearningClient {
     if (options.body !== undefined)
       headers.set("Content-Type", "application/json");
     if (method !== "GET" && this.origin) headers.set("Origin", this.origin);
+    let logicalOperation: { fingerprint: string; key: string } | undefined;
     if (options.idempotencyKey)
       headers.set("Idempotency-Key", options.idempotencyKey);
-    else if (options.idempotent)
-      headers.set("Idempotency-Key", this.idempotencyKey());
+    else if (options.idempotent) {
+      const fingerprint = await fingerprintLogicalOperation({
+        body: options.body,
+        method,
+        path,
+      });
+      const key = this.logicalOperations.getOrCreate(fingerprint);
+      logicalOperation = { fingerprint, key };
+      headers.set("Idempotency-Key", key);
+    }
 
     const retryTransport = method === "GET" || headers.has("Idempotency-Key");
     for (let requestAttempt = 0; requestAttempt < 6; requestAttempt += 1) {
@@ -1961,6 +1981,11 @@ export class HttpLearningClient implements LearningClient {
             ? ""
             : await Promise.race([response.text(), deadline]);
         transportPhase = false;
+        if (logicalOperation)
+          this.logicalOperations.clear(
+            logicalOperation.fingerprint,
+            logicalOperation.key,
+          );
         let payload: unknown;
         try {
           payload = raw ? JSON.parse(raw) : undefined;
@@ -4186,6 +4211,7 @@ export class HttpLearningClient implements LearningClient {
       idempotent: true,
       method: "DELETE",
     });
+    this.logicalOperations.clearAll();
     if (typeof indexedDB !== "undefined")
       indexedDB.deleteDatabase("ielts-writing-coach");
   }

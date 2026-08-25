@@ -239,3 +239,12 @@ covers all five forms/eight topics through real validation and PostgreSQL
 publication; real provider payloads remain unchanged; 94 files / 905 tests,
 type, lint, format, and production builds green on Node 24.19.0 with fresh
 PostgreSQL 17.6; see final-remediation-g2-report.md)
+Fourth final broad review: changes requested at e555176 (1 Important —
+exhausted unknown-outcome retry discards idempotency key; 1 stale-evidence Minor)
+Final remediation H1: complete (digest-only in-memory logical-operation
+registry retains one auto key across six transport attempts and later identical
+user calls; definitive HTTP responses clear it; 256-entry LRU and 24-hour TTL;
+STARTED, ABANDONED, and initial recommendation fidelity replays create one
+identity with actionable Today recovery; 94 files / 916 tests, format, type,
+lint, and production builds green on Node 24.19.0 with fresh PostgreSQL 17.6;
+reload persistence remains an explicit boundary; see final-remediation-h1-report.md)
