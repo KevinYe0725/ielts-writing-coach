@@ -13,20 +13,24 @@ logical mutation under a different key.
 
 ## Client logical-operation registry
 
-Auto-keyed JSON mutations now compute a SHA-256 fingerprint over the uppercase
-method, exact path, and recursively key-sorted JSON body. The in-memory registry
-stores only that 64-character digest, the generated idempotency key, and its
-expiry. It never writes request bodies, API keys, credentials, or idempotency
-keys to localStorage, IndexedDB, sessionStorage, cookies, or another persistent
-store.
+The non-secret recommendation-creation and training-cycle mutations explicitly
+opt into a SHA-256 fingerprint over the uppercase method, exact path, and
+recursively key-sorted JSON body. The in-memory registry stores only that
+64-character digest, the generated idempotency key, and its expiry. Other
+auto-keyed mutations still keep one key through their six internal attempts,
+but never canonicalize, digest, or retain their bodies across method calls. It
+never writes request bodies, API keys, credentials, or idempotency keys to
+localStorage, IndexedDB, sessionStorage, cookies, or another persistent store.
 
 The registry:
 
 - retains one key across all six internal attempts and later identical method
   calls while the outcome remains transport-unknown;
-- clears the matching entry after the complete HTTP response body arrives,
-  whether the result is success, a permitted status, or a parsed 400, 409, or
-  503 problem;
+- clears the matching entry after successful/permitted HTTP classification or
+  a definitive non-`IDEMPOTENCY_IN_PROGRESS` problem;
+- retains the entry when a complete `IDEMPOTENCY_IN_PROGRESS` response is
+  followed by transport exhaustion, so the next user call continues the
+  server's original operation;
 - gives a changed method, path, or wire-equivalent canonical body a new key;
 - leaves explicit caller-supplied deterministic keys outside the registry;
 - caps unresolved operations at 256 and refreshes access order for LRU
@@ -34,6 +38,18 @@ The registry:
 - expires entries after 24 hours, matching the server idempotency-record TTL;
 - clears every remaining in-memory entry after confirmed learning-data
   deletion.
+
+Concurrent identical opt-in calls first meet at a synchronous
+canonical-material map before the asynchronous WebCrypto digest. They share one
+digest, key, request promise, network operation, and result. The temporary map
+is restricted to the two non-secret method bodies and is removed when the
+shared promise settles; only digest and key can remain for later recovery.
+
+An opaque module-local account epoch contains no identity. Confirmed sign-out
+and successful sign-in advance it; bootstrap advances it before and after the
+account transition. Each live HTTP client clears both the unresolved registry
+and in-flight map when it observes a new epoch. A failed sign-out does not
+advance the boundary.
 
 The registry is intentionally scoped to the live `HttpLearningClient`
 instance. A page reload or browser restart creates a new registry. Persisting
@@ -93,8 +109,8 @@ All final gates used Node 24.19.0 and a newly migrated tmpfs
 
 ```text
 PostgreSQL migration chain: pass
-Full repository tests: 94 files / 916 passed / 0 failed / 0 skipped
-Web tests: 54 files / 505 passed
+Full repository tests: 94 files / 920 passed / 0 failed / 0 skipped
+Web tests: 54 files / 509 passed
 format: pass
 typecheck: pass
 lint: pass, 0 errors / 4 existing Fast Refresh warnings
@@ -102,8 +118,8 @@ Worker production build: pass, 2 ESM entries plus source maps
 Web production build: pass, 48/48 static pages
 ```
 
-The current evidence range is `e555176..H1 commit`, superseding the earlier
-fourth-review snapshot and its 94-file / 905-test total.
+The current evidence range is `16f5f78..H1 Fix Round 1 commit`, superseding the
+earlier fourth-review snapshot and its 94-file / 905-test total.
 
 ## Remaining boundary
 
@@ -112,5 +128,29 @@ boundary would require a separate security design for session persistence,
 strict account namespace and deletion, and digest-plus-key-only storage. H1
 does not persist credentials or request bodies and does not claim reload-safe
 recovery.
+
+## Fix Round 1/5 — classification, coalescing, and account scope
+
+The first H1 review found three gaps in `16f5f78`:
+
+1. the registry cleared immediately after body read, before recognizing
+   `IDEMPOTENCY_IN_PROGRESS`;
+2. concurrent identical calls both calculated a digest and performed a network
+   operation, while every auto-keyed body, including API-key writes, passed
+   through canonicalization;
+3. a soft account transition did not invalidate unresolved client keys.
+
+Strict RED on Node 24.19.0 proved all three boundaries: IN_PROGRESS plus five
+lost bodies generated a second key on the next call; a delayed digest ran twice
+and issued two fetches; the Brave API-key body was hashed twice; and account B
+reused account A's unresolved key after confirmed sign-out.
+
+GREEN after the changes:
+
+- focused Fix Round lifecycle: 4/4 passed;
+- full HTTP client plus account session: 2 files / 139 passed;
+- STARTED, ABANDONED, and initial recommendation Today fidelity: 3/3 passed;
+- full Web on fresh PostgreSQL 17.6: 54 files / 509 passed;
+- full repository on the same fresh database: 94 files / 920 passed.
 
 Commit: the commit containing this report.

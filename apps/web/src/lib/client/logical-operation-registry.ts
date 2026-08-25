@@ -30,16 +30,21 @@ function canonicalJsonValue(value: unknown): unknown {
  * body is used only while calculating SHA-256 and is never retained by the
  * registry or written to browser storage.
  */
-export async function fingerprintLogicalOperation(input: {
+export function canonicalLogicalOperationMaterial(input: {
   body: unknown;
   method: string;
   path: string;
-}): Promise<string> {
-  const canonical = JSON.stringify({
+}): string {
+  return JSON.stringify({
     body: canonicalJsonValue(input.body),
     method: input.method.toUpperCase(),
     path: input.path,
   });
+}
+
+export async function fingerprintLogicalOperationMaterial(
+  canonical: string,
+): Promise<string> {
   const digest = await globalThis.crypto.subtle.digest(
     "SHA-256",
     new TextEncoder().encode(canonical),
@@ -47,6 +52,16 @@ export async function fingerprintLogicalOperation(input: {
   return [...new Uint8Array(digest)]
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
+}
+
+export async function fingerprintLogicalOperation(input: {
+  body: unknown;
+  method: string;
+  path: string;
+}): Promise<string> {
+  return fingerprintLogicalOperationMaterial(
+    canonicalLogicalOperationMaterial(input),
+  );
 }
 
 /**

@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import { DraftConflictError, LearningClientError } from "./errors";
+import { signOutAccount } from "./account-session";
 import * as httpService from "./http-service";
 import { HttpLearningClient } from "./http-service";
 import { createLearningClient } from "./index";
@@ -987,6 +988,203 @@ describe("HttpLearningClient protocol", () => {
     ).toEqual(new Set(["logical-recommendation-initial"]));
   });
 
+  it("retains the logical key when IN_PROGRESS is followed by exhausted transport loss", async () => {
+    const issuedKey = vi
+      .fn<() => string>()
+      .mockReturnValueOnce("logical-in-progress")
+      .mockReturnValueOnce("duplicate-after-in-progress");
+    const fetcher = vi.fn<typeof fetch>(async () => {
+      const attempt = fetcher.mock.calls.length;
+      if (attempt === 1)
+        return jsonResponse(
+          {
+            title: "Request still processing",
+            status: 409,
+            code: "IDEMPOTENCY_IN_PROGRESS",
+            detail: "The original request is still processing.",
+          },
+          { status: 409 },
+        );
+      if (attempt <= 6) return responseWithDisconnectedBody();
+      return jsonResponse(
+        { cycle: { id: "cycle-after-in-progress-loss" } },
+        { status: 201 },
+      );
+    });
+    const client = new HttpLearningClient({
+      baseUrl: "https://coach.test/api/v1",
+      fetch: fetcher,
+      idempotencyKey: issuedKey,
+      origin: "https://coach.test",
+      requestTimeoutMs: 25,
+      sleep: async () => undefined,
+    });
+
+    await expect(
+      client.startTrainingCycle("question-in-progress"),
+    ).rejects.toMatchObject({ code: "NETWORK_ERROR", retryable: true });
+    await expect(
+      client.startTrainingCycle("question-in-progress"),
+    ).resolves.toBe("cycle-after-in-progress-loss");
+
+    expect(issuedKey).toHaveBeenCalledTimes(1);
+    expect(
+      new Set(
+        fetcher.mock.calls.map((call) =>
+          requestHeaders(call).get("idempotency-key"),
+        ),
+      ),
+    ).toEqual(new Set(["logical-in-progress"]));
+  });
+
+  it("coalesces concurrent identical calls before their delayed digest into one request", async () => {
+    let releaseDigest!: (value: ArrayBuffer) => void;
+    const delayedDigest = new Promise<ArrayBuffer>((resolve) => {
+      releaseDigest = resolve;
+    });
+    const digest = vi
+      .spyOn(globalThis.crypto.subtle, "digest")
+      .mockImplementation(() => delayedDigest);
+    const issuedKey = vi.fn(() => "coalesced-logical-key");
+    const fetcher = vi.fn<typeof fetch>(async () =>
+      jsonResponse({ cycle: { id: "cycle-coalesced" } }, { status: 201 }),
+    );
+    const client = new HttpLearningClient({
+      baseUrl: "https://coach.test/api/v1",
+      fetch: fetcher,
+      idempotencyKey: issuedKey,
+      origin: "https://coach.test",
+    });
+
+    try {
+      const first = client.startTrainingCycle("question-coalesced", {
+        recommendationId: "recommendation-coalesced",
+      });
+      const second = client.startTrainingCycle("question-coalesced", {
+        recommendationId: "recommendation-coalesced",
+      });
+      releaseDigest(new Uint8Array(32).buffer);
+
+      await expect(Promise.all([first, second])).resolves.toEqual([
+        "cycle-coalesced",
+        "cycle-coalesced",
+      ]);
+      expect(digest).toHaveBeenCalledTimes(1);
+      expect(issuedKey).toHaveBeenCalledTimes(1);
+      expect(fetcher).toHaveBeenCalledTimes(1);
+    } finally {
+      digest.mockRestore();
+    }
+  });
+
+  it("does not retain or coalesce secret-bearing auto-keyed mutations", async () => {
+    const digest = vi.spyOn(globalThis.crypto.subtle, "digest");
+    const issuedKey = vi
+      .fn<() => string>()
+      .mockReturnValueOnce("secret-operation-first")
+      .mockReturnValueOnce("secret-operation-second");
+    const fetcher = vi.fn<typeof fetch>(async () => {
+      if (fetcher.mock.calls.length <= 6) return responseWithDisconnectedBody();
+      return jsonResponse({
+        kind: "brave",
+        status: "ACTIVE",
+        tested_at: "2026-08-25T10:00:00.000Z",
+      });
+    });
+    const client = new HttpLearningClient({
+      baseUrl: "https://coach.test/api/v1",
+      fetch: fetcher,
+      idempotencyKey: issuedKey,
+      origin: "https://coach.test",
+      requestTimeoutMs: 25,
+      sleep: async () => undefined,
+    });
+
+    try {
+      await expect(
+        client.saveSearchConnection("brave-secret-never-canonicalized"),
+      ).rejects.toMatchObject({ code: "NETWORK_ERROR" });
+      await expect(
+        client.saveSearchConnection("brave-secret-never-canonicalized"),
+      ).resolves.toMatchObject({ status: "ACTIVE" });
+
+      expect(digest).not.toHaveBeenCalled();
+      expect(issuedKey).toHaveBeenCalledTimes(2);
+      expect(
+        new Set(
+          fetcher.mock.calls
+            .slice(0, 6)
+            .map((call) => requestHeaders(call).get("idempotency-key")),
+        ),
+      ).toEqual(new Set(["secret-operation-first"]));
+      expect(
+        requestHeaders(fetcher.mock.calls[6] ?? []).get("idempotency-key"),
+      ).toBe("secret-operation-second");
+    } finally {
+      digest.mockRestore();
+    }
+  });
+
+  it("keeps account A after failed sign-out but gives account B a new logical key after confirmed sign-out", async () => {
+    const issuedKey = vi
+      .fn<() => string>()
+      .mockReturnValueOnce("account-a-logical-key")
+      .mockReturnValueOnce("account-b-logical-key");
+    const fetcher = vi.fn<typeof fetch>(async () => {
+      if (fetcher.mock.calls.length <= 12)
+        return responseWithDisconnectedBody();
+      return jsonResponse(
+        { cycle: { id: "account-b-cycle" } },
+        { status: 201 },
+      );
+    });
+    const client = new HttpLearningClient({
+      baseUrl: "https://coach.test/api/v1",
+      fetch: fetcher,
+      idempotencyKey: issuedKey,
+      origin: "https://coach.test",
+      requestTimeoutMs: 25,
+      sleep: async () => undefined,
+    });
+    const signOutFetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        jsonResponse({ detail: "Try again" }, { status: 500 }),
+      )
+      .mockResolvedValueOnce(jsonResponse({ success: true }));
+    vi.stubGlobal("fetch", signOutFetcher);
+
+    try {
+      await expect(
+        client.startTrainingCycle("same-question-across-accounts"),
+      ).rejects.toMatchObject({ code: "NETWORK_ERROR" });
+      await expect(signOutAccount()).rejects.toThrow("Try again");
+      await expect(
+        client.startTrainingCycle("same-question-across-accounts"),
+      ).rejects.toMatchObject({ code: "NETWORK_ERROR" });
+      expect(issuedKey).toHaveBeenCalledTimes(1);
+
+      await expect(signOutAccount()).resolves.toBeUndefined();
+      await expect(
+        client.startTrainingCycle("same-question-across-accounts"),
+      ).resolves.toBe("account-b-cycle");
+
+      expect(issuedKey).toHaveBeenCalledTimes(2);
+      expect(
+        new Set(
+          fetcher.mock.calls
+            .slice(0, 12)
+            .map((call) => requestHeaders(call).get("idempotency-key")),
+        ),
+      ).toEqual(new Set(["account-a-logical-key"]));
+      expect(
+        requestHeaders(fetcher.mock.calls[12] ?? []).get("idempotency-key"),
+      ).toBe("account-b-logical-key");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("canonicalizes object property order but gives changed paths or payloads new logical keys", async () => {
     const issuedKey = vi
       .fn<() => string>()
@@ -1013,6 +1211,7 @@ describe("HttpLearningClient protocol", () => {
             body: Record<string, unknown>;
             idempotent: true;
             method: "POST";
+            retainLogicalOperation: true;
           },
         ) => Promise<unknown>;
       }
@@ -1023,6 +1222,7 @@ describe("HttpLearningClient protocol", () => {
         body: { action: "INITIAL", nested: { b: 2, a: 1 } },
         idempotent: true,
         method: "POST",
+        retainLogicalOperation: true,
       }),
     ).rejects.toMatchObject({ code: "NETWORK_ERROR" });
     await expect(
@@ -1030,6 +1230,7 @@ describe("HttpLearningClient protocol", () => {
         body: { nested: { a: 1, b: 2 }, action: "INITIAL" },
         idempotent: true,
         method: "POST",
+        retainLogicalOperation: true,
       }),
     ).resolves.toBeDefined();
     await expect(
@@ -1037,6 +1238,7 @@ describe("HttpLearningClient protocol", () => {
         body: { action: "SWAP", nested: { a: 1, b: 2 } },
         idempotent: true,
         method: "POST",
+        retainLogicalOperation: true,
       }),
     ).resolves.toBeDefined();
     await expect(
@@ -1044,6 +1246,7 @@ describe("HttpLearningClient protocol", () => {
         body: { action: "INITIAL", nested: { a: 1, b: 2 } },
         idempotent: true,
         method: "POST",
+        retainLogicalOperation: true,
       }),
     ).resolves.toBeDefined();
 
@@ -1234,6 +1437,7 @@ describe("HttpLearningClient protocol", () => {
             body: { operation: number };
             idempotent: true;
             method: "POST";
+            retainLogicalOperation: true;
           },
         ) => Promise<unknown>;
       }
@@ -1244,27 +1448,32 @@ describe("HttpLearningClient protocol", () => {
         body: { operation },
         idempotent: true,
         method: "POST",
+        retainLogicalOperation: true,
       }).catch(() => undefined);
     }
     await request("/bounded-logical-operation", {
       body: { operation: 0 },
       idempotent: true,
       method: "POST",
+      retainLogicalOperation: true,
     }).catch(() => undefined);
     await request("/bounded-logical-operation", {
       body: { operation: 256 },
       idempotent: true,
       method: "POST",
+      retainLogicalOperation: true,
     }).catch(() => undefined);
     await request("/bounded-logical-operation", {
       body: { operation: 0 },
       idempotent: true,
       method: "POST",
+      retainLogicalOperation: true,
     }).catch(() => undefined);
     await request("/bounded-logical-operation", {
       body: { operation: 1 },
       idempotent: true,
       method: "POST",
+      retainLogicalOperation: true,
     }).catch(() => undefined);
 
     expect(issuedKey).toHaveBeenCalledTimes(258);

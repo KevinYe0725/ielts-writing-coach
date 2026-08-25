@@ -1,4 +1,5 @@
 import { clearLearningDestinations } from "./learning-navigation";
+import { markAccountBoundary } from "./account-boundary";
 
 export type AccountRole = "owner" | "admin" | "learner";
 
@@ -92,5 +93,6 @@ export async function signOutAccount(): Promise<void> {
       await responseProblem(response, "Unable to sign out right now."),
     );
   }
+  markAccountBoundary();
   clearLearningDestinations();
 }

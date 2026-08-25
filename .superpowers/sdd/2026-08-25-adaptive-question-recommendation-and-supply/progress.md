@@ -248,3 +248,9 @@ STARTED, ABANDONED, and initial recommendation fidelity replays create one
 identity with actionable Today recovery; 94 files / 916 tests, format, type,
 lint, and production builds green on Node 24.19.0 with fresh PostgreSQL 17.6;
 reload persistence remains an explicit boundary; see final-remediation-h1-report.md)
+Final remediation H1: fix round 1/5 complete (`IDEMPOTENCY_IN_PROGRESS` retains
+its key through later transport loss; concurrent identical recommendation and
+cycle calls coalesce before digest into one promise/key/fetch/result; only those
+non-secret methods opt into retention; confirmed account transitions clear
+registry and in-flight state; 94 files / 920 tests green on Node 24.19.0 with
+fresh PostgreSQL 17.6; reload remains an explicit known boundary; see report)

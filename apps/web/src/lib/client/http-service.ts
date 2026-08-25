@@ -5,9 +5,14 @@ import {
   type ApiProblemDetails,
 } from "./errors";
 import {
-  fingerprintLogicalOperation,
+  canonicalLogicalOperationMaterial,
+  fingerprintLogicalOperationMaterial,
   LogicalOperationRegistry,
 } from "./logical-operation-registry";
+import {
+  currentAccountBoundary,
+  markAccountBoundary,
+} from "./account-boundary";
 import {
   projectTeachingPracticeResponse,
   unavailableTeachingPracticeResponse,
@@ -108,6 +113,7 @@ interface RequestOptions {
   idempotencyKey?: string;
   method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
   permitStatuses?: readonly number[];
+  retainLogicalOperation?: true;
 }
 
 interface RequestResult<T> {
@@ -1867,6 +1873,11 @@ export class HttpLearningClient implements LearningClient {
   private readonly lessonIndexes = new Map<string, number>();
   private readonly lessonLengths = new Map<string, number>();
   private readonly logicalOperations: LogicalOperationRegistry;
+  private readonly logicalOperationsInFlight = new Map<
+    string,
+    Promise<RequestResult<unknown>>
+  >();
+  private accountBoundary = currentAccountBoundary();
   private readonly clientId = `web-${randomId()}`;
 
   constructor(options: HttpLearningClientOptions = {}) {
@@ -1922,9 +1933,39 @@ export class HttpLearningClient implements LearningClient {
     return value;
   }
 
-  private async request<T>(
+  private request<T>(
     path: string,
     options: RequestOptions = {},
+  ): Promise<RequestResult<T>> {
+    this.synchronizeAccountBoundary();
+    if (!options.retainLogicalOperation || options.idempotencyKey)
+      return this.performRequest(path, options);
+
+    const material = canonicalLogicalOperationMaterial({
+      body: options.body,
+      method: options.method ?? "GET",
+      path,
+    });
+    const existing = this.logicalOperationsInFlight.get(material);
+    if (existing) return existing as Promise<RequestResult<T>>;
+
+    const shared = this.performRequest<T>(path, options, material).finally(
+      () => {
+        if (this.logicalOperationsInFlight.get(material) === shared)
+          this.logicalOperationsInFlight.delete(material);
+      },
+    );
+    this.logicalOperationsInFlight.set(
+      material,
+      shared as Promise<RequestResult<unknown>>,
+    );
+    return shared;
+  }
+
+  private async performRequest<T>(
+    path: string,
+    options: RequestOptions,
+    logicalOperationMaterial?: string,
   ): Promise<RequestResult<T>> {
     const method = options.method ?? "GET";
     const headers = new Headers(options.headers);
@@ -1936,14 +1977,16 @@ export class HttpLearningClient implements LearningClient {
     if (options.idempotencyKey)
       headers.set("Idempotency-Key", options.idempotencyKey);
     else if (options.idempotent) {
-      const fingerprint = await fingerprintLogicalOperation({
-        body: options.body,
-        method,
-        path,
-      });
-      const key = this.logicalOperations.getOrCreate(fingerprint);
-      logicalOperation = { fingerprint, key };
-      headers.set("Idempotency-Key", key);
+      if (logicalOperationMaterial) {
+        const fingerprint = await fingerprintLogicalOperationMaterial(
+          logicalOperationMaterial,
+        );
+        const key = this.logicalOperations.getOrCreate(fingerprint);
+        logicalOperation = { fingerprint, key };
+        headers.set("Idempotency-Key", key);
+      } else {
+        headers.set("Idempotency-Key", this.idempotencyKey());
+      }
     }
 
     const retryTransport = method === "GET" || headers.has("Idempotency-Key");
@@ -1981,11 +2024,6 @@ export class HttpLearningClient implements LearningClient {
             ? ""
             : await Promise.race([response.text(), deadline]);
         transportPhase = false;
-        if (logicalOperation)
-          this.logicalOperations.clear(
-            logicalOperation.fingerprint,
-            logicalOperation.key,
-          );
         let payload: unknown;
         try {
           payload = raw ? JSON.parse(raw) : undefined;
@@ -2002,6 +2040,17 @@ export class HttpLearningClient implements LearningClient {
             payload.code === "IDEMPOTENCY_IN_PROGRESS" &&
             requestAttempt < 5;
           if (!retryIdempotencyInProgress) {
+            if (
+              logicalOperation &&
+              !(
+                isApiProblem(payload) &&
+                payload.code === "IDEMPOTENCY_IN_PROGRESS"
+              )
+            )
+              this.logicalOperations.clear(
+                logicalOperation.fingerprint,
+                logicalOperation.key,
+              );
             if (isApiProblem(payload)) throw errorFromProblem(payload);
             throw new LearningClientError(
               typeof payload === "string" && payload
@@ -2014,6 +2063,11 @@ export class HttpLearningClient implements LearningClient {
             );
           }
         } else {
+          if (logicalOperation)
+            this.logicalOperations.clear(
+              logicalOperation.fingerprint,
+              logicalOperation.key,
+            );
           return { data: payload as T, response };
         }
       } catch (cause) {
@@ -2036,6 +2090,18 @@ export class HttpLearningClient implements LearningClient {
       code: "IDEMPOTENCY_IN_PROGRESS",
       retryable: true,
     });
+  }
+
+  private clearLogicalOperationState(): void {
+    this.logicalOperations.clearAll();
+    this.logicalOperationsInFlight.clear();
+  }
+
+  private synchronizeAccountBoundary(): void {
+    const boundary = currentAccountBoundary();
+    if (boundary === this.accountBoundary) return;
+    this.clearLogicalOperationState();
+    this.accountBoundary = boundary;
   }
 
   private async getTodayWire(): Promise<TodayWire> {
@@ -2357,6 +2423,7 @@ export class HttpLearningClient implements LearningClient {
       idempotent: true,
       method: "POST",
       permitStatuses: [202, 503],
+      retainLogicalOperation: true,
     });
     return projectQuestionRecommendation(data);
   }
@@ -2429,6 +2496,7 @@ export class HttpLearningClient implements LearningClient {
         },
         idempotent: true,
         method: "POST",
+        retainLogicalOperation: true,
       },
     );
     if (!data.cycle?.id)
@@ -4211,7 +4279,7 @@ export class HttpLearningClient implements LearningClient {
       idempotent: true,
       method: "DELETE",
     });
-    this.logicalOperations.clearAll();
+    this.clearLogicalOperationState();
     if (typeof indexedDB !== "undefined")
       indexedDB.deleteDatabase("ielts-writing-coach");
   }
@@ -4274,6 +4342,8 @@ export class HttpLearningClient implements LearningClient {
   }
 
   async completeBootstrap(input: BootstrapInput): Promise<void> {
+    markAccountBoundary();
+    this.synchronizeAccountBoundary();
     const status = await this.request<{
       setup_required?: boolean;
       session_only_available?: boolean;
@@ -4333,6 +4403,8 @@ export class HttpLearningClient implements LearningClient {
         },
         method: "POST",
       });
+      markAccountBoundary();
+      this.synchronizeAccountBoundary();
       return;
     }
     await this.request("/auth/sign-in/email", {
@@ -4343,6 +4415,8 @@ export class HttpLearningClient implements LearningClient {
       },
       method: "POST",
     });
+    markAccountBoundary();
+    this.synchronizeAccountBoundary();
     if (input.configureAi === false) return;
     const provider = await this.request<{
       provider?: { id?: string };
