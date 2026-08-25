@@ -383,14 +383,12 @@ test.describe("account controls", () => {
         return;
       }
       if (path.endsWith("/search-connection")) {
-        if (request.method() !== "GET") {
-          mutations.push({
-            body: request.postData(),
-            headers: request.headers(),
-            method: request.method(),
-            path,
-          });
-        }
+        mutations.push({
+          body: request.postData(),
+          headers: request.headers(),
+          method: request.method(),
+          path,
+        });
         if (request.method() === "GET") {
           if (searchMode === "FORBIDDEN") {
             await json(
@@ -534,7 +532,54 @@ test.describe("account controls", () => {
     const testCalls = mutations.filter((mutation) =>
       mutation.path.endsWith("/test"),
     );
+    const searchCalls = mutations.filter((mutation) =>
+      mutation.path.endsWith("/search-connection"),
+    );
+    expect(
+      [...searchCalls, ...testCalls]
+        .sort(
+          (left, right) =>
+            mutations.indexOf(left) - mutations.indexOf(right),
+        )
+        .map((mutation) => `${mutation.method} ${mutation.path}`),
+    ).toEqual([
+      "GET /api/v1/search-connection",
+      "GET /api/v1/search-connection",
+      "POST /api/v1/search-connection/test",
+      "POST /api/v1/search-connection/test",
+      "PUT /api/v1/search-connection",
+      "PUT /api/v1/search-connection",
+      "DELETE /api/v1/search-connection",
+      "GET /api/v1/search-connection",
+      "GET /api/v1/search-connection",
+      "GET /api/v1/search-connection",
+      "GET /api/v1/search-connection",
+      "GET /api/v1/search-connection",
+      "GET /api/v1/search-connection",
+    ]);
     expect(testCalls).toHaveLength(2);
+    expect(testCalls.map((mutation) => JSON.parse(mutation.body ?? "{}"))).toEqual([
+      { api_key: "temporary-invalid-key" },
+      { api_key: "temporary-valid-key" },
+    ]);
+    expect(
+      testCalls.every(
+        (mutation) =>
+          mutation.headers["content-type"] === "application/json" &&
+          mutation.headers.origin === "http://127.0.0.1:3295" &&
+          !mutation.headers["idempotency-key"],
+      ),
+    ).toBe(true);
+    const gets = searchCalls.filter((mutation) => mutation.method === "GET");
+    expect(gets).toHaveLength(8);
+    expect(
+      gets.every(
+        (mutation) =>
+          mutation.body === null &&
+          !mutation.headers["content-type"] &&
+          !mutation.headers["idempotency-key"],
+      ),
+    ).toBe(true);
     for (const mutation of mutations) {
       if (mutation.method === "GET") continue;
       expect(mutation.headers.origin).toBe("http://127.0.0.1:3295");
@@ -553,6 +598,8 @@ test.describe("account controls", () => {
     );
     expect(deletes).toHaveLength(1);
     expect(deletes[0]?.headers["idempotency-key"]).toBeTruthy();
+    expect(deletes[0]?.body).toBeNull();
+    expect(deletes[0]?.headers["content-type"]).toBeUndefined();
   });
 
   for (const viewport of [
