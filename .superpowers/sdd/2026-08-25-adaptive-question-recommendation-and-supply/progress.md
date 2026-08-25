@@ -228,4 +228,9 @@ learner-locked transaction; completed replay records survive later settlement;
 fetch/body/parse/status share one per-attempt deadline; GET and same-key
 mutations retry transport failures within six attempts; Today releases busy
 state after exhaustion; see final-remediation-g1-report.md)
+Final remediation G1: fix round 1/5 complete (completion requires exactly one
+UPDATE/RETURNING reservation; real zero-row and concurrent learning-delete
+barriers roll back cycle/disposition/D14; 201 cycle replay preserves exact
+body/Location and Date wire values; realistic streams, keyed HTTP no-retry, and
+new Today logical-key acceptance run under Node 24.19.0; see report)
 Final remediation G2: pending (Mock target-mix contract)

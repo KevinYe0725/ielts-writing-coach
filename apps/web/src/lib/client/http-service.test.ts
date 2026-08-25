@@ -346,18 +346,38 @@ function requestHeaders(call: unknown[]): Headers {
   return new Headers(init.headers);
 }
 
-function responseWhoseTextRejects(error: unknown): Response {
-  const response = jsonResponse({ headers_arrived: true });
-  response.text = async () => {
-    throw error;
-  };
-  return response;
+function responseWithDisconnectedBody(): Response {
+  let sentPartialBody = false;
+  return new Response(
+    new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (!sentPartialBody) {
+          sentPartialBody = true;
+          controller.enqueue(new TextEncoder().encode('{"headers_arrived":'));
+        }
+        controller.error(new TypeError("response body connection terminated"));
+      },
+    }),
+    { headers: { "content-type": "application/json" } },
+  );
 }
 
-function responseWhoseTextStalls(): Response {
-  const response = jsonResponse({ headers_arrived: true });
-  response.text = () => new Promise<string>(() => undefined);
-  return response;
+function responseWithStalledBody(
+  signal: AbortSignal | null | undefined,
+): Response {
+  return new Response(
+    new ReadableStream<Uint8Array>({
+      start(controller) {
+        const abort = () =>
+          controller.error(
+            signal?.reason ?? new DOMException("request aborted", "AbortError"),
+          );
+        if (signal?.aborted) abort();
+        else signal?.addEventListener("abort", abort, { once: true });
+      },
+    }),
+    { headers: { "content-type": "application/json" } },
+  );
 }
 
 describe("HttpLearningClient protocol", () => {
@@ -692,15 +712,14 @@ describe("HttpLearningClient protocol", () => {
     );
   });
 
-  it("retries a recommendation body AbortError with the original idempotency key", async () => {
+  it("retries a recommendation post-header body disconnect with the original idempotency key", async () => {
     const issuedKey = vi.fn(() => "recommendation-body-abort-key");
     const fetcher = vi
       .fn<typeof fetch>()
-      .mockResolvedValueOnce(
-        responseWhoseTextRejects(
-          new DOMException("body stream aborted", "AbortError"),
-        ),
-      )
+      .mockImplementationOnce(async (_input, init) => {
+        expect(init?.signal).toBeInstanceOf(AbortSignal);
+        return responseWithDisconnectedBody();
+      })
       .mockResolvedValueOnce(
         jsonResponse({
           recommendation: {
@@ -745,15 +764,14 @@ describe("HttpLearningClient protocol", () => {
     ]);
   });
 
-  it("retries a coupled cycle body AbortError with the original idempotency key", async () => {
+  it("retries a coupled cycle post-header body disconnect with the original idempotency key", async () => {
     const issuedKey = vi.fn(() => "cycle-body-abort-key");
     const fetcher = vi
       .fn<typeof fetch>()
-      .mockResolvedValueOnce(
-        responseWhoseTextRejects(
-          new DOMException("body stream aborted", "AbortError"),
-        ),
-      )
+      .mockImplementationOnce(async (_input, init) => {
+        expect(init?.signal).toBeInstanceOf(AbortSignal);
+        return responseWithDisconnectedBody();
+      })
       .mockResolvedValueOnce(
         jsonResponse({ cycle: { id: "cycle-replayed-after-body-abort" } }),
       );
@@ -783,7 +801,9 @@ describe("HttpLearningClient protocol", () => {
   it("aborts a stalled response body at the attempt deadline and retries with the same key", async () => {
     const fetcher = vi
       .fn<typeof fetch>()
-      .mockResolvedValueOnce(responseWhoseTextStalls())
+      .mockImplementationOnce(async (_input, init) =>
+        responseWithStalledBody(init?.signal),
+      )
       .mockResolvedValueOnce(
         jsonResponse({ cycle: { id: "cycle-after-stalled-body" } }),
       );
@@ -820,7 +840,9 @@ describe("HttpLearningClient protocol", () => {
   });
 
   it("returns a safe bounded error after every same-key body attempt stalls", async () => {
-    const fetcher = vi.fn<typeof fetch>(async () => responseWhoseTextStalls());
+    const fetcher = vi.fn<typeof fetch>(async (_input, init) =>
+      responseWithStalledBody(init?.signal),
+    );
     const client = new HttpLearningClient({
       baseUrl: "https://coach.test/api/v1",
       fetch: fetcher,
@@ -859,9 +881,7 @@ describe("HttpLearningClient protocol", () => {
   it("retries safe GET transport failures but never retries an unkeyed POST", async () => {
     const getFetcher = vi
       .fn<typeof fetch>()
-      .mockResolvedValueOnce(
-        responseWhoseTextRejects(new TypeError("GET body disconnected")),
-      )
+      .mockImplementationOnce(async () => responseWithDisconnectedBody())
       .mockResolvedValueOnce(jsonResponse({ questions: [] }));
     const getClient = new HttpLearningClient({
       baseUrl: "https://coach.test/api/v1",
@@ -874,7 +894,7 @@ describe("HttpLearningClient protocol", () => {
     expect(getFetcher).toHaveBeenCalledTimes(2);
 
     const postFetcher = vi.fn<typeof fetch>(async () =>
-      responseWhoseTextRejects(new TypeError("POST body disconnected")),
+      responseWithDisconnectedBody(),
     );
     const postClient = new HttpLearningClient({
       baseUrl: "https://coach.test/api/v1",
@@ -891,6 +911,36 @@ describe("HttpLearningClient protocol", () => {
       requestHeaders(postFetcher.mock.calls[0] ?? []).get("idempotency-key"),
     ).toBeNull();
   });
+
+  it.each([400, 503])(
+    "does not transport-retry an ordinary keyed HTTP %i response",
+    async (status) => {
+      const fetcher = vi.fn<typeof fetch>(async () =>
+        jsonResponse(
+          {
+            title: "Cycle request rejected",
+            status,
+            detail: "The cycle request was rejected safely.",
+            code: `CYCLE_HTTP_${status}`,
+          },
+          { status },
+        ),
+      );
+      const client = new HttpLearningClient({
+        baseUrl: "https://coach.test/api/v1",
+        fetch: fetcher,
+        idempotencyKey: () => `cycle-http-${status}-key`,
+        origin: "https://coach.test",
+        requestTimeoutMs: 25,
+        sleep: async () => undefined,
+      });
+
+      await expect(
+        client.startTrainingCycle("manual-question"),
+      ).rejects.toMatchObject({ code: `CYCLE_HTTP_${status}`, status });
+      expect(fetcher).toHaveBeenCalledTimes(1);
+    },
+  );
 
   it("rejects PENDING recommendations without a non-empty runtime string id", async () => {
     for (const id of [undefined, null, 7, "", "   "]) {

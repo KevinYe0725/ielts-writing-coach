@@ -2,6 +2,7 @@ import { eq, sql } from "drizzle-orm";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  auditEvent,
   aiJob,
   createDatabase,
   idempotencyRecord,
@@ -17,6 +18,7 @@ import {
   writingAttempt,
   writingAttemptRevision,
 } from "@iwc/db";
+import { QUESTION_BANK } from "@iwc/question-bank";
 
 const routeState = vi.hoisted(() => ({
   actor: {
@@ -49,6 +51,7 @@ import { GET as getCycle } from "../../app/api/v1/training-cycles/[id]/route";
 import { POST as startCycle } from "../../app/api/v1/training-cycles/[id]/start/route";
 import { POST as rescheduleTransferRoute } from "../../app/api/v1/transfer-tasks/[id]/reschedule/route";
 import { HttpLearningClient } from "./http-service";
+import { deleteLearningRecord } from "../server/learning-record";
 
 const databaseUrl =
   process.env.IWC_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
@@ -58,6 +61,7 @@ describe.skipIf(!databaseUrl)(
   () => {
     const database = createDatabase(databaseUrl!);
     const createdUsers: string[] = [];
+    const createdPublicQuestionExternalIds: string[] = [];
 
     routeState.context = {
       db: database.db,
@@ -71,6 +75,26 @@ describe.skipIf(!databaseUrl)(
       mail: undefined,
     };
 
+    async function waitForReservation(
+      userId: string,
+      key: string,
+    ): Promise<void> {
+      for (let attempt = 0; attempt < 100; attempt += 1) {
+        const reservation = await database.db.query.idempotencyRecord.findFirst(
+          {
+            where: (table, operators) =>
+              operators.and(
+                operators.eq(table.userId, userId),
+                operators.eq(table.key, key),
+              ),
+          },
+        );
+        if (reservation) return;
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      throw new Error(`Timed out waiting for idempotency reservation ${key}`);
+    }
+
     afterEach(async () => {
       for (const userId of createdUsers.splice(0)) {
         const jobs = await database.db.query.aiJob.findMany({
@@ -83,7 +107,15 @@ describe.skipIf(!databaseUrl)(
             );
           }
         }
+        await database.db
+          .delete(auditEvent)
+          .where(eq(auditEvent.targetId, userId));
         await database.db.delete(user).where(eq(user.id, userId));
+      }
+      for (const externalId of createdPublicQuestionExternalIds.splice(0)) {
+        await database.db
+          .delete(question)
+          .where(eq(question.externalId, externalId));
       }
     });
 
@@ -338,10 +370,16 @@ describe.skipIf(!databaseUrl)(
           abandon_recommendation_id: recommendationId,
         }),
       );
+      const firstBody = (await first.json()) as { cycle: { id: string } };
+      const replayBody = (await replay.json()) as { cycle: { id: string } };
+      const expectedLocation = `/api/v1/training-cycles/${firstBody.cycle.id}`;
 
       expect(first.status).toBe(201);
       expect(replay.status).toBe(201);
       expect(replay.headers.get("idempotency-replayed")).toBe("true");
+      expect(replayBody).toEqual(firstBody);
+      expect(first.headers.get("location")).toBe(expectedLocation);
+      expect(replay.headers.get("location")).toBe(expectedLocation);
       expect(terminalFallback.status).toBe(409);
       await expect(terminalFallback.json()).resolves.toMatchObject({
         code: "RECOMMENDATION_NOT_ABANDONABLE",
@@ -609,7 +647,7 @@ describe.skipIf(!databaseUrl)(
           begin
             if new.key like 'g1-cycle-response-failure-%'
               and new.response_status = 201 then
-              raise exception 'forced idempotency response persistence failure';
+              return null;
             end if;
             return new;
           end;
@@ -675,6 +713,116 @@ describe.skipIf(!databaseUrl)(
         });
       },
     );
+
+    it("rolls back a public cycle when concurrent learning-data deletion removes its reserved key", async () => {
+      const suffix = newDomainId();
+      const userId = `g1-cycle-delete-race-${suffix}`;
+      const cycleKey = `g1-cycle-delete-race-${suffix}`;
+      const deletionKey = `g1-learning-delete-${suffix}`;
+      const publicQuestionId = QUESTION_BANK[0]!.id;
+      const existingPublicQuestion = await database.db.query.question.findFirst(
+        {
+          where: eq(question.externalId, publicQuestionId),
+        },
+      );
+      if (!existingPublicQuestion)
+        createdPublicQuestionExternalIds.push(publicQuestionId);
+      createdUsers.push(userId);
+      routeState.actor.id = userId;
+      routeState.actor.email = `${suffix}@example.test`;
+      await database.db.insert(user).values({
+        id: userId,
+        name: routeState.actor.name,
+        email: routeState.actor.email,
+        role: "learner",
+      });
+      const makeRequest = () =>
+        new Request("https://coach.test/api/v1/training-cycles", {
+          body: JSON.stringify({
+            question_id: publicQuestionId,
+            timezone: "UTC",
+          }),
+          headers: {
+            "content-type": "application/json",
+            "idempotency-key": cycleKey,
+            origin: "https://coach.test",
+          },
+          method: "POST",
+        });
+      let releaseCycleTransaction!: () => void;
+      const cycleTransactionRelease = new Promise<void>((resolve) => {
+        releaseCycleTransaction = resolve;
+      });
+      let cycleTransactionReached!: () => void;
+      const cycleTransactionReady = new Promise<void>((resolve) => {
+        cycleTransactionReached = resolve;
+      });
+      const originalContext = routeState.context as {
+        db: typeof database.db;
+        [key: string]: unknown;
+      };
+      const routeDatabase = new Proxy(database.db, {
+        get(target, property) {
+          const value = Reflect.get(target, property, target);
+          if (property === "transaction" && typeof value === "function") {
+            return async (...args: unknown[]) => {
+              cycleTransactionReached();
+              await cycleTransactionRelease;
+              return Reflect.apply(value, target, args);
+            };
+          }
+          return typeof value === "function" ? value.bind(target) : value;
+        },
+      });
+      routeState.context = { ...originalContext, db: routeDatabase };
+      try {
+        const firstAttempt = createCycle(makeRequest());
+        await cycleTransactionReady;
+        await waitForReservation(userId, cycleKey);
+        await deleteLearningRecord(database.db, userId, deletionKey);
+        await expect(
+          database.db.query.idempotencyRecord.findFirst({
+            where: eq(idempotencyRecord.key, cycleKey),
+          }),
+        ).resolves.toBeUndefined();
+        releaseCycleTransaction();
+        const failed = await firstAttempt;
+
+        expect(failed.status).toBe(500);
+        await expect(
+          database.db.query.trainingCycle.findMany({
+            where: eq(trainingCycle.userId, userId),
+          }),
+        ).resolves.toHaveLength(0);
+        await expect(
+          database.db.query.idempotencyRecord.findFirst({
+            where: eq(idempotencyRecord.key, cycleKey),
+          }),
+        ).resolves.toBeUndefined();
+
+        const retried = await createCycle(makeRequest());
+        const replay = await createCycle(makeRequest());
+        const retriedBody = (await retried.json()) as {
+          cycle: { id: string };
+        };
+        const replayBody = (await replay.json()) as { cycle: { id: string } };
+
+        expect(retried.status).toBe(201);
+        expect(replay.status).toBe(201);
+        expect(replayBody).toEqual(retriedBody);
+        expect(replay.headers.get("location")).toBe(
+          `/api/v1/training-cycles/${retriedBody.cycle.id}`,
+        );
+        await expect(
+          database.db.query.trainingCycle.findMany({
+            where: eq(trainingCycle.userId, userId),
+          }),
+        ).resolves.toHaveLength(1);
+      } finally {
+        releaseCycleTransaction();
+        routeState.context = originalContext;
+      }
+    });
 
     it("rejects conflicting disposition ids and another learner's fallback recommendation", async () => {
       const suffix = newDomainId();

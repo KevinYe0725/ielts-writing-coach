@@ -69,6 +69,22 @@ describe("idempotency response secret boundary", () => {
     });
     expect(JSON.stringify(sanitized)).not.toContain(sentinel);
   });
+
+  it("preserves public Date fields as their JSON wire values", () => {
+    expect(
+      sanitizeIdempotencyResponseForPersistence({
+        cycle: {
+          createdAt: new Date("2026-08-25T12:00:00.000Z"),
+          updatedAt: new Date("2026-08-25T12:01:00.000Z"),
+        },
+      }),
+    ).toEqual({
+      cycle: {
+        createdAt: "2026-08-25T12:00:00.000Z",
+        updatedAt: "2026-08-25T12:01:00.000Z",
+      },
+    });
+  });
 });
 
 const integration = process.env.DATABASE_URL ? describe : describe.skip;
@@ -150,6 +166,18 @@ integration("API idempotency invariants", () => {
     expect(reservation).toEqual({ key });
   });
 
+  it("rejects completion when no matching reservation row exists", async () => {
+    await expect(
+      completeIdempotentResponse(
+        database.db,
+        userId,
+        `missing-${newDomainId()}`,
+        201,
+        { cycle: { id: newDomainId() } },
+      ),
+    ).rejects.toThrow("Idempotency response completion updated 0 rows");
+  });
+
   it("restores Location when replaying a long-running response", async () => {
     const key = newDomainId();
     const request = new Request("http://localhost/api/v1/test-submit", {
@@ -172,6 +200,49 @@ integration("API idempotency invariants", () => {
       `/api/v1/ai-jobs/${jobId}`,
     );
     expect(replay.replay?.headers.get("idempotency-replayed")).toBe("true");
+  });
+
+  it("does not infer a cycle Location from an inexact 201 response", async () => {
+    const publicQuestion = {
+      id: "question-public",
+      prompt: "A complete public IELTS question.",
+      type: "opinion",
+      topic: "education",
+    };
+    for (const body of [
+      {
+        cycle: { id: newDomainId(), question: publicQuestion },
+        next_action: "not_start_version_1",
+      },
+      {
+        cycle: {
+          id: newDomainId(),
+          question: { ...publicQuestion, source: "must-not-cross-boundary" },
+        },
+        next_action: "start_version_1",
+      },
+      {
+        cycle: { id: "../data", question: publicQuestion },
+        next_action: "start_version_1",
+      },
+    ]) {
+      const key = newDomainId();
+      const request = new Request("http://localhost/api/v1/invitations", {
+        method: "POST",
+        headers: { "idempotency-key": key },
+      });
+      await reserveIdempotencyKey(database.db, userId, request, {});
+      await completeIdempotentResponse(database.db, userId, key, 201, body);
+
+      const replay = await reserveIdempotencyKey(
+        database.db,
+        userId,
+        request,
+        {},
+      );
+      expect(replay.replay?.status).toBe(201);
+      expect(replay.replay?.headers.get("location")).toBeNull();
+    }
   });
 
   it("never stores or replays a plaintext one-time token", async () => {

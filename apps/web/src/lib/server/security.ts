@@ -120,6 +120,7 @@ export function sanitizeIdempotencyResponseForPersistence(
 
   function visit(input: unknown): unknown {
     if (Array.isArray(input)) return input.map(visit);
+    if (input instanceof Date) return input.toJSON();
     if (!input || typeof input !== "object") return input;
 
     const output: Record<string, unknown> = {};
@@ -148,6 +149,48 @@ export function sanitizeIdempotencyResponseForPersistence(
     };
   }
   return sanitized;
+}
+
+function cycleReplayLocation(
+  responseBody: Record<string, unknown>,
+): string | undefined {
+  const outerKeys = Object.keys(responseBody).sort();
+  if (
+    outerKeys.length !== 2 ||
+    outerKeys[0] !== "cycle" ||
+    outerKeys[1] !== "next_action" ||
+    responseBody.next_action !== "start_version_1"
+  )
+    return undefined;
+  const cycle = responseBody.cycle;
+  if (!cycle || typeof cycle !== "object" || Array.isArray(cycle))
+    return undefined;
+  const cycleRecord = cycle as Record<string, unknown>;
+  const question = cycleRecord.question;
+  if (!question || typeof question !== "object" || Array.isArray(question))
+    return undefined;
+  const questionRecord = question as Record<string, unknown>;
+  const questionKeys = Object.keys(questionRecord).sort();
+  if (
+    typeof cycleRecord.id !== "string" ||
+    !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/u.test(cycleRecord.id) ||
+    questionKeys.length !== 4 ||
+    questionKeys[0] !== "id" ||
+    questionKeys[1] !== "prompt" ||
+    questionKeys[2] !== "topic" ||
+    questionKeys[3] !== "type" ||
+    !["id", "type", "topic"].every(
+      (key) =>
+        typeof questionRecord[key] === "string" &&
+        questionRecord[key].length > 0 &&
+        questionRecord[key].length <= 200,
+    ) ||
+    typeof questionRecord.prompt !== "string" ||
+    questionRecord.prompt.length === 0 ||
+    questionRecord.prompt.length > 20_000
+  )
+    return undefined;
+  return `/api/v1/training-cycles/${encodeURIComponent(cycleRecord.id)}`;
 }
 
 export async function reserveIdempotencyKey(
@@ -241,6 +284,9 @@ export async function reserveIdempotencyKey(
           )}`;
         }
       }
+    } else if (existing.responseStatus === 201) {
+      const location = cycleReplayLocation(replayBody);
+      if (location) replayHeaders.location = location;
     }
     return {
       key,
@@ -306,7 +352,7 @@ export async function completeIdempotentResponse(
   status: number,
   responseBody: unknown,
 ): Promise<void> {
-  await db
+  const completed = await db
     .update(idempotencyRecord)
     .set({
       responseStatus: status,
@@ -314,5 +360,11 @@ export async function completeIdempotentResponse(
     })
     .where(
       and(eq(idempotencyRecord.userId, userId), eq(idempotencyRecord.key, key)),
+    )
+    .returning({ key: idempotencyRecord.key });
+  if (completed.length !== 1) {
+    throw new Error(
+      `Idempotency response completion updated ${completed.length} rows; expected exactly one reservation.`,
     );
+  }
 }

@@ -962,10 +962,22 @@ test.describe("Today query states at the HTTP boundary", () => {
       }),
     ).toBeVisible();
     await expect(start).toBeEnabled();
-    expect(new Set(idempotencyKeys)).toEqual(
-      new Set([idempotencyKeys[0] as string]),
+    const firstOperationKey = idempotencyKeys[0];
+    expect(new Set(idempotencyKeys.slice(0, 6))).toEqual(
+      new Set([firstOperationKey as string]),
     );
-    expect(idempotencyKeys[0]).not.toBe("missing");
+    expect(firstOperationKey).not.toBe("missing");
+
+    await start.click();
+
+    await expect.poll(() => idempotencyKeys.length).toBe(12);
+    await expect(start).toBeEnabled();
+    const secondOperationKey = idempotencyKeys[6];
+    expect(new Set(idempotencyKeys.slice(6))).toEqual(
+      new Set([secondOperationKey as string]),
+    );
+    expect(secondOperationKey).not.toBe(firstOperationKey);
+    expect(secondOperationKey).not.toBe("missing");
     expect(pageErrors).toEqual([]);
   });
 
