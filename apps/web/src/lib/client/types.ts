@@ -794,6 +794,7 @@ export const AI_TASK_KINDS = [
   "teaching_practice_analysis",
   "version_comparison",
   "transfer_evaluation",
+  "question_bank_refill",
 ] as const;
 
 export type AiTaskKind = (typeof AI_TASK_KINDS)[number];

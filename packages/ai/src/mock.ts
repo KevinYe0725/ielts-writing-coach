@@ -518,6 +518,30 @@ function mockStructuredValue(
         "连接真实语言模型后，才能判断目标能力是否在陌生话题中自然、准确地出现。",
     };
   }
+  if (request.schemaName === "iwc_question_bank_refill_v1") {
+    return {
+      proposals: [
+        {
+          type: "opinion",
+          topic: "government",
+          track: "academic",
+          prompt:
+            "Local governments should reserve a fixed part of their budgets for maintaining public spaces rather than building new landmarks. Do you agree or disagree?",
+          internalRationale:
+            "Public-space maintenance creates a stable civic trade-off for Task 2 argument practice.",
+        },
+        {
+          type: "problems_solutions",
+          topic: "urban_transport",
+          track: "general_training",
+          prompt:
+            "Many people who live outside city centres find it difficult to reach essential services without a car. What problems does this situation create, and what measures could address them?",
+          internalRationale:
+            "Access to services is a durable transport issue without requiring current facts.",
+        },
+      ],
+    };
+  }
   return generated;
 }
 

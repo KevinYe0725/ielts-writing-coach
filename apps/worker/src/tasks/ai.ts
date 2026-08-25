@@ -2667,6 +2667,13 @@ async function execute(
       return evaluateTransfer(job);
     case "objective_prioritization":
       return {};
+    case "question_bank_refill":
+      throw Object.assign(
+        new Error(
+          "Question-bank refill requires the supply pipeline before execution.",
+        ),
+        { code: "QUESTION_BANK_REFILL_NOT_IMPLEMENTED" },
+      );
   }
 }
 

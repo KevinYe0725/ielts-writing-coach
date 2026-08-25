@@ -55,9 +55,8 @@ import styles from "./settings.module.css";
 
 type SettingsTab = "learning" | "schedule" | "ai" | "data";
 
-const AI_ROUTE_TASK_COPY: Record<
-  AiTaskKind,
-  { readonly zh: string; readonly en: string }
+const AI_ROUTE_TASK_COPY: Partial<
+  Record<AiTaskKind, { readonly zh: string; readonly en: string }>
 > = {
   ielts_assessment: { zh: "IELTS 四项估分", en: "IELTS assessment" },
   issue_classification: {
@@ -85,10 +84,10 @@ const AI_ROUTE_TASK_COPY: Record<
   transfer_evaluation: { zh: "迁移表现判断", en: "Transfer evaluation" },
 };
 
-const AI_ROUTE_TASKS = AI_TASK_KINDS.map((id) => ({
-  id,
-  ...AI_ROUTE_TASK_COPY[id],
-}));
+const AI_ROUTE_TASKS = AI_TASK_KINDS.flatMap((id) => {
+  const copy = AI_ROUTE_TASK_COPY[id];
+  return copy === undefined ? [] : [{ id, ...copy }];
+});
 
 export default function SettingsPage() {
   const { text, locale, setLocale } = useLocale();

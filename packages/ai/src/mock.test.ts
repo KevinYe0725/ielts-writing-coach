@@ -9,11 +9,48 @@ import {
   focusedLearningPackageSchema,
   teachingPracticeAnalysisSchema,
 } from "../../../apps/worker/src/schemas";
+import * as workerSchemas from "../../../apps/worker/src/schemas";
 import { MockAdapter } from "./mock";
 
 const ajv = new Ajv2020({ allErrors: true, strict: true });
 
 describe("deterministic Mock Provider", () => {
+  it("returns two original offline question-bank proposals without research claims", async () => {
+    const adapter = new MockAdapter();
+    expect(workerSchemas).toHaveProperty("questionBankRefillSchema");
+    const questionBankRefillSchema = (workerSchemas as Record<string, unknown>)
+      .questionBankRefillSchema;
+    if (!questionBankRefillSchema) return;
+    const validate = new Ajv2020({ allErrors: true, strict: true }).compile(
+      questionBankRefillSchema as AnySchemaObject,
+    );
+
+    const result = await adapter.generateStructured({
+      model: "mock-deterministic-v1",
+      input:
+        "Create an original shared question-bank refill without web research.",
+      schemaName: "iwc_question_bank_refill_v1",
+      schema: questionBankRefillSchema as unknown as Record<string, unknown>,
+      validate: (
+        value: unknown,
+      ): value is {
+        proposals: Array<{ prompt: string }>;
+      } => validate(value) === true,
+    });
+
+    expect(validate(result.value), ajv.errorsText(validate.errors)).toBe(true);
+    expect(result.value).toMatchObject({
+      proposals: expect.any(Array),
+    });
+    expect(result.value.proposals).toHaveLength(2);
+    expect(JSON.stringify(result.value)).not.toMatch(
+      /web[_ -]?research|https?:\/\/|www\.|citation|source url/i,
+    );
+    expect(
+      new Set(result.value.proposals.map((proposal) => proposal.prompt)).size,
+    ).toBe(2);
+  });
+
   it("returns repeatable structured values that satisfy the caller validator", async () => {
     const adapter = new MockAdapter();
     const schema = {

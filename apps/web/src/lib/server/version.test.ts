@@ -20,6 +20,10 @@ describe("public version descriptor", () => {
       prompt: "2.0.0",
       rubric: "iwc-teaching-practice-analysis-atoms-2.0.0",
     });
+    expect(descriptor.prompts.registry.question_bank_refill).toEqual({
+      prompt: "1.0.0",
+      rubric: "iwc-question-bank-refill-1.0.0",
+    });
     expect(JSON.stringify(descriptor)).not.toMatch(/api[_-]?key|secret/i);
   });
 });

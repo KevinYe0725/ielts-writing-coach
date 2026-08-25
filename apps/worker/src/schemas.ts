@@ -5,6 +5,25 @@ import {
   TEACHING_PRACTICE_STRENGTH_CODES,
 } from "@iwc/learning-contracts";
 
+export const GENERATED_QUESTION_TYPES = [
+  "opinion",
+  "discussion",
+  "advantages_disadvantages",
+  "problems_solutions",
+  "two_part",
+] as const;
+
+export const GENERATED_QUESTION_TOPICS = [
+  "education",
+  "technology",
+  "environment",
+  "health",
+  "government",
+  "work_economy",
+  "society_culture",
+  "urban_transport",
+] as const;
+
 const band = {
   type: "number",
   minimum: 0,
@@ -12,6 +31,44 @@ const band = {
   multipleOf: 0.5,
 } as const;
 const confidence = { type: "number", minimum: 0, maximum: 1 } as const;
+
+const generatedQuestionProposal = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type", "topic", "track", "prompt", "internalRationale"],
+  properties: {
+    type: { type: "string", enum: [...GENERATED_QUESTION_TYPES] },
+    topic: { type: "string", enum: [...GENERATED_QUESTION_TOPICS] },
+    track: { type: "string", enum: ["academic", "general_training"] },
+    prompt: { type: "string", minLength: 40, maxLength: 900 },
+    internalRationale: { type: "string", minLength: 1, maxLength: 300 },
+  },
+} as const;
+
+export const questionBankRefillSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["proposals"],
+  properties: {
+    proposals: {
+      type: "array",
+      minItems: 1,
+      maxItems: 15,
+      items: generatedQuestionProposal,
+    },
+  },
+} as const;
+
+export const questionGenerationJudgmentSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["duplicate", "confidence", "rationale"],
+  properties: {
+    duplicate: { type: "boolean" },
+    confidence,
+    rationale: { type: "string", minLength: 1, maxLength: 300 },
+  },
+} as const;
 const criterion = {
   type: "object",
   additionalProperties: false,
