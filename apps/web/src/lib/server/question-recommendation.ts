@@ -354,6 +354,7 @@ export async function getQuestionRecommendation(
   const randomIndex =
     options.randomIndex ?? ((upperExclusive) => randomInt(upperExclusive));
   return database.transaction(async (transaction) => {
+    await lockQuestionBankRefillAdmission(transaction);
     await lockLearner(transaction, actorId);
     const [stored] = await transaction
       .select()

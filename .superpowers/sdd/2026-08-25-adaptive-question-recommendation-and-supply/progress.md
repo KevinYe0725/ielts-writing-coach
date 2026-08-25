@@ -201,6 +201,10 @@ status-independent SWAP cooldown, forced race orderings; review clean)
 Final remediation F2: complete (single exported global refill-admission helper,
 global-before-user transaction order, reentrant enqueue, and three deterministic
 PostgreSQL barrier/mutation cases; see final-remediation-f2-report.md)
+Final remediation F2: fix round 1/5 complete (successful poll finalization now
+acquires global admission before learner/recommendation rows; same-learner
+create and overlapping privileged-retry PostgreSQL barriers prove bounded
+completion, READY/STARTED state, one active linked job, and mutation sensitivity)
 Final remediation F1: complete (internal ABANDONED state, protected atomic
 DELETE, GET/DELETE PostgreSQL race barriers, strict client/Demo persistence,
 and manual/private fallback abandonment before custom/cycle creation; see
@@ -213,6 +217,6 @@ Final remediation F1: fix round 2/5 complete (fallback disposition is resolved
 against the cycle question so exact READY use becomes STARTED; every recent
 SWAP row cools excluded_external_id by created_at independent of status; two
 PostgreSQL barriers force both recommended-vs-fallback commit orderings)
-Current final evidence scope: baseline 938c248 plus the focused F2 remediation
-and its report. Earlier broad ranges through d897490 remain historical review
-evidence rather than the current final baseline.
+Current final evidence scope: baseline 85a6eaa plus the focused F2 Fix Round 1
+remediation and updated report. Earlier broad ranges through d897490 remain
+historical review evidence rather than the current final baseline.

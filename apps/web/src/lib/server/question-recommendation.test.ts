@@ -132,6 +132,37 @@ integration("question recommendation service (PostgreSQL)", () => {
     return id;
   }
 
+  async function createSucceededPendingPollFixture(
+    actorId: string,
+    label: string,
+  ): Promise<{
+    recommendationId: string;
+    candidateIds: [string, string];
+  }> {
+    const batchId = await insertBatch(actorId, "SUCCEEDED");
+    const candidateIds: [string, string] = [
+      `poll-${label}-a-${newDomainId()}`,
+      `poll-${label}-b-${newDomainId()}`,
+    ];
+    for (const externalId of candidateIds) {
+      await insertStoredQuestion({
+        externalId,
+        generationBatchId: batchId,
+        source: "AI_GENERATED",
+      });
+    }
+    await exposeAllExcept(actorId, candidateIds);
+    const recommendationId = newDomainId();
+    await database.db.insert(questionRecommendation).values({
+      id: recommendationId,
+      userId: actorId,
+      generationBatchId: batchId,
+      action: "INITIAL",
+      status: "PENDING",
+    });
+    return { recommendationId, candidateIds };
+  }
+
   const options = {
     now: () => now,
     randomIndex: () => 0,
@@ -1547,6 +1578,174 @@ integration("question recommendation service (PostgreSQL)", () => {
         where: eq(questionRecommendation.id, pending.id),
       }),
     ).resolves.toMatchObject({ status: "READY", shownAt: now });
+  });
+
+  it("orders a successful low-supply poll before a same-learner recommendation", async () => {
+    const learnerId = await createLearner("refill-order-poll-create");
+    await database.db
+      .update(user)
+      .set({ role: "owner" })
+      .where(eq(user.id, learnerId));
+    const shared = await installSharedRefillRoute(learnerId);
+    const fixture = await createSucceededPendingPollFixture(
+      learnerId,
+      "create",
+    );
+
+    let markAdmissionAcquired!: () => void;
+    const admissionAcquired = new Promise<void>((resolve) => {
+      markAdmissionAcquired = resolve;
+    });
+    let releaseAdmission!: () => void;
+    const admissionReleased = new Promise<void>((resolve) => {
+      releaseAdmission = resolve;
+    });
+    const createDatabaseWithBarrier = databaseWithRefillAdmissionBarrier({
+      acquired: markAdmissionAcquired,
+      release: () => admissionReleased,
+    });
+    const create = createQuestionRecommendation(
+      createDatabaseWithBarrier,
+      learnerId,
+      { action: "INITIAL" },
+      options,
+    );
+    let poll: ReturnType<typeof getQuestionRecommendation> | null = null;
+    let rowProbe: Promise<void> | null = null;
+    try {
+      await within(admissionAcquired, "same-learner create admission");
+      poll = getQuestionRecommendation(
+        database.db,
+        learnerId,
+        fixture.recommendationId,
+        options,
+      );
+      await waitForAdvisoryLockWaiter();
+
+      rowProbe = database.db.transaction(async (transaction) => {
+        await transaction
+          .select({ id: user.id })
+          .from(user)
+          .where(eq(user.id, learnerId))
+          .for("update");
+      });
+      await within(
+        rowProbe,
+        "the poll learner row while refill admission is held",
+        1_000,
+      );
+      releaseAdmission();
+
+      const [created, polled] = await within(
+        Promise.all([create, poll]),
+        "same-learner create and successful poll completion",
+      );
+      expect(created.status).toBe("READY");
+      expect(polled.status).toBe("READY");
+      expect(new Set([created.question!.id, polled.question!.id])).toEqual(
+        new Set(fixture.candidateIds),
+      );
+      await expect(
+        database.db.query.questionRecommendation.findFirst({
+          where: eq(questionRecommendation.id, fixture.recommendationId),
+        }),
+      ).resolves.toMatchObject({
+        status: "READY",
+        questionExternalId: polled.question!.id,
+        shownAt: now,
+      });
+      await expectOneActiveRefillWithoutOrphanJobs([learnerId]);
+    } finally {
+      releaseAdmission();
+      await Promise.allSettled([
+        create,
+        ...(poll ? [poll] : []),
+        ...(rowProbe ? [rowProbe] : []),
+      ]);
+      await shared.restoreDeploymentMode();
+    }
+  });
+
+  it("orders a successful low-supply poll before an overlapping privileged retry", async () => {
+    const ownerId = await createLearner("refill-order-poll-retry-owner");
+    await database.db
+      .update(user)
+      .set({ role: "owner" })
+      .where(eq(user.id, ownerId));
+    const shared = await installSharedRefillRoute(ownerId);
+    const fixture = await createSucceededPendingPollFixture(ownerId, "retry");
+    await insertBatch(ownerId, "FAILED", new Date(now.getTime() + 60_000));
+
+    let markAdmissionAcquired!: () => void;
+    const admissionAcquired = new Promise<void>((resolve) => {
+      markAdmissionAcquired = resolve;
+    });
+    let releaseAdmission!: () => void;
+    const admissionReleased = new Promise<void>((resolve) => {
+      releaseAdmission = resolve;
+    });
+    const retryDatabase = databaseWithRefillAdmissionBarrier({
+      acquired: markAdmissionAcquired,
+      release: () => admissionReleased,
+    });
+    const retry = retryQuestionBankRefill(retryDatabase, ownerId);
+    let poll: ReturnType<typeof getQuestionRecommendation> | null = null;
+    let rowProbe: Promise<void> | null = null;
+    try {
+      await within(admissionAcquired, "overlapping privileged retry admission");
+      poll = getQuestionRecommendation(
+        database.db,
+        ownerId,
+        fixture.recommendationId,
+        options,
+      );
+      await waitForAdvisoryLockWaiter();
+
+      rowProbe = database.db.transaction(async (transaction) => {
+        await transaction
+          .select({ id: user.id })
+          .from(user)
+          .where(eq(user.id, ownerId))
+          .for("update");
+      });
+      await within(
+        rowProbe,
+        "the poll owner row while retry admission is held",
+        1_000,
+      );
+      releaseAdmission();
+
+      const [retried, polled] = await within(
+        Promise.all([retry, poll]),
+        "overlapping privileged retry and successful poll completion",
+      );
+      expect(retried).toEqual({
+        state: "STARTED",
+        batchStatus: "QUEUED",
+      });
+      expect(polled).toMatchObject({
+        status: "READY",
+        question: { id: fixture.candidateIds[0] },
+      });
+      await expect(
+        database.db.query.questionRecommendation.findFirst({
+          where: eq(questionRecommendation.id, fixture.recommendationId),
+        }),
+      ).resolves.toMatchObject({
+        status: "READY",
+        questionExternalId: fixture.candidateIds[0],
+        shownAt: now,
+      });
+      await expectOneActiveRefillWithoutOrphanJobs([ownerId]);
+    } finally {
+      releaseAdmission();
+      await Promise.allSettled([
+        retry,
+        ...(poll ? [poll] : []),
+        ...(rowProbe ? [rowProbe] : []),
+      ]);
+      await shared.restoreDeploymentMode();
+    }
   });
 
   it("couples READY fallback to cycle creation, preserves exposure, and keeps the question cooled", async () => {
