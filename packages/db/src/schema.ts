@@ -381,6 +381,10 @@ export const questionRecommendation = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
+    generationBatchId: uuid("generation_batch_id").references(
+      () => questionGenerationBatch.id,
+      { onDelete: "set null" },
+    ),
     questionExternalId: text("question_external_id"),
     action: questionRecommendationAction("action").notNull(),
     status: questionRecommendationStatusEnum("status").notNull(),
@@ -403,6 +407,10 @@ export const questionRecommendation = pgTable(
     index("question_recommendation_status_updated_idx").on(
       table.status,
       table.updatedAt,
+    ),
+    index("question_recommendation_generation_batch_status_idx").on(
+      table.generationBatchId,
+      table.status,
     ),
   ],
 );
@@ -1313,6 +1321,10 @@ export const questionRecommendationRelations = relations(
       fields: [questionRecommendation.userId],
       references: [user.id],
     }),
+    generationBatch: one(questionGenerationBatch, {
+      fields: [questionRecommendation.generationBatchId],
+      references: [questionGenerationBatch.id],
+    }),
   }),
 );
 
@@ -1331,6 +1343,7 @@ export const questionGenerationBatchRelations = relations(
       fields: [questionGenerationBatch.aiJobId],
       references: [aiJob.id],
     }),
+    recommendations: many(questionRecommendation),
     questions: many(question),
   }),
 );

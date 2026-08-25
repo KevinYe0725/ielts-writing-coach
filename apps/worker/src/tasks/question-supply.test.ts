@@ -766,7 +766,6 @@ const integration = process.env.DATABASE_URL
 integration("question-bank refill PostgreSQL publication", () => {
   const suffix = newDomainId();
   const userId = `question-supply-${suffix}`;
-  const waitingUserId = `question-supply-waiting-${suffix}`;
   const successBatchId = newDomainId();
   const successJobId = newDomainId();
   const failedBatchId = newDomainId();
@@ -789,18 +788,14 @@ integration("question-bank refill PostgreSQL publication", () => {
   const recoveredRaceJobId = newDomainId();
   const terminalRaceBatchId = newDomainId();
   const terminalRaceJobId = newDomainId();
+  const transitionRecoveryBatchId = newDomainId();
+  const transitionRecoveryJobId = newDomainId();
 
   beforeAll(async () => {
     await databaseContext.db.insert(user).values({
       id: userId,
       name: "Question supply integration",
       email: `${userId}@example.test`,
-      role: "learner",
-    });
-    await databaseContext.db.insert(user).values({
-      id: waitingUserId,
-      name: "Shared question supply waiter",
-      email: `${waitingUserId}@example.test`,
       role: "learner",
     });
     await databaseContext.db.insert(aiJob).values([
@@ -903,6 +898,18 @@ integration("question-bank refill PostgreSQL publication", () => {
         idempotencyKey: `question-bank-refill:${terminalRaceBatchId}`,
         attemptCount: 2,
       },
+      {
+        id: transitionRecoveryJobId,
+        ownerId: userId,
+        taskKind: "question_bank_refill",
+        status: "RUNNING",
+        protectedReference: {
+          generationBatchId: transitionRecoveryBatchId,
+        },
+        versionSnapshot: { providerKind: "mock", providerConnectionId: "mock" },
+        idempotencyKey: `question-bank-refill:${transitionRecoveryBatchId}`,
+        attemptCount: 1,
+      },
     ]);
     await databaseContext.db.insert(questionGenerationBatch).values([
       {
@@ -977,10 +984,21 @@ integration("question-bank refill PostgreSQL publication", () => {
         promptVersion: "1.0.0",
         rubricVersion: "iwc-question-bank-refill-1.0.0",
       },
+      {
+        id: transitionRecoveryBatchId,
+        triggeredByUserId: userId,
+        status: "SEARCHING",
+        mode: "OFFLINE",
+        targetMix: [{ questionType: "opinion", topic: "government", count: 1 }],
+        aiJobId: transitionRecoveryJobId,
+        promptVersion: "1.0.0",
+        rubricVersion: "iwc-question-bank-refill-1.0.0",
+      },
     ]);
     await databaseContext.db.insert(questionRecommendation).values({
       id: recommendationId,
       userId,
+      generationBatchId: failedBatchId,
       action: "INITIAL",
       status: "PENDING",
     });
@@ -1005,7 +1023,6 @@ integration("question-bank refill PostgreSQL publication", () => {
       .where(eq(questionGenerationBatch.triggeredByUserId, userId));
     await databaseContext.db.delete(aiJob).where(eq(aiJob.ownerId, userId));
     await databaseContext.db.delete(user).where(eq(user.id, userId));
-    await databaseContext.db.delete(user).where(eq(user.id, waitingUserId));
     await databaseContext.pool.end();
   });
 
@@ -1054,7 +1071,8 @@ integration("question-bank refill PostgreSQL publication", () => {
     const failure = new Error("private provider failure body");
     await databaseContext.db.insert(questionRecommendation).values({
       id: sharedWaitingRecommendationId,
-      userId: waitingUserId,
+      userId,
+      generationBatchId: rejectedBatchId,
       action: "INITIAL",
       status: "PENDING",
     });
@@ -1101,6 +1119,7 @@ integration("question-bank refill PostgreSQL publication", () => {
     await databaseContext.db.insert(questionRecommendation).values({
       id: rejectedRecommendationId,
       userId,
+      generationBatchId: rejectedBatchId,
       action: "SWAP",
       status: "PENDING",
     });
@@ -1315,6 +1334,62 @@ integration("question-bank refill PostgreSQL publication", () => {
       });
       expect(rows).toHaveLength(0);
     }
+  });
+
+  it("blocks a stale transition behind recovery and no-ops after the attempt advances", async () => {
+    let releaseRecovery!: () => void;
+    let recoveryAdvanced!: () => void;
+    const recoveryRelease = new Promise<void>((resolve) => {
+      releaseRecovery = resolve;
+    });
+    const recoveryReady = new Promise<void>((resolve) => {
+      recoveryAdvanced = resolve;
+    });
+    const recovery = databaseContext.db.transaction(async (transaction) => {
+      await transaction
+        .select({ id: aiJob.id })
+        .from(aiJob)
+        .where(eq(aiJob.id, transitionRecoveryJobId))
+        .for("update");
+      await transaction
+        .update(aiJob)
+        .set({ attemptCount: 2 })
+        .where(eq(aiJob.id, transitionRecoveryJobId));
+      recoveryAdvanced();
+      await recoveryRelease;
+    });
+    await recoveryReady;
+
+    let staleSettled = false;
+    const staleTransition = databaseQuestionSupplyStore
+      .transitionBatch(
+        transitionRecoveryBatchId,
+        { aiJobId: transitionRecoveryJobId, attemptCount: 1 },
+        { status: "VALIDATING" },
+      )
+      .then((applied) => {
+        staleSettled = true;
+        return applied;
+      });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const settledBeforeRecoveryCommit = staleSettled;
+    releaseRecovery();
+    await recovery;
+
+    expect(settledBeforeRecoveryCommit).toBe(false);
+    await expect(staleTransition).resolves.toBe(false);
+    expect(
+      await databaseQuestionSupplyStore.transitionBatch(
+        transitionRecoveryBatchId,
+        { aiJobId: transitionRecoveryJobId, attemptCount: 2 },
+        { status: "GENERATING" },
+      ),
+    ).toBe(true);
+    expect(
+      await databaseContext.db.query.questionGenerationBatch.findFirst({
+        where: eq(questionGenerationBatch.id, transitionRecoveryBatchId),
+      }),
+    ).toMatchObject({ status: "GENERATING" });
   });
 
   it("dispatches question_bank_refill through runAIJob instead of the removed fail-closed placeholder", async () => {

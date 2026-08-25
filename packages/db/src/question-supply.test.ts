@@ -4,7 +4,7 @@ import {
   decryptProviderSecret,
   encryptProviderSecret,
 } from "../../ai/src/crypto";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { createDatabase, newDomainId } from "./index";
@@ -121,6 +121,14 @@ integration("adaptive question supply persistence", () => {
     if (!savedBatch) {
       throw new Error("generation batch insert did not return a row");
     }
+    const [linkedRecommendation] = await db
+      .update(questionRecommendation)
+      .set({ generationBatchId: savedBatch.id })
+      .where(eq(questionRecommendation.id, savedRecommendation.id))
+      .returning();
+    if (!linkedRecommendation) {
+      throw new Error("linked recommendation update did not return a row");
+    }
     const [savedQuestion] = await db
       .insert(question)
       .values({
@@ -142,6 +150,7 @@ integration("adaptive question supply persistence", () => {
       status: "PENDING",
       questionExternalId: null,
     });
+    expect(linkedRecommendation.generationBatchId).toBe(savedBatch.id);
     expect(savedQuestion.generationBatchId).toBe(savedBatch.id);
     expect(
       decryptProviderSecret(
@@ -154,6 +163,26 @@ integration("adaptive question supply persistence", () => {
         `search:${ownerId}:${searchConnectionId}`,
       ),
     ).toBe("brave-test-key");
+
+    const invalidBatchLink = await db
+      .insert(questionRecommendation)
+      .values({
+        userId: learnerId,
+        action: "SWAP",
+        status: "PENDING",
+        generationBatchId: newDomainId(),
+      })
+      .catch((error: unknown) => error);
+    expect(invalidBatchLink).toMatchObject({ cause: { code: "23503" } });
+
+    const indexRows = await db.execute(sql`
+      select indexname
+      from pg_indexes
+      where schemaname = 'public'
+        and tablename = 'question_recommendation'
+        and indexname = 'question_recommendation_generation_batch_status_idx'
+    `);
+    expect(indexRows.rows).toHaveLength(1);
   });
 
   it("rejects a batch-backed generated question with an owner", async () => {

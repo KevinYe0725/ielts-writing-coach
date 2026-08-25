@@ -2962,6 +2962,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "generation_batch_id": {
+          "name": "generation_batch_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "question_external_id": {
           "name": "question_external_id",
           "type": "text",
@@ -3084,6 +3090,27 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "question_recommendation_generation_batch_status_idx": {
+          "name": "question_recommendation_generation_batch_status_idx",
+          "columns": [
+            {
+              "expression": "generation_batch_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -3098,6 +3125,19 @@
             "id"
           ],
           "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "question_recommendation_generation_batch_id_question_generation_batch_id_fk": {
+          "name": "question_recommendation_generation_batch_id_question_generation_batch_id_fk",
+          "tableFrom": "question_recommendation",
+          "tableTo": "question_generation_batch",
+          "columnsFrom": [
+            "generation_batch_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
           "onUpdate": "no action"
         }
       },

@@ -2,7 +2,7 @@ import Ajv2020, {
   type AnySchemaObject,
   type ValidateFunction,
 } from "ajv/dist/2020.js";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { JobHelpers } from "graphile-worker";
 
 import {
@@ -314,16 +314,15 @@ async function lockBatchDelivery(
 
 async function failLinkedRecommendations(
   transaction: QuestionSupplyTransaction,
-  triggeredByUserId: string | null,
+  batchId: string,
   safeFailureCode: string,
 ): Promise<void> {
-  if (!triggeredByUserId) return;
   await transaction
     .update(questionRecommendation)
     .set({ status: "UNAVAILABLE", safeFailureCode })
     .where(
       and(
-        eq(questionRecommendation.userId, triggeredByUserId),
+        eq(questionRecommendation.generationBatchId, batchId),
         eq(questionRecommendation.status, "PENDING"),
       ),
     );
@@ -350,24 +349,23 @@ export const databaseQuestionSupplyStore: QuestionSupplyStore = {
     return resolveSearchConnectionForJob(jobOwnerId);
   },
   async transitionBatch(batchId, fence, update) {
-    const updated = await databaseContext.db
-      .update(questionGenerationBatch)
-      .set(update)
-      .where(
-        and(
-          eq(questionGenerationBatch.id, batchId),
-          eq(questionGenerationBatch.aiJobId, fence.aiJobId),
-          inArray(questionGenerationBatch.status, NON_TERMINAL_BATCH_STATUSES),
-          sql`exists (
-            select 1 from ${aiJob}
-            where ${aiJob.id} = ${fence.aiJobId}
-              and ${aiJob.attemptCount} = ${fence.attemptCount}
-              and ${aiJob.status} = 'RUNNING'
-          )`,
-        ),
-      )
-      .returning({ id: questionGenerationBatch.id });
-    return updated.length === 1;
+    return databaseContext.db.transaction(async (transaction) => {
+      const locked = await lockBatchDelivery(transaction, batchId, fence);
+      if (
+        !locked.batch ||
+        !locked.current ||
+        !NON_TERMINAL_BATCH_STATUSES.includes(
+          locked.batch.status as (typeof NON_TERMINAL_BATCH_STATUSES)[number],
+        )
+      ) {
+        return false;
+      }
+      await transaction
+        .update(questionGenerationBatch)
+        .set(update)
+        .where(eq(questionGenerationBatch.id, batchId));
+      return true;
+    });
   },
   async loadExistingQuestions() {
     const dynamic = await databaseContext.db.query.question.findMany({
@@ -463,7 +461,7 @@ export const databaseQuestionSupplyStore: QuestionSupplyStore = {
       if (terminalFailureCode) {
         await failLinkedRecommendations(
           transaction,
-          locked.batch.triggeredByUserId,
+          batchId,
           terminalFailureCode,
         );
       }
@@ -485,11 +483,7 @@ export const databaseQuestionSupplyStore: QuestionSupplyStore = {
         .update(questionGenerationBatch)
         .set({ status: "FAILED", safeFailureCode })
         .where(eq(questionGenerationBatch.id, batchId));
-      await failLinkedRecommendations(
-        transaction,
-        locked.batch.triggeredByUserId,
-        safeFailureCode,
-      );
+      await failLinkedRecommendations(transaction, batchId, safeFailureCode);
       return true;
     });
   },
