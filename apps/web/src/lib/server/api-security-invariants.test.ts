@@ -51,6 +51,26 @@ describe("API security architecture", () => {
     expect(getOnly).not.toContain("keyVersion");
   });
 
+  it("projects search GET responses without encryption or configuring-user columns", () => {
+    const searchRoute = readFileSync(
+      join(apiRoot, "search-connection/route.ts"),
+      "utf8",
+    );
+    const getOnly = searchRoute.slice(
+      searchRoute.indexOf("export const GET"),
+      searchRoute.indexOf("export const PUT"),
+    );
+    for (const forbidden of [
+      "encryptedApiKey",
+      "encryptedApiKeyNonce",
+      "encryptionKeyVersion",
+      "configuredByUserId",
+      "api_key",
+    ]) {
+      expect(getOnly).not.toContain(forbidden);
+    }
+  });
+
   it("keeps provider and model-route technical metadata privileged", () => {
     for (const relativePath of [
       "providers/route.ts",
