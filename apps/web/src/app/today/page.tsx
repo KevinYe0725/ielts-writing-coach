@@ -133,7 +133,8 @@ export default function TodayPage() {
   const recommendationStartRef = useRef<HTMLButtonElement>(null);
   const recommendationOperation = useRef(0);
   const recommendationTimers = useRef(new Map<number, () => void>());
-  const recommendationInteractionLocked = useRef(false);
+  const recommendationActionLocked = useRef(false);
+  const cycleOperationLocked = useRef(false);
   const [customOpen, setCustomOpen] = useState(false);
   const [customPrompt, setCustomPrompt] = useState("");
   const [customType, setCustomType] = useState<QuestionType>("opinion");
@@ -210,6 +211,8 @@ export default function TodayPage() {
       input: { action: "INITIAL" | "SWAP"; excludedQuestionId?: string },
       focusStart = false,
     ) => {
+      if (recommendationActionLocked.current) return;
+      recommendationActionLocked.current = true;
       cancelRecommendationOperation();
       const operation = recommendationOperation.current;
       setRecommendationBusy(true);
@@ -232,6 +235,7 @@ export default function TodayPage() {
       } finally {
         if (recommendationOperation.current === operation)
           setRecommendationBusy(false);
+        recommendationActionLocked.current = false;
       }
     },
     [
@@ -242,7 +246,13 @@ export default function TodayPage() {
   );
 
   const retryRecommendation = useCallback(async () => {
-    if (!recommendationRetryId || recommendationBusy) return;
+    if (
+      !recommendationRetryId ||
+      recommendationBusy ||
+      recommendationActionLocked.current
+    )
+      return;
+    recommendationActionLocked.current = true;
     cancelRecommendationOperation();
     const operation = recommendationOperation.current;
     setRecommendationBusy(true);
@@ -259,6 +269,7 @@ export default function TodayPage() {
     } finally {
       if (recommendationOperation.current === operation)
         setRecommendationBusy(false);
+      recommendationActionLocked.current = false;
     }
   }, [
     cancelRecommendationOperation,
@@ -318,11 +329,12 @@ export default function TodayPage() {
     if (
       !question ||
       questionLoading ||
-      (recommendedStart && recommendationBusy) ||
-      recommendationInteractionLocked.current
+      (recommendedStart &&
+        (recommendationBusy || recommendationActionLocked.current)) ||
+      cycleOperationLocked.current
     )
       return;
-    recommendationInteractionLocked.current = true;
+    cycleOperationLocked.current = true;
     if (!recommendedStart) chooseManualFallback();
     setQuestionLoading(true);
     setQuestionError(null);
@@ -337,7 +349,7 @@ export default function TodayPage() {
         error instanceof Error ? error.message : "The cycle could not start.",
       );
     } finally {
-      recommendationInteractionLocked.current = false;
+      cycleOperationLocked.current = false;
       setQuestionLoading(false);
     }
   };
@@ -347,21 +359,16 @@ export default function TodayPage() {
       recommendation?.state !== "READY" ||
       recommendationBusy ||
       questionLoading ||
-      recommendationInteractionLocked.current
+      recommendationActionLocked.current
     )
       return;
-    recommendationInteractionLocked.current = true;
-    try {
-      await requestRecommendation(
-        {
-          action: "SWAP",
-          excludedQuestionId: recommendation.question.id,
-        },
-        true,
-      );
-    } finally {
-      recommendationInteractionLocked.current = false;
-    }
+    await requestRecommendation(
+      {
+        action: "SWAP",
+        excludedQuestionId: recommendation.question.id,
+      },
+      true,
+    );
   };
 
   const retryPendingJob = async () => {
@@ -387,10 +394,10 @@ export default function TodayPage() {
     if (
       customPrompt.trim().length < 30 ||
       questionLoading ||
-      recommendationInteractionLocked.current
+      cycleOperationLocked.current
     )
       return;
-    recommendationInteractionLocked.current = true;
+    cycleOperationLocked.current = true;
     chooseManualFallback();
     setQuestionLoading(true);
     setQuestionError(null);
@@ -414,7 +421,7 @@ export default function TodayPage() {
           : "The private question could not be saved.",
       );
     } finally {
-      recommendationInteractionLocked.current = false;
+      cycleOperationLocked.current = false;
       setQuestionLoading(false);
     }
   };

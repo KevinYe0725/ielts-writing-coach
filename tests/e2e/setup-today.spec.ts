@@ -581,6 +581,118 @@ async function routePreparingFallbackFixture(page: Page) {
   };
 }
 
+async function routeSwapPreparingFallbackFixture(page: Page) {
+  await routeTodayHttpFixture(page, "mixed-review");
+  let releasePoll!: () => void;
+  let releaseCycle!: () => void;
+  const pollRelease = new Promise<void>((resolve) => {
+    releasePoll = resolve;
+  });
+  const cycleRelease = new Promise<void>((resolve) => {
+    releaseCycle = resolve;
+  });
+  let polls = 0;
+  const cycleBodies: Array<Record<string, unknown>> = [];
+
+  await page.route("**/api/v1/question-recommendations", async (route) => {
+    if (route.request().method() !== "POST") return route.fallback();
+    const input = route.request().postDataJSON();
+    if (input.action === "SWAP") {
+      await route.fulfill({
+        contentType: "application/json",
+        status: 202,
+        body: JSON.stringify({
+          recommendation: {
+            id: "recommendation-swap-preparing",
+            status: "PENDING",
+            retry_after_seconds: 1,
+          },
+        }),
+      });
+      return;
+    }
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        recommendation: {
+          id: "recommendation-swap-source",
+          status: "READY",
+          question: {
+            id: "http-question-education",
+            prompt:
+              "Some people believe schools should teach financial literacy. To what extent do you agree or disagree?",
+            type: "opinion",
+            topic: "education",
+            ielts_track: "academic",
+            visibility: "public",
+          },
+        },
+      }),
+    });
+  });
+  await page.route(
+    "**/api/v1/question-recommendations/recommendation-swap-preparing",
+    async (route) => {
+      polls += 1;
+      await pollRelease;
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          recommendation: {
+            id: "recommendation-swap-preparing",
+            status: "READY",
+            question: {
+              id: "stale-swap-question",
+              prompt: "STALE SWAP RESULT MUST NOT REPLACE THE FALLBACK",
+              type: "discussion",
+              topic: "technology",
+              ielts_track: "academic",
+              visibility: "public",
+            },
+          },
+        }),
+      });
+    },
+  );
+  await page.route("**/api/v1/training-cycles", async (route) => {
+    cycleBodies.push(route.request().postDataJSON());
+    await cycleRelease;
+    await route.fulfill({
+      contentType: "application/json",
+      status: 201,
+      body: JSON.stringify({ cycle: { id: "cycle-swap-fallback" } }),
+    });
+  });
+  await page.route("**/api/v1/questions", async (route) => {
+    if (route.request().method() === "POST") {
+      const input = route.request().postDataJSON();
+      await route.fulfill({
+        contentType: "application/json",
+        status: 201,
+        body: JSON.stringify({
+          question: {
+            id: "custom-swap-fallback-question",
+            prompt: input.prompt,
+            type: input.type,
+            topic: input.topic,
+            ielts_track: input.ielts_track,
+            visibility: "private",
+          },
+        }),
+      });
+      return;
+    }
+    await route.fallback();
+  });
+
+  return {
+    cycleBodies,
+    polls: () => polls,
+    releaseCycle,
+    releasePoll,
+  };
+}
+
 test.describe("Today query states at the HTTP boundary", () => {
   test.skip(
     deterministicDemo,
@@ -728,6 +840,80 @@ test.describe("Today query states at the HTTP boundary", () => {
     expect(fixture.cycleBodies[0]).not.toHaveProperty("recommendation_id");
     await page.waitForTimeout(100);
     expect(fixture.cycleBodies).toHaveLength(1);
+  });
+
+  test("READY swap polling does not block a double-event manual bank fallback", async ({
+    page,
+  }) => {
+    const fixture = await routeSwapPreparingFallbackFixture(page);
+    await page.goto("/today?new-essay=1");
+    await expect(page.getByRole("button", { name: "换一题" })).toBeVisible();
+    await page.getByText("浏览全部题库").click();
+    await page.getByLabel("题库").selectOption("http-question-education");
+    const manualStart = page
+      .getByLabel("题库")
+      .locator("..")
+      .locator("..")
+      .getByRole("button", { name: "用这道题开始写作" });
+
+    await page.getByRole("button", { name: "换一题" }).click();
+    await expect.poll(fixture.polls, { timeout: 5_000 }).toBe(1);
+    await expect(manualStart).toBeEnabled();
+    await manualStart.evaluate((button: HTMLButtonElement) => {
+      button.click();
+      button.click();
+    });
+
+    await expect.poll(() => fixture.cycleBodies.length).toBe(1);
+    fixture.releasePoll();
+    await expect(
+      page.getByText("STALE SWAP RESULT MUST NOT REPLACE THE FALLBACK"),
+    ).toHaveCount(0);
+    fixture.releaseCycle();
+    await expect(page).toHaveURL(/\/write\?cycle=cycle-swap-fallback$/);
+    expect(fixture.cycleBodies).toEqual([
+      expect.objectContaining({ question_id: "http-question-education" }),
+    ]);
+    expect(fixture.cycleBodies[0]).not.toHaveProperty("recommendation_id");
+  });
+
+  test("READY swap polling does not block a double-event custom create/start fallback", async ({
+    page,
+  }) => {
+    const fixture = await routeSwapPreparingFallbackFixture(page);
+    await page.goto("/today?new-essay=1");
+    await expect(page.getByRole("button", { name: "换一题" })).toBeVisible();
+    await page.getByText("粘贴我自己的题目").click();
+    await page
+      .getByLabel("完整英文题目")
+      .fill(
+        "Some people believe every city should provide free public libraries. To what extent do you agree or disagree?",
+      );
+    const customStart = page.getByRole("button", {
+      name: "保存并开始写作",
+    });
+
+    await page.getByRole("button", { name: "换一题" }).click();
+    await expect.poll(fixture.polls, { timeout: 5_000 }).toBe(1);
+    await expect(customStart).toBeEnabled();
+    await customStart.evaluate((button: HTMLButtonElement) => {
+      button.click();
+      button.click();
+    });
+
+    await expect.poll(() => fixture.cycleBodies.length).toBe(1);
+    fixture.releasePoll();
+    await expect(
+      page.getByText("STALE SWAP RESULT MUST NOT REPLACE THE FALLBACK"),
+    ).toHaveCount(0);
+    fixture.releaseCycle();
+    await expect(page).toHaveURL(/\/write\?cycle=cycle-swap-fallback$/);
+    expect(fixture.cycleBodies).toEqual([
+      expect.objectContaining({
+        question_id: "custom-swap-fallback-question",
+      }),
+    ]);
+    expect(fixture.cycleBodies[0]).not.toHaveProperty("recommendation_id");
   });
 
   test("feedback-waiting notice keeps the queued state and refresh action", async ({

@@ -186,3 +186,7 @@ Final remediation E: complete (PREPARING manual/private start, strict PENDING
 projection, Demo recommendation-state deletion, ephemeral tested Brave key,
 post-header TIMEOUT, shared Admin DELETE assertion, and refreshed final gates;
 see final-remediation-e-report.md; commit is the report-containing E commit)
+Final remediation E: fix round 1/5 complete (separate recommendation-action
+and cycle/custom mutexes; READY → SWAP → PENDING manual/private double-event
+fallbacks each create one unattributed cycle and ignore the stale in-flight
+poll; see final-remediation-e-report.md)

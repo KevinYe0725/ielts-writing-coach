@@ -87,3 +87,51 @@ The helper failure is not presented as a passing gate.
   durable handoff.
 
 Commit: the commit containing this report.
+
+## Fix Round 1/5 — independent recommendation and cycle fences
+
+### Root cause and RED
+
+The first remediation used one synchronous ref for both recommendation actions
+and cycle creation. A READY card entering SWAP → PENDING held that ref through
+its request and poll, so the visually enabled manual and private controls were
+silently rejected by their handlers.
+
+Two non-Demo HTTP tests now begin READY, dispatch SWAP, return PENDING, and hold
+the recommendation GET in flight. Both the bank start and private create/start
+buttons remain enabled and receive two synchronous native click events. Before
+the split each test failed with zero `/training-cycles` requests.
+
+### Fix
+
+- `recommendationActionLocked` serializes initial recommendation requests,
+  swap, retry, and the associated bounded poll. Duplicate swap events cannot
+  enter a second recommendation mutation.
+- `cycleOperationLocked` is shared by recommended start, manual start, and
+  private create/start. It is acquired synchronously before any await, so each
+  double event produces one cycle/custom operation.
+- Recommended start additionally rejects while a recommendation action is
+  active. Manual/private fallbacks deliberately ignore that mutex, obsolete the
+  recommendation operation token, clear/resolve its timers, and proceed.
+- The test releases the stale poll while cycle creation is still held. Its
+  READY payload never renders or changes navigation, and the eventual cycle
+  request contains no `recommendation_id`.
+
+### Fresh focused verification
+
+```text
+Initial Chromium RED: 2 failed, each observing 0 cycles instead of 1
+Chromium GREEN, old double-event start/swap plus new fallbacks: 4/4 passed
+Chromium + WebKit + mobile new fallback matrix: 6/6 passed
+Client suites: 2 files / 114 passed
+Web typecheck: passed
+Web lint: passed, 0 errors / 4 existing Fast Refresh warnings
+Web production build: passed, 48/48 static pages
+Targeted Prettier and git diff checks: passed
+```
+
+The complete E gate totals above remain the release baseline; this fix round
+changed only the Today interaction controller and its non-Demo regression
+fixture. External boundaries are unchanged.
+
+Fix-round commit: the commit containing this section.
