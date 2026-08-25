@@ -50,6 +50,59 @@ describe.skipIf(!databaseUrl)("GET /api/v1/questions (PostgreSQL)", () => {
     },
   };
 
+  async function seedSucceededStaticCollision(label: string): Promise<{
+    learnerId: string;
+    externalId: string;
+  }> {
+    const suffix = newDomainId();
+    const learnerId = `${label}-${suffix}`;
+    const batchId = newDomainId();
+    const questionId = newDomainId();
+    const storedExternalIds = new Set(
+      (
+        await database.db.query.question.findMany({
+          columns: { externalId: true },
+        })
+      ).map((item) => item.externalId),
+    );
+    const staticQuestion = QUESTION_BANK.find(
+      (item) => !storedExternalIds.has(item.id),
+    );
+    expect(staticQuestion).toBeDefined();
+    createdUsers.push(learnerId);
+    createdBatchIds.push(batchId);
+    createdQuestionIds.push(questionId);
+    routeState.actorId = learnerId;
+    await database.db.insert(user).values({
+      id: learnerId,
+      name: "Static collision learner",
+      email: `${learnerId}@example.test`,
+      role: "learner",
+    });
+    await database.db.insert(questionGenerationBatch).values({
+      id: batchId,
+      triggeredByUserId: learnerId,
+      status: "SUCCEEDED",
+      mode: "OFFLINE",
+      targetMix: [],
+      promptVersion: "1.0.0",
+      rubricVersion: "iwc-question-bank-refill-1.0.0",
+    });
+    await database.db.insert(question).values({
+      id: questionId,
+      externalId: staticQuestion!.id,
+      source: "AI_GENERATED",
+      visibility: "public",
+      questionType: staticQuestion!.type,
+      topic: staticQuestion!.topic,
+      ieltsTrack: "academic",
+      prompt:
+        "A conflicting generated prompt that must never redefine a static external ID.",
+      generationBatchId: batchId,
+    });
+    return { learnerId, externalId: staticQuestion!.id };
+  }
+
   afterEach(async () => {
     for (const userId of createdUsers.splice(0)) {
       await database.db.delete(user).where(eq(user.id, userId));
@@ -159,6 +212,51 @@ describe.skipIf(!databaseUrl)("GET /api/v1/questions (PostgreSQL)", () => {
     expect(ids).not.toContain(invalidExternalId);
     expect(new Set(ids).size).toBe(ids.length);
     expect(JSON.stringify(body)).not.toMatch(/AI_GENERATED|AI_RESEARCHED/u);
+  });
+
+  it("excludes a generated row that collides with a canonical static ID from the recommendation catalog", async () => {
+    const collision = await seedSucceededStaticCollision(
+      "catalog-static-collision",
+    );
+
+    const response = await GET(
+      new Request("https://coach.test/api/v1/questions"),
+    );
+    const body = (await response.json()) as {
+      questions: Array<{ id?: string; externalId?: string; prompt?: string }>;
+    };
+    const matching = body.questions.filter(
+      (item) => (item.externalId ?? item.id) === collision.externalId,
+    );
+
+    expect(response.status).toBe(200);
+    expect(matching).toHaveLength(0);
+  });
+
+  it("returns 404 when direct cycle creation names a generated row colliding with a static ID", async () => {
+    const collision = await seedSucceededStaticCollision(
+      "cycle-static-collision",
+    );
+
+    const response = await createTrainingCycle(
+      new Request("https://coach.test/api/v1/training-cycles", {
+        method: "POST",
+        headers: {
+          origin: "https://coach.test",
+          "content-type": "application/json",
+          "idempotency-key": `cycle-static-collision-${newDomainId()}`,
+        },
+        body: JSON.stringify({
+          question_id: collision.externalId,
+          timezone: "UTC",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({
+      code: "QUESTION_NOT_FOUND",
+    });
   });
 
   it("rejects direct cycles for unvalidated dynamic rows while keeping valid shared and owned-private questions", async () => {
@@ -296,18 +394,34 @@ describe.skipIf(!databaseUrl)("GET /api/v1/questions (PostgreSQL)", () => {
     }
     const privateId = newDomainId();
     const privateExternalId = `owned-private-${suffix}`;
-    createdQuestionIds.push(privateId);
-    await database.db.insert(question).values({
-      id: privateId,
-      externalId: privateExternalId,
-      ownerId: learnerId,
-      source: "user_private",
-      visibility: "private",
-      questionType: "discussion",
-      topic: "health",
-      ieltsTrack: "general_training",
-      prompt: "A valid owned private question for direct cycle creation.",
-    });
+    const unlinkedGeneratedPrivateId = newDomainId();
+    const unlinkedGeneratedPrivateExternalId = `owned-private-generated-${suffix}`;
+    createdQuestionIds.push(privateId, unlinkedGeneratedPrivateId);
+    await database.db.insert(question).values([
+      {
+        id: privateId,
+        externalId: privateExternalId,
+        ownerId: learnerId,
+        source: "USER_CUSTOM",
+        visibility: "private",
+        questionType: "discussion",
+        topic: "health",
+        ieltsTrack: "general_training",
+        prompt: "A valid owned private question for direct cycle creation.",
+      },
+      {
+        id: unlinkedGeneratedPrivateId,
+        externalId: unlinkedGeneratedPrivateExternalId,
+        ownerId: learnerId,
+        source: "AI_GENERATED",
+        visibility: "private",
+        questionType: "discussion",
+        topic: "health",
+        ieltsTrack: "academic",
+        prompt:
+          "An actor-owned generated private row without batch provenance.",
+      },
+    ]);
 
     const postCycle = (externalId: string, key: string) =>
       createTrainingCycle(
@@ -338,6 +452,14 @@ describe.skipIf(!databaseUrl)("GET /api/v1/questions (PostgreSQL)", () => {
         code: "QUESTION_NOT_FOUND",
       });
     }
+    const unlinkedGeneratedPrivate = await postCycle(
+      unlinkedGeneratedPrivateExternalId,
+      `invalid-cycle-private-generated-unlinked-${suffix}`,
+    );
+    expect(unlinkedGeneratedPrivate.status).toBe(404);
+    await expect(unlinkedGeneratedPrivate.json()).resolves.toMatchObject({
+      code: "QUESTION_NOT_FOUND",
+    });
 
     expect(
       (

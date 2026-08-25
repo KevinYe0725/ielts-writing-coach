@@ -6,7 +6,12 @@ import {
   questionGenerationBatch,
   type Database,
 } from "@iwc/db";
-import { getQuestionById, QUESTION_TYPES, TOPICS } from "@iwc/question-bank";
+import {
+  getQuestionById,
+  QUESTION_TYPES,
+  TOPICS,
+  type Question as StaticQuestion,
+} from "@iwc/question-bank";
 
 import { ApiProblem } from "./problem";
 
@@ -15,10 +20,17 @@ export async function resolveQuestion(
   ownerId: string,
   externalId: string,
 ): Promise<typeof question.$inferSelect> {
+  const original = getQuestionById(externalId);
   const existing = await database.query.question.findFirst({
     where: eq(question.externalId, externalId),
   });
   if (existing) {
+    if (original) {
+      if (!isCanonicalStoredStaticQuestion(existing, original)) {
+        throw questionNotFound();
+      }
+      return existing;
+    }
     if (
       !isSupportedQuestion(
         existing.questionType,
@@ -27,12 +39,6 @@ export async function resolveQuestion(
       )
     ) {
       throw questionNotFound();
-    }
-    if (existing.visibility === "private") {
-      if (existing.ownerId !== ownerId || existing.generationBatchId !== null) {
-        throw questionNotFound();
-      }
-      return existing;
     }
     const isGenerated =
       existing.generationBatchId !== null ||
@@ -55,17 +61,12 @@ export async function resolveQuestion(
       if (batch?.status !== "SUCCEEDED") throw questionNotFound();
       return existing;
     }
-    const staticQuestion = getQuestionById(externalId);
-    if (
-      !staticQuestion ||
-      existing.visibility !== "public" ||
-      existing.ownerId !== null
-    ) {
-      throw questionNotFound();
+    if (existing.visibility === "private") {
+      if (existing.ownerId !== ownerId) throw questionNotFound();
+      return existing;
     }
-    return existing;
+    throw questionNotFound();
   }
-  const original = getQuestionById(externalId);
   if (!original) {
     throw questionNotFound();
   }
@@ -87,6 +88,24 @@ export async function resolveQuestion(
     .returning();
   if (created) return created;
   return resolveQuestion(database, ownerId, externalId);
+}
+
+export function isCanonicalStoredStaticQuestion(
+  stored: typeof question.$inferSelect,
+  canonical: StaticQuestion,
+): boolean {
+  return (
+    stored.externalId === canonical.id &&
+    stored.ownerId === null &&
+    stored.visibility === "public" &&
+    stored.generationBatchId === null &&
+    stored.source !== "AI_GENERATED" &&
+    stored.source !== "AI_RESEARCHED" &&
+    stored.ieltsTrack === "academic" &&
+    stored.questionType === canonical.type &&
+    stored.topic === canonical.topic &&
+    stored.prompt === canonical.prompt
+  );
 }
 
 function isSupportedQuestion(

@@ -42,6 +42,7 @@ import {
   selectTopBucket,
   type RecommendationCandidate,
 } from "./question-recommendation-score";
+import { isCanonicalStoredStaticQuestion } from "./questions";
 
 type DatabaseTransaction = Parameters<
   Parameters<Database["transaction"]>[0]
@@ -102,10 +103,23 @@ export async function listPublicQuestionCatalog(
   database: QueryDatabase,
   filters: { type?: QuestionType; topic?: QuestionTopic } = {},
 ): Promise<PublicQuestionCatalogItem[]> {
+  const staticIdSet = new Set(QUESTION_BANK.map((item) => item.id));
+  const storedStaticRows = await database
+    .select()
+    .from(question)
+    .where(inArray(question.externalId, [...staticIdSet]));
+  const storedStaticByExternalId = new Map(
+    storedStaticRows.map((item) => [item.externalId, item]),
+  );
   const staticQuestions = QUESTION_BANK.filter(
     (item) =>
       (filters.type === undefined || item.type === filters.type) &&
-      (filters.topic === undefined || item.topic === filters.topic),
+      (filters.topic === undefined || item.topic === filters.topic) &&
+      (storedStaticByExternalId.get(item.id) === undefined ||
+        isCanonicalStoredStaticQuestion(
+          storedStaticByExternalId.get(item.id)!,
+          item,
+        )),
   ).map((item) => ({
     id: item.id,
     prompt: item.prompt,
@@ -150,6 +164,7 @@ export async function listPublicQuestionCatalog(
   const dynamicQuestions: PublicQuestionCatalogItem[] = dynamicRows.flatMap(
     (row) => {
       if (
+        staticIdSet.has(row.id) ||
         seen.has(row.id) ||
         !isQuestionType(row.type) ||
         !isQuestionTopic(row.topic) ||
