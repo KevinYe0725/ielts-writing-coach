@@ -3,7 +3,7 @@
 import {
   useCallback,
   useEffect,
-  useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
 } from "react";
@@ -38,7 +38,12 @@ import { EssayWorkspace } from "@/components/essay-workspace";
 import { PageLayout } from "@/components/layout/page-layout";
 import { cn } from "@/components/utils";
 import { learningClient } from "@/lib/client";
-import type { QuestionOption, QuestionTopic, QuestionType } from "@/lib/client";
+import type {
+  QuestionOption,
+  QuestionRecommendation,
+  QuestionTopic,
+  QuestionType,
+} from "@/lib/client";
 import { learningRouteHref } from "@/lib/client/learning-route";
 import { saveLearningDestinations } from "@/lib/client/learning-navigation";
 
@@ -94,6 +99,11 @@ function feedbackWaitingNoticeSnapshot() {
   );
 }
 
+const MAX_RECOMMENDATION_POLLS = 5;
+
+const waitForRecommendation = (milliseconds: number) =>
+  new Promise<void>((resolve) => window.setTimeout(resolve, milliseconds));
+
 export default function TodayPage() {
   const router = useRouter();
   const startingNewEssay = useSyncExternalStore(
@@ -115,6 +125,11 @@ export default function TodayPage() {
   const [questionLoading, setQuestionLoading] = useState(false);
   const [questionError, setQuestionError] = useState<string | null>(null);
   const [selectedQuestionId, setSelectedQuestionId] = useState("");
+  const [recommendation, setRecommendation] =
+    useState<QuestionRecommendation | null>(null);
+  const [recommendationLoading, setRecommendationLoading] = useState(false);
+  const focusRecommendationStart = useRef(false);
+  const recommendationStartRef = useRef<HTMLButtonElement>(null);
   const [customOpen, setCustomOpen] = useState(false);
   const [customPrompt, setCustomPrompt] = useState("");
   const [customType, setCustomType] = useState<QuestionType>("opinion");
@@ -133,46 +148,77 @@ export default function TodayPage() {
   useEffect(() => {
     if (!needsQuestion) return;
     let cancelled = false;
-    const timeout = window.setTimeout(() => {
-      if (!cancelled) setQuestionLoading(true);
-    }, 0);
-    void learningClient
-      .getQuestions()
-      .then((items) => {
-        if (cancelled) return;
-        setQuestions(items);
-        setSelectedQuestionId((current) => current || items[0]?.id || "");
-      })
-      .catch((error: unknown) => {
+    void learningClient.getQuestions().then(
+      (items) => {
+        if (!cancelled) setQuestions(items);
+      },
+      (error: unknown) => {
         if (!cancelled)
           setQuestionError(
             error instanceof Error
               ? error.message
               : "Questions could not be loaded.",
           );
-      })
-      .finally(() => {
-        window.clearTimeout(timeout);
-        if (!cancelled) setQuestionLoading(false);
-      });
+      },
+    );
+    const loadRecommendation = async () => {
+      setRecommendationLoading(true);
+      setQuestionError(null);
+      try {
+        let next = await learningClient.requestQuestionRecommendation({
+          action: "INITIAL",
+        });
+        if (!cancelled) setRecommendation(next);
+        for (
+          let attempt = 0;
+          next.state === "PREPARING" && attempt < MAX_RECOMMENDATION_POLLS;
+          attempt += 1
+        ) {
+          await waitForRecommendation(next.retryAfterSeconds * 1_000);
+          if (cancelled) return;
+          next = await learningClient.getQuestionRecommendation(next.id);
+          if (!cancelled) setRecommendation(next);
+        }
+      } catch (error) {
+        if (!cancelled)
+          setQuestionError(
+            error instanceof Error
+              ? error.message
+              : "A question could not be prepared.",
+          );
+      } finally {
+        if (!cancelled) setRecommendationLoading(false);
+      }
+    };
+    void loadRecommendation();
     return () => {
       cancelled = true;
-      window.clearTimeout(timeout);
     };
   }, [needsQuestion]);
 
-  const selectedQuestion = useMemo(
-    () => questions.find((question) => question.id === selectedQuestionId),
-    [questions, selectedQuestionId],
+  const selectedQuestion = questions.find(
+    (question) => question.id === selectedQuestionId,
   );
 
-  const beginSelectedQuestion = async () => {
-    if (!selectedQuestionId) return;
+  useEffect(() => {
+    if (recommendation?.state !== "READY" || !focusRecommendationStart.current)
+      return;
+    focusRecommendationStart.current = false;
+    recommendationStartRef.current?.focus();
+  }, [recommendation]);
+
+  const beginSelectedQuestion = async (
+    question: QuestionOption | undefined,
+    recommendationId?: string,
+  ) => {
+    if (!question) return;
     setQuestionLoading(true);
     setQuestionError(null);
     try {
-      const cycleId =
-        await learningClient.startTrainingCycle(selectedQuestionId);
+      const cycleId = await learningClient.startTrainingCycle(
+        question.id,
+        recommendationId,
+      );
       router.push(learningRouteHref("/write", { cycleId }));
     } catch (error) {
       setQuestionError(
@@ -180,6 +226,37 @@ export default function TodayPage() {
       );
     } finally {
       setQuestionLoading(false);
+    }
+  };
+
+  const swapRecommendation = async () => {
+    if (recommendation?.state !== "READY") return;
+    setRecommendationLoading(true);
+    setQuestionError(null);
+    focusRecommendationStart.current = true;
+    try {
+      let next = await learningClient.requestQuestionRecommendation({
+        action: "SWAP",
+        excludedQuestionId: recommendation.question.id,
+      });
+      setRecommendation(next);
+      for (
+        let attempt = 0;
+        next.state === "PREPARING" && attempt < MAX_RECOMMENDATION_POLLS;
+        attempt += 1
+      ) {
+        await waitForRecommendation(next.retryAfterSeconds * 1_000);
+        next = await learningClient.getQuestionRecommendation(next.id);
+        setRecommendation(next);
+      }
+    } catch (error) {
+      setQuestionError(
+        error instanceof Error
+          ? error.message
+          : "A new question could not be prepared.",
+      );
+    } finally {
+      setRecommendationLoading(false);
     }
   };
 
@@ -371,235 +448,351 @@ export default function TodayPage() {
           </p>
         ) : null}
 
-        <section
-          className={cn("next-task-card", styles.primaryAction)}
-          data-today-primary
-        >
-          <div className="next-task-accent" aria-hidden="true" />
-          <div className="next-task-topline">
-            <Badge tone="blue">
-              <Sparkles aria-hidden="true" size={13} />
-              {text(task.eyebrowZh, task.eyebrowEn)}
-            </Badge>
-            <span className="due-label">
-              <CalendarClock aria-hidden="true" size={15} />
-              {text(task.dueLabelZh, task.dueLabelEn)}
-            </span>
-          </div>
-          <div className="next-task-body">
-            <div className="next-task-copy">
-              <h2>{text(task.titleZh, task.titleEn)}</h2>
-              <p>{text(task.descriptionZh, task.descriptionEn)}</p>
-              <div className="task-meta">
-                <span>
-                  <Clock3 aria-hidden="true" size={16} />
-                  {task.durationMinutes} {messages.common.minutes}
-                </span>
-                <span>
-                  <Target aria-hidden="true" size={16} />
-                  {text("闭卷独立输出", "Closed-book production")}
-                </span>
+        {needsQuestion ? (
+          <section
+            aria-labelledby="recommendation-title"
+            className={styles.recommendationSheet}
+            data-today-primary
+          >
+            <div className={styles.sheetHeading}>
+              <div>
+                <p className={styles.sheetEyebrow}>
+                  {text("为你推荐", "Recommended for you")}
+                </p>
+                <h2 id="recommendation-title">
+                  {text("今天就写这一题", "Write this one today")}
+                </h2>
               </div>
+              <p className={styles.selectionNote}>
+                {text(
+                  "已为你平衡近期题型与话题",
+                  "Balanced across your recent question types and topics",
+                )}
+              </p>
             </div>
-            {needsQuestion ? (
-              <Button
-                disabled={questionLoading || !selectedQuestionId}
-                onClick={() => void beginSelectedQuestion()}
-                size="lg"
-              >
-                {questionLoading ? (
-                  <LoaderCircle aria-hidden="true" className="spin" size={17} />
-                ) : (
-                  <PenLine aria-hidden="true" size={17} />
+            {recommendationLoading && !recommendation ? (
+              <p className={styles.preparing} role="status">
+                <LoaderCircle aria-hidden="true" className="spin" size={18} />
+                {text("正在为你准备一题…", "Preparing a question for you…")}
+              </p>
+            ) : recommendation?.state === "READY" ? (
+              <>
+                <div className={styles.promptBody}>
+                  <div className={styles.promptCopy}>
+                    <p className={styles.promptLabel}>IELTS Writing Task 2</p>
+                    <p
+                      className={styles.promptText}
+                      data-recommendation-prompt
+                      lang="en"
+                    >
+                      {recommendation.question.prompt}
+                    </p>
+                  </div>
+                  <dl className={styles.rationaleRail}>
+                    <div>
+                      <dt>{text("题型", "Type")}</dt>
+                      <dd>
+                        {optionLabel(
+                          questionTypes,
+                          recommendation.question.type,
+                          locale,
+                        )}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>{text("话题", "Topic")}</dt>
+                      <dd>
+                        {optionLabel(
+                          topics,
+                          recommendation.question.topic,
+                          locale,
+                        )}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>{text("考试类别", "Track")}</dt>
+                      <dd>
+                        {recommendation.question.ieltsTrack === "academic"
+                          ? "Academic"
+                          : "General Training"}
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
+                <div className={styles.recommendationActions}>
+                  <Button
+                    disabled={questionLoading}
+                    onClick={() =>
+                      void beginSelectedQuestion(
+                        recommendation.question,
+                        recommendation.id,
+                      )
+                    }
+                    ref={recommendationStartRef}
+                    size="lg"
+                  >
+                    {questionLoading ? (
+                      <LoaderCircle
+                        aria-hidden="true"
+                        className="spin"
+                        size={17}
+                      />
+                    ) : (
+                      <PenLine aria-hidden="true" size={17} />
+                    )}
+                    {text(
+                      "用这道题开始写作",
+                      "Start writing with this question",
+                    )}
+                  </Button>
+                  <Button
+                    disabled={recommendationLoading}
+                    onClick={() => void swapRecommendation()}
+                    type="button"
+                    variant="secondary"
+                  >
+                    {text("换一题", "Try another question")}
+                  </Button>
+                </div>
+              </>
+            ) : recommendation?.state === "PREPARING" ? (
+              <p className={styles.preparing} role="status">
+                <LoaderCircle aria-hidden="true" className="spin" size={18} />
+                {text(
+                  "正在为你准备一题；你也可以先使用自己的题目。",
+                  "We are preparing a question; you can also use your own task.",
                 )}
-                {text("用这道题开始", "Start with this question")}
-              </Button>
-            ) : data.pendingJobAction === "retry" ? (
-              <Button
-                disabled={retryingJob}
-                onClick={() => void retryPendingJob()}
-                size="lg"
-              >
-                {retryingJob ? (
-                  <LoaderCircle aria-hidden="true" className="spin" size={17} />
-                ) : (
-                  <Sparkles aria-hidden="true" size={17} />
-                )}
-                {text(task.actionZh, task.actionEn)}
-              </Button>
-            ) : data.pendingJobAction === "review-connection" ? (
-              <ActionLink href="/settings" size="lg">
-                {text("检查 AI 连接", "Review AI connection")}
-              </ActionLink>
+              </p>
             ) : (
-              <ActionLink href={task.href} size="lg">
-                {text(task.actionZh, task.actionEn)}
-              </ActionLink>
+              <p className={styles.unavailable} role="alert">
+                {recommendation?.message ??
+                  text(
+                    "暂时无法准备新题。你可以浏览题库，或粘贴自己的题目。",
+                    "A new question is unavailable. Browse the bank or paste your own task.",
+                  )}
+              </p>
             )}
-          </div>
-        </section>
+          </section>
+        ) : (
+          <section
+            className={cn("next-task-card", styles.primaryAction)}
+            data-today-primary
+          >
+            <div className="next-task-accent" aria-hidden="true" />
+            <div className="next-task-topline">
+              <Badge tone="blue">
+                <Sparkles aria-hidden="true" size={13} />
+                {text(task.eyebrowZh, task.eyebrowEn)}
+              </Badge>
+              <span className="due-label">
+                <CalendarClock aria-hidden="true" size={15} />
+                {text(task.dueLabelZh, task.dueLabelEn)}
+              </span>
+            </div>
+            <div className="next-task-body">
+              <div className="next-task-copy">
+                <h2>{text(task.titleZh, task.titleEn)}</h2>
+                <p>{text(task.descriptionZh, task.descriptionEn)}</p>
+                <div className="task-meta">
+                  <span>
+                    <Clock3 aria-hidden="true" size={16} />
+                    {task.durationMinutes} {messages.common.minutes}
+                  </span>
+                  <span>
+                    <Target aria-hidden="true" size={16} />
+                    {text("闭卷独立输出", "Closed-book production")}
+                  </span>
+                </div>
+              </div>
+              {data.pendingJobAction === "retry" ? (
+                <Button
+                  disabled={retryingJob}
+                  onClick={() => void retryPendingJob()}
+                  size="lg"
+                >
+                  {retryingJob ? (
+                    <LoaderCircle
+                      aria-hidden="true"
+                      className="spin"
+                      size={17}
+                    />
+                  ) : (
+                    <Sparkles aria-hidden="true" size={17} />
+                  )}
+                  {text(task.actionZh, task.actionEn)}
+                </Button>
+              ) : data.pendingJobAction === "review-connection" ? (
+                <ActionLink href="/settings" size="lg">
+                  {text("检查 AI 连接", "Review AI connection")}
+                </ActionLink>
+              ) : (
+                <ActionLink href={task.href} size="lg">
+                  {text(task.actionZh, task.actionEn)}
+                </ActionLink>
+              )}
+            </div>
+          </section>
+        )}
 
         {needsQuestion ? (
-          <section aria-labelledby="question-picker-title">
+          <section
+            aria-labelledby="question-picker-title"
+            className={styles.manualRoutes}
+          >
             <SectionHeader
-              title={text("先选一道题", "Choose a question first")}
+              title={text("也可以自己选题", "Or choose your own task")}
               description={text(
-                "120 道原创开放题可直接使用；你粘贴的题目只保存在自己的私有题库。",
-                "Use one of 120 original open questions, or save a pasted task privately.",
+                "题库和私有题目始终可用；它们不会替代今天的推荐。",
+                "The bank and private tasks remain available without replacing today’s recommendation.",
               )}
             />
             <Card className="setup-form-card">
-              {questionLoading && questions.length === 0 ? (
-                <p role="status">{messages.common.loading}</p>
-              ) : (
+              <details className={styles.manualDisclosure}>
+                <summary>
+                  <LibraryBig aria-hidden="true" size={16} />
+                  {text("浏览全部题库", "Browse the whole question bank")}
+                </summary>
+                {questionLoading && questions.length === 0 ? (
+                  <p role="status">{messages.common.loading}</p>
+                ) : (
+                  <div className="form-grid">
+                    <div className="form-field form-field-wide">
+                      <label htmlFor="question-choice">
+                        {text("题库", "Question bank")}
+                      </label>
+                      <select
+                        className="select-input"
+                        id="question-choice"
+                        onChange={(event) =>
+                          setSelectedQuestionId(event.target.value)
+                        }
+                        value={selectedQuestionId}
+                      >
+                        <option value="">
+                          {text("选择一道题", "Choose a question")}
+                        </option>
+                        {questions.map((question) => (
+                          <option key={question.id} value={question.id}>
+                            {optionLabel(topics, question.topic, locale)} ·{" "}
+                            {optionLabel(questionTypes, question.type, locale)}{" "}
+                            — {question.prompt.slice(0, 110)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    {selectedQuestion ? (
+                      <div className="form-field form-field-wide">
+                        <p className="field-hint" lang="en">
+                          {selectedQuestion.prompt}
+                        </p>
+                        <Button
+                          disabled={questionLoading}
+                          onClick={() =>
+                            void beginSelectedQuestion(selectedQuestion)
+                          }
+                          type="button"
+                        >
+                          {text(
+                            "用这道题开始写作",
+                            "Start writing with this question",
+                          )}
+                        </Button>
+                      </div>
+                    ) : null}
+                  </div>
+                )}
+              </details>
+              <details
+                className={styles.manualDisclosure}
+                onToggle={(event) => setCustomOpen(event.currentTarget.open)}
+                open={customOpen}
+              >
+                <summary>
+                  <PenLine aria-hidden="true" size={16} />
+                  {text("粘贴我自己的题目", "Paste my own task")}
+                </summary>
                 <div className="form-grid">
                   <div className="form-field form-field-wide">
-                    <label htmlFor="question-choice">
-                      <LibraryBig aria-hidden="true" size={16} />{" "}
-                      {text("题库", "Question bank")}
+                    <label htmlFor="custom-question">
+                      {text("完整英文题目", "Full English task")}
+                    </label>
+                    <textarea
+                      className="exercise-textarea"
+                      id="custom-question"
+                      lang="en"
+                      minLength={30}
+                      onChange={(event) => setCustomPrompt(event.target.value)}
+                      placeholder="Paste the complete Task 2 prompt and instruction…"
+                      value={customPrompt}
+                    />
+                  </div>
+                  <div className="form-field">
+                    <label htmlFor="custom-question-type">
+                      {text("题型", "Type")}
                     </label>
                     <select
                       className="select-input"
-                      id="question-choice"
+                      id="custom-question-type"
                       onChange={(event) =>
-                        setSelectedQuestionId(event.target.value)
+                        setCustomType(event.target.value as QuestionType)
                       }
-                      value={selectedQuestionId}
+                      value={customType}
                     >
-                      {questions.map((question) => (
-                        <option key={question.id} value={question.id}>
-                          {optionLabel(topics, question.topic, locale)} ·{" "}
-                          {optionLabel(questionTypes, question.type, locale)} —{" "}
-                          {question.prompt.slice(0, 110)}
+                      {questionTypes.map((value) => (
+                        <option key={value.id} value={value.id}>
+                          {text(value.zh, value.en)}
                         </option>
                       ))}
                     </select>
                   </div>
-                  {selectedQuestion ? (
-                    <div className="form-field form-field-wide">
-                      <p className="field-hint" lang="en">
-                        {selectedQuestion.prompt}
-                      </p>
-                      <div className="task-meta">
-                        <Badge tone="neutral">
-                          {optionLabel(topics, selectedQuestion.topic, locale)}
-                        </Badge>
-                        <Badge tone="neutral">
-                          {optionLabel(
-                            questionTypes,
-                            selectedQuestion.type,
-                            locale,
-                          )}
-                        </Badge>
-                        {selectedQuestion.visibility === "private" ? (
-                          <Badge tone="neutral">
-                            {text("仅自己可见", "Private")}
-                          </Badge>
-                        ) : null}
-                      </div>
-                    </div>
-                  ) : null}
-                  <div className="form-field form-field-wide">
-                    <Button
-                      onClick={() => setCustomOpen((value) => !value)}
-                      type="button"
-                      variant="secondary"
+                  <div className="form-field">
+                    <label htmlFor="custom-question-topic">
+                      {text("话题", "Topic")}
+                    </label>
+                    <select
+                      className="select-input"
+                      id="custom-question-topic"
+                      onChange={(event) =>
+                        setCustomTopic(event.target.value as QuestionTopic)
+                      }
+                      value={customTopic}
                     >
-                      <PenLine aria-hidden="true" size={16} />
-                      {text("粘贴我自己的题目", "Paste my own task")}
+                      {topics.map((value) => (
+                        <option key={value.id} value={value.id}>
+                          {text(value.zh, value.en)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-field">
+                    <label htmlFor="custom-question-track">IELTS</label>
+                    <select
+                      className="select-input"
+                      id="custom-question-track"
+                      onChange={(event) =>
+                        setCustomTrack(
+                          event.target.value as "academic" | "general_training",
+                        )
+                      }
+                      value={customTrack}
+                    >
+                      <option value="academic">Academic</option>
+                      <option value="general_training">General Training</option>
+                    </select>
+                  </div>
+                  <div className="form-field">
+                    <Button
+                      disabled={
+                        questionLoading || customPrompt.trim().length < 30
+                      }
+                      onClick={() => void saveCustomQuestion()}
+                      type="button"
+                    >
+                      {text("保存到私有题库", "Save privately")}
                     </Button>
                   </div>
-                  {customOpen ? (
-                    <>
-                      <div className="form-field form-field-wide">
-                        <label htmlFor="custom-question">
-                          {text("完整英文题目", "Full English task")}
-                        </label>
-                        <textarea
-                          className="exercise-textarea"
-                          id="custom-question"
-                          lang="en"
-                          minLength={30}
-                          onChange={(event) =>
-                            setCustomPrompt(event.target.value)
-                          }
-                          placeholder="Paste the complete Task 2 prompt and instruction…"
-                          value={customPrompt}
-                        />
-                      </div>
-                      <div className="form-field">
-                        <label htmlFor="custom-question-type">
-                          {text("题型", "Type")}
-                        </label>
-                        <select
-                          className="select-input"
-                          id="custom-question-type"
-                          onChange={(event) =>
-                            setCustomType(event.target.value as QuestionType)
-                          }
-                          value={customType}
-                        >
-                          {questionTypes.map((value) => (
-                            <option key={value.id} value={value.id}>
-                              {text(value.zh, value.en)}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="form-field">
-                        <label htmlFor="custom-question-topic">
-                          {text("话题", "Topic")}
-                        </label>
-                        <select
-                          className="select-input"
-                          id="custom-question-topic"
-                          onChange={(event) =>
-                            setCustomTopic(event.target.value as QuestionTopic)
-                          }
-                          value={customTopic}
-                        >
-                          {topics.map((value) => (
-                            <option key={value.id} value={value.id}>
-                              {text(value.zh, value.en)}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="form-field">
-                        <label htmlFor="custom-question-track">IELTS</label>
-                        <select
-                          className="select-input"
-                          id="custom-question-track"
-                          onChange={(event) =>
-                            setCustomTrack(
-                              event.target.value as
-                                | "academic"
-                                | "general_training",
-                            )
-                          }
-                          value={customTrack}
-                        >
-                          <option value="academic">Academic</option>
-                          <option value="general_training">
-                            General Training
-                          </option>
-                        </select>
-                      </div>
-                      <div className="form-field">
-                        <Button
-                          disabled={
-                            questionLoading || customPrompt.trim().length < 30
-                          }
-                          onClick={() => void saveCustomQuestion()}
-                          type="button"
-                        >
-                          {text("保存到私有题库", "Save privately")}
-                        </Button>
-                      </div>
-                    </>
-                  ) : null}
                 </div>
-              )}
+              </details>
               {questionError ? (
                 <p className="inline-probe error" role="alert">
                   {questionError}

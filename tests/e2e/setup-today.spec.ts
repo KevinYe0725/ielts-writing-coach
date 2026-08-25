@@ -111,17 +111,31 @@ test.describe("deterministic setup and Today experience", () => {
     await expect(page.getByRole("button", { name: "刷新计划" })).toBeVisible();
   });
 
-  test("new-essay keeps public and custom question controls reachable", async ({
+  test("new-essay recommends one prompt and keeps manual routes inside disclosures", async ({
     page,
   }) => {
     await page.goto("/today?new-essay=1");
 
     await expect(page).toHaveURL(/\/today\?new-essay=1$/);
+    await expect(page.getByText("为你推荐", { exact: true })).toBeVisible();
     await expect(
-      page.getByRole("heading", { name: "先选一道题" }),
+      page.getByRole("button", { name: "用这道题开始写作" }),
+    ).toHaveCount(1);
+    await expect(page.getByText("已为你平衡近期题型与话题")).toBeVisible();
+    const recommendation = page.getByLabel("今天就写这一题");
+    await expect(
+      recommendation.getByText("题型", { exact: true }),
     ).toBeVisible();
-    await expect(page.getByLabel("题库")).not.toHaveValue("");
-    await page.getByRole("button", { name: "粘贴我自己的题目" }).click();
+    await expect(
+      recommendation.getByText("话题", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      recommendation.getByText("考试类别", { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByText("浏览全部题库")).toBeVisible();
+    await expect(page.getByText("粘贴我自己的题目")).toBeVisible();
+    await expect(page.getByLabel("题库")).not.toBeVisible();
+    await page.getByText("粘贴我自己的题目").click();
     await expect(page.getByLabel("完整英文题目")).toBeVisible();
     await expect(page.getByLabel("题型")).toBeVisible();
     await expect(page.getByLabel("话题")).toBeVisible();
@@ -131,6 +145,70 @@ test.describe("deterministic setup and Today experience", () => {
     await expect(
       page.getByLabel("IELTS").locator('option[value="general_training"]'),
     ).toHaveCount(1);
+  });
+
+  test("swap replaces the recommendation and returns keyboard focus to its start action", async ({
+    page,
+  }) => {
+    await page.goto("/today?new-essay=1");
+    const prompt = page.locator("[data-recommendation-prompt]");
+    const before = await prompt.textContent();
+
+    await page.getByRole("button", { name: "换一题" }).click();
+
+    await expect(prompt).not.toHaveText(before ?? "");
+    await expect(
+      page.getByRole("button", { name: "用这道题开始写作" }),
+    ).toBeFocused();
+  });
+
+  test("preparing and unavailable recommendation states retain the private-question fallback", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      if (!localStorage.getItem("iwc.demo.question-recommendation-state"))
+        localStorage.setItem(
+          "iwc.demo.question-recommendation-state",
+          "PREPARING",
+        );
+    });
+    await page.goto("/today?new-essay=1");
+    await expect(page.getByRole("status")).toContainText("正在为你准备");
+    await page.getByText("粘贴我自己的题目").click();
+    await expect(page.getByLabel("完整英文题目")).toBeVisible();
+
+    await page.evaluate(() => {
+      localStorage.setItem(
+        "iwc.demo.question-recommendation-state",
+        "UNAVAILABLE",
+      );
+    });
+    await page.reload();
+    await expect(
+      page.locator("[data-today-primary]").getByRole("alert"),
+    ).toContainText("暂时无法准备新题");
+    await expect(
+      page.getByRole("button", { name: "用这道题开始写作" }),
+    ).toHaveCount(0);
+    await expect(page.getByText("粘贴我自己的题目")).toBeVisible();
+  });
+
+  test("starting a recommendation records its recommendation id and avoids backend vocabulary", async ({
+    page,
+  }) => {
+    await page.goto("/today?new-essay=1");
+    await page.getByRole("button", { name: "用这道题开始写作" }).click();
+    await expect(page).toHaveURL(/\/write\?cycle=cycle-demo-selected$/);
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          localStorage.getItem("iwc.demo.selected-recommendation"),
+        ),
+      )
+      .not.toBeNull();
+    await expect(page.locator("main")).not.toContainText(
+      /provider|job id|ranking|score|候选|供应商/i,
+    );
   });
 
   test("the whole interface switches language without translating the task", async ({
@@ -168,7 +246,7 @@ test.describe("deterministic setup and Today experience", () => {
     page,
   }, testInfo) => {
     test.skip(testInfo.project.name !== "mobile", "Mobile-only smoke check.");
-    await page.goto("/today");
+    await page.goto("/today?new-essay=1");
 
     await page.locator('summary[aria-label="打开导航"]').click();
     await expect(
@@ -180,6 +258,16 @@ test.describe("deterministic setup and Today experience", () => {
         document.documentElement.clientWidth,
     );
     expect(overflow).toBeLessThanOrEqual(1);
+
+    const promptBox = await page
+      .locator("[data-recommendation-prompt]")
+      .boundingBox();
+    const startBox = await page
+      .getByRole("button", { name: "用这道题开始写作" })
+      .boundingBox();
+    expect(promptBox).not.toBeNull();
+    expect(startBox).not.toBeNull();
+    expect(startBox!.y).toBeGreaterThan(promptBox!.y + promptBox!.height);
   });
 });
 

@@ -255,6 +255,209 @@
   inset: var(--desk-space-6) auto var(--desk-space-6) 18px;
 }
 
+/* The recommendation is a reading surface, not a second dashboard card. */
+.recommendationSheet {
+  position: relative;
+  display: grid;
+  overflow: hidden;
+  min-width: 0;
+  padding: clamp(var(--desk-space-6), 4vw, var(--desk-space-12));
+  background: var(--desk-paper);
+  border: 1px solid color-mix(in srgb, var(--desk-blue) 30%, transparent);
+  border-radius: var(--desk-radius-lg);
+  gap: var(--desk-space-8);
+}
+
+.recommendationSheet::before {
+  position: absolute;
+  top: var(--desk-space-4);
+  bottom: var(--desk-space-4);
+  left: var(--desk-space-4);
+  width: 2px;
+  content: "";
+  background: var(--desk-blue);
+  opacity: 0.72;
+}
+
+.sheetHeading,
+.promptBody,
+.recommendationActions,
+.preparing,
+.unavailable {
+  position: relative;
+  margin-left: var(--desk-space-3);
+}
+
+.sheetHeading {
+  display: flex;
+  min-width: 0;
+  align-items: end;
+  justify-content: space-between;
+  gap: var(--desk-space-4);
+}
+
+.sheetEyebrow,
+.promptLabel,
+.rationaleRail dt {
+  margin: 0;
+  color: var(--desk-blue);
+  font-family: var(--desk-font-utility);
+  font-size: var(--desk-type-meta);
+  font-weight: var(--desk-utility-weight-semibold);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.sheetHeading h2 {
+  margin: var(--desk-space-1) 0 0;
+  font-size: var(--desk-type-section-title);
+  letter-spacing: -0.025em;
+  line-height: var(--desk-leading-compact);
+}
+
+.selectionNote {
+  max-width: 28ch;
+  margin: 0;
+  color: var(--desk-ink-muted);
+  font-size: var(--desk-type-meta);
+  line-height: 1.55;
+  text-align: right;
+}
+
+.promptBody {
+  display: grid;
+  min-width: 0;
+  padding: var(--desk-space-8) 0;
+  border-top: 1px solid var(--desk-line);
+  border-bottom: 1px solid var(--desk-line);
+  grid-template-columns: minmax(0, 1fr) minmax(164px, 0.26fr);
+  gap: clamp(var(--desk-space-6), 5vw, var(--desk-space-12));
+}
+
+.promptCopy {
+  min-width: 0;
+}
+
+.promptText {
+  max-width: 43ch;
+  margin: var(--desk-space-3) 0 0;
+  color: var(--desk-ink);
+  font-family: var(--desk-font-reading);
+  font-size: clamp(21px, 2.3vw, 29px);
+  font-weight: var(--desk-reading-weight-regular);
+  letter-spacing: -0.017em;
+  line-height: 1.46;
+}
+
+.rationaleRail {
+  display: grid;
+  min-width: 0;
+  margin: 0;
+  padding-left: var(--desk-space-4);
+  border-left: 1px solid color-mix(in srgb, var(--desk-blue) 28%, transparent);
+  align-content: start;
+  gap: var(--desk-space-4);
+}
+
+.rationaleRail > div {
+  min-width: 0;
+}
+
+.rationaleRail dd {
+  margin: var(--desk-space-1) 0 0;
+  color: var(--desk-ink);
+  font-family: var(--desk-font-utility);
+  font-size: var(--desk-type-label);
+  font-weight: var(--desk-utility-weight-semibold);
+  line-height: 1.35;
+}
+
+.recommendationActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--desk-space-3);
+}
+
+.preparing,
+.unavailable {
+  display: flex;
+  min-height: 224px;
+  margin-top: 0;
+  margin-bottom: 0;
+  color: var(--desk-ink-muted);
+  border-top: 1px solid var(--desk-line);
+  border-bottom: 1px solid var(--desk-line);
+  font-size: var(--desk-type-reading);
+  align-items: center;
+  gap: var(--desk-space-2);
+}
+
+.unavailable {
+  color: var(--desk-amber);
+}
+
+.manualRoutes {
+  display: grid;
+  gap: var(--desk-space-4);
+}
+
+.manualRoutes :global(.section-header) {
+  margin-bottom: 0;
+}
+
+.manualDisclosure {
+  padding: var(--desk-space-4) 0;
+  border-top: 1px solid var(--desk-line);
+}
+
+.manualDisclosure:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.manualDisclosure:last-child {
+  padding-bottom: 0;
+}
+
+.manualDisclosure summary {
+  display: flex;
+  width: fit-content;
+  color: var(--desk-ink);
+  cursor: pointer;
+  font-family: var(--desk-font-utility);
+  font-size: var(--desk-type-label);
+  font-weight: var(--desk-utility-weight-semibold);
+  list-style: none;
+  align-items: center;
+  gap: var(--desk-space-2);
+}
+
+.manualDisclosure summary::-webkit-details-marker {
+  display: none;
+}
+
+.manualDisclosure summary::after {
+  content: "+";
+  color: var(--desk-blue);
+  font-size: var(--desk-type-subheading);
+  font-weight: var(--desk-utility-weight-medium);
+  line-height: 1;
+}
+
+.manualDisclosure[open] summary {
+  margin-bottom: var(--desk-space-4);
+}
+
+.manualDisclosure[open] summary::after {
+  content: "−";
+}
+
+.manualDisclosure summary:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--desk-blue) 42%, transparent);
+  outline-offset: var(--desk-space-1);
+}
+
 .primaryAction :global(.next-task-topline),
 .primaryAction :global(.next-task-body) {
   position: relative;
@@ -380,5 +583,82 @@
 
   .refreshAction {
     justify-self: start;
+  }
+
+  .recommendationSheet {
+    padding: var(--desk-space-6) var(--desk-space-4);
+    gap: var(--desk-space-6);
+  }
+
+  .recommendationSheet::before {
+    top: var(--desk-space-3);
+    bottom: var(--desk-space-3);
+    left: var(--desk-space-2);
+  }
+
+  .sheetHeading,
+  .promptBody,
+  .recommendationActions,
+  .preparing,
+  .unavailable {
+    margin-left: var(--desk-space-2);
+  }
+
+  .sheetHeading {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .selectionNote {
+    max-width: none;
+    text-align: left;
+  }
+
+  .promptBody {
+    padding: var(--desk-space-6) 0;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--desk-space-6);
+  }
+
+  .promptText {
+    font-size: 22px;
+  }
+
+  .rationaleRail {
+    padding: var(--desk-space-3) 0 0;
+    border-top: 1px solid color-mix(in srgb, var(--desk-blue) 28%, transparent);
+    border-left: 0;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--desk-space-2);
+  }
+
+  .rationaleRail dd {
+    overflow-wrap: anywhere;
+  }
+
+  .recommendationActions :global(.button) {
+    width: 100%;
+  }
+
+  .preparing,
+  .unavailable {
+    min-height: 260px;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .recommendationSheet {
+    animation: recommendation-settle 180ms ease-out both;
+  }
+}
+
+@keyframes recommendation-settle {
+  from {
+    opacity: 0.82;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }

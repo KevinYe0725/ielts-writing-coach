@@ -44,6 +44,8 @@ import type {
   NextTask,
   PendingAiJob,
   QuestionOption,
+  QuestionRecommendation,
+  QuestionRecommendationRequest,
   QuestionTopic,
   QuestionType,
   RewriteData,
@@ -130,12 +132,20 @@ interface WireQuestion extends JsonRecord {
   externalId?: string;
   id?: string;
   ieltsTrack?: string;
+  ielts_track?: string;
   instructions?: string;
   prompt?: string;
   questionType?: string;
   topic?: string;
   type?: string;
   visibility?: string;
+}
+
+interface WireQuestionRecommendation extends JsonRecord {
+  id?: string;
+  question?: WireQuestion;
+  retry_after_seconds?: number;
+  status?: string;
 }
 
 interface WireTransferResult extends JsonRecord {
@@ -1602,6 +1612,94 @@ function isAiTaskKind(value: unknown): value is AiTaskKind {
   return typeof value === "string" && AI_TASK_KIND_SET.has(value as AiTaskKind);
 }
 
+const QUESTION_TYPES = new Set<QuestionType>([
+  "opinion",
+  "discussion",
+  "advantages_disadvantages",
+  "problems_solutions",
+  "two_part",
+]);
+
+const QUESTION_TOPICS = new Set<QuestionTopic>([
+  "education",
+  "technology",
+  "environment",
+  "health",
+  "government",
+  "work_economy",
+  "society_culture",
+  "urban_transport",
+]);
+
+function projectRecommendationQuestion(
+  question: WireQuestion | undefined,
+): QuestionOption | null {
+  const id = question?.id ?? question?.externalId;
+  const type = question?.type ?? question?.questionType;
+  const topic = question?.topic;
+  if (
+    !id ||
+    !question?.prompt ||
+    !type ||
+    !topic ||
+    !QUESTION_TYPES.has(type as QuestionType) ||
+    !QUESTION_TOPICS.has(topic as QuestionTopic)
+  )
+    return null;
+  return {
+    id,
+    prompt: question.prompt,
+    type: type as QuestionType,
+    topic: topic as QuestionTopic,
+    ieltsTrack:
+      (question.ielts_track ?? question.ieltsTrack) === "general_training"
+        ? "general_training"
+        : "academic",
+    visibility: question.visibility === "private" ? "private" : "public",
+  };
+}
+
+function projectQuestionRecommendation(
+  payload: unknown,
+): QuestionRecommendation {
+  const record = payload as {
+    detail?: unknown;
+    recommendation?: WireQuestionRecommendation;
+    recommendation_id?: unknown;
+  };
+  const recommendation = record.recommendation;
+  if (recommendation?.status === "READY" && recommendation.id) {
+    const question = projectRecommendationQuestion(recommendation.question);
+    if (question) return { state: "READY", id: recommendation.id, question };
+  }
+  if (recommendation?.status === "PENDING" && recommendation.id) {
+    return {
+      state: "PREPARING",
+      id: recommendation.id,
+      retryAfterSeconds:
+        typeof recommendation.retry_after_seconds === "number" &&
+        Number.isFinite(recommendation.retry_after_seconds) &&
+        recommendation.retry_after_seconds > 0
+          ? Math.min(30, Math.ceil(recommendation.retry_after_seconds))
+          : 2,
+    };
+  }
+  if (
+    typeof record.recommendation_id === "string" &&
+    typeof record.detail === "string"
+  ) {
+    return {
+      state: "UNAVAILABLE",
+      id: record.recommendation_id,
+      message: record.detail,
+    };
+  }
+  throw new LearningClientError(
+    "The server did not return a usable question recommendation.",
+    { code: "INVALID_RESPONSE" },
+  );
+}
+
 async function readBoundedResponseText(
   response: Response,
   maximumBytes: number,
@@ -2077,6 +2175,31 @@ export class HttpLearningClient implements LearningClient {
     });
   }
 
+  async requestQuestionRecommendation(
+    input: QuestionRecommendationRequest,
+  ): Promise<QuestionRecommendation> {
+    const { data } = await this.request<unknown>("/question-recommendations", {
+      body: {
+        action: input.action,
+        ...(input.excludedQuestionId
+          ? { excluded_question_id: input.excludedQuestionId }
+          : {}),
+      },
+      idempotent: true,
+      method: "POST",
+      permitStatuses: [202, 503],
+    });
+    return projectQuestionRecommendation(data);
+  }
+
+  async getQuestionRecommendation(id: string): Promise<QuestionRecommendation> {
+    const { data } = await this.request<unknown>(
+      `/question-recommendations/${encodeURIComponent(id)}`,
+      { permitStatuses: [503] },
+    );
+    return projectQuestionRecommendation(data);
+  }
+
   async createCustomQuestion(
     input: CustomQuestionInput,
   ): Promise<QuestionOption> {
@@ -2115,12 +2238,16 @@ export class HttpLearningClient implements LearningClient {
     };
   }
 
-  async startTrainingCycle(questionId: string): Promise<string> {
+  async startTrainingCycle(
+    questionId: string,
+    recommendationId?: string,
+  ): Promise<string> {
     const { data } = await this.request<{ cycle?: { id?: string } }>(
       "/training-cycles",
       {
         body: {
           question_id: questionId,
+          ...(recommendationId ? { recommendation_id: recommendationId } : {}),
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         },
         idempotent: true,

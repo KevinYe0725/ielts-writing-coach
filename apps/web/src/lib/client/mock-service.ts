@@ -19,6 +19,8 @@ import type {
   PracticePaperData,
   ModelRouteSetting,
   QuestionOption,
+  QuestionRecommendation,
+  QuestionRecommendationRequest,
   SettingsData,
   SystemStatus,
   TodayData,
@@ -54,6 +56,10 @@ const STORAGE_KEYS = {
   preferences: "iwc.demo.preferences",
   rewriteWindowExpired: "iwc.demo.rewrite-window-expired",
   selectedQuestion: "iwc.demo.selected-question",
+  selectedRecommendation: "iwc.demo.selected-recommendation",
+  questionRecommendationActive: "iwc.demo.question-recommendation-active",
+  questionRecommendationExposure: "iwc.demo.question-recommendation-exposure",
+  questionRecommendationState: "iwc.demo.question-recommendation-state",
   transferAnswer: "iwc.demo.transfer-answer",
   transferWindowExpired: "iwc.demo.transfer-window-expired",
   transferResult: "iwc.demo.transfer-result",
@@ -65,6 +71,91 @@ const delay = async (milliseconds = 160): Promise<void> => {
     window.setTimeout(resolve, milliseconds),
   );
 };
+
+const demoRecommendationQuestions: QuestionOption[] = [
+  {
+    id: "prompt-foreign-language",
+    prompt:
+      "Some experts believe that it is better for children to begin learning a foreign language at primary school rather than secondary school. Do the advantages of this outweigh the disadvantages?",
+    type: "advantages_disadvantages",
+    topic: "education",
+    ieltsTrack: "academic",
+    visibility: "public",
+  },
+  {
+    id: "prompt-transfer-technology",
+    prompt:
+      "Some people believe that children should begin using computers in primary school. Do the advantages outweigh the disadvantages?",
+    type: "advantages_disadvantages",
+    topic: "technology",
+    ieltsTrack: "academic",
+    visibility: "public",
+  },
+  {
+    id: "prompt-public-transport",
+    prompt:
+      "Some cities are considering free public transport for all residents. Discuss the advantages and disadvantages of this policy.",
+    type: "discussion",
+    topic: "urban_transport",
+    ieltsTrack: "academic",
+    visibility: "public",
+  },
+];
+
+type DemoRecommendationExposure = { id: string; shownAt: number };
+
+function readDemoRecommendationExposures(): DemoRecommendationExposure[] {
+  try {
+    const raw = readStorage(STORAGE_KEYS.questionRecommendationExposure);
+    const parsed = raw ? (JSON.parse(raw) as unknown) : [];
+    return Array.isArray(parsed)
+      ? parsed.flatMap((item) => {
+          if (
+            item &&
+            typeof item === "object" &&
+            typeof (item as DemoRecommendationExposure).id === "string" &&
+            typeof (item as DemoRecommendationExposure).shownAt === "number"
+          )
+            return [item as DemoRecommendationExposure];
+          return [];
+        })
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function chooseDemoRecommendation(): QuestionOption | null {
+  const cutoff = Date.now() - 72 * 60 * 60 * 1_000;
+  const recent = new Set(
+    readDemoRecommendationExposures()
+      .filter((entry) => entry.shownAt > cutoff)
+      .map((entry) => entry.id),
+  );
+  return (
+    demoRecommendationQuestions.find((question) => !recent.has(question.id)) ??
+    null
+  );
+}
+
+function saveDemoRecommendation(
+  question: QuestionOption,
+): QuestionRecommendation {
+  const id = `demo-recommendation-${question.id}`;
+  const exposures = readDemoRecommendationExposures().filter(
+    (entry) => entry.shownAt > Date.now() - 72 * 60 * 60 * 1_000,
+  );
+  exposures.push({ id: question.id, shownAt: Date.now() });
+  writeStorage(
+    STORAGE_KEYS.questionRecommendationExposure,
+    JSON.stringify(exposures),
+  );
+  writeStorage(
+    STORAGE_KEYS.questionRecommendationActive,
+    JSON.stringify({ id, question }),
+  );
+  return { state: "READY", id, question };
+}
 
 const canUseStorage = (): boolean => typeof window !== "undefined";
 
@@ -1350,24 +1441,61 @@ export class MockLearningClient implements LearningClient {
 
   async getQuestions(): Promise<QuestionOption[]> {
     await delay();
-    return [
-      {
-        id: "prompt-foreign-language",
-        prompt: `${writingPrompt.question} ${writingPrompt.instruction}`,
-        type: "advantages_disadvantages",
-        topic: "education",
-        ieltsTrack: "academic",
-        visibility: "public",
-      },
-      {
-        id: "prompt-transfer-technology",
-        prompt: `${transferPrompt.question} ${transferPrompt.instruction}`,
-        type: "advantages_disadvantages",
-        topic: "technology",
-        ieltsTrack: "academic",
-        visibility: "public",
-      },
-    ];
+    return demoRecommendationQuestions;
+  }
+
+  async requestQuestionRecommendation(
+    _input: QuestionRecommendationRequest,
+  ): Promise<QuestionRecommendation> {
+    await delay();
+    const forcedState = readStorage(STORAGE_KEYS.questionRecommendationState);
+    if (forcedState === "PREPARING")
+      return {
+        state: "PREPARING",
+        id: "demo-recommendation-preparing",
+        retryAfterSeconds: 1,
+      };
+    if (forcedState === "UNAVAILABLE")
+      return {
+        state: "UNAVAILABLE",
+        id: "demo-recommendation-unavailable",
+        message: "暂时无法准备新题。你可以浏览题库，或粘贴自己的题目。",
+      };
+    const question = chooseDemoRecommendation();
+    if (!question)
+      return {
+        state: "UNAVAILABLE",
+        id: "demo-recommendation-unavailable",
+        message: "暂时无法准备新题。你可以浏览题库，或粘贴自己的题目。",
+      };
+    return saveDemoRecommendation(question);
+  }
+
+  async getQuestionRecommendation(id: string): Promise<QuestionRecommendation> {
+    await delay();
+    const forcedState = readStorage(STORAGE_KEYS.questionRecommendationState);
+    if (forcedState === "PREPARING")
+      return { state: "PREPARING", id, retryAfterSeconds: 1 };
+    if (forcedState === "UNAVAILABLE")
+      return {
+        state: "UNAVAILABLE",
+        id,
+        message: "暂时无法准备新题。你可以浏览题库，或粘贴自己的题目。",
+      };
+    try {
+      const stored = JSON.parse(
+        readStorage(STORAGE_KEYS.questionRecommendationActive) ?? "null",
+      ) as { id?: string; question?: QuestionOption } | null;
+      if (stored?.id === id && stored.question)
+        return { state: "READY", id, question: stored.question };
+    } catch {
+      // Treat damaged demo storage as a safe learner-facing fallback.
+    }
+    return {
+      state: "UNAVAILABLE",
+      id,
+      message: "暂时无法准备新题。你可以浏览题库，或粘贴自己的题目。",
+    };
   }
 
   async createCustomQuestion(
@@ -1381,8 +1509,13 @@ export class MockLearningClient implements LearningClient {
     };
   }
 
-  async startTrainingCycle(questionId: string): Promise<string> {
+  async startTrainingCycle(
+    questionId: string,
+    recommendationId?: string,
+  ): Promise<string> {
     writeStorage(STORAGE_KEYS.selectedQuestion, questionId);
+    if (recommendationId)
+      writeStorage(STORAGE_KEYS.selectedRecommendation, recommendationId);
     await delay();
     return "cycle-demo-selected";
   }

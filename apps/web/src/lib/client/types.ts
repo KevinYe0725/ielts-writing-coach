@@ -160,6 +160,16 @@ export interface QuestionOption {
   visibility: "public" | "private";
 }
 
+export type QuestionRecommendation =
+  | { state: "READY"; id: string; question: QuestionOption }
+  | { state: "PREPARING"; id: string; retryAfterSeconds: number }
+  | { state: "UNAVAILABLE"; id: string; message: string };
+
+export interface QuestionRecommendationRequest {
+  action: "INITIAL" | "SWAP";
+  excludedQuestionId?: string;
+}
+
 export interface CustomQuestionInput {
   prompt: string;
   type: QuestionType;
@@ -925,8 +935,15 @@ export interface LearningClient {
   getToday(): Promise<TodayData>;
   getEssayWorkspace(): Promise<EssayWorkspaceData>;
   getQuestions(): Promise<QuestionOption[]>;
+  requestQuestionRecommendation(
+    input: QuestionRecommendationRequest,
+  ): Promise<QuestionRecommendation>;
+  getQuestionRecommendation(id: string): Promise<QuestionRecommendation>;
   createCustomQuestion(input: CustomQuestionInput): Promise<QuestionOption>;
-  startTrainingCycle(questionId: string): Promise<string>;
+  startTrainingCycle(
+    questionId: string,
+    recommendationId?: string,
+  ): Promise<string>;
   getAttempt(version: 1 | 2, cycleId: string): Promise<AttemptData>;
   saveDraft(attemptId: string, draft: string): Promise<void>;
   saveSelfCheckSnapshot(

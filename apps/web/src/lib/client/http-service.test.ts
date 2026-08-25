@@ -213,6 +213,149 @@ function requestHeaders(call: unknown[]): Headers {
 }
 
 describe("HttpLearningClient protocol", () => {
+  it("projects recommendation responses strictly and carries the recommendation into cycle creation", async () => {
+    const fetcher = vi.fn<typeof fetch>(async (input, init) => {
+      const url = String(input);
+      if (url.endsWith("/question-recommendations")) {
+        expect(init?.method).toBe("POST");
+        expect(JSON.parse(String(init?.body))).toEqual({ action: "INITIAL" });
+        return jsonResponse({
+          recommendation: {
+            id: "recommendation-1",
+            status: "READY",
+            question: {
+              id: "question-1",
+              prompt:
+                "Some people think public libraries should change their role. Discuss both views and give your opinion.",
+              type: "discussion",
+              topic: "society_culture",
+              ielts_track: "general_training",
+              visibility: "public",
+              job_id: "internal-job",
+              source_url: "https://internal.example/source",
+            },
+            provider: "internal-provider",
+          },
+        });
+      }
+      if (url.endsWith("/training-cycles")) {
+        expect(init?.method).toBe("POST");
+        expect(JSON.parse(String(init?.body))).toMatchObject({
+          question_id: "question-1",
+          recommendation_id: "recommendation-1",
+        });
+        return jsonResponse({ cycle: { id: "cycle-1" } });
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+    const client = new HttpLearningClient({
+      baseUrl: "https://coach.test/api/v1",
+      fetch: fetcher,
+      idempotencyKey: () => "recommendation-idempotency",
+      origin: "https://coach.test",
+    });
+
+    await expect(
+      client.requestQuestionRecommendation({ action: "INITIAL" }),
+    ).resolves.toEqual({
+      state: "READY",
+      id: "recommendation-1",
+      question: {
+        id: "question-1",
+        prompt:
+          "Some people think public libraries should change their role. Discuss both views and give your opinion.",
+        type: "discussion",
+        topic: "society_culture",
+        ieltsTrack: "general_training",
+        visibility: "public",
+      },
+    });
+    await expect(
+      client.startTrainingCycle("question-1", "recommendation-1"),
+    ).resolves.toBe("cycle-1");
+
+    const recommendationCall = fetcher.mock.calls[0] ?? [];
+    expect(requestHeaders(recommendationCall).get("origin")).toBe(
+      "https://coach.test",
+    );
+    expect(requestHeaders(recommendationCall).get("idempotency-key")).toBe(
+      "recommendation-idempotency",
+    );
+  });
+
+  it("maps pending and unavailable recommendations without exposing provider details", async () => {
+    const fetcher = vi.fn<typeof fetch>(async (input) => {
+      const url = String(input);
+      if (url.endsWith("/question-recommendations"))
+        return jsonResponse(
+          {
+            recommendation: {
+              id: "recommendation-pending",
+              status: "PENDING",
+              retry_after_seconds: 3,
+              job_id: "internal-job",
+            },
+          },
+          { status: 202 },
+        );
+      if (url.endsWith("/question-recommendations/recommendation-pending"))
+        return jsonResponse(
+          {
+            type: "https://ielts-writing-coach.dev/problems/question_supply_unavailable",
+            detail:
+              "A new question could not be prepared. Browse the question bank or paste your own question.",
+            recommendation_id: "recommendation-pending",
+            provider: "internal-provider",
+          },
+          { status: 503 },
+        );
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+    const client = new HttpLearningClient({
+      baseUrl: "https://coach.test/api/v1",
+      fetch: fetcher,
+      origin: "https://coach.test",
+    });
+
+    await expect(
+      client.requestQuestionRecommendation({
+        action: "SWAP",
+        excludedQuestionId: "question-old",
+      }),
+    ).resolves.toEqual({
+      state: "PREPARING",
+      id: "recommendation-pending",
+      retryAfterSeconds: 3,
+    });
+    await expect(
+      client.getQuestionRecommendation("recommendation-pending"),
+    ).resolves.toEqual({
+      state: "UNAVAILABLE",
+      id: "recommendation-pending",
+      message:
+        "A new question could not be prepared. Browse the question bank or paste your own question.",
+    });
+  });
+
+  it("rejects a READY recommendation without a complete question", async () => {
+    const client = new HttpLearningClient({
+      baseUrl: "https://coach.test/api/v1",
+      fetch: async () =>
+        jsonResponse({
+          recommendation: {
+            id: "recommendation-incomplete",
+            status: "READY",
+            question: { id: "question-incomplete", prompt: "Only a prompt" },
+          },
+        }),
+      origin: "https://coach.test",
+    });
+
+    await expect(
+      client.requestQuestionRecommendation({ action: "INITIAL" }),
+    ).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
+  });
+
   it("returns a saved tutorial answer immediately without reading an AI job", async () => {
     const safeResponse = {
       id: "019teaching-response",
