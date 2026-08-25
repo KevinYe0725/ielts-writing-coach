@@ -3,6 +3,7 @@ const DEFAULT_MAX_LOGICAL_OPERATIONS = 256;
 
 interface LogicalOperationEntry {
   expiresAt: number;
+  generation: number;
   key: string;
 }
 
@@ -79,17 +80,21 @@ export class LogicalOperationRegistry {
     private readonly ttlMs = SERVER_IDEMPOTENCY_TTL_MS,
   ) {}
 
-  getOrCreate(fingerprint: string): string {
+  getOrCreate(fingerprint: string, generation: number): string {
     const now = this.now();
     this.pruneExpired(now);
     const existing = this.entries.get(fingerprint);
-    if (existing) {
+    if (existing?.generation === generation) {
       this.entries.delete(fingerprint);
       this.entries.set(fingerprint, existing);
       return existing.key;
     }
 
-    const entry = { expiresAt: now + this.ttlMs, key: this.createKey() };
+    const entry = {
+      expiresAt: now + this.ttlMs,
+      generation,
+      key: this.createKey(),
+    };
     this.entries.set(fingerprint, entry);
     while (this.entries.size > this.maxEntries) {
       const oldest = this.entries.keys().next().value as string | undefined;
@@ -99,8 +104,9 @@ export class LogicalOperationRegistry {
     return entry.key;
   }
 
-  clear(fingerprint: string, key: string): void {
-    if (this.entries.get(fingerprint)?.key === key)
+  clear(fingerprint: string, key: string, generation: number): void {
+    const entry = this.entries.get(fingerprint);
+    if (entry?.key === key && entry.generation === generation)
       this.entries.delete(fingerprint);
   }
 

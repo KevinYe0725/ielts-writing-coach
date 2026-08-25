@@ -1,11 +1,22 @@
-let accountBoundary = {};
+export interface AccountBoundarySnapshot {
+  generation: number;
+  signal: AbortSignal;
+}
+
+let generation = 0;
+let controller = new AbortController();
 
 /** Marks a confirmed or imminent account transition for every live client. */
 export function markAccountBoundary(): void {
-  accountBoundary = {};
+  const previous = controller;
+  generation += 1;
+  controller = new AbortController();
+  previous.abort(
+    new DOMException("The account context changed.", "AbortError"),
+  );
 }
 
-/** Opaque process-local token; it never contains an account identifier. */
-export function currentAccountBoundary(): object {
-  return accountBoundary;
+/** Process-local generation and signal; neither contains an account identity. */
+export function currentAccountBoundary(): AccountBoundarySnapshot {
+  return { generation, signal: controller.signal };
 }

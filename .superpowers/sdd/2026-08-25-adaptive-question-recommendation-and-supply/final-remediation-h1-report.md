@@ -45,11 +45,13 @@ digest, key, request promise, network operation, and result. The temporary map
 is restricted to the two non-secret method bodies and is removed when the
 shared promise settles; only digest and key can remain for later recovery.
 
-An opaque module-local account epoch contains no identity. Confirmed sign-out
-and successful sign-in advance it; bootstrap advances it before and after the
-account transition. Each live HTTP client clears both the unresolved registry
-and in-flight map when it observes a new epoch. A failed sign-out does not
-advance the boundary.
+A monotonically increasing module-local account generation contains no
+identity. Each generation also owns an AbortSignal. Confirmed sign-out and
+successful sign-in advance it; bootstrap advances it before and after the
+account transition. Active logical operations capture the generation and
+signal before canonicalization. A boundary synchronously aborts their request
+controllers and clears both the unresolved registry and in-flight map. A failed
+sign-out does not advance the boundary.
 
 The registry is intentionally scoped to the live `HttpLearningClient`
 instance. A page reload or browser restart creates a new registry. Persisting
@@ -109,8 +111,8 @@ All final gates used Node 24.19.0 and a newly migrated tmpfs
 
 ```text
 PostgreSQL migration chain: pass
-Full repository tests: 94 files / 920 passed / 0 failed / 0 skipped
-Web tests: 54 files / 509 passed
+Full repository tests: 94 files / 924 passed / 0 failed / 0 skipped
+Web tests: 54 files / 513 passed
 format: pass
 typecheck: pass
 lint: pass, 0 errors / 4 existing Fast Refresh warnings
@@ -118,7 +120,7 @@ Worker production build: pass, 2 ESM entries plus source maps
 Web production build: pass, 48/48 static pages
 ```
 
-The current evidence range is `16f5f78..H1 Fix Round 1 commit`, superseding the
+The current evidence range is `d6ba3b3..H1 Fix Round 2 commit`, superseding the
 earlier fourth-review snapshot and its 94-file / 905-test total.
 
 ## Remaining boundary
@@ -152,5 +154,42 @@ GREEN after the changes:
 - STARTED, ABANDONED, and initial recommendation Today fidelity: 3/3 passed;
 - full Web on fresh PostgreSQL 17.6: 54 files / 509 passed;
 - full repository on the same fresh database: 94 files / 920 passed.
+
+## Fix Round 2/5 — monotonic generation and active cancellation
+
+The second H1 review found that Fix Round 1 observed an account epoch only when
+the next request began. An old digest or response-body read could therefore
+resume after a boundary, execute with the new session, and race its finally
+against the new generation's in-flight entry.
+
+Every opt-in operation now captures the monotonically increasing account
+generation and its AbortSignal before canonicalization. It rechecks after
+digest, before registry insertion and POST, after fetch/body/backoff awaits,
+and before registry mutation. Active request controllers and shared promises
+are tracked by generation. Boundary advance aborts old controllers, clears the
+old digest registry and in-flight map, and makes every old waiter reject with
+the fixed client-safe `ACCOUNT_CONTEXT_CHANGED` error.
+
+Registry clear requires fingerprint, key, and generation. In-flight cleanup
+requires promise identity, generation, the client's current generation, and
+the global current generation. An A finally can therefore neither delete nor
+reuse a B entry. Learning-data deletion advances the same generation after its
+confirmed 204 and cannot leave a stale cycle operation attached to the live
+client.
+
+Strict RED on `d6ba3b3`:
+
+- delayed account-A digest resumed under B and returned B's result;
+- an account-A stalled response body retried and returned B's cycle;
+- a pre-deletion cycle resumed after confirmed learning-data deletion.
+
+The failed-sign-out control remained green and proved that an unsuccessful
+boundary must not advance or abort. GREEN after the change:
+
+- focused generation/cancellation matrix: 5/5 passed;
+- full HTTP client plus account session: 2 files / 143 passed;
+- STARTED, ABANDONED, and initial recommendation Today fidelity: 3/3 passed;
+- full Web on fresh PostgreSQL 17.6: 54 files / 513 passed;
+- full repository on the same fresh database: 94 files / 924 passed.
 
 Commit: the commit containing this report.

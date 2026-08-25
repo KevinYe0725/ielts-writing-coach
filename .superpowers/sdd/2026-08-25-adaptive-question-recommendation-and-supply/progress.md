@@ -254,3 +254,10 @@ cycle calls coalesce before digest into one promise/key/fetch/result; only those
 non-secret methods opt into retention; confirmed account transitions clear
 registry and in-flight state; 94 files / 920 tests green on Node 24.19.0 with
 fresh PostgreSQL 17.6; reload remains an explicit known boundary; see report)
+Final remediation H1: fix round 2/5 complete (monotonic account generation and
+AbortSignal captured before canonicalization; rechecked around digest,
+registry, network, body, and cleanup; boundary aborts old active controllers
+and promises with fixed ACCOUNT_CONTEXT_CHANGED; generation/identity guards
+prevent A cleanup from touching B; data deletion advances the boundary; 94
+files / 924 tests green on Node 24.19.0 with fresh PostgreSQL 17.6; live-client
+reload boundary remains deliberate and documented; see report)

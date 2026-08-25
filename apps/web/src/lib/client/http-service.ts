@@ -12,6 +12,7 @@ import {
 import {
   currentAccountBoundary,
   markAccountBoundary,
+  type AccountBoundarySnapshot,
 } from "./account-boundary";
 import {
   projectTeachingPracticeResponse,
@@ -119,6 +120,17 @@ interface RequestOptions {
 interface RequestResult<T> {
   data: T;
   response: Response;
+}
+
+interface LogicalOperationContext {
+  generation: number;
+  signal: AbortSignal;
+}
+
+interface LogicalOperationInFlight {
+  generation: number;
+  identity: object;
+  promise: Promise<RequestResult<unknown>>;
 }
 
 interface JobEventSource {
@@ -1875,9 +1887,13 @@ export class HttpLearningClient implements LearningClient {
   private readonly logicalOperations: LogicalOperationRegistry;
   private readonly logicalOperationsInFlight = new Map<
     string,
-    Promise<RequestResult<unknown>>
+    LogicalOperationInFlight
   >();
-  private accountBoundary = currentAccountBoundary();
+  private readonly activeLogicalControllers = new Map<
+    number,
+    Set<AbortController>
+  >();
+  private accountGeneration = currentAccountBoundary().generation;
   private readonly clientId = `web-${randomId()}`;
 
   constructor(options: HttpLearningClientOptions = {}) {
@@ -1937,9 +1953,14 @@ export class HttpLearningClient implements LearningClient {
     path: string,
     options: RequestOptions = {},
   ): Promise<RequestResult<T>> {
-    this.synchronizeAccountBoundary();
+    const boundary = this.synchronizeAccountBoundary();
     if (!options.retainLogicalOperation || options.idempotencyKey)
       return this.performRequest(path, options);
+
+    const context: LogicalOperationContext = {
+      generation: boundary.generation,
+      signal: boundary.signal,
+    };
 
     const material = canonicalLogicalOperationMaterial({
       body: options.body,
@@ -1947,18 +1968,41 @@ export class HttpLearningClient implements LearningClient {
       path,
     });
     const existing = this.logicalOperationsInFlight.get(material);
-    if (existing) return existing as Promise<RequestResult<T>>;
+    if (existing?.generation === context.generation)
+      return existing.promise as Promise<RequestResult<T>>;
 
-    const shared = this.performRequest<T>(path, options, material).finally(
-      () => {
-        if (this.logicalOperationsInFlight.get(material) === shared)
-          this.logicalOperationsInFlight.delete(material);
-      },
-    );
-    this.logicalOperationsInFlight.set(
+    const identity = {};
+    const accountBoundaryAbort = () => {
+      const current = currentAccountBoundary();
+      if (current.generation !== context.generation)
+        this.clearLogicalOperationState(current.generation);
+    };
+    context.signal.addEventListener("abort", accountBoundaryAbort, {
+      once: true,
+    });
+    const shared = this.performRequest<T>(
+      path,
+      options,
       material,
-      shared as Promise<RequestResult<unknown>>,
-    );
+      context,
+    ).finally(() => {
+      context.signal.removeEventListener("abort", accountBoundaryAbort);
+      const current = this.logicalOperationsInFlight.get(material);
+      const boundary = currentAccountBoundary();
+      if (
+        current?.identity === identity &&
+        current.generation === context.generation &&
+        this.accountGeneration === context.generation &&
+        boundary.generation === context.generation
+      ) {
+        this.logicalOperationsInFlight.delete(material);
+      }
+    });
+    this.logicalOperationsInFlight.set(material, {
+      generation: context.generation,
+      identity,
+      promise: shared as Promise<RequestResult<unknown>>,
+    });
     return shared;
   }
 
@@ -1966,6 +2010,7 @@ export class HttpLearningClient implements LearningClient {
     path: string,
     options: RequestOptions,
     logicalOperationMaterial?: string,
+    logicalContext?: LogicalOperationContext,
   ): Promise<RequestResult<T>> {
     const method = options.method ?? "GET";
     const headers = new Headers(options.headers);
@@ -1973,7 +2018,9 @@ export class HttpLearningClient implements LearningClient {
     if (options.body !== undefined)
       headers.set("Content-Type", "application/json");
     if (method !== "GET" && this.origin) headers.set("Origin", this.origin);
-    let logicalOperation: { fingerprint: string; key: string } | undefined;
+    let logicalOperation:
+      | { fingerprint: string; generation: number; key: string }
+      | undefined;
     if (options.idempotencyKey)
       headers.set("Idempotency-Key", options.idempotencyKey);
     else if (options.idempotent) {
@@ -1981,8 +2028,11 @@ export class HttpLearningClient implements LearningClient {
         const fingerprint = await fingerprintLogicalOperationMaterial(
           logicalOperationMaterial,
         );
-        const key = this.logicalOperations.getOrCreate(fingerprint);
-        logicalOperation = { fingerprint, key };
+        this.assertLogicalGeneration(logicalContext);
+        const generation = logicalContext!.generation;
+        const key = this.logicalOperations.getOrCreate(fingerprint, generation);
+        this.assertLogicalGeneration(logicalContext);
+        logicalOperation = { fingerprint, key, generation };
         headers.set("Idempotency-Key", key);
       } else {
         headers.set("Idempotency-Key", this.idempotencyKey());
@@ -1992,6 +2042,17 @@ export class HttpLearningClient implements LearningClient {
     const retryTransport = method === "GET" || headers.has("Idempotency-Key");
     for (let requestAttempt = 0; requestAttempt < 6; requestAttempt += 1) {
       const controller = new AbortController();
+      const accountAbort = () =>
+        controller.abort(logicalContext?.signal.reason);
+      if (logicalContext) {
+        this.assertLogicalGeneration(logicalContext);
+        this.trackLogicalController(logicalContext.generation, controller);
+        if (logicalContext.signal.aborted) accountAbort();
+        else
+          logicalContext.signal.addEventListener("abort", accountAbort, {
+            once: true,
+          });
+      }
       let rejectDeadline: ((reason: unknown) => void) | undefined;
       const deadline = new Promise<never>((_resolve, reject) => {
         rejectDeadline = reject;
@@ -2019,10 +2080,12 @@ export class HttpLearningClient implements LearningClient {
           }),
           deadline,
         ]);
+        this.assertLogicalGeneration(logicalContext);
         const raw =
           response.status === 204
             ? ""
             : await Promise.race([response.text(), deadline]);
+        this.assertLogicalGeneration(logicalContext);
         transportPhase = false;
         let payload: unknown;
         try {
@@ -2050,6 +2113,7 @@ export class HttpLearningClient implements LearningClient {
               this.logicalOperations.clear(
                 logicalOperation.fingerprint,
                 logicalOperation.key,
+                logicalOperation.generation,
               );
             if (isApiProblem(payload)) throw errorFromProblem(payload);
             throw new LearningClientError(
@@ -2063,14 +2127,17 @@ export class HttpLearningClient implements LearningClient {
             );
           }
         } else {
+          if (logicalOperation) this.assertLogicalGeneration(logicalContext);
           if (logicalOperation)
             this.logicalOperations.clear(
               logicalOperation.fingerprint,
               logicalOperation.key,
+              logicalOperation.generation,
             );
           return { data: payload as T, response };
         }
       } catch (cause) {
+        this.assertLogicalGeneration(logicalContext);
         if (!transportPhase) throw cause;
         controller.abort(cause);
         if (!(retryTransport && requestAttempt < 5)) {
@@ -2080,10 +2147,15 @@ export class HttpLearningClient implements LearningClient {
           );
         }
       } finally {
+        if (logicalContext) {
+          logicalContext.signal.removeEventListener("abort", accountAbort);
+          this.untrackLogicalController(logicalContext.generation, controller);
+        }
         globalThis.clearTimeout(timeout);
         rejectDeadline = undefined;
       }
       await this.sleep(50 * 2 ** requestAttempt);
+      this.assertLogicalGeneration(logicalContext);
     }
     throw new LearningClientError("The operation did not finish in time.", {
       status: 409,
@@ -2092,16 +2164,65 @@ export class HttpLearningClient implements LearningClient {
     });
   }
 
-  private clearLogicalOperationState(): void {
-    this.logicalOperations.clearAll();
-    this.logicalOperationsInFlight.clear();
+  private accountContextChangedError(): LearningClientError {
+    return new LearningClientError(
+      "The account changed before this operation finished. Retry in the current account.",
+      {
+        code: "ACCOUNT_CONTEXT_CHANGED",
+        retryable: true,
+      },
+    );
   }
 
-  private synchronizeAccountBoundary(): void {
+  private assertLogicalGeneration(
+    context: LogicalOperationContext | undefined,
+  ): void {
+    if (!context) return;
+    const current = currentAccountBoundary();
+    if (
+      context.generation !== this.accountGeneration ||
+      context.generation !== current.generation ||
+      context.signal.aborted
+    )
+      throw this.accountContextChangedError();
+  }
+
+  private trackLogicalController(
+    generation: number,
+    controller: AbortController,
+  ): void {
+    const active = this.activeLogicalControllers.get(generation) ?? new Set();
+    active.add(controller);
+    this.activeLogicalControllers.set(generation, active);
+  }
+
+  private untrackLogicalController(
+    generation: number,
+    controller: AbortController,
+  ): void {
+    const active = this.activeLogicalControllers.get(generation);
+    if (!active) return;
+    active.delete(controller);
+    if (active.size === 0) this.activeLogicalControllers.delete(generation);
+  }
+
+  private clearLogicalOperationState(nextGeneration: number): void {
+    for (const [generation, controllers] of this.activeLogicalControllers) {
+      if (generation === nextGeneration) continue;
+      for (const controller of controllers)
+        controller.abort(this.accountContextChangedError());
+      this.activeLogicalControllers.delete(generation);
+    }
+    this.logicalOperations.clearAll();
+    this.logicalOperationsInFlight.clear();
+    this.accountGeneration = nextGeneration;
+  }
+
+  private synchronizeAccountBoundary(): AccountBoundarySnapshot {
     const boundary = currentAccountBoundary();
-    if (boundary === this.accountBoundary) return;
-    this.clearLogicalOperationState();
-    this.accountBoundary = boundary;
+    if (boundary.generation !== this.accountGeneration)
+      this.clearLogicalOperationState(boundary.generation);
+    return boundary;
   }
 
   private async getTodayWire(): Promise<TodayWire> {
@@ -4279,7 +4400,8 @@ export class HttpLearningClient implements LearningClient {
       idempotent: true,
       method: "DELETE",
     });
-    this.clearLogicalOperationState();
+    markAccountBoundary();
+    this.synchronizeAccountBoundary();
     if (typeof indexedDB !== "undefined")
       indexedDB.deleteDatabase("ielts-writing-coach");
   }

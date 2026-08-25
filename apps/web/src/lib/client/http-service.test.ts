@@ -1185,6 +1185,221 @@ describe("HttpLearningClient protocol", () => {
     }
   });
 
+  it("rejects a delayed account A digest before POST and lets account B use a new generation key", async () => {
+    let releaseAccountADigest!: (value: ArrayBuffer) => void;
+    const accountADigest = new Promise<ArrayBuffer>((resolve) => {
+      releaseAccountADigest = resolve;
+    });
+    const digestBytes = new Uint8Array(32).buffer;
+    const digest = vi
+      .spyOn(globalThis.crypto.subtle, "digest")
+      .mockImplementationOnce(() => accountADigest)
+      .mockResolvedValue(digestBytes);
+    let releaseAccountBFetch!: (response: Response) => void;
+    const accountBFetch = new Promise<Response>((resolve) => {
+      releaseAccountBFetch = resolve;
+    });
+    const issuedKey = vi.fn(() => "account-b-generation-key");
+    const fetcher = vi.fn<typeof fetch>(async () => accountBFetch);
+    const client = new HttpLearningClient({
+      baseUrl: "https://coach.test/api/v1",
+      fetch: fetcher,
+      idempotencyKey: issuedKey,
+      origin: "https://coach.test",
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({ success: true })),
+    );
+
+    try {
+      const accountA = client.startTrainingCycle("same-generation-question");
+      await vi.waitFor(() => expect(digest).toHaveBeenCalledTimes(1));
+      await signOutAccount();
+      const accountB = client.startTrainingCycle("same-generation-question");
+      await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1));
+      releaseAccountADigest(digestBytes);
+
+      await expect(accountA).rejects.toMatchObject({
+        code: "ACCOUNT_CONTEXT_CHANGED",
+        retryable: true,
+      });
+      const accountBSecond = client.startTrainingCycle(
+        "same-generation-question",
+      );
+      expect(fetcher).toHaveBeenCalledTimes(1);
+      releaseAccountBFetch(
+        jsonResponse(
+          { cycle: { id: "account-b-generation-cycle" } },
+          { status: 201 },
+        ),
+      );
+      await expect(Promise.all([accountB, accountBSecond])).resolves.toEqual([
+        "account-b-generation-cycle",
+        "account-b-generation-cycle",
+      ]);
+      expect(issuedKey).toHaveBeenCalledTimes(1);
+      expect(
+        requestHeaders(fetcher.mock.calls[0] ?? []).get("idempotency-key"),
+      ).toBe("account-b-generation-key");
+    } finally {
+      digest.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("aborts an account A response body and ignores its stale result after account B begins", async () => {
+    let cycleCalls = 0;
+    const issuedKey = vi
+      .fn<() => string>()
+      .mockReturnValueOnce("account-a-active-key")
+      .mockReturnValueOnce("account-b-active-key");
+    const fetcher = vi.fn<typeof fetch>(async (_input, init) => {
+      cycleCalls += 1;
+      if (cycleCalls === 1) return responseWithStalledBody(init?.signal);
+      return jsonResponse(
+        { cycle: { id: "account-b-active-cycle" } },
+        { status: 201 },
+      );
+    });
+    const client = new HttpLearningClient({
+      baseUrl: "https://coach.test/api/v1",
+      fetch: fetcher,
+      idempotencyKey: issuedKey,
+      origin: "https://coach.test",
+      requestTimeoutMs: 100,
+      sleep: async () => undefined,
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({ success: true })),
+    );
+
+    try {
+      const accountA = client.startTrainingCycle("active-account-question");
+      await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1));
+      const accountASignal = (fetcher.mock.calls[0]?.[1] as RequestInit).signal;
+      await signOutAccount();
+
+      await expect(accountA).rejects.toMatchObject({
+        code: "ACCOUNT_CONTEXT_CHANGED",
+        retryable: true,
+      });
+      expect(accountASignal?.aborted).toBe(true);
+      const accountB = client.startTrainingCycle("active-account-question");
+      await expect(accountB).resolves.toBe("account-b-active-cycle");
+
+      expect(cycleCalls).toBe(2);
+      expect(issuedKey).toHaveBeenCalledTimes(2);
+      expect(
+        requestHeaders(fetcher.mock.calls[1] ?? []).get("idempotency-key"),
+      ).toBe("account-b-active-key");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("advances generation on learning-data deletion so an old cycle cannot recreate client state", async () => {
+    let cycleCalls = 0;
+    const cycleKeys: string[] = [];
+    const issuedKey = vi
+      .fn<() => string>()
+      .mockReturnValueOnce("cycle-before-data-delete")
+      .mockReturnValueOnce("data-delete-key")
+      .mockReturnValueOnce("cycle-after-data-delete");
+    const fetcher = vi.fn<typeof fetch>(async (input, init) => {
+      const url = String(input);
+      if (url.endsWith("/data")) return new Response(null, { status: 204 });
+      if (url.endsWith("/training-cycles")) {
+        cycleCalls += 1;
+        cycleKeys.push(new Headers(init?.headers).get("idempotency-key") ?? "");
+        if (cycleCalls === 1) return responseWithStalledBody(init?.signal);
+        return jsonResponse(
+          { cycle: { id: "cycle-after-learning-data-delete" } },
+          { status: 201 },
+        );
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    const client = new HttpLearningClient({
+      baseUrl: "https://coach.test/api/v1",
+      fetch: fetcher,
+      idempotencyKey: issuedKey,
+      origin: "https://coach.test",
+      requestTimeoutMs: 100,
+      sleep: async () => undefined,
+    });
+
+    const oldCycle = client.startTrainingCycle("question-before-data-delete");
+    await vi.waitFor(() => expect(cycleCalls).toBe(1));
+    await client.deleteLearningData();
+
+    await expect(oldCycle).rejects.toMatchObject({
+      code: "ACCOUNT_CONTEXT_CHANGED",
+      retryable: true,
+    });
+    expect(cycleCalls).toBe(1);
+    await expect(
+      client.startTrainingCycle("question-before-data-delete"),
+    ).resolves.toBe("cycle-after-learning-data-delete");
+    expect(cycleKeys).toEqual([
+      "cycle-before-data-delete",
+      "cycle-after-data-delete",
+    ]);
+  });
+
+  it("does not advance generation or abort an active operation after failed sign-out", async () => {
+    let completeBody!: () => void;
+    const bodyReady = new Promise<void>((resolve) => {
+      completeBody = resolve;
+    });
+    const fetcher = vi.fn<typeof fetch>(
+      async () =>
+        new Response(
+          new ReadableStream<Uint8Array>({
+            async start(controller) {
+              await bodyReady;
+              controller.enqueue(
+                new TextEncoder().encode(
+                  JSON.stringify({ cycle: { id: "account-a-still-active" } }),
+                ),
+              );
+              controller.close();
+            },
+          }),
+          { status: 201, headers: { "content-type": "application/json" } },
+        ),
+    );
+    const client = new HttpLearningClient({
+      baseUrl: "https://coach.test/api/v1",
+      fetch: fetcher,
+      idempotencyKey: () => "account-a-still-active-key",
+      origin: "https://coach.test",
+      requestTimeoutMs: 100,
+      sleep: async () => undefined,
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(
+          jsonResponse({ detail: "Try again" }, { status: 500 }),
+        ),
+    );
+
+    try {
+      const active = client.startTrainingCycle("failed-signout-question");
+      await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1));
+      const signal = (fetcher.mock.calls[0]?.[1] as RequestInit).signal;
+      await expect(signOutAccount()).rejects.toThrow("Try again");
+      expect(signal?.aborted).toBe(false);
+      completeBody();
+      await expect(active).resolves.toBe("account-a-still-active");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("canonicalizes object property order but gives changed paths or payloads new logical keys", async () => {
     const issuedKey = vi
       .fn<() => string>()
