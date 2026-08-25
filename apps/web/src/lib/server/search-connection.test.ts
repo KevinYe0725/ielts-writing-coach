@@ -60,6 +60,29 @@ integration("encrypted search connections (PostgreSQL)", () => {
   const database = createDatabase(databaseUrl!);
   const userIds: string[] = [];
 
+  function deferred() {
+    let resolve!: () => void;
+    const promise = new Promise<void>((resolvePromise) => {
+      resolve = resolvePromise;
+    });
+    return { promise, resolve };
+  }
+
+  async function waitForAdvisoryLockWaiter(): Promise<void> {
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      const result = await database.pool.query<{ waiting: boolean }>(`
+        select exists (
+          select 1
+          from pg_locks
+          where locktype = 'advisory' and not granted
+        ) as waiting
+      `);
+      if (result.rows[0]?.waiting) return;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    throw new Error("Timed out waiting for the competing advisory lock");
+  }
+
   async function createUser(role: "owner" | "admin" | "learner") {
     const id = `search-${role}-${newDomainId()}`;
     userIds.push(id);
@@ -292,6 +315,90 @@ integration("encrypted search connections (PostgreSQL)", () => {
     ).toHaveLength(1);
   });
 
+  it("linearizes a revoke after an overlapping save so the replacement is not left selected", async () => {
+    state.environment.DEPLOYMENT_MODE = "shared";
+    const actor = await createUser("owner");
+    const admin = await createUser("admin");
+    await saveSearchConnection(database.db, actor, "initial-api-key");
+    const replacementPersisted = deferred();
+    const allowReplacementCommit = deferred();
+
+    const save = saveSearchConnection(
+      database.db,
+      actor,
+      "replacement-api-key",
+      {
+        afterPersist: async (_transaction, projection) => {
+          expect(projection).toEqual({
+            kind: "brave",
+            status: "ACTIVE",
+            tested_at: expect.any(String),
+          });
+          replacementPersisted.resolve();
+          await allowReplacementCommit.promise;
+        },
+      },
+    );
+    await replacementPersisted.promise;
+    const revoke = revokeSearchConnection(database.db, admin);
+
+    try {
+      await waitForAdvisoryLockWaiter();
+    } finally {
+      allowReplacementCommit.resolve();
+    }
+
+    await expect(save).resolves.toEqual({
+      kind: "brave",
+      status: "ACTIVE",
+      tested_at: expect.any(String),
+    });
+    await expect(revoke).resolves.toBe(true);
+    await expect(
+      getSearchConnectionProjection(database.db, admin),
+    ).resolves.toBeNull();
+  });
+
+  it("linearizes a save after an overlapping revoke so the later replacement remains selected", async () => {
+    state.environment.DEPLOYMENT_MODE = "shared";
+    const actor = await createUser("owner");
+    const admin = await createUser("admin");
+    await saveSearchConnection(database.db, actor, "initial-api-key");
+    const revocationPersisted = deferred();
+    const allowRevocationCommit = deferred();
+
+    const revoke = revokeSearchConnection(database.db, admin, {
+      afterPersist: async (_transaction, projection) => {
+        expect(projection).toBeUndefined();
+        revocationPersisted.resolve();
+        await allowRevocationCommit.promise;
+      },
+    });
+    await revocationPersisted.promise;
+    const save = saveSearchConnection(
+      database.db,
+      actor,
+      "replacement-api-key",
+    );
+
+    try {
+      await waitForAdvisoryLockWaiter();
+    } finally {
+      allowRevocationCommit.resolve();
+    }
+
+    await expect(revoke).resolves.toBe(true);
+    const savedProjection = await save;
+    expect(savedProjection).toEqual({
+      kind: "brave",
+      status: "ACTIVE",
+      tested_at: expect.any(String),
+    });
+    await expect(
+      getSearchConnectionProjection(database.db, admin),
+    ).resolves.toEqual(savedProjection);
+  });
+
   it("rejects a second selected connection for one configuring user at the database boundary", async () => {
     const actor = await createUser("owner");
     await database.db.insert(searchConnection).values({
@@ -389,6 +496,57 @@ integration("encrypted search connections (PostgreSQL)", () => {
       kind: "brave",
       status: "ACTIVE",
       tested_at: now.toISOString(),
+    });
+  });
+
+  it("revokes only the shared canonical Owner connection before the newer Admin connection", async () => {
+    state.environment.DEPLOYMENT_MODE = "shared";
+    const ownerActor = await createUser("owner");
+    const admin = await createUser("admin");
+    const now = new Date();
+    const ownerConnectionId = "00000000-0000-7000-8000-000000000011";
+    const adminConnectionId = "00000000-0000-7000-8000-000000000012";
+    await database.db.insert(searchConnection).values([
+      {
+        id: adminConnectionId,
+        configuredByUserId: admin.id,
+        kind: "BRAVE",
+        encryptedApiKey: "admin-ciphertext",
+        encryptedApiKeyNonce: "admin-nonce",
+        encryptionKeyVersion: 1,
+        status: "ACTIVE",
+        testedAt: new Date(now.getTime() + 1_000),
+        createdAt: new Date(now.getTime() + 1_000),
+        updatedAt: new Date(now.getTime() + 1_000),
+      },
+      {
+        id: ownerConnectionId,
+        configuredByUserId: ownerActor.id,
+        kind: "BRAVE",
+        encryptedApiKey: "owner-ciphertext",
+        encryptedApiKeyNonce: "owner-nonce",
+        encryptionKeyVersion: 1,
+        status: "INVALID",
+        testedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      },
+    ]);
+
+    await expect(revokeSearchConnection(database.db, admin)).resolves.toBe(
+      true,
+    );
+    await expect(
+      database.db.query.searchConnection.findFirst({
+        where: eq(searchConnection.id, ownerConnectionId),
+      }),
+    ).resolves.toMatchObject({ status: "REVOKED" });
+    await expect(
+      getSearchConnectionProjection(database.db, admin),
+    ).resolves.toEqual({
+      kind: "brave",
+      status: "ACTIVE",
+      tested_at: new Date(now.getTime() + 1_000).toISOString(),
     });
   });
 });
