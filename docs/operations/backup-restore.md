@@ -7,6 +7,7 @@ Back up IELTS Writing Coach before every upgrade and on a regular schedule appro
 | Asset                                              | Why it matters                                                                            |
 | -------------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | PostgreSQL logical dump                            | accounts, essays, learning state, jobs, configuration, and encrypted provider credentials |
+| Encrypted search connection                        | preserves the optional Brave question-research connection without exposing its key        |
 | `APP_ENCRYPTION_KEY` and version                   | decrypts persisted provider credentials                                                   |
 | `AUTH_SECRET`                                      | protects authentication state                                                             |
 | `POSTGRES_PASSWORD` or managed database credential | allows the services to reconnect                                                          |
@@ -14,6 +15,14 @@ Back up IELTS Writing Coach before every upgrade and on a regular schedule appro
 | SMTP and environment-provider credentials, if used | external integration configuration                                                        |
 
 The setup token is sensitive even after initial setup and should remain protected. A CycleBundle export is useful for learner portability but is not a substitute for a full database backup.
+
+The learner-wide JSON, Markdown, and ZIP exports and CycleBundle archives do
+not include search connections, encrypted keys, research sources, refill
+batches, recommendation history, ranking scores, or generated-question
+provenance labels. The full instance archive is the only supported export that
+preserves the encrypted search connection. It does so inside `database.dump`,
+which cannot be inspected until the outer archive passphrase has authenticated
+and decrypted the complete payload.
 
 Store backups outside the live host or cloud project, encrypt them at rest, restrict access, and define a retention policy. Never commit a dump, secret archive, `.env`, or provider key.
 
@@ -58,6 +67,12 @@ The manifest never contains plaintext secrets, `.env`, `DATABASE_URL`, SMTP
 credentials, or environment-managed provider credentials. Preserve those omitted
 settings separately in an encrypted secret manager. Keep the backup passphrase
 outside the host and archive; losing it makes the backup unrecoverable.
+
+`database.dump` includes the `search_connection` row with its already encrypted
+key envelope, nonce, and key version. Do not copy that row into an ordinary
+learning export or print it during backup verification. Restoring it also
+requires the matching `APP_ENCRYPTION_KEY` and version from the encrypted secret
+envelope.
 
 ### Verify the Compose backup
 
@@ -153,6 +168,9 @@ Railway and Render backup availability, retention, and point-in-time recovery de
 - Owner sign-in works; changing `AUTH_SECRET` may require signing in again.
 - Authorized essay, lesson, rewrite, and skill-history samples are present.
 - A provider test and a queued AI job complete successfully.
+- The Admin question-supply projection shows only aggregate counts and the
+  latest safe mode/status; if an authorized Brave connection exists, its UI
+  status is restored without revealing the key.
 - The restored deployment is backed up again after any subsequent migration.
 
 ## Automated clean-instance recovery gate

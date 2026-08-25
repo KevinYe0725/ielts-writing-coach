@@ -152,7 +152,8 @@ cp .env.example .env
 printf '\nPOSTGRES_PASSWORD=%s\n' "$(openssl rand -hex 24)" >> .env
 
 docker compose up -d --build
-docker compose logs bootstrap   # 打印一次性初始化令牌
+docker compose run --rm --no-deps --entrypoint sh bootstrap \
+  -c 'cat /run/iwc-secrets/setup_token'   # 交互读取，不写入服务日志
 ```
 
 1. 打开 `http://127.0.0.1:3000/setup?token=你的令牌`

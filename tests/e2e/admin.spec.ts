@@ -169,6 +169,27 @@ async function installAdminHttpFixtures(page: Page): Promise<void> {
           deployment_mode: "personal",
           jobs: { FAILED: 0, QUEUED: 2, RUNNING: 1 },
           pending_invitations: 1,
+          question_supply: {
+            eligible_question_count: 121,
+            recommendations: { READY: 8, PENDING: 2, UNAVAILABLE: 1 },
+            latest_batch: {
+              status: "FAILED",
+              mode: "WEB_RESEARCH",
+              accepted_count: 7,
+              rejected_count: 2,
+              safe_failure_code: "SEARCH_UNAVAILABLE",
+              triggered_by_user_id: "must-not-render-user-id",
+              prompt: "must-not-render-private-prompt",
+              research_sources: [
+                {
+                  url: "https://must-not-render.example.test",
+                  snippet: "must-not-render-source-snippet",
+                },
+              ],
+              provider_response: "must-not-render-provider-response",
+              encrypted_api_key: "must-not-render-encrypted-key",
+            },
+          },
           recent_audit: [
             {
               action: "provider.test",
@@ -282,6 +303,35 @@ test.describe("secure administration surfaces", () => {
       page.getByText("数据库可连接，但迁移版本不匹配"),
     ).toBeVisible();
     await expect(page.getByText("数据库连接与迁移版本均已核验")).toHaveCount(0);
+  });
+
+  test("shows compact aggregate question-supply status without operational internals", async ({
+    page,
+  }) => {
+    await page.goto("/admin");
+
+    const supply = page.locator('[data-question-supply-status="aggregate"]');
+    await expect(supply).toBeVisible();
+    await expect(supply.getByText("题库补充", { exact: true })).toBeVisible();
+    await expect(supply.getByText("121", { exact: true })).toBeVisible();
+    await expect(supply.getByText("8 / 2 / 1", { exact: true })).toBeVisible();
+    await expect(supply.getByText("联网调研", { exact: true })).toBeVisible();
+    await expect(supply.getByText("7 / 2", { exact: true })).toBeVisible();
+    await expect(
+      supply.getByText("SEARCH_UNAVAILABLE", { exact: true }),
+    ).toBeVisible();
+
+    const pageText = await page.getByRole("main").innerText();
+    for (const forbidden of [
+      "must-not-render-user-id",
+      "must-not-render-private-prompt",
+      "https://must-not-render.example.test",
+      "must-not-render-source-snippet",
+      "must-not-render-provider-response",
+      "must-not-render-encrypted-key",
+    ]) {
+      expect(pageText).not.toContain(forbidden);
+    }
   });
 
   test("Owner creates a one-time recovery link from an HTTP fixture", async ({

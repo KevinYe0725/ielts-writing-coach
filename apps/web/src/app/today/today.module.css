@@ -343,7 +343,7 @@
   margin: var(--desk-space-3) 0 0;
   color: var(--desk-ink);
   font-family: var(--desk-font-reading);
-  font-size: clamp(21px, 2.3vw, 29px);
+  font-size: var(--desk-type-reading-prompt);
   font-weight: var(--desk-reading-weight-regular);
   letter-spacing: -0.017em;
   line-height: 1.46;
@@ -694,7 +694,7 @@
   }
 
   .promptText {
-    font-size: 22px;
+    font-size: var(--desk-type-reading-prompt-mobile);
   }
 
   .rationaleRail {

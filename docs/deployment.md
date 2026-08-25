@@ -50,6 +50,14 @@ openssl rand -base64 24  # SETUP_TOKEN
 
 When a provider key is saved through the UI, Web encrypts it and Worker decrypts it. Different encryption keys therefore cause background AI jobs to fail. Do not change `APP_ENCRYPTION_KEY` after credentials are stored unless a supported re-encryption migration is available.
 
+Version one has no `BRAVE_API_KEY` or configurable search-origin environment
+variable. An Owner, or an Admin in shared mode, configures the fixed Brave
+Search connection in **Settings → Advanced → Online question research**. The
+key is write-only in the UI, encrypted at rest, and decrypted only inside the
+bounded search path. Do not place setup, search, or AI provider keys in command
+arguments, shell history, application logs, or support transcripts. Ordinary
+logs record fixed safe codes and aggregate counts only.
+
 ## Docker Compose — Tier 1
 
 The root [`compose.yaml`](../compose.yaml) runs bootstrap, PostgreSQL 17, the migration command, Web, and Worker. The migration container must finish successfully before Web and Worker start.
@@ -63,7 +71,17 @@ docker compose logs bootstrap
 curl --fail http://127.0.0.1:3000/api/v1/health/ready
 ```
 
-The setup token is printed only when the secret volume is first created, although it remains in the local Docker log until logs are removed. Complete setup at `http://127.0.0.1:3000/setup?token=YOUR_TOKEN`.
+Bootstrap logs confirm only that secret files are ready; they never contain the
+setup token. Retrieve the token interactively from the protected secret volume,
+then complete setup without pasting it into a log or issue:
+
+```bash
+docker compose run --rm --no-deps --entrypoint sh bootstrap \
+  -c 'cat /run/iwc-secrets/setup_token'
+```
+
+Open `http://127.0.0.1:3000/setup?token=YOUR_TOKEN`. The setup page moves the
+token into memory and clears it from the browser URL.
 
 Compose uses `/api/v1/health/ready` for the Web container health check. It stays
 not-ready until PostgreSQL is reachable, the exact application migration
@@ -190,5 +208,14 @@ For every target:
 4. the provider connection test succeeds without exposing its key;
 5. a synthetic training cycle can enqueue and complete an AI task; and
 6. an operator can create and verify a backup.
+
+Question supply is intentionally non-blocking for learners. Each READY
+recommendation starts a three-day exposure cooldown; when fewer than 12 unseen
+eligible questions remain, the service may enqueue one shared refill. A failed
+automatic refill has a six-hour cooldown. Missing, invalid, rate-limited, or
+timed-out search falls back to offline AI generation, and total supply failure
+leaves manual question browsing and private custom questions available. Check
+the aggregate **Question supply** rows on `/admin`; they contain no learner IDs,
+prompts, sources, URLs, provider responses, or encrypted fields.
 
 The liveness endpoint does not query PostgreSQL and must not be used as the only release check. Readiness requires the exact application migration lineage and a fresh heartbeat from a same-version Graphile task executor. `/api/version` publishes the application, schema, teaching-contract, planner, prompt, rubric, and exchange versions. Readiness does not prove that an external AI provider or SMTP server is available, so test those separately in the administrator UI.

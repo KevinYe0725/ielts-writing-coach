@@ -179,3 +179,22 @@ New breakage — NONE / list:
 External-boundary handling — PASS/FAIL:
 Final verdict — APPROVE / REQUEST_CHANGES:
 ```
+
+## Adaptive question-supply Task 10 handoff
+
+The later adaptive question-supply release gate extends this package without
+changing the earlier independent-review verdict boundary. Repository-controlled
+evidence is recorded in the 2026-08-25 addendum to
+`annotation-desk-v1-evidence.md`:
+
+- isolated PostgreSQL 17.6: 91 files / 798 tests passed, no skips or failures;
+- Demo four-project browser matrix: 658 passed / 238 intentional skips;
+- non-Demo four-project HTTP matrix: 123 passed / 73 intentional skips;
+- format, lint, typecheck, Web/Worker build, and whitespace gates passed;
+- learner exports omit question-supply internals, the encrypted full backup
+  preserves the encrypted search connection only after archive authentication,
+  and Admin renders aggregate supply state only.
+
+The real Brave connection/refill acceptance remains `EXTERNAL_PENDING`. No
+credential was requested, entered, stored, synthesized, logged, or transmitted
+during repository verification.

@@ -56,14 +56,20 @@ export function selectTopBucket(
   if (bucket.length === 0) return null;
   const index = randomIndex(bucket.length);
   if (!Number.isInteger(index) || index < 0 || index >= bucket.length) {
-    throw new RangeError("randomIndex must return an index within the top bucket");
+    throw new RangeError(
+      "randomIndex must return an index within the top bucket",
+    );
   }
   return bucket[index] ?? null;
 }
 
-function countBy<T, K>(values: readonly T[], key: (value: T) => K): Map<K, number> {
+function countBy<T, K>(
+  values: readonly T[],
+  key: (value: T) => K,
+): Map<K, number> {
   const counts = new Map<K, number>();
-  for (const value of values) counts.set(key(value), (counts.get(key(value)) ?? 0) + 1);
+  for (const value of values)
+    counts.set(key(value), (counts.get(key(value)) ?? 0) + 1);
   return counts;
 }
 

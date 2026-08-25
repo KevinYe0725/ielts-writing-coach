@@ -6,7 +6,11 @@ import {
   selectTopBucket,
 } from "./question-recommendation-score";
 
-const candidate = (id: string, type: "discussion" | "opinion" = "discussion", topic: "health" | "education" = "health") => ({
+const candidate = (
+  id: string,
+  type: "discussion" | "opinion" = "discussion",
+  topic: "health" | "education" = "health",
+) => ({
   id,
   type,
   topic,
@@ -64,7 +68,10 @@ describe("question recommendation scoring", () => {
 
   it("permanently excludes questions already used in prior cycles", () => {
     const ranked = rankQuestionCandidates({
-      candidates: [candidate("used"), candidate("fresh", "opinion", "education")],
+      candidates: [
+        candidate("used"),
+        candidate("fresh", "opinion", "education"),
+      ],
       priorCycles: [candidate("used")],
       recentCycles: [],
     });
@@ -102,6 +109,8 @@ describe("question recommendation scoring", () => {
       { ...candidate("b"), score: 90 },
       { ...candidate("a"), score: 90 },
     ];
-    expect(selectTopBucket(ranked, (upperExclusive) => upperExclusive - 1)?.id).toBe("b");
+    expect(
+      selectTopBucket(ranked, (upperExclusive) => upperExclusive - 1)?.id,
+    ).toBe("b");
   });
 });

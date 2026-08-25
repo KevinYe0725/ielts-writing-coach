@@ -235,3 +235,65 @@ browser zoom.
   account. No credentials were requested, entered, stored, or transmitted.
 - `EXTERNAL_PENDING` — actual rendered 200%/400% content inspection in an
   authorized browser session. Viewport resizing is not used as a proxy.
+
+## 2026-08-25 adaptive question-supply release addendum
+
+**Status: REPOSITORY_GATES_VERIFIED_WITH_REAL_PROVIDER_EXTERNAL_PENDING.**
+
+This addendum verifies the adaptive recommendation and shared question-supply
+work based on `a9c2fbada3a9a8e735dd513a42c73aa3cb933b87` plus the Task 10
+release-gate diff. It does not replace the external real-account and rendered
+zoom boundaries above.
+
+### Privacy, backup, and administration
+
+- Learner-wide JSON, Markdown, and ZIP exports exclude search connections,
+  encrypted keys, research sources, refill batches, recommendation history,
+  ranking scores, and generated-question `source`/`attribution` labels.
+- The fully encrypted instance archive preserves the encrypted
+  `search_connection` database row. The test proves neither its ID nor its
+  encrypted-key sentinel is visible in archive bytes, a wrong passphrase leaves
+  no output, and an authenticated decrypt exposes a PostgreSQL dump from which
+  `pg_restore` can recover the row.
+- `/api/v1/admin/status` returns only aggregate eligible and
+  READY/PENDING/UNAVAILABLE counts plus the latest batch's mode, status,
+  accepted/rejected counts, and validated safe failure code. Test fixtures place
+  user IDs, prompts, snippets, URLs, provider responses, and encryption fields
+  beside those values and prove the question-supply projection omits them.
+- `/admin` reuses the existing operation card, status rows, and badges for one
+  compact bilingual Question supply block. The non-Demo four-project matrix
+  covers its sensitive-field absence, desktop/mobile overflow, text floor, and
+  Axe checks.
+- Compose bootstrap writes no setup-token value to process output. Operators
+  retrieve it interactively from the protected secret volume; no Brave search
+  key is configured through an environment variable or printed in logs.
+
+### Fresh release evidence
+
+| Gate                               | Result                                                                                 |
+| ---------------------------------- | -------------------------------------------------------------------------------------- |
+| Isolated PostgreSQL 17.6 migration | VERIFIED, exit 0 on tmpfs `iwc-question-supply-final-pg17`                             |
+| Exact DB-backed `pnpm test`        | VERIFIED, 91 files / 798 passed / 0 skipped / 0 failed                                 |
+| Format                             | VERIFIED, all matched files use Prettier style                                         |
+| Lint                               | VERIFIED, 0 errors / 4 existing Fast Refresh warnings                                  |
+| Typecheck                          | VERIFIED, all packages and scripts                                                     |
+| Web production build               | VERIFIED, compiled and generated 47/47 pages                                           |
+| Worker production build            | VERIFIED, two ESM entry points and source maps                                         |
+| Compose operation regressions      | VERIFIED, 2 files / 13 passed / 0 skipped / 0 failed                                   |
+| Demo browser matrix                | VERIFIED, 896 enumerated / 658 passed / 238 intentional skips / 0 failed               |
+| Non-Demo HTTP matrix               | VERIFIED, 196 enumerated / 123 passed / 73 intentional skips / 0 failed                |
+| Whitespace                         | VERIFIED, `git diff --check` exit 0                                                    |
+| Real Brave connection and refill   | `EXTERNAL_PENDING`; no credential requested, read, stored, synthesized, or transmitted |
+
+The 238 Demo skips belong to non-Demo HTTP/Admin contracts and
+hardware-keyboard or mode-specific coverage. The 73 non-Demo skips include the
+inverse Demo-only recommendation/setup flows and 24 browser-only Demo
+presentation checks; the latter passed in the complete Demo matrix, while the
+non-Demo owner-safe search test independently scans mounted desktop and mobile
+Settings with Axe. No failing assertion was converted to a general skip.
+
+The first full Demo run correctly failed four stale copies of the pre-recommendation
+heading; the focused four-project correction passed before the complete green
+rerun. The first non-Demo run failed 24 Demo-fixture presentation cases that
+were missing their mode ownership; after explicit Demo-only routing, the exact
+matrix above passed and retained the real HTTP search/Admin coverage.

@@ -3,10 +3,11 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
+import { eq } from "drizzle-orm";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { readServerEnvironment } from "@iwc/config";
-import { createDatabase } from "@iwc/db";
+import { createDatabase, newDomainId, searchConnection, user } from "@iwc/db";
 
 import {
   decryptBackupSecrets,
@@ -108,7 +109,7 @@ const integration = integrationUrl ? describe : describe.skip;
 
 integration("PostgreSQL instance backup", () => {
   if (!integrationUrl) return;
-  const { pool } = createDatabase(integrationUrl);
+  const { db, pool } = createDatabase(integrationUrl);
 
   afterAll(async () => {
     await pool.end();
@@ -145,6 +146,96 @@ integration("PostgreSQL instance backup", () => {
       expect(backup.archiveSha256).toMatch(/^[a-f\d]{64}$/u);
     } finally {
       await backup.cleanup();
+    }
+  });
+
+  it("preserves encrypted search connections only inside an authenticated archive", async () => {
+    const suffix = newDomainId();
+    const ownerId = `backup-search-owner-${suffix}`;
+    const connectionId = newDomainId();
+    const encryptedSentinel = `encrypted-search-connection-${suffix}`;
+    const directory = await mkdtemp(join(tmpdir(), "iwc-backup-search-test-"));
+    const environment = readServerEnvironment({
+      NODE_ENV: "test",
+      DATABASE_URL: integrationUrl,
+      AUTH_SECRET: "b".repeat(32),
+      APP_ENCRYPTION_KEY: Buffer.alloc(32, 2).toString("base64"),
+      SETUP_TOKEN: "test-only-setup-token",
+    });
+    try {
+      await db.insert(user).values({
+        id: ownerId,
+        name: "Backup search owner",
+        email: `${suffix}@example.test`,
+        role: "owner",
+      });
+      await db.insert(searchConnection).values({
+        id: connectionId,
+        configuredByUserId: ownerId,
+        kind: "BRAVE",
+        encryptedApiKey: encryptedSentinel,
+        encryptedApiKeyNonce: Buffer.alloc(12, 9).toString("base64"),
+        encryptionKeyVersion: 1,
+        status: "ACTIVE",
+      });
+
+      const backup = await createInstanceBackup({
+        pool,
+        environment,
+        passphrase: "authenticated archive passphrase",
+        now: new Date("2026-08-25T12:00:00.000Z"),
+      });
+      try {
+        const archiveBytes = await readFile(backup.archivePath);
+        expect(archiveBytes.includes(Buffer.from(connectionId))).toBe(false);
+        expect(archiveBytes.includes(Buffer.from(encryptedSentinel))).toBe(
+          false,
+        );
+
+        const rejectedPayload = join(directory, "wrong-passphrase.tar.gz");
+        await expect(
+          decryptInstanceBackupArchive(
+            backup.archivePath,
+            rejectedPayload,
+            "wrong archive passphrase",
+          ),
+        ).rejects.toThrow();
+        await expect(readFile(rejectedPayload)).rejects.toThrow();
+
+        const payload = join(directory, "authenticated.tar.gz");
+        await decryptInstanceBackupArchive(
+          backup.archivePath,
+          payload,
+          "authenticated archive passphrase",
+        );
+        await promisify(execFile)("tar", [
+          "-xzf",
+          payload,
+          "-C",
+          directory,
+          "database.dump",
+        ]);
+        const { stdout } = await promisify(execFile)(
+          process.env.IWC_PG_RESTORE_PATH ?? "pg_restore",
+          [
+            "--data-only",
+            "--table=search_connection",
+            "--file=-",
+            join(directory, "database.dump"),
+          ],
+          { maxBuffer: 8 * 1_024 * 1_024 },
+        );
+        expect(stdout).toContain(connectionId);
+        expect(stdout).toContain(encryptedSentinel);
+      } finally {
+        await backup.cleanup();
+      }
+    } finally {
+      await db
+        .delete(searchConnection)
+        .where(eq(searchConnection.id, connectionId));
+      await db.delete(user).where(eq(user.id, ownerId));
+      await rm(directory, { recursive: true, force: true });
     }
   });
 });

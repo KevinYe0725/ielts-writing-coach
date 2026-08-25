@@ -150,7 +150,7 @@ test.describe("desktop learning workspace", () => {
     await workspace.getByRole("link", { name: "开始新作文" }).click();
     await expect(page).toHaveURL(/\/today\?new-essay=1$/);
     await expect(
-      page.getByRole("heading", { name: "先选一道题" }),
+      page.getByRole("heading", { name: "今天就写这一题" }),
     ).toBeVisible();
 
     await page.goto("/today");

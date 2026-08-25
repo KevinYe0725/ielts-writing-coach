@@ -75,6 +75,62 @@ describe("browser-safe core imports", () => {
   });
 });
 
+describe("Admin question-supply status projection", () => {
+  it("maps only aggregate counts and safe latest-batch fields", async () => {
+    const fetcher = vi.fn<typeof fetch>(async (input) => {
+      const pathname = new URL(String(input)).pathname;
+      if (pathname.endsWith("/providers")) {
+        return jsonResponse({ providers: [] });
+      }
+      if (pathname.endsWith("/admin/status")) {
+        return jsonResponse({
+          actor_role: "owner",
+          deployment_mode: "personal",
+          question_supply: {
+            eligible_question_count: 121,
+            recommendations: { READY: 8, PENDING: 2, UNAVAILABLE: 1 },
+            latest_batch: {
+              status: "FAILED",
+              mode: "WEB_RESEARCH",
+              accepted_count: 7,
+              rejected_count: 2,
+              safe_failure_code: "SEARCH_UNAVAILABLE",
+              triggered_by_user_id: "must-not-project-user-id",
+              prompt: "must-not-project-prompt",
+              research_sources: ["must-not-project-source"],
+              provider_response: "must-not-project-response",
+              encrypted_api_key: "must-not-project-encrypted-field",
+            },
+          },
+        });
+      }
+      throw new Error(`Unexpected request: ${pathname}`);
+    });
+    const client = new HttpLearningClient({
+      baseUrl: "https://coach.test/api/v1",
+      fetch: fetcher,
+      origin: "https://coach.test",
+    });
+
+    const status = await client.getSystemStatus();
+
+    expect(status.questionSupply).toEqual({
+      eligibleQuestionCount: 121,
+      recommendations: { ready: 8, pending: 2, unavailable: 1 },
+      latestBatch: {
+        status: "FAILED",
+        mode: "WEB_RESEARCH",
+        acceptedCount: 7,
+        rejectedCount: 2,
+        safeFailureCode: "SEARCH_UNAVAILABLE",
+      },
+    });
+    expect(JSON.stringify(status.questionSupply)).not.toMatch(
+      /must-not-project/u,
+    );
+  });
+});
+
 describe("legacy practice recovery client", () => {
   it("returns a safe continuation state instead of waiting on a blocked replacement", async () => {
     const fetcher = vi.fn<typeof fetch>(async (input) => {

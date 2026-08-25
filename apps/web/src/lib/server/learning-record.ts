@@ -130,8 +130,6 @@ export async function buildLearningRecord(db: Database, userId: string) {
           topic: cycle.question.topic,
           prompt: cycle.question.prompt,
           promptZh: cycle.question.promptZh,
-          source: cycle.question.source,
-          attribution: cycle.question.attribution,
         },
         attempts: cycle.writingAttempts
           .sort(

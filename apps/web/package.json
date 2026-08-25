@@ -7,7 +7,7 @@
     "dev": "next dev --hostname 127.0.0.1",
     "lint": "eslint src next.config.ts",
     "start": "next start",
-    "test": "vitest run --root ../.. apps/web/src",
+    "test": "vitest run --root ../.. apps/web/src --maxWorkers=1",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

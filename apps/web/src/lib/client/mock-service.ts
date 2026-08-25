@@ -2343,6 +2343,17 @@ export class MockLearningClient implements LearningClient {
         running: aiEnabled() ? 1 : 0,
         failed: aiEnabled() ? 0 : 3,
       },
+      questionSupply: {
+        eligibleQuestionCount: 120,
+        recommendations: { ready: 8, pending: 2, unavailable: 1 },
+        latestBatch: {
+          status: "SUCCEEDED",
+          mode: "OFFLINE",
+          acceptedCount: 10,
+          rejectedCount: 2,
+          safeFailureCode: null,
+        },
+      },
       users: { active: 4, invited: 1, publicRegistration: false },
       privacy: {
         adminCanReadEssays: false,

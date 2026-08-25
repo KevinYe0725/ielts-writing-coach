@@ -4322,6 +4322,21 @@ export class HttpLearningClient implements LearningClient {
         deployment_mode?: "personal" | "shared";
         jobs?: Record<string, number>;
         pending_invitations?: number;
+        question_supply?: {
+          eligible_question_count?: unknown;
+          recommendations?: {
+            READY?: unknown;
+            PENDING?: unknown;
+            UNAVAILABLE?: unknown;
+          };
+          latest_batch?: {
+            status?: unknown;
+            mode?: unknown;
+            accepted_count?: unknown;
+            rejected_count?: unknown;
+            safe_failure_code?: unknown;
+          } | null;
+        };
         recent_audit?: Array<{
           action?: string;
           id?: string;
@@ -4343,6 +4358,44 @@ export class HttpLearningClient implements LearningClient {
       this.getProviders().catch(() => []),
     ]);
     const jobs = status.data.jobs ?? {};
+    const supply = status.data.question_supply;
+    const countValue = (value: unknown) =>
+      typeof value === "number" && Number.isSafeInteger(value) && value >= 0
+        ? value
+        : 0;
+    const latestBatch = supply?.latest_batch;
+    const latestBatchMode =
+      latestBatch?.mode === "WEB_RESEARCH" || latestBatch?.mode === "OFFLINE"
+        ? latestBatch.mode
+        : null;
+    const batchStatuses = new Set([
+      "QUEUED",
+      "SEARCHING",
+      "GENERATING",
+      "VALIDATING",
+      "SUCCEEDED",
+      "FAILED",
+    ]);
+    const safeFailureCode =
+      typeof latestBatch?.safe_failure_code === "string" &&
+      /^[A-Z][A-Z0-9_]{0,79}$/u.test(latestBatch.safe_failure_code)
+        ? latestBatch.safe_failure_code
+        : null;
+    const projectedLatestBatch: SystemStatus["questionSupply"]["latestBatch"] =
+      latestBatch &&
+      typeof latestBatch.status === "string" &&
+      batchStatuses.has(latestBatch.status) &&
+      latestBatchMode
+        ? {
+            status: latestBatch.status as NonNullable<
+              SystemStatus["questionSupply"]["latestBatch"]
+            >["status"],
+            mode: latestBatchMode,
+            acceptedCount: countValue(latestBatch.accepted_count),
+            rejectedCount: countValue(latestBatch.rejected_count),
+            safeFailureCode,
+          }
+        : null;
     return {
       actorRole: status.data.actor_role ?? "admin",
       version: status.data.versions?.application ?? "unknown",
@@ -4368,6 +4421,15 @@ export class HttpLearningClient implements LearningClient {
           (jobs.WAITING_FOR_CONSENT ?? 0) +
           (jobs.QUEUED ?? 0) +
           (jobs.RETRY_SCHEDULED ?? 0),
+      },
+      questionSupply: {
+        eligibleQuestionCount: countValue(supply?.eligible_question_count),
+        recommendations: {
+          ready: countValue(supply?.recommendations?.READY),
+          pending: countValue(supply?.recommendations?.PENDING),
+          unavailable: countValue(supply?.recommendations?.UNAVAILABLE),
+        },
+        latestBatch: projectedLatestBatch,
       },
       users: {
         active: status.data.users ?? 0,

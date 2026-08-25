@@ -1,7 +1,11 @@
 import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
-import { expectBasicAccessibility, expectVisibleTextFloor } from "./support";
+import {
+  deterministicDemo,
+  expectBasicAccessibility,
+  expectVisibleTextFloor,
+} from "./support";
 
 async function expectAllVisibleFontsAtLeast(
   locator: import("@playwright/test").Locator,
@@ -638,6 +642,10 @@ test.describe("account controls", () => {
     test(`entry, account, and settings surfaces pass axe at ${viewport.label}`, async ({
       page,
     }) => {
+      test.skip(
+        !deterministicDemo,
+        "This visual matrix uses the complete browser-only Demo settings fixtures; non-Demo search/settings Axe coverage runs in the HTTP contract test.",
+      );
       await page.setViewportSize(viewport);
 
       for (const route of ["/signin", "/setup"]) {
@@ -661,6 +669,10 @@ test.describe("account controls", () => {
     test(`all visible Entry, Settings, and Account text stays at least 12px on ${viewport.label}`, async ({
       page,
     }) => {
+      test.skip(
+        !deterministicDemo,
+        "This typography matrix uses the complete browser-only Demo settings fixtures.",
+      );
       await page.setViewportSize(viewport);
 
       await page.goto("/signin");
@@ -738,6 +750,10 @@ test.describe("account controls", () => {
     test(`primary controls retain the body-size type scale on ${viewport.label}`, async ({
       page,
     }) => {
+      test.skip(
+        !deterministicDemo,
+        "This typography matrix uses the complete browser-only Demo settings fixtures.",
+      );
       await page.setViewportSize(viewport);
 
       await page.goto("/signin");

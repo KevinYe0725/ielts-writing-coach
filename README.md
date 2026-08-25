@@ -152,7 +152,8 @@ cp .env.example .env
 printf '\nPOSTGRES_PASSWORD=%s\n' "$(openssl rand -hex 24)" >> .env
 
 docker compose up -d --build
-docker compose logs bootstrap   # prints the one-time setup token
+docker compose run --rm --no-deps --entrypoint sh bootstrap \
+  -c 'cat /run/iwc-secrets/setup_token'   # interactive retrieval; not service logs
 ```
 
 1. Open `http://127.0.0.1:3000/setup?token=YOUR_TOKEN`

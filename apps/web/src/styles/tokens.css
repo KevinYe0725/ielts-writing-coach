@@ -7,6 +7,7 @@
   --desk-green: #2f6d5a;
   --desk-amber: #7c531b;
   --desk-error: #b4474c;
+  --desk-error-strong: #9f3840;
   --desk-evidence-muted: color-mix(
     in srgb,
     var(--desk-ink) 64%,
@@ -49,6 +50,8 @@
   --desk-type-label: 14px;
   --desk-type-body: 16px;
   --desk-type-reading: 17px;
+  --desk-type-reading-prompt: clamp(21px, 2.3vw, 29px);
+  --desk-type-reading-prompt-mobile: 22px;
   --desk-type-subheading: 20px;
   --desk-type-section-title: clamp(24px, 3vw, 28px);
   --desk-type-page-title: clamp(30px, 4vw, 40px);

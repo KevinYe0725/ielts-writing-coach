@@ -17,6 +17,9 @@ import { describe, expect, it } from "vitest";
 import { DATABASE_SCHEMA_VERSION } from "../packages/db/src/schema-version";
 
 const repositoryRoot = fileURLToPath(new URL("..", import.meta.url));
+const bootstrapScript = fileURLToPath(
+  new URL("../docker/bootstrap.mjs", import.meta.url),
+);
 const scripts = {
   backup: fileURLToPath(new URL("./compose-backup.sh", import.meta.url)),
   doctor: fileURLToPath(new URL("./compose-doctor.sh", import.meta.url)),
@@ -68,6 +71,34 @@ function run(
 }
 
 describe("supported Compose operator commands", () => {
+  it("creates the setup token without persisting it in process logs", () => {
+    const secretDirectory = mkdtempSync(join(tmpdir(), "iwc-bootstrap-test-"));
+    try {
+      const result = spawnSync(process.execPath, [bootstrapScript], {
+        cwd: repositoryRoot,
+        encoding: "utf8",
+        env: {
+          ...childEnvironment,
+          IWC_SECRET_DIRECTORY: secretDirectory,
+        },
+      });
+      const setupToken = readFileSync(
+        join(secretDirectory, "setup_token"),
+        "utf8",
+      ).trim();
+
+      expect(result.status, String(result.stderr ?? "")).toBe(0);
+      expect(setupToken.length).toBeGreaterThanOrEqual(32);
+      expect(String(result.stdout)).not.toContain(setupToken);
+      expect(String(result.stderr)).not.toContain(setupToken);
+      expect(String(result.stdout)).toContain(
+        "IELTS Writing Coach secrets are ready",
+      );
+    } finally {
+      rmSync(secretDirectory, { recursive: true, force: true });
+    }
+  });
+
   it("has executable Bash entry points and root package scripts", () => {
     for (const path of Object.values(scripts)) {
       execFileSync("bash", ["-n", path]);

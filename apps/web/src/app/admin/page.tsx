@@ -366,6 +366,76 @@ export default function AdminPage() {
 
       <SectionHeader title={text("隐私与运维", "Privacy & operations")} />
       <div className="operations-list">
+        <Card data-question-supply-status="aggregate">
+          <span className={styles.operationIconStandard}>
+            <Database aria-hidden="true" size={19} />
+          </span>
+          <div>
+            <strong>{text("题库补充", "Question supply")}</strong>
+            <p data-admin-auxiliary>
+              {text(
+                "仅显示共享题库与补充任务的汇总状态。",
+                "Aggregate shared-bank and refill status only.",
+              )}
+            </p>
+            <div className="policy-row">
+              <span>{text("可用题目", "Eligible questions")}</span>
+              <Badge tone="neutral">
+                {data.questionSupply.eligibleQuestionCount}
+              </Badge>
+            </div>
+            <div className="policy-row">
+              <span>
+                {text(
+                  "已就绪 / 准备中 / 不可用",
+                  "Ready / preparing / unavailable",
+                )}
+              </span>
+              <Badge tone="neutral">
+                {data.questionSupply.recommendations.ready} /{" "}
+                {data.questionSupply.recommendations.pending} /{" "}
+                {data.questionSupply.recommendations.unavailable}
+              </Badge>
+            </div>
+            {data.questionSupply.latestBatch ? (
+              <>
+                <div className="policy-row">
+                  <span>{text("补充方式", "Refill mode")}</span>
+                  <Badge tone="neutral">
+                    {data.questionSupply.latestBatch.mode === "WEB_RESEARCH"
+                      ? text("联网调研", "Web research")
+                      : text("离线生成", "Offline generation")}
+                  </Badge>
+                </div>
+                <div className="policy-row">
+                  <span>{text("接受 / 拒绝", "Accepted / rejected")}</span>
+                  <Badge tone="neutral">
+                    {data.questionSupply.latestBatch.acceptedCount} /{" "}
+                    {data.questionSupply.latestBatch.rejectedCount}
+                  </Badge>
+                </div>
+                {data.questionSupply.latestBatch.safeFailureCode ? (
+                  <div className="policy-row">
+                    <span>{text("安全状态码", "Safe status code")}</span>
+                    <Badge tone="amber">
+                      {data.questionSupply.latestBatch.safeFailureCode}
+                    </Badge>
+                  </div>
+                ) : null}
+              </>
+            ) : null}
+          </div>
+          <Badge
+            tone={
+              data.questionSupply.latestBatch?.status === "FAILED"
+                ? "amber"
+                : "blue"
+            }
+          >
+            {data.questionSupply.latestBatch?.status ??
+              text("暂无任务", "No batch")}
+          </Badge>
+        </Card>
         {data.mailState === "missing" && data.actorRole === "owner" ? (
           <Card>
             <span className="operation-icon blue">

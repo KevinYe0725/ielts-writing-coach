@@ -111,12 +111,8 @@
           "name": "account_user_id_user_id_fk",
           "tableFrom": "account",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -307,12 +303,8 @@
           "name": "ai_job_owner_id_user_id_fk",
           "tableFrom": "ai_job",
           "tableTo": "user",
-          "columnsFrom": [
-            "owner_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["owner_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -320,12 +312,8 @@
           "name": "ai_job_provider_connection_id_provider_connection_id_fk",
           "tableFrom": "ai_job",
           "tableTo": "provider_connection",
-          "columnsFrom": [
-            "provider_connection_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["provider_connection_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -333,12 +321,8 @@
           "name": "ai_job_model_route_id_model_route_id_fk",
           "tableFrom": "ai_job",
           "tableTo": "model_route",
-          "columnsFrom": [
-            "model_route_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["model_route_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -444,12 +428,8 @@
           "name": "assessment_attempt_id_writing_attempt_id_fk",
           "tableFrom": "assessment",
           "tableTo": "writing_attempt",
-          "columnsFrom": [
-            "attempt_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["attempt_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -543,12 +523,8 @@
           "name": "audit_event_actor_id_user_id_fk",
           "tableFrom": "audit_event",
           "tableTo": "user",
-          "columnsFrom": [
-            "actor_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["actor_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -698,12 +674,8 @@
           "name": "evaluation_ai_job_id_ai_job_id_fk",
           "tableFrom": "evaluation",
           "tableTo": "ai_job",
-          "columnsFrom": [
-            "ai_job_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["ai_job_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -711,12 +683,8 @@
           "name": "evaluation_exercise_attempt_id_exercise_attempt_id_fk",
           "tableFrom": "evaluation",
           "tableTo": "exercise_attempt",
-          "columnsFrom": [
-            "exercise_attempt_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["exercise_attempt_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -856,12 +824,8 @@
           "name": "exercise_attempt_exercise_item_id_exercise_item_id_fk",
           "tableFrom": "exercise_attempt",
           "tableTo": "exercise_item",
-          "columnsFrom": [
-            "exercise_item_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["exercise_item_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -869,12 +833,8 @@
           "name": "exercise_attempt_user_id_user_id_fk",
           "tableFrom": "exercise_attempt",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -973,12 +933,8 @@
           "name": "exercise_item_lesson_plan_id_lesson_plan_id_fk",
           "tableFrom": "exercise_item",
           "tableTo": "lesson_plan",
-          "columnsFrom": [
-            "lesson_plan_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["lesson_plan_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -986,12 +942,8 @@
           "name": "exercise_item_learning_objective_id_learning_objective_id_fk",
           "tableFrom": "exercise_item",
           "tableTo": "learning_objective",
-          "columnsFrom": [
-            "learning_objective_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["learning_objective_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1056,12 +1008,8 @@
           "name": "idempotency_record_user_id_user_id_fk",
           "tableFrom": "idempotency_record",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1069,10 +1017,7 @@
       "compositePrimaryKeys": {
         "idempotency_record_user_id_key_pk": {
           "name": "idempotency_record_user_id_key_pk",
-          "columns": [
-            "user_id",
-            "key"
-          ]
+          "columns": ["user_id", "key"]
         }
       },
       "uniqueConstraints": {},
@@ -1163,12 +1108,8 @@
           "name": "import_record_user_id_user_id_fk",
           "tableFrom": "import_record",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1337,12 +1278,8 @@
           "name": "invitation_created_by_user_id_fk",
           "tableFrom": "invitation",
           "tableTo": "user",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1350,12 +1287,8 @@
           "name": "invitation_consumed_by_user_id_fk",
           "tableFrom": "invitation",
           "tableTo": "user",
-          "columnsFrom": [
-            "consumed_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["consumed_by"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1475,12 +1408,8 @@
           "name": "issue_evidence_assessment_id_assessment_id_fk",
           "tableFrom": "issue_evidence",
           "tableTo": "assessment",
-          "columnsFrom": [
-            "assessment_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["assessment_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1589,12 +1518,8 @@
           "name": "learning_objective_cycle_id_training_cycle_id_fk",
           "tableFrom": "learning_objective",
           "tableTo": "training_cycle",
-          "columnsFrom": [
-            "cycle_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["cycle_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1670,12 +1595,8 @@
           "name": "learning_preference_user_id_user_id_fk",
           "tableFrom": "learning_preference",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1762,12 +1683,8 @@
           "name": "learning_slot_user_id_user_id_fk",
           "tableFrom": "learning_slot",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1990,12 +1907,8 @@
           "name": "lesson_plan_cycle_id_training_cycle_id_fk",
           "tableFrom": "lesson_plan",
           "tableTo": "training_cycle",
-          "columnsFrom": [
-            "cycle_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["cycle_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2003,12 +1916,8 @@
           "name": "lesson_plan_paper_evaluation_job_id_ai_job_id_fk",
           "tableFrom": "lesson_plan",
           "tableTo": "ai_job",
-          "columnsFrom": [
-            "paper_evaluation_job_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["paper_evaluation_job_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -2130,12 +2039,8 @@
           "name": "mixed_review_task_source_cycle_id_training_cycle_id_fk",
           "tableFrom": "mixed_review_task",
           "tableTo": "training_cycle",
-          "columnsFrom": [
-            "source_cycle_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["source_cycle_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2143,12 +2048,8 @@
           "name": "mixed_review_task_user_id_user_id_fk",
           "tableFrom": "mixed_review_task",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2156,12 +2057,8 @@
           "name": "mixed_review_task_target_cycle_id_training_cycle_id_fk",
           "tableFrom": "mixed_review_task",
           "tableTo": "training_cycle",
-          "columnsFrom": [
-            "target_cycle_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["target_cycle_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -2275,12 +2172,8 @@
           "name": "model_route_owner_id_user_id_fk",
           "tableFrom": "model_route",
           "tableTo": "user",
-          "columnsFrom": [
-            "owner_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["owner_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2288,12 +2181,8 @@
           "name": "model_route_provider_connection_id_provider_connection_id_fk",
           "tableFrom": "model_route",
           "tableTo": "provider_connection",
-          "columnsFrom": [
-            "provider_connection_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["provider_connection_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -2301,12 +2190,8 @@
           "name": "model_route_fallback_provider_connection_id_provider_connection_id_fk",
           "tableFrom": "model_route",
           "tableTo": "provider_connection",
-          "columnsFrom": [
-            "fallback_provider_connection_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["fallback_provider_connection_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2424,12 +2309,8 @@
           "name": "notification_user_id_user_id_fk",
           "tableFrom": "notification",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2563,12 +2444,8 @@
           "name": "provider_connection_owner_id_user_id_fk",
           "tableFrom": "provider_connection",
           "tableTo": "user",
-          "columnsFrom": [
-            "owner_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["owner_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2730,12 +2607,8 @@
           "name": "question_owner_id_user_id_fk",
           "tableFrom": "question",
           "tableTo": "user",
-          "columnsFrom": [
-            "owner_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["owner_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2743,12 +2616,8 @@
           "name": "question_generation_batch_id_question_generation_batch_id_fk",
           "tableFrom": "question",
           "tableTo": "question_generation_batch",
-          "columnsFrom": [
-            "generation_batch_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["generation_batch_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -2895,12 +2764,8 @@
           "name": "question_generation_batch_triggered_by_user_id_user_id_fk",
           "tableFrom": "question_generation_batch",
           "tableTo": "user",
-          "columnsFrom": [
-            "triggered_by_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["triggered_by_user_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -2908,12 +2773,8 @@
           "name": "question_generation_batch_search_connection_id_search_connection_id_fk",
           "tableFrom": "question_generation_batch",
           "tableTo": "search_connection",
-          "columnsFrom": [
-            "search_connection_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["search_connection_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -2921,12 +2782,8 @@
           "name": "question_generation_batch_ai_job_id_ai_job_id_fk",
           "tableFrom": "question_generation_batch",
           "tableTo": "ai_job",
-          "columnsFrom": [
-            "ai_job_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["ai_job_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -3118,12 +2975,8 @@
           "name": "question_recommendation_user_id_user_id_fk",
           "tableFrom": "question_recommendation",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -3131,12 +2984,8 @@
           "name": "question_recommendation_generation_batch_id_question_generation_batch_id_fk",
           "tableFrom": "question_recommendation",
           "tableTo": "question_generation_batch",
-          "columnsFrom": [
-            "generation_batch_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["generation_batch_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -3189,11 +3038,7 @@
       "compositePrimaryKeys": {
         "rate_limit_bucket_bucket_subject_digest_window_started_at_pk": {
           "name": "rate_limit_bucket_bucket_subject_digest_window_started_at_pk",
-          "columns": [
-            "bucket",
-            "subject_digest",
-            "window_started_at"
-          ]
+          "columns": ["bucket", "subject_digest", "window_started_at"]
         }
       },
       "uniqueConstraints": {},
@@ -3324,12 +3169,8 @@
           "name": "rewrite_task_cycle_id_training_cycle_id_fk",
           "tableFrom": "rewrite_task",
           "tableTo": "training_cycle",
-          "columnsFrom": [
-            "cycle_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["cycle_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -3337,12 +3178,8 @@
           "name": "rewrite_task_user_id_user_id_fk",
           "tableFrom": "rewrite_task",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -3461,12 +3298,8 @@
           "name": "search_connection_configured_by_user_id_user_id_fk",
           "tableFrom": "search_connection",
           "tableTo": "user",
-          "columnsFrom": [
-            "configured_by_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["configured_by_user_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -3569,12 +3402,8 @@
           "name": "session_user_id_user_id_fk",
           "tableFrom": "session",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -3724,12 +3553,8 @@
           "name": "skill_evidence_event_user_id_user_id_fk",
           "tableFrom": "skill_evidence_event",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -3737,12 +3562,8 @@
           "name": "skill_evidence_event_cycle_id_training_cycle_id_fk",
           "tableFrom": "skill_evidence_event",
           "tableTo": "training_cycle",
-          "columnsFrom": [
-            "cycle_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["cycle_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -3860,12 +3681,8 @@
           "name": "teaching_practice_response_lesson_plan_id_lesson_plan_id_fk",
           "tableFrom": "teaching_practice_response",
           "tableTo": "lesson_plan",
-          "columnsFrom": [
-            "lesson_plan_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["lesson_plan_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -3873,12 +3690,8 @@
           "name": "teaching_practice_response_user_id_user_id_fk",
           "tableFrom": "teaching_practice_response",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -3886,12 +3699,8 @@
           "name": "teaching_practice_response_ai_job_id_ai_job_id_fk",
           "tableFrom": "teaching_practice_response",
           "tableTo": "ai_job",
-          "columnsFrom": [
-            "ai_job_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["ai_job_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -4044,12 +3853,8 @@
           "name": "training_cycle_user_id_user_id_fk",
           "tableFrom": "training_cycle",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -4057,12 +3862,8 @@
           "name": "training_cycle_question_id_question_id_fk",
           "tableFrom": "training_cycle",
           "tableTo": "question",
-          "columnsFrom": [
-            "question_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["question_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -4208,12 +4009,8 @@
           "name": "transfer_task_source_cycle_id_training_cycle_id_fk",
           "tableFrom": "transfer_task",
           "tableTo": "training_cycle",
-          "columnsFrom": [
-            "source_cycle_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["source_cycle_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -4221,12 +4018,8 @@
           "name": "transfer_task_user_id_user_id_fk",
           "tableFrom": "transfer_task",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -4234,12 +4027,8 @@
           "name": "transfer_task_question_id_question_id_fk",
           "tableFrom": "transfer_task",
           "tableTo": "question",
-          "columnsFrom": [
-            "question_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["question_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -4247,12 +4036,8 @@
           "name": "transfer_task_objective_id_learning_objective_id_fk",
           "tableFrom": "transfer_task",
           "tableTo": "learning_objective",
-          "columnsFrom": [
-            "objective_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["objective_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -4421,12 +4206,8 @@
           "name": "user_skill_state_user_id_user_id_fk",
           "tableFrom": "user_skill_state",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -4434,10 +4215,7 @@
       "compositePrimaryKeys": {
         "user_skill_state_user_id_skill_id_pk": {
           "name": "user_skill_state_user_id_skill_id_pk",
-          "columns": [
-            "user_id",
-            "skill_id"
-          ]
+          "columns": ["user_id", "skill_id"]
         }
       },
       "uniqueConstraints": {},
@@ -4732,12 +4510,8 @@
           "name": "writing_attempt_cycle_id_training_cycle_id_fk",
           "tableFrom": "writing_attempt",
           "tableTo": "training_cycle",
-          "columnsFrom": [
-            "cycle_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["cycle_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -4745,12 +4519,8 @@
           "name": "writing_attempt_user_id_user_id_fk",
           "tableFrom": "writing_attempt",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -4872,12 +4642,8 @@
           "name": "writing_attempt_revision_attempt_id_writing_attempt_id_fk",
           "tableFrom": "writing_attempt_revision",
           "tableTo": "writing_attempt",
-          "columnsFrom": [
-            "attempt_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["attempt_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -4907,11 +4673,7 @@
     "public.attempt_kind": {
       "name": "attempt_kind",
       "schema": "public",
-      "values": [
-        "version_1",
-        "version_2",
-        "transfer"
-      ]
+      "values": ["version_1", "version_2", "transfer"]
     },
     "public.cycle_status": {
       "name": "cycle_status",
@@ -4936,53 +4698,32 @@
     "public.deployment_mode": {
       "name": "deployment_mode",
       "schema": "public",
-      "values": [
-        "personal",
-        "shared"
-      ]
+      "values": ["personal", "shared"]
     },
     "public.notification_channel": {
       "name": "notification_channel",
       "schema": "public",
-      "values": [
-        "in_app",
-        "email"
-      ]
+      "values": ["in_app", "email"]
     },
     "public.objective_role": {
       "name": "objective_role",
       "schema": "public",
-      "values": [
-        "CORE",
-        "SECONDARY",
-        "REVIEW"
-      ]
+      "values": ["CORE", "SECONDARY", "REVIEW"]
     },
     "public.provider_kind": {
       "name": "provider_kind",
       "schema": "public",
-      "values": [
-        "openai",
-        "compatible",
-        "mock"
-      ]
+      "values": ["openai", "compatible", "mock"]
     },
     "public.provider_secret_mode": {
       "name": "provider_secret_mode",
       "schema": "public",
-      "values": [
-        "encrypted",
-        "environment",
-        "session_only"
-      ]
+      "values": ["encrypted", "environment", "session_only"]
     },
     "public.question_generation_batch_mode": {
       "name": "question_generation_batch_mode",
       "schema": "public",
-      "values": [
-        "WEB_RESEARCH",
-        "OFFLINE"
-      ]
+      "values": ["WEB_RESEARCH", "OFFLINE"]
     },
     "public.question_generation_batch_status": {
       "name": "question_generation_batch_status",
@@ -4999,19 +4740,12 @@
     "public.question_recommendation_action": {
       "name": "question_recommendation_action",
       "schema": "public",
-      "values": [
-        "INITIAL",
-        "SWAP"
-      ]
+      "values": ["INITIAL", "SWAP"]
     },
     "public.question_recommendation_status": {
       "name": "question_recommendation_status",
       "schema": "public",
-      "values": [
-        "PENDING",
-        "READY",
-        "UNAVAILABLE"
-      ]
+      "values": ["PENDING", "READY", "UNAVAILABLE"]
     },
     "public.rewrite_task_status": {
       "name": "rewrite_task_status",
@@ -5029,18 +4763,12 @@
     "public.search_connection_kind": {
       "name": "search_connection_kind",
       "schema": "public",
-      "values": [
-        "BRAVE"
-      ]
+      "values": ["BRAVE"]
     },
     "public.search_connection_status": {
       "name": "search_connection_status",
       "schema": "public",
-      "values": [
-        "ACTIVE",
-        "INVALID",
-        "REVOKED"
-      ]
+      "values": ["ACTIVE", "INVALID", "REVOKED"]
     },
     "public.transfer_task_status": {
       "name": "transfer_task_status",
@@ -5056,11 +4784,7 @@
     "public.user_role": {
       "name": "user_role",
       "schema": "public",
-      "values": [
-        "owner",
-        "admin",
-        "learner"
-      ]
+      "values": ["owner", "admin", "learner"]
     }
   },
   "schemas": {},

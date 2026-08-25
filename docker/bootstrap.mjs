@@ -29,19 +29,11 @@ async function ensureSecret(fileName, createValue) {
 
 await ensureSecret("auth_secret", () => randomBytes(48).toString("base64url"));
 await ensureSecret("encryption_key", () => randomBytes(32).toString("base64"));
-const setup = await ensureSecret("setup_token", () =>
-  randomBytes(24).toString("base64url"),
-);
+await ensureSecret("setup_token", () => randomBytes(24).toString("base64url"));
 
 await writeFile(`${directory}/.ready`, `${new Date().toISOString()}\n`, {
   mode: 0o600,
 });
-if (setup.created) {
-  process.stdout.write(
-    `IELTS Writing Coach setup token (shown once): ${setup.value}\n`,
-  );
-} else {
-  process.stdout.write(
-    "IELTS Writing Coach secrets already exist; no secrets were changed.\n",
-  );
-}
+process.stdout.write(
+  "IELTS Writing Coach secrets are ready; no secret values were written to logs.\n",
+);

@@ -4,7 +4,7 @@ import {
   decryptProviderSecret,
   encryptProviderSecret,
 } from "../../ai/src/crypto";
-import { eq, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { createDatabase, newDomainId } from "./index";
@@ -28,8 +28,31 @@ integration("adaptive question supply persistence", () => {
   const testId = randomUUID();
   const ownerId = `owner-question-supply-${testId}`;
   const learnerId = `learner-question-supply-${testId}`;
+  const createdUserIds = [ownerId, learnerId];
+  const createdSearchConnectionIds: string[] = [];
+  const createdRecommendationIds: string[] = [];
+  const createdJobIds: string[] = [];
+  const createdBatchIds: string[] = [];
+  const createdQuestionIds: string[] = [];
 
   afterAll(async () => {
+    if (createdRecommendationIds.length > 0)
+      await db
+        .delete(questionRecommendation)
+        .where(inArray(questionRecommendation.id, createdRecommendationIds));
+    if (createdQuestionIds.length > 0)
+      await db.delete(question).where(inArray(question.id, createdQuestionIds));
+    if (createdBatchIds.length > 0)
+      await db
+        .delete(questionGenerationBatch)
+        .where(inArray(questionGenerationBatch.id, createdBatchIds));
+    if (createdJobIds.length > 0)
+      await db.delete(aiJob).where(inArray(aiJob.id, createdJobIds));
+    if (createdSearchConnectionIds.length > 0)
+      await db
+        .delete(searchConnection)
+        .where(inArray(searchConnection.id, createdSearchConnectionIds));
+    await db.delete(user).where(inArray(user.id, createdUserIds));
     await pool.end();
   });
 
@@ -74,6 +97,7 @@ integration("adaptive question supply persistence", () => {
     if (!savedSearchConnection) {
       throw new Error("search connection insert did not return a row");
     }
+    createdSearchConnectionIds.push(savedSearchConnection.id);
     const [savedRecommendation] = await db
       .insert(questionRecommendation)
       .values({
@@ -85,6 +109,7 @@ integration("adaptive question supply persistence", () => {
     if (!savedRecommendation) {
       throw new Error("recommendation insert did not return a row");
     }
+    createdRecommendationIds.push(savedRecommendation.id);
     const [savedJob] = await db
       .insert(aiJob)
       .values({
@@ -98,6 +123,7 @@ integration("adaptive question supply persistence", () => {
     if (!savedJob) {
       throw new Error("AI job insert did not return a row");
     }
+    createdJobIds.push(savedJob.id);
     const [savedBatch] = await db
       .insert(questionGenerationBatch)
       .values({
@@ -121,6 +147,7 @@ integration("adaptive question supply persistence", () => {
     if (!savedBatch) {
       throw new Error("generation batch insert did not return a row");
     }
+    createdBatchIds.push(savedBatch.id);
     const [linkedRecommendation] = await db
       .update(questionRecommendation)
       .set({ generationBatchId: savedBatch.id })
@@ -144,6 +171,7 @@ integration("adaptive question supply persistence", () => {
     if (!savedQuestion) {
       throw new Error("generated question insert did not return a row");
     }
+    createdQuestionIds.push(savedQuestion.id);
 
     expect(savedRecommendation).toMatchObject({
       action: "INITIAL",
@@ -187,6 +215,7 @@ integration("adaptive question supply persistence", () => {
 
   it("rejects a batch-backed generated question with an owner", async () => {
     const generatedQuestionOwnerId = `generated-question-owner-${randomUUID()}`;
+    createdUserIds.push(generatedQuestionOwnerId);
     await db.insert(user).values({
       id: generatedQuestionOwnerId,
       name: "Generated Question Owner",
@@ -205,6 +234,7 @@ integration("adaptive question supply persistence", () => {
       })
       .returning();
     if (!batch) throw new Error("generation batch insert did not return a row");
+    createdBatchIds.push(batch.id);
 
     await expect(
       db.insert(question).values({
@@ -222,6 +252,7 @@ integration("adaptive question supply persistence", () => {
 
   it("preserves a shared batch and generated question when its trigger user is deleted", async () => {
     const triggerUserId = `generation-trigger-${randomUUID()}`;
+    createdUserIds.push(triggerUserId);
     await db.insert(user).values({
       id: triggerUserId,
       name: "Question Generation Trigger",
@@ -241,6 +272,7 @@ integration("adaptive question supply persistence", () => {
       })
       .returning();
     if (!batch) throw new Error("generation batch insert did not return a row");
+    createdBatchIds.push(batch.id);
     const [generatedQuestion] = await db
       .insert(question)
       .values({
@@ -255,6 +287,7 @@ integration("adaptive question supply persistence", () => {
       .returning();
     if (!generatedQuestion)
       throw new Error("generated question insert did not return a row");
+    createdQuestionIds.push(generatedQuestion.id);
 
     await db.delete(user).where(eq(user.id, triggerUserId));
 

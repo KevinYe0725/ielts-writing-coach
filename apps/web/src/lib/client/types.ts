@@ -878,6 +878,27 @@ export interface SystemStatus {
     running: number;
     failed: number;
   };
+  questionSupply: {
+    eligibleQuestionCount: number;
+    recommendations: {
+      ready: number;
+      pending: number;
+      unavailable: number;
+    };
+    latestBatch: {
+      status:
+        | "QUEUED"
+        | "SEARCHING"
+        | "GENERATING"
+        | "VALIDATING"
+        | "SUCCEEDED"
+        | "FAILED";
+      mode: "WEB_RESEARCH" | "OFFLINE";
+      acceptedCount: number;
+      rejectedCount: number;
+      safeFailureCode: string | null;
+    } | null;
+  };
   users: {
     active: number;
     invited: number;

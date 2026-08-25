@@ -1,20 +1,27 @@
-import { count, eq, sql } from "drizzle-orm";
+import { count, desc, eq, sql } from "drizzle-orm";
 
 import {
   aiJob,
   auditEvent,
   invitation,
   providerConnection,
+  questionGenerationBatch,
+  questionRecommendation,
   user,
 } from "@iwc/db";
 
 import { getServerContext } from "@/lib/server/context";
 import { apiRoute } from "@/lib/server/problem";
+import { listPublicQuestionCatalog } from "@/lib/server/question-recommendation";
 import { requireRole, requireSession } from "@/lib/server/session";
 import { inspectRuntimeReadiness } from "@/lib/server/readiness";
 import { publicVersionDescriptor } from "@/lib/server/version";
 
 export const dynamic = "force-dynamic";
+
+function safeFailureCode(value: string | null): string | null {
+  return value && /^[A-Z][A-Z0-9_]{0,79}$/u.test(value) ? value : null;
+}
 
 export const GET = apiRoute(async (request) => {
   const actor = await requireSession(request);
@@ -28,6 +35,9 @@ export const GET = apiRoute(async (request) => {
     pendingInvitations,
     auditCount,
     latestAudit,
+    eligibleQuestions,
+    recommendationCounts,
+    latestGenerationBatch,
   ] = await Promise.all([
     inspectRuntimeReadiness(pool, environment),
     db.select({ count: count() }).from(user),
@@ -50,7 +60,30 @@ export const GET = apiRoute(async (request) => {
       orderBy: (table, operators) => [operators.desc(table.occurredAt)],
       limit: 20,
     }),
+    listPublicQuestionCatalog(db),
+    db
+      .select({ status: questionRecommendation.status, count: count() })
+      .from(questionRecommendation)
+      .groupBy(questionRecommendation.status),
+    db
+      .select({
+        status: questionGenerationBatch.status,
+        mode: questionGenerationBatch.mode,
+        acceptedCount: questionGenerationBatch.acceptedCount,
+        rejectedCount: questionGenerationBatch.rejectedCount,
+        safeFailureCode: questionGenerationBatch.safeFailureCode,
+      })
+      .from(questionGenerationBatch)
+      .orderBy(
+        desc(questionGenerationBatch.updatedAt),
+        desc(questionGenerationBatch.id),
+      )
+      .limit(1),
   ]);
+  const recommendationStateCounts = Object.fromEntries(
+    recommendationCounts.map((row) => [row.status, row.count]),
+  );
+  const latestBatch = latestGenerationBatch[0];
   return Response.json(
     {
       status: readiness.ready ? "operational" : "degraded",
@@ -82,6 +115,23 @@ export const GET = apiRoute(async (request) => {
       })),
       audit_event_count: auditCount[0]?.count ?? 0,
       pending_invitations: pendingInvitations[0]?.count ?? 0,
+      question_supply: {
+        eligible_question_count: eligibleQuestions.length,
+        recommendations: {
+          READY: recommendationStateCounts.READY ?? 0,
+          PENDING: recommendationStateCounts.PENDING ?? 0,
+          UNAVAILABLE: recommendationStateCounts.UNAVAILABLE ?? 0,
+        },
+        latest_batch: latestBatch
+          ? {
+              status: latestBatch.status,
+              mode: latestBatch.mode,
+              accepted_count: latestBatch.acceptedCount,
+              rejected_count: latestBatch.rejectedCount,
+              safe_failure_code: safeFailureCode(latestBatch.safeFailureCode),
+            }
+          : null,
+      },
       content_access_default: false,
     },
     { headers: { "cache-control": "no-store" } },
