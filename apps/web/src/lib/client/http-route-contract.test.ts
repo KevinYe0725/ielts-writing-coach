@@ -5,6 +5,7 @@ import {
   aiJob,
   createDatabase,
   idempotencyRecord,
+  mixedReviewTask,
   newDomainId,
   question,
   questionGenerationBatch,
@@ -496,6 +497,184 @@ describe.skipIf(!databaseUrl)(
         }),
       ).resolves.toHaveLength(1);
     });
+
+    it.each([
+      { initialStatus: "READY" as const, terminalStatus: "STARTED" as const },
+      {
+        initialStatus: "PENDING" as const,
+        terminalStatus: "ABANDONED" as const,
+      },
+    ])(
+      "rolls back cycle, $terminalStatus disposition, and D14 attachment when replay persistence fails",
+      async ({ initialStatus, terminalStatus }) => {
+        const suffix = newDomainId();
+        const userId = `g1-cycle-atomic-${initialStatus.toLowerCase()}-${suffix}`;
+        const questionId = newDomainId();
+        const sourceQuestionId = newDomainId();
+        const sourceCycleId = newDomainId();
+        const recommendationId = newDomainId();
+        const reviewId = newDomainId();
+        const externalId = `g1-cycle-question-${suffix}`;
+        const key = `g1-cycle-response-failure-${suffix}`;
+        createdUsers.push(userId);
+        routeState.actor.id = userId;
+        routeState.actor.email = `${suffix}@example.test`;
+        await database.db.insert(user).values({
+          id: userId,
+          name: routeState.actor.name,
+          email: routeState.actor.email,
+          role: "learner",
+        });
+        await database.db.insert(question).values([
+          {
+            id: questionId,
+            externalId,
+            ownerId: userId,
+            source: "private_test",
+            visibility: "private",
+            questionType: "opinion",
+            topic: "education",
+            prompt: "Should schools teach practical decision-making?",
+          },
+          {
+            id: sourceQuestionId,
+            externalId: `g1-cycle-source-${suffix}`,
+            ownerId: userId,
+            source: "private_test",
+            visibility: "private",
+            questionType: "discussion",
+            topic: "health",
+            prompt: "Should public health campaigns focus on prevention?",
+          },
+        ]);
+        await database.db.insert(trainingCycle).values({
+          id: sourceCycleId,
+          userId,
+          questionId: sourceQuestionId,
+          status: "CORE_CYCLE_COMPLETED",
+          schemaVersion: "1.0.0",
+          timezone: "UTC",
+        });
+        await database.db.insert(mixedReviewTask).values({
+          id: reviewId,
+          userId,
+          sourceCycleId,
+          dueAt: new Date("2026-08-24T00:00:00.000Z"),
+          status: "PLANNED",
+        });
+        await database.db.insert(questionRecommendation).values({
+          id: recommendationId,
+          userId,
+          ...(initialStatus === "READY"
+            ? {
+                questionExternalId: externalId,
+                shownAt: new Date("2026-08-25T12:00:00.000Z"),
+              }
+            : {}),
+          action: "INITIAL",
+          status: initialStatus,
+        });
+        const body = {
+          question_id: externalId,
+          ...(initialStatus === "READY"
+            ? { recommendation_id: recommendationId }
+            : { abandon_recommendation_id: recommendationId }),
+          timezone: "UTC",
+        };
+        const makeRequest = () =>
+          new Request("https://coach.test/api/v1/training-cycles", {
+            body: JSON.stringify(body),
+            headers: {
+              "content-type": "application/json",
+              "idempotency-key": key,
+              origin: "https://coach.test",
+            },
+            method: "POST",
+          });
+        const dropFailureTrigger = async () => {
+          await database.db.execute(
+            sql`drop trigger if exists iwc_test_fail_cycle_idempotency_response on idempotency_record`,
+          );
+          await database.db.execute(
+            sql`drop function if exists iwc_test_fail_cycle_idempotency_response()`,
+          );
+        };
+
+        await dropFailureTrigger();
+        await database.db.execute(sql`
+          create function iwc_test_fail_cycle_idempotency_response()
+          returns trigger
+          language plpgsql
+          as $$
+          begin
+            if new.key like 'g1-cycle-response-failure-%'
+              and new.response_status = 201 then
+              raise exception 'forced idempotency response persistence failure';
+            end if;
+            return new;
+          end;
+          $$
+        `);
+        await database.db.execute(sql`
+          create trigger iwc_test_fail_cycle_idempotency_response
+          before update on idempotency_record
+          for each row
+          execute function iwc_test_fail_cycle_idempotency_response()
+        `);
+
+        try {
+          const failed = await createCycle(makeRequest());
+          expect(failed.status).toBe(500);
+          await expect(
+            database.db.query.trainingCycle.findMany({
+              where: eq(trainingCycle.userId, userId),
+            }),
+          ).resolves.toHaveLength(1);
+          await expect(
+            database.db.query.questionRecommendation.findFirst({
+              where: eq(questionRecommendation.id, recommendationId),
+            }),
+          ).resolves.toMatchObject({ status: initialStatus });
+          await expect(
+            database.db.query.mixedReviewTask.findFirst({
+              where: eq(mixedReviewTask.id, reviewId),
+            }),
+          ).resolves.toMatchObject({ status: "PLANNED", targetCycleId: null });
+        } finally {
+          await dropFailureTrigger();
+        }
+
+        const retried = await createCycle(makeRequest());
+        const replay = await createCycle(makeRequest());
+        const retriedBody = (await retried.json()) as {
+          cycle: { id: string };
+        };
+        const replayBody = (await replay.json()) as { cycle: { id: string } };
+
+        expect(retried.status).toBe(201);
+        expect(replay.status).toBe(201);
+        expect(replay.headers.get("idempotency-replayed")).toBe("true");
+        expect(replayBody.cycle.id).toBe(retriedBody.cycle.id);
+        await expect(
+          database.db.query.trainingCycle.findMany({
+            where: eq(trainingCycle.userId, userId),
+          }),
+        ).resolves.toHaveLength(2);
+        await expect(
+          database.db.query.questionRecommendation.findFirst({
+            where: eq(questionRecommendation.id, recommendationId),
+          }),
+        ).resolves.toMatchObject({ status: terminalStatus });
+        await expect(
+          database.db.query.mixedReviewTask.findFirst({
+            where: eq(mixedReviewTask.id, reviewId),
+          }),
+        ).resolves.toMatchObject({
+          status: "READY",
+          targetCycleId: retriedBody.cycle.id,
+        });
+      },
+    );
 
     it("rejects conflicting disposition ids and another learner's fallback recommendation", async () => {
       const suffix = newDomainId();

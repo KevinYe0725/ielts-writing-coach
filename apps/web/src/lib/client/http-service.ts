@@ -127,6 +127,7 @@ export interface HttpLearningClientOptions {
   now?: () => Date;
   origin?: string;
   pollIntervalMs?: number;
+  requestTimeoutMs?: number;
   sleep?: (milliseconds: number) => Promise<void>;
 }
 
@@ -1853,6 +1854,7 @@ export class HttpLearningClient implements LearningClient {
   private readonly now: () => Date;
   private readonly origin: string | undefined;
   private readonly pollIntervalMs: number;
+  private readonly requestTimeoutMs: number;
   private readonly sleep: (milliseconds: number) => Promise<void>;
   private readonly attemptEtags = new Map<string, string>();
   private readonly draftQueues = new Map<string, Promise<void>>();
@@ -1868,6 +1870,12 @@ export class HttpLearningClient implements LearningClient {
     this.now = options.now ?? (() => new Date());
     this.origin = options.origin ?? this.detectOrigin();
     this.pollIntervalMs = options.pollIntervalMs ?? 1_000;
+    this.requestTimeoutMs =
+      typeof options.requestTimeoutMs === "number" &&
+      Number.isFinite(options.requestTimeoutMs) &&
+      options.requestTimeoutMs > 0
+        ? options.requestTimeoutMs
+        : 10_000;
     this.sleep =
       options.sleep ??
       ((milliseconds) =>
@@ -1918,62 +1926,85 @@ export class HttpLearningClient implements LearningClient {
     else if (options.idempotent)
       headers.set("Idempotency-Key", this.idempotencyKey());
 
-    const retryInProgress = headers.has("Idempotency-Key");
+    const retryTransport = method === "GET" || headers.has("Idempotency-Key");
     for (let requestAttempt = 0; requestAttempt < 6; requestAttempt += 1) {
-      let response: Response;
+      const controller = new AbortController();
+      let rejectDeadline: ((reason: unknown) => void) | undefined;
+      const deadline = new Promise<never>((_resolve, reject) => {
+        rejectDeadline = reject;
+      });
+      const deadlineError = new DOMException(
+        "The request attempt exceeded its deadline.",
+        "AbortError",
+      );
+      const timeout = globalThis.setTimeout(() => {
+        controller.abort(deadlineError);
+        rejectDeadline?.(deadlineError);
+      }, this.requestTimeoutMs);
+      let transportPhase = true;
       try {
-        response = await this.fetcher(this.url(path), {
-          ...(options.body === undefined
-            ? {}
-            : { body: JSON.stringify(options.body) }),
-          cache: "no-store",
-          credentials: "include",
-          headers,
-          method,
-        });
-      } catch (cause) {
-        if (retryInProgress && requestAttempt < 5) {
-          await this.sleep(50 * 2 ** requestAttempt);
-          continue;
+        const response = await Promise.race([
+          this.fetcher(this.url(path), {
+            ...(options.body === undefined
+              ? {}
+              : { body: JSON.stringify(options.body) }),
+            cache: "no-store",
+            credentials: "include",
+            headers,
+            method,
+            signal: controller.signal,
+          }),
+          deadline,
+        ]);
+        const raw =
+          response.status === 204
+            ? ""
+            : await Promise.race([response.text(), deadline]);
+        transportPhase = false;
+        let payload: unknown;
+        try {
+          payload = raw ? JSON.parse(raw) : undefined;
+        } catch {
+          payload = raw;
         }
-        throw new LearningClientError(
-          "The IELTS Writing server could not be reached.",
-          { code: "NETWORK_ERROR", retryable: true, cause },
-        );
-      }
-
-      const raw = response.status === 204 ? "" : await response.text();
-      let payload: unknown;
-      try {
-        payload = raw ? JSON.parse(raw) : undefined;
-      } catch {
-        payload = raw;
-      }
-      if (
-        !response.ok &&
-        !(options.permitStatuses ?? []).includes(response.status)
-      ) {
         if (
-          retryInProgress &&
-          isApiProblem(payload) &&
-          payload.code === "IDEMPOTENCY_IN_PROGRESS" &&
-          requestAttempt < 5
+          !response.ok &&
+          !(options.permitStatuses ?? []).includes(response.status)
         ) {
-          await this.sleep(50 * 2 ** requestAttempt);
-          continue;
+          const retryIdempotencyInProgress =
+            retryTransport &&
+            isApiProblem(payload) &&
+            payload.code === "IDEMPOTENCY_IN_PROGRESS" &&
+            requestAttempt < 5;
+          if (!retryIdempotencyInProgress) {
+            if (isApiProblem(payload)) throw errorFromProblem(payload);
+            throw new LearningClientError(
+              typeof payload === "string" && payload
+                ? payload
+                : `Request failed with HTTP ${response.status}.`,
+              {
+                status: response.status,
+                code: "HTTP_ERROR",
+              },
+            );
+          }
+        } else {
+          return { data: payload as T, response };
         }
-        if (isApiProblem(payload)) throw errorFromProblem(payload);
-        throw new LearningClientError(
-          typeof payload === "string" && payload
-            ? payload
-            : `Request failed with HTTP ${response.status}.`,
-          {
-            status: response.status,
-            code: "HTTP_ERROR",
-          },
-        );
+      } catch (cause) {
+        if (!transportPhase) throw cause;
+        controller.abort(cause);
+        if (!(retryTransport && requestAttempt < 5)) {
+          throw new LearningClientError(
+            "The IELTS Writing server could not be reached.",
+            { code: "NETWORK_ERROR", retryable: true, cause },
+          );
+        }
+      } finally {
+        globalThis.clearTimeout(timeout);
+        rejectDeadline = undefined;
       }
-      return { data: payload as T, response };
+      await this.sleep(50 * 2 ** requestAttempt);
     }
     throw new LearningClientError("The operation did not finish in time.", {
       status: 409,

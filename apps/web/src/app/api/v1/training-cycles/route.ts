@@ -72,7 +72,7 @@ export const POST = apiRoute(async (request) => {
       actor.id,
       payload.question_id,
     );
-    const cycle = await db.transaction(async (transaction) => {
+    const response = await db.transaction(async (transaction) => {
       // Recommendation and cycle creation share this exact learner-locked
       // capacity predicate so neither mutation can drift from the other.
       await lockLearnerAndAssertActiveCycleCapacity(transaction, actor.id);
@@ -160,32 +160,32 @@ export const POST = apiRoute(async (request) => {
             ),
           );
       }
-      return created;
-    });
-    const responseBody = {
-      cycle: {
-        ...cycle,
-        question: {
-          id: selectedQuestion.externalId,
-          prompt: selectedQuestion.prompt,
-          type: selectedQuestion.questionType,
-          topic: selectedQuestion.topic,
+      const responseBody = {
+        cycle: {
+          ...created,
+          question: {
+            id: selectedQuestion.externalId,
+            prompt: selectedQuestion.prompt,
+            type: selectedQuestion.questionType,
+            topic: selectedQuestion.topic,
+          },
         },
-      },
-      next_action: "start_version_1",
-    };
-    const location = `/api/v1/training-cycles/${cycle.id}`;
-    await completeIdempotentResponse(
-      db,
-      actor.id,
-      reservation.key,
-      201,
-      responseBody,
-    );
-    return Response.json(responseBody, {
-      status: 201,
-      headers: { location },
+        next_action: "start_version_1",
+      };
+      const location = `/api/v1/training-cycles/${created.id}`;
+      await completeIdempotentResponse(
+        transaction,
+        actor.id,
+        reservation.key,
+        201,
+        responseBody,
+      );
+      return Response.json(responseBody, {
+        status: 201,
+        headers: { location },
+      });
     });
+    return response;
   } catch (error) {
     return settleIdempotentError(db, actor.id, reservation.key, error);
   }

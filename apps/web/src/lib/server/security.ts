@@ -1,7 +1,7 @@
 import { createHash, createHmac } from "node:crypto";
 import { isIP } from "node:net";
 
-import { and, eq, lte, sql } from "drizzle-orm";
+import { and, eq, isNull, lte, sql } from "drizzle-orm";
 
 import { assertTrustedOrigin } from "@iwc/auth";
 import { trustedOrigins } from "@iwc/config";
@@ -292,6 +292,7 @@ export async function settleIdempotentError(
         and(
           eq(idempotencyRecord.userId, userId),
           eq(idempotencyRecord.key, key),
+          isNull(idempotencyRecord.responseStatus),
         ),
       );
   }

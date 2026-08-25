@@ -346,6 +346,20 @@ function requestHeaders(call: unknown[]): Headers {
   return new Headers(init.headers);
 }
 
+function responseWhoseTextRejects(error: unknown): Response {
+  const response = jsonResponse({ headers_arrived: true });
+  response.text = async () => {
+    throw error;
+  };
+  return response;
+}
+
+function responseWhoseTextStalls(): Response {
+  const response = jsonResponse({ headers_arrived: true });
+  response.text = () => new Promise<string>(() => undefined);
+  return response;
+}
+
 describe("HttpLearningClient protocol", () => {
   it("projects only the public search-connection setting and uses the correct mutation boundaries", async () => {
     const fetcher = vi
@@ -676,6 +690,206 @@ describe("HttpLearningClient protocol", () => {
     expect(requestHeaders(call).get("idempotency-key")).toBe(
       "cycle-fallback-idempotency",
     );
+  });
+
+  it("retries a recommendation body AbortError with the original idempotency key", async () => {
+    const issuedKey = vi.fn(() => "recommendation-body-abort-key");
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        responseWhoseTextRejects(
+          new DOMException("body stream aborted", "AbortError"),
+        ),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          recommendation: {
+            id: "recommendation-after-body-abort",
+            status: "READY",
+            question: {
+              id: "question-after-body-abort",
+              prompt:
+                "Some people believe schools should teach financial literacy. To what extent do you agree or disagree?",
+              type: "opinion",
+              topic: "education",
+              ielts_track: "academic",
+              visibility: "public",
+            },
+          },
+        }),
+      );
+    const client = new HttpLearningClient({
+      baseUrl: "https://coach.test/api/v1",
+      fetch: fetcher,
+      idempotencyKey: issuedKey,
+      origin: "https://coach.test",
+      requestTimeoutMs: 25,
+      sleep: async () => undefined,
+    });
+
+    await expect(
+      client.requestQuestionRecommendation({ action: "INITIAL" }),
+    ).resolves.toMatchObject({
+      state: "READY",
+      id: "recommendation-after-body-abort",
+    });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(issuedKey).toHaveBeenCalledTimes(1);
+    expect(
+      fetcher.mock.calls.map((call) =>
+        requestHeaders(call).get("idempotency-key"),
+      ),
+    ).toEqual([
+      "recommendation-body-abort-key",
+      "recommendation-body-abort-key",
+    ]);
+  });
+
+  it("retries a coupled cycle body AbortError with the original idempotency key", async () => {
+    const issuedKey = vi.fn(() => "cycle-body-abort-key");
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        responseWhoseTextRejects(
+          new DOMException("body stream aborted", "AbortError"),
+        ),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({ cycle: { id: "cycle-replayed-after-body-abort" } }),
+      );
+    const client = new HttpLearningClient({
+      baseUrl: "https://coach.test/api/v1",
+      fetch: fetcher,
+      idempotencyKey: issuedKey,
+      origin: "https://coach.test",
+      requestTimeoutMs: 25,
+      sleep: async () => undefined,
+    });
+
+    await expect(
+      client.startTrainingCycle("manual-question", {
+        abandonRecommendationId: "recommendation-pending",
+      }),
+    ).resolves.toBe("cycle-replayed-after-body-abort");
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(issuedKey).toHaveBeenCalledTimes(1);
+    expect(
+      fetcher.mock.calls.map((call) =>
+        requestHeaders(call).get("idempotency-key"),
+      ),
+    ).toEqual(["cycle-body-abort-key", "cycle-body-abort-key"]);
+  });
+
+  it("aborts a stalled response body at the attempt deadline and retries with the same key", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(responseWhoseTextStalls())
+      .mockResolvedValueOnce(
+        jsonResponse({ cycle: { id: "cycle-after-stalled-body" } }),
+      );
+    const client = new HttpLearningClient({
+      baseUrl: "https://coach.test/api/v1",
+      fetch: fetcher,
+      idempotencyKey: () => "cycle-stalled-body-key",
+      origin: "https://coach.test",
+      requestTimeoutMs: 10,
+      sleep: async () => undefined,
+    });
+    const outcome = await Promise.race([
+      client.startTrainingCycle("manual-question", {
+        abandonRecommendationId: "recommendation-pending",
+      }),
+      new Promise<string>((resolve) =>
+        setTimeout(() => resolve("watchdog-expired"), 150),
+      ),
+    ]);
+
+    expect(outcome).toBe("cycle-after-stalled-body");
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(
+      fetcher.mock.calls.map((call) =>
+        requestHeaders(call).get("idempotency-key"),
+      ),
+    ).toEqual(["cycle-stalled-body-key", "cycle-stalled-body-key"]);
+    const signals = fetcher.mock.calls.map(
+      (call) => (call[1] as RequestInit).signal,
+    );
+    expect(signals[0]).toBeInstanceOf(AbortSignal);
+    expect(signals[0]?.aborted).toBe(true);
+    expect(signals[1]?.aborted).toBe(false);
+  });
+
+  it("returns a safe bounded error after every same-key body attempt stalls", async () => {
+    const fetcher = vi.fn<typeof fetch>(async () => responseWhoseTextStalls());
+    const client = new HttpLearningClient({
+      baseUrl: "https://coach.test/api/v1",
+      fetch: fetcher,
+      idempotencyKey: () => "cycle-all-bodies-stall-key",
+      origin: "https://coach.test",
+      requestTimeoutMs: 5,
+      sleep: async () => undefined,
+    });
+    const outcome = await Promise.race([
+      client
+        .startTrainingCycle("manual-question", {
+          abandonRecommendationId: "recommendation-pending",
+        })
+        .catch((error: unknown) => error),
+      new Promise<string>((resolve) =>
+        setTimeout(() => resolve("watchdog-expired"), 150),
+      ),
+    ]);
+
+    expect(outcome).toBeInstanceOf(LearningClientError);
+    expect(outcome).toMatchObject({
+      code: "NETWORK_ERROR",
+      retryable: true,
+    });
+    expect((outcome as Error).name).not.toBe("AbortError");
+    expect(fetcher).toHaveBeenCalledTimes(6);
+    expect(
+      new Set(
+        fetcher.mock.calls.map((call) =>
+          requestHeaders(call).get("idempotency-key"),
+        ),
+      ),
+    ).toEqual(new Set(["cycle-all-bodies-stall-key"]));
+  });
+
+  it("retries safe GET transport failures but never retries an unkeyed POST", async () => {
+    const getFetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        responseWhoseTextRejects(new TypeError("GET body disconnected")),
+      )
+      .mockResolvedValueOnce(jsonResponse({ questions: [] }));
+    const getClient = new HttpLearningClient({
+      baseUrl: "https://coach.test/api/v1",
+      fetch: getFetcher,
+      origin: "https://coach.test",
+      requestTimeoutMs: 25,
+      sleep: async () => undefined,
+    });
+    await expect(getClient.getQuestions()).resolves.toEqual([]);
+    expect(getFetcher).toHaveBeenCalledTimes(2);
+
+    const postFetcher = vi.fn<typeof fetch>(async () =>
+      responseWhoseTextRejects(new TypeError("POST body disconnected")),
+    );
+    const postClient = new HttpLearningClient({
+      baseUrl: "https://coach.test/api/v1",
+      fetch: postFetcher,
+      origin: "https://coach.test",
+      requestTimeoutMs: 25,
+      sleep: async () => undefined,
+    });
+    await expect(
+      postClient.testSearchConnection("temporary-key"),
+    ).rejects.toMatchObject({ code: "NETWORK_ERROR", retryable: true });
+    expect(postFetcher).toHaveBeenCalledTimes(1);
+    expect(
+      requestHeaders(postFetcher.mock.calls[0] ?? []).get("idempotency-key"),
+    ).toBeNull();
   });
 
   it("rejects PENDING recommendations without a non-empty runtime string id", async () => {

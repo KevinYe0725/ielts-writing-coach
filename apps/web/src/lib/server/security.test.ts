@@ -7,6 +7,7 @@ import {
   completeIdempotentResponse,
   reserveIdempotencyKey,
   sanitizeIdempotencyResponseForPersistence,
+  settleIdempotentError,
   trustedRequestAddress,
 } from "./security";
 
@@ -203,5 +204,39 @@ integration("API idempotency invariants", () => {
     const replayText = await replay.replay?.text();
     expect(replayText).not.toContain(sentinel);
     expect(replayText).toContain("sensitive_values_omitted_on_replay");
+  });
+
+  it("does not erase a completed response while settling a later unexpected fault", async () => {
+    const key = newDomainId();
+    const request = new Request("http://localhost/api/v1/training-cycles", {
+      method: "POST",
+      headers: { "idempotency-key": key },
+    });
+    const responseBody = { cycle: { id: newDomainId() } };
+    await reserveIdempotencyKey(database.db, userId, request, {
+      question_id: "question-safe-replay",
+    });
+    await completeIdempotentResponse(
+      database.db,
+      userId,
+      key,
+      201,
+      responseBody,
+    );
+
+    await expect(
+      settleIdempotentError(
+        database.db,
+        userId,
+        key,
+        new Error("late response construction fault"),
+      ),
+    ).rejects.toThrow("late response construction fault");
+
+    const replay = await reserveIdempotencyKey(database.db, userId, request, {
+      question_id: "question-safe-replay",
+    });
+    expect(replay.replay?.status).toBe(201);
+    await expect(replay.replay?.json()).resolves.toEqual(responseBody);
   });
 });

@@ -936,6 +936,39 @@ test.describe("Today query states at the HTTP boundary", () => {
     await expect.poll(() => starts).toBe(1);
   });
 
+  test("exhausted same-key cycle transport retries release Today for an actionable retry", async ({
+    page,
+  }) => {
+    const idempotencyKeys: string[] = [];
+    const pageErrors: Error[] = [];
+    page.on("pageerror", (error) => pageErrors.push(error));
+    await routeTodayHttpFixture(page, "mixed-review");
+    await page.route("**/api/v1/training-cycles", async (route) => {
+      idempotencyKeys.push(
+        route.request().headers()["idempotency-key"] ?? "missing",
+      );
+      await route.abort("timedout");
+    });
+    await page.goto("/today?mixed-review=1");
+    const start = page.getByRole("button", { name: "用这道题开始写作" });
+    await expect(start).toBeVisible();
+
+    await start.click();
+
+    await expect.poll(() => idempotencyKeys.length).toBe(6);
+    await expect(
+      page.getByText("The IELTS Writing server could not be reached.", {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(start).toBeEnabled();
+    expect(new Set(idempotencyKeys)).toEqual(
+      new Set([idempotencyKeys[0] as string]),
+    );
+    expect(idempotencyKeys[0]).not.toBe("missing");
+    expect(pageErrors).toEqual([]);
+  });
+
   test("synchronously dispatched swap events create one recommendation request", async ({
     page,
   }) => {

@@ -220,3 +220,12 @@ PostgreSQL barriers force both recommended-vs-fallback commit orderings)
 Current final evidence scope: baseline 85a6eaa plus the focused F2 Fix Round 1
 remediation and updated report. Earlier broad ranges through d897490 remain
 historical review evidence rather than the current final baseline.
+Third final broad review: changes requested at 82d7767 (3 Important — cycle
+idempotency atomicity, post-header client retry/deadline, Mock target contract;
+1 stale-evidence Minor)
+Final remediation G1: complete (cycle/disposition/D14/replay response share one
+learner-locked transaction; completed replay records survive later settlement;
+fetch/body/parse/status share one per-attempt deadline; GET and same-key
+mutations retry transport failures within six attempts; Today releases busy
+state after exhaustion; see final-remediation-g1-report.md)
+Final remediation G2: pending (Mock target-mix contract)
