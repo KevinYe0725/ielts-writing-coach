@@ -92,6 +92,41 @@ describe("BraveSearchAdapter", () => {
     expect((error as Error).message).not.toContain("test-key");
   });
 
+  it("classifies a timeout while reading the response body as TIMEOUT", async () => {
+    const adapter = new BraveSearchAdapter({
+      apiKey: "test-key",
+      fetch: async (request) =>
+        new Response(
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              controller.enqueue(new TextEncoder().encode('{"web":'));
+              request.signal.addEventListener(
+                "abort",
+                () =>
+                  controller.error(
+                    new DOMException(
+                      "provider reflected test-key after headers",
+                      "AbortError",
+                    ),
+                  ),
+                { once: true },
+              );
+            },
+          }),
+          { headers: { "content-type": "application/json" } },
+        ),
+    });
+
+    const error = await adapter
+      .search({ ...defaultQuery, timeoutMs: 1 })
+      .catch((caught: unknown) => caught);
+    expect(error).toMatchObject({
+      code: "TIMEOUT",
+      message: "Search request timed out.",
+    });
+    expect((error as Error).message).not.toContain("test-key");
+  });
+
   it.each([
     [401, "Search credentials were rejected."],
     [429, "Search provider rate limit reached."],

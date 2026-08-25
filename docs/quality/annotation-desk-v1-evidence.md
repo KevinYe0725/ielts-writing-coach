@@ -286,28 +286,29 @@ zoom boundaries above.
 | Gate                               | Result                                                                                 |
 | ---------------------------------- | -------------------------------------------------------------------------------------- |
 | Isolated PostgreSQL 17.6 migration | VERIFIED, exit 0 on tmpfs `iwc-question-supply-final-pg17`                             |
-| Exact DB-backed `pnpm test`        | VERIFIED, 91 files / 802 passed / 0 skipped / 0 failed                                 |
+| Exact DB-backed `pnpm test`        | VERIFIED, 91 files / 850 passed / 0 skipped / 0 failed                                 |
 | Format                             | VERIFIED, all matched files use Prettier style                                         |
 | Lint                               | VERIFIED, 0 errors / 4 existing Fast Refresh warnings                                  |
 | Typecheck                          | VERIFIED, all packages and scripts                                                     |
-| Web production build               | VERIFIED, compiled and generated 47/47 pages                                           |
+| Web production build               | VERIFIED, compiled and generated 48/48 pages                                           |
 | Worker production build            | VERIFIED, two ESM entry points and source maps                                         |
 | Compose operation regressions      | VERIFIED, 2 files / 13 passed / 0 skipped / 0 failed                                   |
-| Demo browser matrix                | VERIFIED, 896 enumerated / 658 passed / 238 intentional skips / 0 failed               |
-| Non-Demo HTTP matrix               | VERIFIED, 196 enumerated / 123 passed / 73 intentional skips / 0 failed                |
+| Demo browser matrix                | VERIFIED, 908 enumerated / 658 passed / 250 intentional skips / 0 failed               |
+| Non-Demo HTTP matrix               | VERIFIED, 208 enumerated / 135 passed / 73 intentional skips / 0 failed                |
 | Fix Round 1 Admin matrix           | VERIFIED, 52/52 passed across Chromium, Firefox, WebKit, and mobile                    |
 | Whitespace                         | VERIFIED, `git diff --check` exit 0                                                    |
 | Real Brave connection and refill   | `EXTERNAL_PENDING`; no credential requested, read, stored, synthesized, or transmitted |
 
-The 238 Demo skips belong to non-Demo HTTP/Admin contracts and
+The 250 Demo skips belong to non-Demo HTTP/Admin contracts and
 hardware-keyboard or mode-specific coverage. The 73 non-Demo skips include the
 inverse Demo-only recommendation/setup flows and 24 browser-only Demo
 presentation checks; the latter passed in the complete Demo matrix, while the
 non-Demo owner-safe search test independently scans mounted desktop and mobile
 Settings with Axe. No failing assertion was converted to a general skip.
 
-The first full Demo run correctly failed four stale copies of the pre-recommendation
-heading; the focused four-project correction passed before the complete green
-rerun. The first non-Demo run failed 24 Demo-fixture presentation cases that
-were missing their mode ownership; after explicit Demo-only routing, the exact
-matrix above passed and retained the real HTTP search/Admin coverage.
+The final-remediation first Demo run had one load-sensitive mobile sign-in
+overflow failure; the unchanged check passed three focused repeats and the
+complete two-worker rerun. The first final-remediation non-Demo run had four
+expected stale write-only-key assertions; the exact matrix passed after the
+oracle required immediate Save from ephemeral component state. No failing
+assertion was converted to a general skip.

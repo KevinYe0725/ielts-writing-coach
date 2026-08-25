@@ -74,7 +74,10 @@ function responseIsJson(response: Response): boolean {
   return contentType.split(";", 1)[0]?.trim() === "application/json";
 }
 
-async function readBoundedJson(response: Response): Promise<unknown> {
+async function readBoundedJson(
+  response: Response,
+  signal: AbortSignal,
+): Promise<unknown> {
   if (!responseIsJson(response)) {
     throw searchError(
       "INVALID_RESPONSE",
@@ -108,6 +111,12 @@ async function readBoundedJson(response: Response): Promise<unknown> {
     }
   } catch (error) {
     if (isSafeSearchError(error)) throw error;
+    if (
+      signal.aborted ||
+      (error instanceof DOMException && error.name === "AbortError")
+    ) {
+      throw searchError("TIMEOUT", "Search request timed out.");
+    }
     throw searchError(
       "INVALID_RESPONSE",
       "Search provider returned an invalid response.",
@@ -345,7 +354,7 @@ export class BraveSearchAdapter implements SearchAdapter {
           response.status,
         );
       }
-      return normalizeResults(await readBoundedJson(response));
+      return normalizeResults(await readBoundedJson(response, signal));
     } catch (error) {
       throw safeErrorFor(error, signal);
     }

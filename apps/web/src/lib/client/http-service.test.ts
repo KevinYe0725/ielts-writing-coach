@@ -622,6 +622,27 @@ describe("HttpLearningClient protocol", () => {
     });
   });
 
+  it("rejects PENDING recommendations without a non-empty runtime string id", async () => {
+    for (const id of [undefined, null, 7, "", "   "]) {
+      const client = new HttpLearningClient({
+        baseUrl: "https://coach.test/api/v1",
+        fetch: async () =>
+          jsonResponse({
+            recommendation: {
+              id,
+              status: "PENDING",
+              retry_after_seconds: 2,
+            },
+          }),
+        origin: "https://coach.test",
+      });
+
+      await expect(
+        client.requestQuestionRecommendation({ action: "INITIAL" }),
+      ).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
+    }
+  });
+
   it("rejects a READY recommendation without a complete question", async () => {
     const client = new HttpLearningClient({
       baseUrl: "https://coach.test/api/v1",

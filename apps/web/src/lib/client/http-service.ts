@@ -1689,7 +1689,11 @@ function projectQuestionRecommendation(
     const question = projectRecommendationQuestion(recommendation.question);
     if (question) return { state: "READY", id: recommendation.id, question };
   }
-  if (recommendation?.status === "PENDING" && recommendation.id) {
+  if (
+    recommendation?.status === "PENDING" &&
+    typeof recommendation.id === "string" &&
+    recommendation.id.trim()
+  ) {
     return {
       state: "PREPARING",
       id: recommendation.id,

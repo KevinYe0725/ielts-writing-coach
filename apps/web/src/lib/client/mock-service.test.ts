@@ -37,4 +37,41 @@ describe("browser-only Demo administration boundary", () => {
       migrationsCurrent: true,
     });
   });
+
+  it("deletes recommendation state from both browser stores while retaining preferences", async () => {
+    const recommendationKeys = [
+      "iwc.demo.selected-recommendation",
+      "iwc.demo.question-recommendation-active",
+      "iwc.demo.question-recommendation-exposure",
+      "iwc.demo.question-recommendation-state",
+      "iwc.demo.question-recommendation-swap",
+      "iwc.demo.question-recommendation-cooldown",
+    ];
+    const localStorage = testStorage({
+      ...Object.fromEntries(recommendationKeys.map((key) => [key, "local"])),
+      "iwc.demo.preferences": JSON.stringify({ locale: "en" }),
+      "iwc.demo.search-connection": "unrelated-connection",
+    });
+    const sessionStorage = testStorage({
+      ...Object.fromEntries(recommendationKeys.map((key) => [key, "session"])),
+      "iwc.demo.navigation": "unrelated-navigation",
+    });
+    vi.stubGlobal("window", { localStorage, sessionStorage, setTimeout });
+
+    await new MockLearningClient().deleteLearningData();
+
+    for (const key of recommendationKeys) {
+      expect(localStorage.getItem(key)).toBeNull();
+      expect(sessionStorage.getItem(key)).toBeNull();
+    }
+    expect(localStorage.getItem("iwc.demo.preferences")).toBe(
+      JSON.stringify({ locale: "en" }),
+    );
+    expect(localStorage.getItem("iwc.demo.search-connection")).toBe(
+      "unrelated-connection",
+    );
+    expect(sessionStorage.getItem("iwc.demo.navigation")).toBe(
+      "unrelated-navigation",
+    );
+  });
 });

@@ -496,6 +496,91 @@ async function routeTodayHttpFixture(page: Page, state: TodayHttpState) {
   });
 }
 
+async function routePreparingFallbackFixture(page: Page) {
+  await routeTodayHttpFixture(page, "mixed-review");
+  let releasePoll!: () => void;
+  const pollRelease = new Promise<void>((resolve) => {
+    releasePoll = resolve;
+  });
+  let polls = 0;
+  const cycleBodies: Array<Record<string, unknown>> = [];
+
+  await page.route("**/api/v1/question-recommendations", async (route) => {
+    if (route.request().method() !== "POST") return route.fallback();
+    await route.fulfill({
+      contentType: "application/json",
+      status: 202,
+      body: JSON.stringify({
+        recommendation: {
+          id: "recommendation-preparing-fallback",
+          status: "PENDING",
+          retry_after_seconds: 1,
+        },
+      }),
+    });
+  });
+  await page.route(
+    "**/api/v1/question-recommendations/recommendation-preparing-fallback",
+    async (route) => {
+      polls += 1;
+      await pollRelease;
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          recommendation: {
+            id: "recommendation-preparing-fallback",
+            status: "READY",
+            question: {
+              id: "stale-recommended-question",
+              prompt:
+                "Some people believe public transport should be free. Discuss both views and give your opinion.",
+              type: "discussion",
+              topic: "urban_transport",
+              ielts_track: "academic",
+              visibility: "public",
+            },
+          },
+        }),
+      });
+    },
+  );
+  await page.route("**/api/v1/training-cycles", async (route) => {
+    cycleBodies.push(route.request().postDataJSON());
+    await route.fulfill({
+      contentType: "application/json",
+      status: 201,
+      body: JSON.stringify({ cycle: { id: "cycle-manual-fallback" } }),
+    });
+  });
+  await page.route("**/api/v1/questions", async (route) => {
+    if (route.request().method() === "POST") {
+      const input = route.request().postDataJSON();
+      await route.fulfill({
+        contentType: "application/json",
+        status: 201,
+        body: JSON.stringify({
+          question: {
+            id: "custom-fallback-question",
+            prompt: input.prompt,
+            type: input.type,
+            topic: input.topic,
+            ielts_track: input.ielts_track,
+            visibility: "private",
+          },
+        }),
+      });
+      return;
+    }
+    await route.fallback();
+  });
+
+  return {
+    cycleBodies,
+    polls: () => polls,
+    releasePoll,
+  };
+}
+
 test.describe("Today query states at the HTTP boundary", () => {
   test.skip(
     deterministicDemo,
@@ -583,6 +668,66 @@ test.describe("Today query states at the HTTP boundary", () => {
     });
 
     await expect.poll(() => swaps).toBe(1);
+  });
+
+  test("PREPARING lets a manual bank question start one cycle and ignores the stale poll", async ({
+    page,
+  }) => {
+    const fixture = await routePreparingFallbackFixture(page);
+    await page.goto("/today?new-essay=1");
+    await page.getByText("浏览全部题库").click();
+    await page.getByLabel("题库").selectOption("http-question-education");
+    await expect.poll(fixture.polls, { timeout: 5_000 }).toBe(1);
+
+    await page.evaluate(() => {
+      const bank =
+        document.querySelector<HTMLSelectElement>("#question-choice");
+      const button = bank
+        ?.closest(".form-grid")
+        ?.querySelector<HTMLButtonElement>("button");
+      button?.click();
+      button?.click();
+    });
+    await expect.poll(() => fixture.cycleBodies.length).toBe(1);
+    fixture.releasePoll();
+    await expect(page).toHaveURL(/\/write\?cycle=cycle-manual-fallback$/);
+    expect(fixture.cycleBodies).toEqual([
+      expect.objectContaining({ question_id: "http-question-education" }),
+    ]);
+    expect(fixture.cycleBodies[0]).not.toHaveProperty("recommendation_id");
+    await page.waitForTimeout(100);
+    expect(fixture.cycleBodies).toHaveLength(1);
+  });
+
+  test("PREPARING lets a custom question create and start one cycle without recommendation attribution", async ({
+    page,
+  }) => {
+    const fixture = await routePreparingFallbackFixture(page);
+    await page.goto("/today?new-essay=1");
+    await page.getByText("粘贴我自己的题目").click();
+    await page
+      .getByLabel("完整英文题目")
+      .fill(
+        "Some people believe every city should provide free public libraries. To what extent do you agree or disagree?",
+      );
+    await expect.poll(fixture.polls, { timeout: 5_000 }).toBe(1);
+
+    await page.evaluate(() => {
+      const button = [...document.querySelectorAll("button")].find(
+        (candidate) => candidate.textContent?.includes("保存并开始写作"),
+      );
+      button?.click();
+      button?.click();
+    });
+    await expect.poll(() => fixture.cycleBodies.length).toBe(1);
+    fixture.releasePoll();
+    await expect(page).toHaveURL(/\/write\?cycle=cycle-manual-fallback$/);
+    expect(fixture.cycleBodies).toEqual([
+      expect.objectContaining({ question_id: "custom-fallback-question" }),
+    ]);
+    expect(fixture.cycleBodies[0]).not.toHaveProperty("recommendation_id");
+    await page.waitForTimeout(100);
+    expect(fixture.cycleBodies).toHaveLength(1);
   });
 
   test("feedback-waiting notice keeps the queued state and refresh action", async ({

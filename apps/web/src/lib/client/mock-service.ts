@@ -173,6 +173,24 @@ const removeStorage = (key: string): void => {
   if (canUseStorage()) window.localStorage.removeItem(key);
 };
 
+function removeDemoRecommendationStorage(): void {
+  if (!canUseStorage()) return;
+  for (const storage of [window.localStorage, window.sessionStorage].filter(
+    (candidate): candidate is Storage => candidate !== undefined,
+  )) {
+    const keys = Array.from({ length: storage.length }, (_, index) =>
+      storage.key(index),
+    ).filter((key): key is string => key !== null);
+    for (const key of keys) {
+      if (
+        key.startsWith("iwc.demo.") &&
+        /(recommendation|swap|exposure|cooldown)/i.test(key)
+      )
+        storage.removeItem(key);
+    }
+  }
+}
+
 function demoDraftStorageKey(version: 1 | 2, cycleId: string): string {
   const base = version === 1 ? STORAGE_KEYS.draftV1 : STORAGE_KEYS.draftV2;
   return cycleId === "cycle-demo" ? base : `${base}:${cycleId}`;
@@ -2271,6 +2289,7 @@ export class MockLearningClient implements LearningClient {
       STORAGE_KEYS.teachingPracticeResponses,
     ])
       removeStorage(key);
+    removeDemoRecommendationStorage();
     await delay(120);
   }
 

@@ -576,8 +576,7 @@ test.describe("annotation desk redesign contracts", () => {
     await key.fill("brave-demo-key");
     await search.getByRole("button", { name: "测试连接" }).click();
     await expect(search.getByRole("status")).toContainText("已通过测试");
-    await expect(key).toHaveValue("");
-    await key.fill("brave-demo-key");
+    await expect(key).toHaveValue("brave-demo-key");
     await search.getByRole("button", { name: "保存并启用" }).click();
     await expect(search.getByText("可正常使用", { exact: true })).toBeVisible();
     await expect(key).toHaveValue("");

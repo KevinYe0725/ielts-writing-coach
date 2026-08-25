@@ -1165,7 +1165,6 @@ function AiSettings({
     setSearchMessage(null);
     try {
       await learningClient.testSearchConnection(searchKey);
-      setSearchKey("");
       setSearchMessage(
         text(
           "已通过测试；保存后才会用于补充新题。",

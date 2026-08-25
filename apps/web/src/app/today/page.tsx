@@ -296,6 +296,13 @@ export default function TodayPage() {
     (question) => question.id === selectedQuestionId,
   );
 
+  const chooseManualFallback = useCallback(() => {
+    cancelRecommendationOperation();
+    focusRecommendationStart.current = false;
+    setRecommendationBusy(false);
+    setRecommendationRetryId(null);
+  }, [cancelRecommendationOperation]);
+
   useEffect(() => {
     if (recommendation?.state !== "READY" || !focusRecommendationStart.current)
       return;
@@ -307,13 +314,16 @@ export default function TodayPage() {
     question: QuestionOption | undefined,
     recommendationId?: string,
   ) => {
+    const recommendedStart = typeof recommendationId === "string";
     if (
       !question ||
-      recommendationBusy ||
+      questionLoading ||
+      (recommendedStart && recommendationBusy) ||
       recommendationInteractionLocked.current
     )
       return;
     recommendationInteractionLocked.current = true;
+    if (!recommendedStart) chooseManualFallback();
     setQuestionLoading(true);
     setQuestionError(null);
     try {
@@ -374,7 +384,14 @@ export default function TodayPage() {
   };
 
   const saveCustomQuestion = async () => {
-    if (customPrompt.trim().length < 30) return;
+    if (
+      customPrompt.trim().length < 30 ||
+      questionLoading ||
+      recommendationInteractionLocked.current
+    )
+      return;
+    recommendationInteractionLocked.current = true;
+    chooseManualFallback();
     setQuestionLoading(true);
     setQuestionError(null);
     try {
@@ -388,6 +405,8 @@ export default function TodayPage() {
       setSelectedQuestionId(created.id);
       setCustomOpen(false);
       setCustomPrompt("");
+      const cycleId = await learningClient.startTrainingCycle(created.id);
+      router.push(learningRouteHref("/write", { cycleId }));
     } catch (error) {
       setQuestionError(
         error instanceof Error
@@ -395,6 +414,7 @@ export default function TodayPage() {
           : "The private question could not be saved.",
       );
     } finally {
+      recommendationInteractionLocked.current = false;
       setQuestionLoading(false);
     }
   };
@@ -919,7 +939,7 @@ export default function TodayPage() {
                       onClick={() => void saveCustomQuestion()}
                       type="button"
                     >
-                      {text("保存到私有题库", "Save privately")}
+                      {text("保存并开始写作", "Save and start writing")}
                     </Button>
                   </div>
                 </div>

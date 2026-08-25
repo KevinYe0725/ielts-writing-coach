@@ -463,9 +463,8 @@ test.describe("account controls", () => {
     await key.fill("temporary-valid-key");
     await search.getByRole("button", { name: "测试连接" }).click();
     await expect(search.getByRole("status")).toContainText("已通过测试");
-    await expect(key).toHaveValue("");
+    await expect(key).toHaveValue("temporary-valid-key");
 
-    await key.fill("first-saved-key");
     await search.getByRole("button", { name: "保存并启用" }).click();
     await expect(search.getByText("可正常使用", { exact: true })).toBeVisible();
     await expect(key).toHaveValue("");
@@ -536,7 +535,6 @@ test.describe("account controls", () => {
     for (const secret of [
       "temporary-invalid-key",
       "temporary-valid-key",
-      "first-saved-key",
       "replacement-key",
     ])
       expect(stored.join("\n")).not.toContain(secret);
@@ -616,7 +614,7 @@ test.describe("account controls", () => {
     const saves = mutations.filter((mutation) => mutation.method === "PUT");
     expect(saves).toHaveLength(2);
     expect(saves.map((mutation) => JSON.parse(mutation.body ?? "{}"))).toEqual([
-      { api_key: "first-saved-key" },
+      { api_key: "temporary-valid-key" },
       { api_key: "replacement-key" },
     ]);
     expect(

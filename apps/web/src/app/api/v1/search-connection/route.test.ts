@@ -194,6 +194,35 @@ describe("/api/v1/search-connection", () => {
     );
   });
 
+  it("passes an Admin DELETE through the canonical revocation boundary", async () => {
+    state.actor = {
+      id: "admin-1",
+      email: "admin@example.test",
+      name: "Admin",
+      role: "admin",
+    };
+
+    const response = await DELETE(
+      request("DELETE", undefined, {
+        "idempotency-key": "shared-search-delete-1",
+      }),
+    );
+
+    expect(response.status).toBe(204);
+    expect(state.revoke).toHaveBeenCalledWith(
+      state.db,
+      state.actor,
+      expect.objectContaining({ afterPersist: expect.any(Function) }),
+    );
+    expect(state.complete).toHaveBeenCalledWith(
+      state.db,
+      state.actor.id,
+      "request-key",
+      204,
+      { revoked: true },
+    );
+  });
+
   it("rejects unexpected and oversized DELETE bodies before reservation", async () => {
     for (const [body, expectedStatus] of [
       [{ unexpected: true }, 422],
