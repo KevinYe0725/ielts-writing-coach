@@ -3398,6 +3398,22 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "search_connection_selected_user_unique": {
+          "name": "search_connection_selected_user_unique",
+          "columns": [
+            {
+              "expression": "configured_by_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {},
+          "where": "\"search_connection\".\"status\" in ('ACTIVE', 'INVALID')"
         }
       },
       "foreignKeys": {

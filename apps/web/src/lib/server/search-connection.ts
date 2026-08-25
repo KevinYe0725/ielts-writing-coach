@@ -9,7 +9,7 @@ import {
   searchConnection,
   type Database,
 } from "@iwc/db";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { BraveSearchAdapter } from "@iwc/search";
 
 import { getServerContext } from "./context";
@@ -33,6 +33,17 @@ export interface SearchConnectionProjection {
   kind: "brave";
   status: "ACTIVE" | "INVALID" | "REVOKED";
   tested_at: string | null;
+}
+
+type SearchConnectionTransaction = Parameters<
+  Parameters<Database["transaction"]>[0]
+>[0];
+
+export interface SearchConnectionPersistenceOptions {
+  afterPersist?: (
+    transaction: SearchConnectionTransaction,
+    projection: SearchConnectionProjection | undefined,
+  ) => Promise<void>;
 }
 
 function assertSearchAdministrator(actor: SessionActor): void {
@@ -62,11 +73,26 @@ function validateApiKey(apiKey: string): string {
   return normalized;
 }
 
-async function activeConnections(
+/** Worker supply may use only verified active credentials. */
+async function activeConnectionsForWorker(
   db: Database,
 ): Promise<SearchConnectionRecord[]> {
   return (await db.query.searchConnection.findMany({
     where: eq(searchConnection.status, "ACTIVE"),
+    with: {
+      configuredByUser: {
+        columns: { id: true, role: true },
+      },
+    },
+  })) as SearchConnectionRecord[];
+}
+
+/** Settings may expose and revoke an invalid credential, but never a revoked one. */
+async function nonRevokedConnections(
+  db: Database,
+): Promise<SearchConnectionRecord[]> {
+  return (await db.query.searchConnection.findMany({
+    where: inArray(searchConnection.status, ["ACTIVE", "INVALID"]),
     with: {
       configuredByUser: {
         columns: { id: true, role: true },
@@ -86,7 +112,7 @@ async function canonicalConnection(
         columns: { deploymentMode: true },
       })
     )?.deploymentMode ?? environment.DEPLOYMENT_MODE;
-  const candidates = (await activeConnections(db)).filter((connection) =>
+  const candidates = (await nonRevokedConnections(db)).filter((connection) =>
     deploymentMode === "personal"
       ? connection.configuredByUserId === actor.id
       : connection.configuredByUser?.role === "owner" ||
@@ -122,6 +148,7 @@ export async function saveSearchConnection(
   db: Database,
   actor: SessionActor,
   apiKey: string,
+  options: SearchConnectionPersistenceOptions = {},
 ): Promise<SearchConnectionProjection> {
   assertSearchAdministrator(actor);
   const normalizedApiKey = validateApiKey(apiKey);
@@ -169,14 +196,22 @@ export async function saveSearchConnection(
     });
   }
   const testedAt = new Date();
+  const projection = {
+    kind: "brave" as const,
+    status: "ACTIVE" as const,
+    tested_at: testedAt.toISOString(),
+  };
   await db.transaction(async (transaction) => {
+    await transaction.execute(
+      sql`select pg_advisory_xact_lock(hashtext(${actor.id}))`,
+    );
     await transaction
       .update(searchConnection)
       .set({ status: "REVOKED" })
       .where(
         and(
           eq(searchConnection.configuredByUserId, actor.id),
-          eq(searchConnection.status, "ACTIVE"),
+          inArray(searchConnection.status, ["ACTIVE", "INVALID"]),
         ),
       );
     await transaction.insert(searchConnection).values({
@@ -197,17 +232,24 @@ export async function saveSearchConnection(
       result: "success",
       metadata: { kind: "brave" },
     });
+    await options.afterPersist?.(transaction, projection);
   });
-  return { kind: "brave", status: "ACTIVE", tested_at: testedAt.toISOString() };
+  return projection;
 }
 
 export async function revokeSearchConnection(
   db: Database,
   actor: SessionActor,
+  options: SearchConnectionPersistenceOptions = {},
 ): Promise<boolean> {
   assertSearchAdministrator(actor);
   const connection = await canonicalConnection(db, actor);
-  if (!connection) return false;
+  if (!connection) {
+    await db.transaction(async (transaction) => {
+      await options.afterPersist?.(transaction, undefined);
+    });
+    return false;
+  }
   await db.transaction(async (transaction) => {
     await transaction
       .update(searchConnection)
@@ -215,7 +257,7 @@ export async function revokeSearchConnection(
       .where(
         and(
           eq(searchConnection.id, connection.id),
-          eq(searchConnection.status, "ACTIVE"),
+          inArray(searchConnection.status, ["ACTIVE", "INVALID"]),
         ),
       );
     await transaction.insert(auditEvent).values({
@@ -226,6 +268,7 @@ export async function revokeSearchConnection(
       result: "success",
       metadata: { kind: "brave" },
     });
+    await options.afterPersist?.(transaction, undefined);
   });
   return true;
 }

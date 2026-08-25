@@ -61,5 +61,6 @@ CREATE INDEX "question_recommendation_user_shown_idx" ON "question_recommendatio
 CREATE INDEX "question_recommendation_user_question_shown_idx" ON "question_recommendation" USING btree ("user_id","question_external_id","shown_at");--> statement-breakpoint
 CREATE INDEX "question_recommendation_status_updated_idx" ON "question_recommendation" USING btree ("status","updated_at");--> statement-breakpoint
 CREATE INDEX "search_connection_status_idx" ON "search_connection" USING btree ("status");--> statement-breakpoint
+CREATE UNIQUE INDEX "search_connection_selected_user_unique" ON "search_connection" USING btree ("configured_by_user_id") WHERE "search_connection"."status" in ('ACTIVE', 'INVALID');--> statement-breakpoint
 ALTER TABLE "question" ADD CONSTRAINT "question_generation_batch_id_question_generation_batch_id_fk" FOREIGN KEY ("generation_batch_id") REFERENCES "public"."question_generation_batch"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "question" ADD CONSTRAINT "question_generated_owner_absent_check" CHECK ("question"."generation_batch_id" is null or "question"."owner_id" is null);

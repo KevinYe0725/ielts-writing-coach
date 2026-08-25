@@ -203,6 +203,141 @@ integration("encrypted search connections (PostgreSQL)", () => {
     );
   });
 
+  it("projects and revokes an invalid connection instead of treating it as absent", async () => {
+    const actor = await createUser("owner");
+    const testedAt = new Date("2026-08-25T00:00:00.000Z");
+    await database.db.insert(searchConnection).values({
+      configuredByUserId: actor.id,
+      kind: "BRAVE",
+      encryptedApiKey: "invalid-ciphertext",
+      encryptedApiKeyNonce: "invalid-nonce",
+      encryptionKeyVersion: 1,
+      status: "INVALID",
+      testedAt,
+    });
+
+    await expect(
+      getSearchConnectionProjection(database.db, actor),
+    ).resolves.toEqual({
+      kind: "brave",
+      status: "INVALID",
+      tested_at: testedAt.toISOString(),
+    });
+    await expect(revokeSearchConnection(database.db, actor)).resolves.toBe(
+      true,
+    );
+    await expect(
+      database.db.query.searchConnection.findFirst({
+        where: eq(searchConnection.configuredByUserId, actor.id),
+      }),
+    ).resolves.toMatchObject({ status: "REVOKED" });
+  });
+
+  it("replaces an invalid connection rather than leaving it selected", async () => {
+    const actor = await createUser("owner");
+    await database.db.insert(searchConnection).values({
+      configuredByUserId: actor.id,
+      kind: "BRAVE",
+      encryptedApiKey: "invalid-ciphertext",
+      encryptedApiKeyNonce: "invalid-nonce",
+      encryptionKeyVersion: 1,
+      status: "INVALID",
+      testedAt: new Date(),
+    });
+
+    await saveSearchConnection(database.db, actor, "replacement-api-key");
+
+    const records = await database.db.query.searchConnection.findMany({
+      where: eq(searchConnection.configuredByUserId, actor.id),
+    });
+    expect(records.filter((record) => record.status === "ACTIVE")).toHaveLength(
+      1,
+    );
+    expect(records.filter((record) => record.status === "INVALID")).toEqual([]);
+  });
+
+  it("serializes concurrent replacement so one actor retains one selected connection", async () => {
+    const actor = await createUser("owner");
+
+    await database.pool.query(`
+      create function test_pause_search_connection_insert()
+      returns trigger language plpgsql as $$
+      begin
+        perform pg_sleep(0.2);
+        return new;
+      end;
+      $$;
+      create trigger test_pause_search_connection_insert
+      before insert on search_connection
+      for each row execute function test_pause_search_connection_insert();
+    `);
+    try {
+      await Promise.all([
+        saveSearchConnection(database.db, actor, "concurrent-api-key-one"),
+        saveSearchConnection(database.db, actor, "concurrent-api-key-two"),
+      ]);
+    } finally {
+      await database.pool.query(
+        "drop trigger if exists test_pause_search_connection_insert on search_connection; drop function if exists test_pause_search_connection_insert();",
+      );
+    }
+
+    const records = await database.db.query.searchConnection.findMany({
+      where: eq(searchConnection.configuredByUserId, actor.id),
+    });
+    expect(
+      records.filter(
+        (record) => record.status === "ACTIVE" || record.status === "INVALID",
+      ),
+    ).toHaveLength(1);
+  });
+
+  it("rejects a second selected connection for one configuring user at the database boundary", async () => {
+    const actor = await createUser("owner");
+    await database.db.insert(searchConnection).values({
+      configuredByUserId: actor.id,
+      kind: "BRAVE",
+      encryptedApiKey: "active-ciphertext",
+      encryptedApiKeyNonce: "active-nonce",
+      encryptionKeyVersion: 1,
+      status: "ACTIVE",
+    });
+
+    await expect(
+      database.db.insert(searchConnection).values({
+        configuredByUserId: actor.id,
+        kind: "BRAVE",
+        encryptedApiKey: "invalid-ciphertext",
+        encryptedApiKeyNonce: "invalid-nonce",
+        encryptionKeyVersion: 1,
+        status: "INVALID",
+      }),
+    ).rejects.toMatchObject({ cause: { code: "23505" } });
+  });
+
+  it("rolls back the connection and audit record when idempotency completion fails", async () => {
+    const actor = await createUser("owner");
+
+    await expect(
+      saveSearchConnection(database.db, actor, "rollback-api-key", {
+        afterPersist: async () => {
+          throw new Error("injected idempotency failure");
+        },
+      }),
+    ).rejects.toThrow("injected idempotency failure");
+
+    await expect(
+      database.db.query.searchConnection.findMany({
+        where: eq(searchConnection.configuredByUserId, actor.id),
+      }),
+    ).resolves.toEqual([]);
+    await expect(
+      database.db.query.auditEvent.findMany({
+        where: eq(auditEvent.actorId, actor.id),
+      }),
+    ).resolves.toEqual([]);
+  });
+
   it("selects the shared canonical Owner connection before newer Admin connections", async () => {
     state.environment.DEPLOYMENT_MODE = "shared";
     const ownerActor = await createUser("owner");

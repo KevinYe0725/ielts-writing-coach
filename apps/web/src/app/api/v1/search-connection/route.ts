@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { getServerContext } from "@/lib/server/context";
 import { apiRoute } from "@/lib/server/problem";
-import { parseJsonBody } from "@/lib/server/request";
+import { emptyObjectSchema, parseJsonBody } from "@/lib/server/request";
 import {
   getSearchConnectionProjection,
   revokeSearchConnection,
@@ -52,13 +52,20 @@ export const PUT = apiRoute(async (request) => {
   );
   if (reservation.replay) return reservation.replay;
   try {
-    const responseBody = await saveSearchConnection(db, actor, payload.api_key);
-    await completeIdempotentResponse(
+    const responseBody = await saveSearchConnection(
       db,
-      actor.id,
-      reservation.key,
-      200,
-      responseBody,
+      actor,
+      payload.api_key,
+      {
+        afterPersist: async (transaction, responseBody) =>
+          completeIdempotentResponse(
+            transaction,
+            actor.id,
+            reservation.key,
+            200,
+            responseBody!,
+          ),
+      },
     );
     return Response.json(responseBody, {
       headers: { "cache-control": "no-store" },
@@ -78,13 +85,25 @@ export const DELETE = apiRoute(async (request) => {
     windowSeconds: 60 * 60,
     identity: actor.id,
   });
+  await parseJsonBody(request, emptyObjectSchema, {
+    allowEmpty: true,
+    maximumBytes: 1_024,
+  });
   const { db } = getServerContext();
   const reservation = await reserveIdempotencyKey(db, actor.id, request, {});
   if (reservation.replay) return reservation.replay;
   try {
-    await revokeSearchConnection(db, actor);
-    await completeIdempotentResponse(db, actor.id, reservation.key, 204, {
-      revoked: true,
+    await revokeSearchConnection(db, actor, {
+      afterPersist: async (transaction) =>
+        completeIdempotentResponse(
+          transaction,
+          actor.id,
+          reservation.key,
+          204,
+          {
+            revoked: true,
+          },
+        ),
     });
     return new Response(null, {
       status: 204,

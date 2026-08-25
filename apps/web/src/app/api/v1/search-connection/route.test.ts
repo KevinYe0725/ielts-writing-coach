@@ -72,12 +72,23 @@ describe("/api/v1/search-connection", () => {
       role: "owner",
     };
     state.getProjection.mockReset().mockResolvedValue(null);
-    state.save.mockReset().mockResolvedValue({
-      kind: "brave",
-      status: "ACTIVE",
-      tested_at: "2026-08-25T00:00:00.000Z",
-    });
-    state.revoke.mockReset().mockResolvedValue(true);
+    state.save
+      .mockReset()
+      .mockImplementation(async (_db, _actor, _key, options) => {
+        const response = {
+          kind: "brave",
+          status: "ACTIVE",
+          tested_at: "2026-08-25T00:00:00.000Z",
+        };
+        await options?.afterPersist(state.db, response);
+        return response;
+      });
+    state.revoke
+      .mockReset()
+      .mockImplementation(async (_db, _actor, options) => {
+        await options?.afterPersist(state.db, undefined);
+        return true;
+      });
     state.protectMutation.mockReset().mockImplementation(() => undefined);
     state.enforceRateLimit.mockReset().mockResolvedValue(undefined);
     state.reserve.mockReset().mockResolvedValue({ key: "request-key" });
@@ -136,7 +147,12 @@ describe("/api/v1/search-connection", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
-    expect(state.save).toHaveBeenCalledWith(state.db, state.actor, apiKey);
+    expect(state.save).toHaveBeenCalledWith(
+      state.db,
+      state.actor,
+      apiKey,
+      expect.objectContaining({ afterPersist: expect.any(Function) }),
+    );
     expect(state.complete).toHaveBeenCalledWith(
       state.db,
       state.actor.id,
@@ -164,7 +180,11 @@ describe("/api/v1/search-connection", () => {
 
     expect(response.status).toBe(204);
     expect(response.headers.get("cache-control")).toBe("no-store");
-    expect(state.revoke).toHaveBeenCalledWith(state.db, state.actor);
+    expect(state.revoke).toHaveBeenCalledWith(
+      state.db,
+      state.actor,
+      expect.objectContaining({ afterPersist: expect.any(Function) }),
+    );
     expect(state.complete).toHaveBeenCalledWith(
       state.db,
       state.actor.id,
@@ -172,5 +192,51 @@ describe("/api/v1/search-connection", () => {
       204,
       { revoked: true },
     );
+  });
+
+  it("rejects unexpected and oversized DELETE bodies before reservation", async () => {
+    for (const [body, expectedStatus] of [
+      [{ unexpected: true }, 422],
+      [{ padding: "x".repeat(1_025) }, 413],
+    ] as const) {
+      const response = await DELETE(
+        request("DELETE", body, { "idempotency-key": "search-delete-body" }),
+      );
+
+      expect(response.status).toBe(expectedStatus);
+    }
+    expect(state.reserve).not.toHaveBeenCalled();
+    expect(state.revoke).not.toHaveBeenCalled();
+  });
+
+  it("returns an idempotent replay without repeating the connection mutation", async () => {
+    state.reserve.mockResolvedValue({
+      key: "replay-key",
+      replay: Response.json(
+        {
+          kind: "brave",
+          status: "ACTIVE",
+          tested_at: "2026-08-25T00:00:00.000Z",
+        },
+        {
+          headers: {
+            "cache-control": "no-store",
+            "idempotency-replayed": "true",
+          },
+        },
+      ),
+    });
+
+    const response = await PUT(
+      request(
+        "PUT",
+        { api_key: "replayed-api-key" },
+        { "idempotency-key": "search-replay-1" },
+      ),
+    );
+
+    expect(response.headers.get("idempotency-replayed")).toBe("true");
+    expect(state.save).not.toHaveBeenCalled();
+    expect(state.complete).not.toHaveBeenCalled();
   });
 });

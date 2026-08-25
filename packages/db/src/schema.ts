@@ -366,7 +366,12 @@ export const searchConnection = pgTable(
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
-  (table) => [index("search_connection_status_idx").on(table.status)],
+  (table) => [
+    index("search_connection_status_idx").on(table.status),
+    uniqueIndex("search_connection_selected_user_unique")
+      .on(table.configuredByUserId)
+      .where(sql`${table.status} in ('ACTIVE', 'INVALID')`),
+  ],
 );
 
 export const questionRecommendation = pgTable(
