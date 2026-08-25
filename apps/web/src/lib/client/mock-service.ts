@@ -27,6 +27,7 @@ import type {
   TodayData,
   TeachingPracticePrompt,
   TeachingPracticeResponseData,
+  TrainingCycleRecommendationLink,
   TransferResponseInput,
   TransferResult,
   TransferSubmission,
@@ -1544,36 +1545,6 @@ export class MockLearningClient implements LearningClient {
     };
   }
 
-  async abandonQuestionRecommendation(id: string): Promise<void> {
-    await delay();
-    type StoredDemoRecommendation = {
-      id?: string;
-      status?: string;
-      question?: QuestionOption;
-    };
-    let stored: StoredDemoRecommendation | null = null;
-    try {
-      stored = JSON.parse(
-        readStorage(STORAGE_KEYS.questionRecommendationActive) ?? "null",
-      ) as StoredDemoRecommendation | null;
-    } catch {
-      // Damaged demo state is replaced by the terminal record below.
-    }
-    if (stored?.id === id && stored.question) {
-      const exposures = readDemoRecommendationExposures().filter(
-        (entry) => entry.id !== stored?.question?.id,
-      );
-      writeStorage(
-        STORAGE_KEYS.questionRecommendationExposure,
-        JSON.stringify(exposures),
-      );
-    }
-    writeStorage(
-      STORAGE_KEYS.questionRecommendationActive,
-      JSON.stringify({ id, status: "ABANDONED" }),
-    );
-  }
-
   async createCustomQuestion(
     input: CustomQuestionInput,
   ): Promise<QuestionOption> {
@@ -1587,11 +1558,55 @@ export class MockLearningClient implements LearningClient {
 
   async startTrainingCycle(
     questionId: string,
-    recommendationId?: string,
+    recommendation: TrainingCycleRecommendationLink = {},
   ): Promise<string> {
+    type StoredDemoRecommendation = {
+      id?: string;
+      status?: string;
+      question?: QuestionOption;
+    };
+    let active: StoredDemoRecommendation | null = null;
+    try {
+      active = JSON.parse(
+        readStorage(STORAGE_KEYS.questionRecommendationActive) ?? "null",
+      ) as StoredDemoRecommendation | null;
+    } catch {
+      // Invalid demo state fails the coupled operation below.
+    }
+    if (recommendation.recommendationId) {
+      if (
+        active?.id !== recommendation.recommendationId ||
+        active.status !== "READY" ||
+        active.question?.id !== questionId
+      )
+        throw new LearningClientError(
+          "The recommendation is not ready for this question.",
+          { code: "RECOMMENDATION_NOT_READY" },
+        );
+      writeStorage(
+        STORAGE_KEYS.questionRecommendationActive,
+        JSON.stringify({ ...active, status: "STARTED" }),
+      );
+    } else if (recommendation.abandonRecommendationId) {
+      if (
+        active?.id !== recommendation.abandonRecommendationId ||
+        (active.status !== "PENDING" && active.status !== "READY")
+      )
+        throw new LearningClientError(
+          "The recommendation cannot be abandoned for this cycle.",
+          { code: "RECOMMENDATION_NOT_ABANDONABLE" },
+        );
+      writeStorage(
+        STORAGE_KEYS.questionRecommendationActive,
+        JSON.stringify({ ...active, status: "ABANDONED" }),
+      );
+    }
     writeStorage(STORAGE_KEYS.selectedQuestion, questionId);
-    if (recommendationId)
-      writeStorage(STORAGE_KEYS.selectedRecommendation, recommendationId);
+    if (recommendation.recommendationId)
+      writeStorage(
+        STORAGE_KEYS.selectedRecommendation,
+        recommendation.recommendationId,
+      );
     await delay();
     return "cycle-demo-selected";
   }

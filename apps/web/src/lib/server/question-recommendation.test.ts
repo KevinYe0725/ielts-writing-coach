@@ -22,13 +22,12 @@ import * as questionRecommendationModule from "./question-recommendation";
 import { completeIdempotentResponse, reserveIdempotencyKey } from "./security";
 
 import {
-  abandonQuestionRecommendation,
-  assertRecommendationForCycle,
   buildQuestionBankRefillTargetMix,
   createQuestionRecommendation,
   getQuestionRecommendation,
   listPublicQuestionCatalog,
 } from "./question-recommendation";
+import { lockLearnerAndAssertActiveCycleCapacity } from "./active-cycle-limit";
 
 const databaseUrl =
   process.env.IWC_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
@@ -133,6 +132,26 @@ integration("question recommendation service (PostgreSQL)", () => {
     now: () => now,
     randomIndex: () => 0,
   };
+
+  type RecommendationTransaction = Parameters<
+    Parameters<Database["transaction"]>[0]
+  >[0];
+
+  function cycleRecommendationApi() {
+    return questionRecommendationModule as unknown as {
+      abandonRecommendationForCycle?: (
+        transaction: RecommendationTransaction,
+        actorId: string,
+        recommendationId: string,
+      ) => Promise<void>;
+      assertRecommendationForCycle?: (
+        transaction: RecommendationTransaction,
+        actorId: string,
+        recommendationId: string,
+        questionExternalId: string,
+      ) => Promise<void>;
+    };
+  }
 
   function marginalCounts(
     targetMix: Array<{ questionType: string; topic: string }>,
@@ -434,14 +453,14 @@ integration("question recommendation service (PostgreSQL)", () => {
         userId: learnerId,
         questionExternalId: tooRecent!.id,
         action: "INITIAL",
-        status: "READY",
+        status: "ABANDONED",
         shownAt: new Date(now.getTime() - (72 * 60 * 60 * 1_000 - 1_000)),
       },
       {
         userId: learnerId,
         questionExternalId: exactBoundary!.id,
         action: "INITIAL",
-        status: "READY",
+        status: "STARTED",
         shownAt: new Date(now.getTime() - 72 * 60 * 60 * 1_000),
       },
     ]);
@@ -1094,9 +1113,17 @@ integration("question recommendation service (PostgreSQL)", () => {
     ).resolves.toMatchObject({ status: "READY", shownAt: now });
   });
 
-  it("abandons READY without exposure and makes its question immediately selectable again", async () => {
+  it("couples READY fallback to cycle creation, preserves exposure, and keeps the question cooled", async () => {
+    const abandon = cycleRecommendationApi().abandonRecommendationForCycle;
+    expect(abandon).toEqual(expect.any(Function));
+    if (!abandon) return;
     const learnerId = await createLearner("recommend-abandon-ready");
     const candidate = QUESTION_BANK[0]!;
+    const manualQuestionId = await insertStoredQuestion({
+      externalId: `manual-ready-fallback-${newDomainId()}`,
+      ownerId: learnerId,
+      visibility: "private",
+    });
     await exposeAllExcept(learnerId, [candidate.id]);
     const ready = await createQuestionRecommendation(
       database.db,
@@ -1109,48 +1136,83 @@ integration("question recommendation service (PostgreSQL)", () => {
       question: { id: candidate.id },
     });
 
-    await abandonQuestionRecommendation(database.db, learnerId, ready.id);
-    await abandonQuestionRecommendation(database.db, learnerId, ready.id);
+    await database.db.transaction(async (transaction) => {
+      await lockLearnerAndAssertActiveCycleCapacity(transaction, learnerId);
+      await abandon(transaction, learnerId, ready.id);
+      await transaction.insert(trainingCycle).values({
+        userId: learnerId,
+        questionId: manualQuestionId,
+        status: "QUESTION_READY",
+        schemaVersion: "1.0.0",
+        timezone: "UTC",
+      });
+    });
 
-    await expect(
-      database.db.query.questionRecommendation.findFirst({
-        where: eq(questionRecommendation.id, ready.id),
-      }),
-    ).resolves.toMatchObject({
+    const abandoned = await database.db.query.questionRecommendation.findFirst({
+      where: eq(questionRecommendation.id, ready.id),
+    });
+    expect(abandoned).toMatchObject({
       status: "ABANDONED",
-      questionExternalId: null,
-      shownAt: null,
+      questionExternalId: candidate.id,
+      shownAt: now,
       safeFailureCode: null,
     });
     await expect(
-      createQuestionRecommendation(
-        database.db,
-        learnerId,
-        { action: "INITIAL" },
-        options,
-      ),
-    ).resolves.toMatchObject({
-      status: "READY",
-      question: { id: candidate.id },
+      database.db.transaction(async (transaction) => {
+        await lockLearnerAndAssertActiveCycleCapacity(transaction, learnerId);
+        await abandon(transaction, learnerId, ready.id);
+      }),
+    ).rejects.toMatchObject({
+      problem: { code: "RECOMMENDATION_NOT_ABANDONABLE", status: 409 },
     });
-  });
-
-  it("abandons PENDING for its owner, projects it generically, and rejects another learner", async () => {
-    const learnerId = await createLearner("recommend-abandon-pending");
-    const otherId = await createLearner("recommend-abandon-other");
-    await exposeAllExcept(learnerId, []);
-    const pending = await createQuestionRecommendation(
+    const next = await createQuestionRecommendation(
       database.db,
       learnerId,
       { action: "INITIAL" },
       options,
     );
-    expect(pending.status).toBe("PENDING");
+    expect(next.status).not.toBe("READY");
+    expect(next.question).toBeNull();
+  });
+
+  it("couples PENDING fallback for its owner without creating an exposure", async () => {
+    const abandon = cycleRecommendationApi().abandonRecommendationForCycle;
+    expect(abandon).toEqual(expect.any(Function));
+    if (!abandon) return;
+    const learnerId = await createLearner("recommend-abandon-pending");
+    const otherId = await createLearner("recommend-abandon-other");
+    const manualQuestionId = await insertStoredQuestion({
+      externalId: `manual-pending-fallback-${newDomainId()}`,
+      ownerId: learnerId,
+      visibility: "private",
+    });
+    const candidate = QUESTION_BANK[0]!;
+    const pending = { id: newDomainId() };
+    await exposeAllExcept(learnerId, [candidate.id]);
+    await database.db.insert(questionRecommendation).values({
+      id: pending.id,
+      userId: learnerId,
+      action: "INITIAL",
+      status: "PENDING",
+    });
 
     await expect(
-      abandonQuestionRecommendation(database.db, otherId, pending.id),
+      database.db.transaction(async (transaction) => {
+        await lockLearnerAndAssertActiveCycleCapacity(transaction, otherId);
+        await abandon(transaction, otherId, pending.id);
+      }),
     ).rejects.toMatchObject({ problem: { status: 404 } });
-    await abandonQuestionRecommendation(database.db, learnerId, pending.id);
+    await database.db.transaction(async (transaction) => {
+      await lockLearnerAndAssertActiveCycleCapacity(transaction, learnerId);
+      await abandon(transaction, learnerId, pending.id);
+      await transaction.insert(trainingCycle).values({
+        userId: learnerId,
+        questionId: manualQuestionId,
+        status: "QUESTION_READY",
+        schemaVersion: "1.0.0",
+        timezone: "UTC",
+      });
+    });
 
     await expect(
       getQuestionRecommendation(database.db, learnerId, pending.id, options),
@@ -1164,10 +1226,72 @@ integration("question recommendation service (PostgreSQL)", () => {
         where: eq(questionRecommendation.id, pending.id),
       }),
     ).resolves.toMatchObject({ status: "ABANDONED", shownAt: null });
+    await expect(
+      database.db.query.trainingCycle.findMany({
+        where: eq(trainingCycle.userId, learnerId),
+      }),
+    ).resolves.toHaveLength(1);
+    await expect(
+      createQuestionRecommendation(
+        database.db,
+        learnerId,
+        { action: "INITIAL" },
+        options,
+      ),
+    ).resolves.toMatchObject({
+      status: "READY",
+      question: { id: candidate.id },
+    });
   });
 
-  it("linearizes poll finalization before abandonment and removes the READY exposure", async () => {
+  it("rolls back abandonment when the coupled cycle transaction fails", async () => {
+    const abandon = cycleRecommendationApi().abandonRecommendationForCycle;
+    expect(abandon).toEqual(expect.any(Function));
+    if (!abandon) return;
+    const learnerId = await createLearner("recommend-abandon-rollback");
+    const candidate = QUESTION_BANK[0]!;
+    await exposeAllExcept(learnerId, [candidate.id]);
+    const ready = await createQuestionRecommendation(
+      database.db,
+      learnerId,
+      { action: "INITIAL" },
+      options,
+    );
+
+    await expect(
+      database.db.transaction(async (transaction) => {
+        await lockLearnerAndAssertActiveCycleCapacity(transaction, learnerId);
+        await abandon(transaction, learnerId, ready.id);
+        throw new Error("cycle insert failed");
+      }),
+    ).rejects.toThrow("cycle insert failed");
+
+    await expect(
+      database.db.query.questionRecommendation.findFirst({
+        where: eq(questionRecommendation.id, ready.id),
+      }),
+    ).resolves.toMatchObject({
+      status: "READY",
+      questionExternalId: candidate.id,
+      shownAt: now,
+    });
+    await expect(
+      database.db.query.trainingCycle.findMany({
+        where: eq(trainingCycle.userId, learnerId),
+      }),
+    ).resolves.toHaveLength(0);
+  });
+
+  it("linearizes poll finalization before coupled fallback and preserves the READY exposure", async () => {
+    const abandon = cycleRecommendationApi().abandonRecommendationForCycle;
+    expect(abandon).toEqual(expect.any(Function));
+    if (!abandon) return;
     const learnerId = await createLearner("recommend-finalize-before-abandon");
+    const manualQuestionId = await insertStoredQuestion({
+      externalId: `manual-finalize-first-${newDomainId()}`,
+      ownerId: learnerId,
+      visibility: "private",
+    });
     await exposeAllExcept(learnerId, []);
     const pending = await createQuestionRecommendation(
       database.db,
@@ -1210,29 +1334,48 @@ integration("question recommendation service (PostgreSQL)", () => {
       options,
     );
     await atCommit;
-    const abandonment = abandonQuestionRecommendation(
-      database.db,
-      learnerId,
-      pending.id,
-    );
+    const fallback = database.db.transaction(async (transaction) => {
+      await lockLearnerAndAssertActiveCycleCapacity(transaction, learnerId);
+      await abandon(transaction, learnerId, pending.id);
+      await transaction.insert(trainingCycle).values({
+        userId: learnerId,
+        questionId: manualQuestionId,
+        status: "QUESTION_READY",
+        schemaVersion: "1.0.0",
+        timezone: "UTC",
+      });
+    });
     await waitForLockWaiter();
     release();
 
     await expect(poll).resolves.toMatchObject({ status: "READY" });
-    await expect(abandonment).resolves.toBeUndefined();
+    await expect(fallback).resolves.toBeUndefined();
     await expect(
       database.db.query.questionRecommendation.findFirst({
         where: eq(questionRecommendation.id, pending.id),
       }),
     ).resolves.toMatchObject({
       status: "ABANDONED",
-      questionExternalId: null,
-      shownAt: null,
+      questionExternalId: generatedExternalId,
+      shownAt: now,
     });
+    await expect(
+      database.db.query.trainingCycle.findMany({
+        where: eq(trainingCycle.userId, learnerId),
+      }),
+    ).resolves.toHaveLength(1);
   });
 
-  it("linearizes abandonment before polling so the batch cannot finalize it", async () => {
+  it("linearizes coupled PENDING fallback before polling so the batch cannot finalize it", async () => {
+    const abandon = cycleRecommendationApi().abandonRecommendationForCycle;
+    expect(abandon).toEqual(expect.any(Function));
+    if (!abandon) return;
     const learnerId = await createLearner("recommend-abandon-before-finalize");
+    const manualQuestionId = await insertStoredQuestion({
+      externalId: `manual-abandon-first-${newDomainId()}`,
+      ownerId: learnerId,
+      visibility: "private",
+    });
     await exposeAllExcept(learnerId, []);
     const pending = await createQuestionRecommendation(
       database.db,
@@ -1268,11 +1411,17 @@ integration("question recommendation service (PostgreSQL)", () => {
       release: () => released,
     });
 
-    const abandonment = abandonQuestionRecommendation(
-      abandoningDatabase,
-      learnerId,
-      pending.id,
-    );
+    const fallback = abandoningDatabase.transaction(async (transaction) => {
+      await lockLearnerAndAssertActiveCycleCapacity(transaction, learnerId);
+      await abandon(transaction, learnerId, pending.id);
+      await transaction.insert(trainingCycle).values({
+        userId: learnerId,
+        questionId: manualQuestionId,
+        status: "QUESTION_READY",
+        schemaVersion: "1.0.0",
+        timezone: "UTC",
+      });
+    });
     await atCommit;
     const poll = getQuestionRecommendation(
       database.db,
@@ -1283,7 +1432,7 @@ integration("question recommendation service (PostgreSQL)", () => {
     await waitForLockWaiter();
     release();
 
-    await expect(abandonment).resolves.toBeUndefined();
+    await expect(fallback).resolves.toBeUndefined();
     await expect(poll).resolves.toEqual({
       id: pending.id,
       status: "UNAVAILABLE",
@@ -1298,6 +1447,11 @@ integration("question recommendation service (PostgreSQL)", () => {
       questionExternalId: null,
       shownAt: null,
     });
+    await expect(
+      database.db.query.trainingCycle.findMany({
+        where: eq(trainingCycle.userId, learnerId),
+      }),
+    ).resolves.toHaveLength(1);
   });
 
   it("polling a failed batch finalizes UNAVAILABLE without creating learning rows", async () => {
@@ -1462,39 +1616,83 @@ integration("question recommendation service (PostgreSQL)", () => {
     });
   });
 
-  it("verifies recommendation ownership and exact question before cycle creation", async () => {
+  it("locks and marks a matching READY recommendation STARTED while terminal states cannot replay", async () => {
+    const assertForCycle =
+      cycleRecommendationApi().assertRecommendationForCycle;
+    expect(assertForCycle).toEqual(expect.any(Function));
+    if (!assertForCycle) return;
     const learnerId = await createLearner("recommend-cycle-audit");
     const otherId = await createLearner("recommend-cycle-other");
-    const ready = await createQuestionRecommendation(
-      database.db,
-      learnerId,
-      { action: "INITIAL" },
-      options,
-    );
+    const candidate = QUESTION_BANK[0]!;
+    const mismatchId = newDomainId();
+    const otherOwnedId = newDomainId();
+    const startedId = newDomainId();
+    await database.db.insert(questionRecommendation).values([
+      {
+        id: startedId,
+        userId: learnerId,
+        questionExternalId: candidate.id,
+        action: "INITIAL",
+        status: "READY",
+        shownAt: now,
+      },
+      {
+        id: mismatchId,
+        userId: learnerId,
+        questionExternalId: candidate.id,
+        action: "INITIAL",
+        status: "READY",
+        shownAt: now,
+      },
+      {
+        id: otherOwnedId,
+        userId: learnerId,
+        questionExternalId: candidate.id,
+        action: "INITIAL",
+        status: "READY",
+        shownAt: now,
+      },
+    ]);
 
     await expect(
-      assertRecommendationForCycle(
-        database.db,
-        learnerId,
-        ready.id,
-        ready.question!.id,
-      ),
+      database.db.transaction(async (transaction) => {
+        await lockLearnerAndAssertActiveCycleCapacity(transaction, learnerId);
+        await assertForCycle(transaction, learnerId, startedId, candidate.id);
+      }),
     ).resolves.toBeUndefined();
     await expect(
-      assertRecommendationForCycle(
-        database.db,
-        otherId,
-        ready.id,
-        ready.question!.id,
-      ),
+      database.db.query.questionRecommendation.findFirst({
+        where: eq(questionRecommendation.id, startedId),
+      }),
+    ).resolves.toMatchObject({
+      status: "STARTED",
+      questionExternalId: candidate.id,
+      shownAt: now,
+    });
+    await expect(
+      database.db.transaction(async (transaction) => {
+        await lockLearnerAndAssertActiveCycleCapacity(transaction, learnerId);
+        await assertForCycle(transaction, learnerId, startedId, candidate.id);
+      }),
+    ).rejects.toMatchObject({
+      problem: { status: 409, code: "RECOMMENDATION_NOT_READY" },
+    });
+    await expect(
+      database.db.transaction(async (transaction) => {
+        await lockLearnerAndAssertActiveCycleCapacity(transaction, otherId);
+        await assertForCycle(transaction, otherId, otherOwnedId, candidate.id);
+      }),
     ).rejects.toMatchObject({ problem: { status: 404 } });
     await expect(
-      assertRecommendationForCycle(
-        database.db,
-        learnerId,
-        ready.id,
-        QUESTION_BANK[1]!.id,
-      ),
+      database.db.transaction(async (transaction) => {
+        await lockLearnerAndAssertActiveCycleCapacity(transaction, learnerId);
+        await assertForCycle(
+          transaction,
+          learnerId,
+          mismatchId,
+          QUESTION_BANK[1]!.id,
+        );
+      }),
     ).rejects.toMatchObject({
       problem: { status: 409, code: "RECOMMENDATION_QUESTION_MISMATCH" },
     });

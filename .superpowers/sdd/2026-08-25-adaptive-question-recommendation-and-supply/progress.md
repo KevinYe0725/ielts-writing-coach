@@ -202,3 +202,7 @@ Final remediation F1: complete (internal ABANDONED state, protected atomic
 DELETE, GET/DELETE PostgreSQL race barriers, strict client/Demo persistence,
 and manual/private fallback abandonment before custom/cycle creation; see
 final-remediation-f1-report.md)
+Final remediation F1: fix round 1/5 complete (removed standalone exposure reset;
+cycle POST now atomically transitions READY to STARTED or PENDING/READY to
+ABANDONED under the learner lock; shown READY exposure remains cooled for 72h;
+Today and Demo couple manual/private fallback to the one cycle request)

@@ -75,7 +75,7 @@ describe("browser-only Demo administration boundary", () => {
     );
   });
 
-  it("durably abandons Demo exposure and makes the question selectable again", async () => {
+  it("couples Demo READY abandonment to cycle creation and preserves its cooldown", async () => {
     const localStorage = testStorage({});
     const sessionStorage = testStorage({});
     vi.stubGlobal("window", { localStorage, sessionStorage, setTimeout });
@@ -84,33 +84,64 @@ describe("browser-only Demo administration boundary", () => {
       action: "INITIAL",
     });
     expect(first.state).toBe("READY");
-    const abandon = (
+    if (first.state !== "READY") return;
+    const start = (
       client as unknown as {
-        abandonQuestionRecommendation?: (id: string) => Promise<void>;
+        startTrainingCycle: (
+          questionId: string,
+          options: { abandonRecommendationId: string },
+        ) => Promise<string>;
       }
-    ).abandonQuestionRecommendation;
-    expect(abandon).toEqual(expect.any(Function));
-    if (!abandon) return;
+    ).startTrainingCycle;
 
-    await abandon.call(client, first.id);
+    await expect(
+      start.call(client, "manual-demo-question", {
+        abandonRecommendationId: first.id,
+      }),
+    ).resolves.toBe("cycle-demo-selected");
 
     expect(
       JSON.parse(
         localStorage.getItem("iwc.demo.question-recommendation-active") ??
           "null",
       ),
-    ).toEqual({ id: first.id, status: "ABANDONED" });
+    ).toMatchObject({ id: first.id, status: "ABANDONED" });
     expect(
       JSON.parse(
         localStorage.getItem("iwc.demo.question-recommendation-exposure") ??
           "null",
       ),
-    ).toEqual([]);
-    await expect(
-      client.requestQuestionRecommendation({ action: "INITIAL" }),
-    ).resolves.toMatchObject({
-      state: "READY",
-      id: first.id,
+    ).toHaveLength(1);
+    const next = await client.requestQuestionRecommendation({
+      action: "INITIAL",
     });
+    expect(next.state).toBe("READY");
+    expect(next.id).not.toBe(first.id);
+  });
+
+  it("marks a Demo recommended start terminal STARTED inside cycle creation", async () => {
+    const localStorage = testStorage({});
+    vi.stubGlobal("window", {
+      localStorage,
+      sessionStorage: testStorage({}),
+      setTimeout,
+    });
+    const client = new MockLearningClient();
+    const ready = await client.requestQuestionRecommendation({
+      action: "INITIAL",
+    });
+    expect(ready.state).toBe("READY");
+    if (ready.state !== "READY") return;
+
+    await client.startTrainingCycle(ready.question.id, {
+      recommendationId: ready.id,
+    });
+
+    expect(
+      JSON.parse(
+        localStorage.getItem("iwc.demo.question-recommendation-active") ??
+          "null",
+      ),
+    ).toMatchObject({ id: ready.id, status: "STARTED" });
   });
 });

@@ -98,10 +98,6 @@ export interface QuestionRecommendationServiceOptions {
   ) => Promise<void>;
 }
 
-export interface AbandonQuestionRecommendationOptions {
-  afterPersist?: (transaction: DatabaseTransaction) => Promise<void>;
-}
-
 export interface QuestionSupplyRetryProjection {
   state: "STARTED" | "ATTACHED";
   batchStatus: (typeof questionGenerationBatch.$inferSelect)["status"];
@@ -385,7 +381,11 @@ export async function getQuestionRecommendation(
       }
       return { id: stored.id, status: "READY", question: projected };
     }
-    if (stored.status === "UNAVAILABLE" || stored.status === "ABANDONED") {
+    if (
+      stored.status === "UNAVAILABLE" ||
+      stored.status === "ABANDONED" ||
+      stored.status === "STARTED"
+    ) {
       return { id: stored.id, status: "UNAVAILABLE", question: null };
     }
     if (!stored.generationBatchId) {
@@ -445,59 +445,49 @@ export async function getQuestionRecommendation(
   });
 }
 
-export async function abandonQuestionRecommendation(
-  database: Database,
+export async function abandonRecommendationForCycle(
+  transaction: DatabaseTransaction,
   actorId: string,
   recommendationId: string,
-  options: AbandonQuestionRecommendationOptions = {},
 ): Promise<void> {
-  await database.transaction(async (transaction) => {
-    await lockLearner(transaction, actorId);
-    const [stored] = await transaction
-      .select({ status: questionRecommendation.status })
-      .from(questionRecommendation)
-      .where(
-        and(
-          eq(questionRecommendation.id, recommendationId),
-          eq(questionRecommendation.userId, actorId),
-        ),
-      )
-      .limit(1)
-      .for("update");
-    if (!stored) throw recommendationNotFound();
-    if (stored.status !== "ABANDONED") {
-      await transaction
-        .update(questionRecommendation)
-        .set({
-          status: "ABANDONED",
-          questionExternalId: null,
-          shownAt: null,
-          safeFailureCode: null,
-        })
-        .where(
-          and(
-            eq(questionRecommendation.id, recommendationId),
-            eq(questionRecommendation.userId, actorId),
-          ),
-        );
-    }
-    await options.afterPersist?.(transaction);
-  });
+  const [stored] = await lockOwnedRecommendation(
+    transaction,
+    actorId,
+    recommendationId,
+  );
+  if (!stored) throw recommendationNotFound();
+  if (stored.status !== "PENDING" && stored.status !== "READY") {
+    throw new ApiProblem({
+      title: "Recommendation cannot be abandoned",
+      status: 409,
+      code: "RECOMMENDATION_NOT_ABANDONABLE",
+      detail:
+        "This recommendation has already reached a terminal state. Request a new recommendation before starting another essay.",
+    });
+  }
+  await transaction
+    .update(questionRecommendation)
+    .set({ status: "ABANDONED" })
+    .where(
+      and(
+        eq(questionRecommendation.id, recommendationId),
+        eq(questionRecommendation.userId, actorId),
+        inArray(questionRecommendation.status, ["PENDING", "READY"]),
+      ),
+    );
 }
 
 export async function assertRecommendationForCycle(
-  database: Database,
+  transaction: DatabaseTransaction,
   actorId: string,
   recommendationId: string,
   questionExternalId: string,
 ): Promise<void> {
-  const stored = await database.query.questionRecommendation.findFirst({
-    columns: { questionExternalId: true, status: true },
-    where: and(
-      eq(questionRecommendation.id, recommendationId),
-      eq(questionRecommendation.userId, actorId),
-    ),
-  });
+  const [stored] = await lockOwnedRecommendation(
+    transaction,
+    actorId,
+    recommendationId,
+  );
   if (!stored) throw recommendationNotFound();
   if (stored.status !== "READY") {
     throw new ApiProblem({
@@ -517,6 +507,16 @@ export async function assertRecommendationForCycle(
         "Start the question attached to this recommendation or omit the recommendation reference.",
     });
   }
+  await transaction
+    .update(questionRecommendation)
+    .set({ status: "STARTED" })
+    .where(
+      and(
+        eq(questionRecommendation.id, recommendationId),
+        eq(questionRecommendation.userId, actorId),
+        eq(questionRecommendation.status, "READY"),
+      ),
+    );
 }
 
 export async function retryQuestionBankRefill(
@@ -702,16 +702,29 @@ async function selectForLearner(
         eq(questionRecommendation.userId, actorId),
         or(
           and(
-            eq(questionRecommendation.status, "READY"),
+            inArray(questionRecommendation.status, [
+              "READY",
+              "ABANDONED",
+              "STARTED",
+            ]),
             gt(questionRecommendation.shownAt, exposureCutoff(input.now)),
           ),
           and(
             eq(questionRecommendation.action, "SWAP"),
-            inArray(questionRecommendation.status, [
-              "PENDING",
-              "READY",
-              "UNAVAILABLE",
-            ]),
+            or(
+              inArray(questionRecommendation.status, [
+                "PENDING",
+                "UNAVAILABLE",
+              ]),
+              and(
+                inArray(questionRecommendation.status, [
+                  "READY",
+                  "ABANDONED",
+                  "STARTED",
+                ]),
+                isNotNull(questionRecommendation.shownAt),
+              ),
+            ),
             isNotNull(questionRecommendation.excludedExternalId),
             gt(
               sql`coalesce(${questionRecommendation.shownAt}, ${questionRecommendation.createdAt})`,
@@ -934,6 +947,27 @@ function isQuestionType(value: string): value is QuestionType {
 
 function isQuestionTopic(value: string): value is QuestionTopic {
   return (TOPICS as readonly string[]).includes(value);
+}
+
+function lockOwnedRecommendation(
+  transaction: DatabaseTransaction,
+  actorId: string,
+  recommendationId: string,
+) {
+  return transaction
+    .select({
+      questionExternalId: questionRecommendation.questionExternalId,
+      status: questionRecommendation.status,
+    })
+    .from(questionRecommendation)
+    .where(
+      and(
+        eq(questionRecommendation.id, recommendationId),
+        eq(questionRecommendation.userId, actorId),
+      ),
+    )
+    .limit(1)
+    .for("update");
 }
 
 function recommendationNotFound(): ApiProblem {

@@ -103,7 +103,7 @@ export const questionRecommendationAction = pgEnum(
 );
 export const questionRecommendationStatusEnum = pgEnum(
   "question_recommendation_status",
-  ["PENDING", "READY", "UNAVAILABLE", "ABANDONED"],
+  ["PENDING", "READY", "UNAVAILABLE", "ABANDONED", "STARTED"],
 );
 export const questionGenerationBatchStatusEnum = pgEnum(
   "question_generation_batch_status",
@@ -131,7 +131,8 @@ export type QuestionRecommendationStatus =
   | "PENDING"
   | "READY"
   | "UNAVAILABLE"
-  | "ABANDONED";
+  | "ABANDONED"
+  | "STARTED";
 export type QuestionRecommendationAction = "INITIAL" | "SWAP";
 export type QuestionGenerationBatchStatus =
   | "QUEUED"

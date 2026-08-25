@@ -949,6 +949,7 @@ integration("question-bank refill PostgreSQL publication", () => {
   const failedJobId = newDomainId();
   const recommendationId = newDomainId();
   const abandonedRecommendationId = newDomainId();
+  const startedRecommendationId = newDomainId();
   const rejectedBatchId = newDomainId();
   const rejectedJobId = newDomainId();
   const rejectedRecommendationId = newDomainId();
@@ -1551,6 +1552,15 @@ integration("question-bank refill PostgreSQL publication", () => {
       action: "INITIAL",
       status: "ABANDONED",
     });
+    await databaseContext.db.insert(questionRecommendation).values({
+      id: startedRecommendationId,
+      userId,
+      generationBatchId: failedBatchId,
+      questionExternalId: "started-question",
+      action: "INITIAL",
+      status: "STARTED",
+      shownAt: new Date(),
+    });
 
     await expect(
       refillQuestionBank(
@@ -1560,7 +1570,7 @@ integration("question-bank refill PostgreSQL publication", () => {
       ),
     ).rejects.toBe(failure);
 
-    const [batch, recommendation, abandoned, sharedWaiting, saved] =
+    const [batch, recommendation, abandoned, started, sharedWaiting, saved] =
       await Promise.all([
         databaseContext.db.query.questionGenerationBatch.findFirst({
           where: eq(questionGenerationBatch.id, failedBatchId),
@@ -1570,6 +1580,9 @@ integration("question-bank refill PostgreSQL publication", () => {
         }),
         databaseContext.db.query.questionRecommendation.findFirst({
           where: eq(questionRecommendation.id, abandonedRecommendationId),
+        }),
+        databaseContext.db.query.questionRecommendation.findFirst({
+          where: eq(questionRecommendation.id, startedRecommendationId),
         }),
         databaseContext.db.query.questionRecommendation.findFirst({
           where: eq(questionRecommendation.id, sharedWaitingRecommendationId),
@@ -1591,6 +1604,12 @@ integration("question-bank refill PostgreSQL publication", () => {
       status: "ABANDONED",
       safeFailureCode: null,
       shownAt: null,
+    });
+    expect(started).toMatchObject({
+      status: "STARTED",
+      safeFailureCode: null,
+      questionExternalId: "started-question",
+      shownAt: expect.any(Date),
     });
     expect(sharedWaiting).toMatchObject({
       status: "PENDING",

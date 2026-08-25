@@ -4,12 +4,6 @@ const state = vi.hoisted(() => ({
   actorId: "learner-1",
   db: {},
   get: vi.fn(),
-  abandon: vi.fn(),
-  protectMutation: vi.fn(),
-  enforceRateLimit: vi.fn(),
-  reserve: vi.fn(),
-  complete: vi.fn(),
-  settle: vi.fn(),
 }));
 
 vi.mock("@/lib/server/context", () => ({
@@ -24,15 +18,7 @@ vi.mock("@/lib/server/session", () => ({
   }),
 }));
 vi.mock("@/lib/server/question-recommendation", () => ({
-  abandonQuestionRecommendation: state.abandon,
   getQuestionRecommendation: state.get,
-}));
-vi.mock("@/lib/server/security", () => ({
-  protectMutation: state.protectMutation,
-  enforceRateLimit: state.enforceRateLimit,
-  reserveIdempotencyKey: state.reserve,
-  completeIdempotentResponse: state.complete,
-  settleIdempotentError: state.settle,
 }));
 
 import * as routeModule from "./route";
@@ -44,21 +30,6 @@ const recommendationId = "f9f0ab90-39e3-4d80-b8f2-968e83b6f722";
 function request(): Request {
   return new Request(
     `https://coach.test/api/v1/question-recommendations/${recommendationId}`,
-  );
-}
-
-function mutationRequest(body?: unknown): Request {
-  return new Request(
-    `https://coach.test/api/v1/question-recommendations/${recommendationId}`,
-    {
-      method: "DELETE",
-      headers: {
-        origin: "https://coach.test",
-        "idempotency-key": "abandon-recommendation-1",
-        ...(body === undefined ? {} : { "content-type": "application/json" }),
-      },
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-    },
   );
 }
 
@@ -77,22 +48,6 @@ describe("GET /api/v1/question-recommendations/:id", () => {
         visibility: "public",
       },
     });
-    state.abandon
-      .mockReset()
-      .mockImplementation(async (_db, _actorId, _id, options) => {
-        await options?.afterPersist(state.db);
-      });
-    state.protectMutation.mockReset().mockImplementation(() => undefined);
-    state.enforceRateLimit.mockReset().mockResolvedValue(undefined);
-    state.reserve.mockReset().mockResolvedValue({ key: "reserved-key" });
-    state.complete.mockReset().mockResolvedValue(undefined);
-    state.settle
-      .mockReset()
-      .mockImplementation(
-        async (_db: unknown, _userId: string, _key: string, error: unknown) => {
-          throw error;
-        },
-      );
   });
 
   it("returns the owning learner's READY projection without supply internals", async () => {
@@ -166,105 +121,9 @@ describe("GET /api/v1/question-recommendations/:id", () => {
     });
   });
 
-  it("protects, rate-limits, idempotently abandons, and returns no internals", async () => {
-    const DELETE = (
-      routeModule as unknown as {
-        DELETE?: (
-          request: Request,
-          context: { params: Promise<{ id: string }> },
-        ) => Promise<Response>;
-      }
-    ).DELETE;
-    expect(DELETE).toEqual(expect.any(Function));
-    if (!DELETE) return;
-
-    const response = await DELETE(mutationRequest(), {
-      params: Promise.resolve({ id: recommendationId }),
-    });
-
-    expect(response.status).toBe(204);
-    expect(response.headers.get("cache-control")).toBe("no-store");
-    await expect(response.text()).resolves.toBe("");
-    expect(state.protectMutation).toHaveBeenCalledOnce();
-    expect(state.enforceRateLimit).toHaveBeenCalledWith(
-      expect.any(Request),
-      expect.objectContaining({
-        bucket: "question-recommendations-abandon",
-        identity: state.actorId,
-      }),
-    );
-    expect(state.reserve).toHaveBeenCalledWith(
-      state.db,
-      state.actorId,
-      expect.any(Request),
-      {},
-    );
-    expect(state.abandon).toHaveBeenCalledWith(
-      state.db,
-      state.actorId,
-      recommendationId,
-      expect.objectContaining({ afterPersist: expect.any(Function) }),
-    );
-    expect(state.complete).toHaveBeenCalledWith(
-      state.db,
-      state.actorId,
-      "reserved-key",
-      204,
-      { abandoned: true },
-    );
-  });
-
-  it("rejects non-empty or oversized abandonment bodies before reservation", async () => {
-    const DELETE = (
-      routeModule as unknown as {
-        DELETE?: (
-          request: Request,
-          context: { params: Promise<{ id: string }> },
-        ) => Promise<Response>;
-      }
-    ).DELETE;
-    expect(DELETE).toEqual(expect.any(Function));
-    if (!DELETE) return;
-
-    for (const [body, status] of [
-      [{ unexpected: true }, 422],
-      [{ padding: "x".repeat(1_025) }, 413],
-    ] as const) {
-      const response = await DELETE(mutationRequest(body), {
-        params: Promise.resolve({ id: recommendationId }),
-      });
-      expect(response.status).toBe(status);
-    }
-    expect(state.reserve).not.toHaveBeenCalled();
-    expect(state.abandon).not.toHaveBeenCalled();
-  });
-
-  it("replays completed abandonment without repeating the state transition", async () => {
-    const DELETE = (
-      routeModule as unknown as {
-        DELETE?: (
-          request: Request,
-          context: { params: Promise<{ id: string }> },
-        ) => Promise<Response>;
-      }
-    ).DELETE;
-    expect(DELETE).toEqual(expect.any(Function));
-    if (!DELETE) return;
-    state.reserve.mockResolvedValue({
-      key: "replay-key",
-      replay: new Response(null, {
-        status: 204,
-        headers: { "idempotency-replayed": "true" },
-      }),
-    });
-
-    const response = await DELETE(mutationRequest(), {
-      params: Promise.resolve({ id: recommendationId }),
-    });
-
-    expect(response.status).toBe(204);
-    expect(response.headers.get("idempotency-replayed")).toBe("true");
-    expect(state.abandon).not.toHaveBeenCalled();
-    expect(state.complete).not.toHaveBeenCalled();
+  it("does not expose a standalone recommendation reset mutation", () => {
+    expect(
+      (routeModule as unknown as { DELETE?: unknown }).DELETE,
+    ).toBeUndefined();
   });
 });

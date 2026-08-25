@@ -316,16 +316,18 @@ export default function TodayPage() {
     (question) => question.id === selectedQuestionId,
   );
 
-  const abandonRecommendationForFallback = useCallback(async () => {
+  const resolveRecommendationForFallback = useCallback(async () => {
     const knownRecommendation = recommendationCurrent.current;
     const pendingRequest = recommendationRequestPending.current;
     cancelRecommendationOperation();
     focusRecommendationStart.current = false;
     setRecommendationRetryId(null);
     const target = pendingRequest ? await pendingRequest : knownRecommendation;
-    if (target) await learningClient.abandonQuestionRecommendation(target.id);
-    setCurrentRecommendation(null);
+    if (target) setCurrentRecommendation(target);
     setRecommendationBusy(false);
+    return target?.state === "READY" || target?.state === "PREPARING"
+      ? target.id
+      : undefined;
   }, [cancelRecommendationOperation, setCurrentRecommendation]);
 
   useEffect(() => {
@@ -351,10 +353,11 @@ export default function TodayPage() {
     cycleOperationLocked.current = true;
     setQuestionLoading(true);
     setQuestionError(null);
+    let abandonRecommendationId: string | undefined;
     try {
       if (!recommendedStart) {
         try {
-          await abandonRecommendationForFallback();
+          abandonRecommendationId = await resolveRecommendationForFallback();
         } catch {
           setRecommendationBusy(false);
           setQuestionError(
@@ -368,12 +371,23 @@ export default function TodayPage() {
       }
       const cycleId = await learningClient.startTrainingCycle(
         question.id,
-        recommendationId,
+        recommendedStart
+          ? { recommendationId }
+          : abandonRecommendationId
+            ? { abandonRecommendationId }
+            : {},
       );
       router.push(learningRouteHref("/write", { cycleId }));
     } catch (error) {
       setQuestionError(
-        error instanceof Error ? error.message : "The cycle could not start.",
+        recommendedStart
+          ? error instanceof Error
+            ? error.message
+            : "The cycle could not start."
+          : text(
+              "未能安全关闭当前推荐题，请重试后再开始写作。",
+              "The current recommendation could not be closed safely. Retry before starting to write.",
+            ),
       );
     } finally {
       cycleOperationLocked.current = false;
@@ -428,9 +442,10 @@ export default function TodayPage() {
     cycleOperationLocked.current = true;
     setQuestionLoading(true);
     setQuestionError(null);
+    let abandonRecommendationId: string | undefined;
     try {
       try {
-        await abandonRecommendationForFallback();
+        abandonRecommendationId = await resolveRecommendationForFallback();
       } catch {
         setRecommendationBusy(false);
         setQuestionError(
@@ -451,8 +466,20 @@ export default function TodayPage() {
       setSelectedQuestionId(created.id);
       setCustomOpen(false);
       setCustomPrompt("");
-      const cycleId = await learningClient.startTrainingCycle(created.id);
-      router.push(learningRouteHref("/write", { cycleId }));
+      try {
+        const cycleId = await learningClient.startTrainingCycle(
+          created.id,
+          abandonRecommendationId ? { abandonRecommendationId } : {},
+        );
+        router.push(learningRouteHref("/write", { cycleId }));
+      } catch {
+        setQuestionError(
+          text(
+            "自己的题目已保存，但未能安全关闭当前推荐题。请从题库中选择该题后重试。",
+            "Your question was saved, but the current recommendation could not be closed safely. Select the saved question from the bank and retry.",
+          ),
+        );
+      }
     } catch (error) {
       setQuestionError(
         error instanceof Error

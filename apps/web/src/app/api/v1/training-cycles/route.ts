@@ -7,7 +7,10 @@ import { mixedReviewTask, trainingCycle } from "@iwc/db";
 import { lockLearnerAndAssertActiveCycleCapacity } from "@/lib/server/active-cycle-limit";
 import { getServerContext } from "@/lib/server/context";
 import { ApiProblem, apiRoute } from "@/lib/server/problem";
-import { assertRecommendationForCycle } from "@/lib/server/question-recommendation";
+import {
+  abandonRecommendationForCycle,
+  assertRecommendationForCycle,
+} from "@/lib/server/question-recommendation";
 import { resolveQuestion } from "@/lib/server/questions";
 import { ianaTimezoneSchema, parseJsonBody } from "@/lib/server/request";
 import { requireSession } from "@/lib/server/session";
@@ -22,9 +25,20 @@ const createCycleSchema = z
   .object({
     question_id: z.string().trim().min(1).max(200),
     recommendation_id: z.uuid().optional(),
+    abandon_recommendation_id: z.uuid().optional(),
     timezone: ianaTimezoneSchema,
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    if (value.recommendation_id && value.abandon_recommendation_id) {
+      context.addIssue({
+        code: "custom",
+        message:
+          "Use recommendation_id or abandon_recommendation_id, not both.",
+        path: ["abandon_recommendation_id"],
+      });
+    }
+  });
 
 export const GET = apiRoute(async (request) => {
   const actor = await requireSession(request);
@@ -53,14 +67,6 @@ export const POST = apiRoute(async (request) => {
   );
   if (reservation.replay) return reservation.replay;
   try {
-    if (payload.recommendation_id) {
-      await assertRecommendationForCycle(
-        db,
-        actor.id,
-        payload.recommendation_id,
-        payload.question_id,
-      );
-    }
     const selectedQuestion = await resolveQuestion(
       db,
       actor.id,
@@ -70,6 +76,20 @@ export const POST = apiRoute(async (request) => {
       // Recommendation and cycle creation share this exact learner-locked
       // capacity predicate so neither mutation can drift from the other.
       await lockLearnerAndAssertActiveCycleCapacity(transaction, actor.id);
+      if (payload.recommendation_id) {
+        await assertRecommendationForCycle(
+          transaction,
+          actor.id,
+          payload.recommendation_id,
+          payload.question_id,
+        );
+      } else if (payload.abandon_recommendation_id) {
+        await abandonRecommendationForCycle(
+          transaction,
+          actor.id,
+          payload.abandon_recommendation_id,
+        );
+      }
 
       // A due D14 review is passively attached to the next ordinary timed essay.
       // The old skill is never returned to the browser, so the first draft stays

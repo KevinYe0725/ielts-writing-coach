@@ -279,6 +279,320 @@ describe.skipIf(!databaseUrl)(
       });
     });
 
+    it("atomically marks a recommended start STARTED and replays one cycle", async () => {
+      const suffix = newDomainId();
+      const userId = `cycle-started-${suffix}`;
+      const questionId = newDomainId();
+      const recommendationId = newDomainId();
+      const externalId = `cycle-started-question-${suffix}`;
+      const shownAt = new Date("2026-08-25T12:00:00.000Z");
+      createdUsers.push(userId);
+      routeState.actor.id = userId;
+      routeState.actor.email = `${suffix}@example.test`;
+      await database.db.insert(user).values({
+        id: userId,
+        name: routeState.actor.name,
+        email: routeState.actor.email,
+        role: "learner",
+      });
+      await database.db.insert(question).values({
+        id: questionId,
+        externalId,
+        ownerId: userId,
+        source: "private_test",
+        visibility: "private",
+        questionType: "opinion",
+        topic: "education",
+        prompt: "Should schools teach practical decision-making?",
+      });
+      await database.db.insert(questionRecommendation).values({
+        id: recommendationId,
+        userId,
+        questionExternalId: externalId,
+        action: "INITIAL",
+        status: "READY",
+        shownAt,
+      });
+      const makeRequest = (key: string, body: Record<string, unknown>) =>
+        new Request("https://coach.test/api/v1/training-cycles", {
+          body: JSON.stringify({ ...body, timezone: "UTC" }),
+          headers: {
+            "content-type": "application/json",
+            "idempotency-key": key,
+            origin: "https://coach.test",
+          },
+          method: "POST",
+        });
+      const key = `cycle-started-${suffix}`;
+      const body = {
+        question_id: externalId,
+        recommendation_id: recommendationId,
+      };
+
+      const first = await createCycle(makeRequest(key, body));
+      const replay = await createCycle(makeRequest(key, body));
+      const terminalFallback = await createCycle(
+        makeRequest(`cycle-started-fallback-${suffix}`, {
+          question_id: externalId,
+          abandon_recommendation_id: recommendationId,
+        }),
+      );
+
+      expect(first.status).toBe(201);
+      expect(replay.status).toBe(201);
+      expect(replay.headers.get("idempotency-replayed")).toBe("true");
+      expect(terminalFallback.status).toBe(409);
+      await expect(terminalFallback.json()).resolves.toMatchObject({
+        code: "RECOMMENDATION_NOT_ABANDONABLE",
+      });
+      await expect(
+        database.db.query.questionRecommendation.findFirst({
+          where: eq(questionRecommendation.id, recommendationId),
+        }),
+      ).resolves.toMatchObject({
+        status: "STARTED",
+        questionExternalId: externalId,
+        shownAt,
+      });
+      await expect(
+        database.db.query.trainingCycle.findMany({
+          where: eq(trainingCycle.userId, userId),
+        }),
+      ).resolves.toHaveLength(1);
+    });
+
+    it("atomically abandons PENDING with a fallback cycle and replays once", async () => {
+      const suffix = newDomainId();
+      const userId = `cycle-abandoned-${suffix}`;
+      const questionId = newDomainId();
+      const recommendationId = newDomainId();
+      const externalId = `cycle-abandoned-question-${suffix}`;
+      createdUsers.push(userId);
+      routeState.actor.id = userId;
+      routeState.actor.email = `${suffix}@example.test`;
+      await database.db.insert(user).values({
+        id: userId,
+        name: routeState.actor.name,
+        email: routeState.actor.email,
+        role: "learner",
+      });
+      await database.db.insert(question).values({
+        id: questionId,
+        externalId,
+        ownerId: userId,
+        source: "private_test",
+        visibility: "private",
+        questionType: "opinion",
+        topic: "education",
+        prompt: "Should schools teach practical decision-making?",
+      });
+      await database.db.insert(questionRecommendation).values({
+        id: recommendationId,
+        userId,
+        action: "INITIAL",
+        status: "PENDING",
+      });
+      const key = `cycle-abandoned-${suffix}`;
+      const makeRequest = () =>
+        new Request("https://coach.test/api/v1/training-cycles", {
+          body: JSON.stringify({
+            question_id: externalId,
+            abandon_recommendation_id: recommendationId,
+            timezone: "UTC",
+          }),
+          headers: {
+            "content-type": "application/json",
+            "idempotency-key": key,
+            origin: "https://coach.test",
+          },
+          method: "POST",
+        });
+
+      const first = await createCycle(makeRequest());
+      const replay = await createCycle(makeRequest());
+
+      expect(first.status).toBe(201);
+      expect(replay.status).toBe(201);
+      expect(replay.headers.get("idempotency-replayed")).toBe("true");
+      await expect(
+        database.db.query.questionRecommendation.findFirst({
+          where: eq(questionRecommendation.id, recommendationId),
+        }),
+      ).resolves.toMatchObject({
+        status: "ABANDONED",
+        questionExternalId: null,
+        shownAt: null,
+      });
+      await expect(
+        database.db.query.trainingCycle.findMany({
+          where: eq(trainingCycle.userId, userId),
+        }),
+      ).resolves.toHaveLength(1);
+    });
+
+    it("linearizes recommended start against fallback so exactly one cycle commits", async () => {
+      const suffix = newDomainId();
+      const userId = `cycle-disposition-race-${suffix}`;
+      const recommendedQuestionId = newDomainId();
+      const manualQuestionId = newDomainId();
+      const recommendationId = newDomainId();
+      const recommendedExternalId = `recommended-race-${suffix}`;
+      const manualExternalId = `manual-race-${suffix}`;
+      createdUsers.push(userId);
+      routeState.actor.id = userId;
+      routeState.actor.email = `${suffix}@example.test`;
+      await database.db.insert(user).values({
+        id: userId,
+        name: routeState.actor.name,
+        email: routeState.actor.email,
+        role: "learner",
+      });
+      await database.db.insert(question).values([
+        {
+          id: recommendedQuestionId,
+          externalId: recommendedExternalId,
+          ownerId: userId,
+          source: "private_test",
+          visibility: "private",
+          questionType: "opinion",
+          topic: "education",
+          prompt: "Should schools teach practical decision-making?",
+        },
+        {
+          id: manualQuestionId,
+          externalId: manualExternalId,
+          ownerId: userId,
+          source: "private_test",
+          visibility: "private",
+          questionType: "discussion",
+          topic: "technology",
+          prompt: "Should schools replace printed books with digital devices?",
+        },
+      ]);
+      await database.db.insert(questionRecommendation).values({
+        id: recommendationId,
+        userId,
+        questionExternalId: recommendedExternalId,
+        action: "INITIAL",
+        status: "READY",
+        shownAt: new Date(),
+      });
+      const makeRequest = (key: string, body: Record<string, unknown>) =>
+        new Request("https://coach.test/api/v1/training-cycles", {
+          body: JSON.stringify({ ...body, timezone: "UTC" }),
+          headers: {
+            "content-type": "application/json",
+            "idempotency-key": key,
+            origin: "https://coach.test",
+          },
+          method: "POST",
+        });
+
+      const responses = await Promise.all([
+        createCycle(
+          makeRequest(`cycle-disposition-start-${suffix}`, {
+            question_id: recommendedExternalId,
+            recommendation_id: recommendationId,
+          }),
+        ),
+        createCycle(
+          makeRequest(`cycle-disposition-abandon-${suffix}`, {
+            question_id: manualExternalId,
+            abandon_recommendation_id: recommendationId,
+          }),
+        ),
+      ]);
+
+      expect(responses.map((response) => response.status).sort()).toEqual([
+        201, 409,
+      ]);
+      await expect(
+        database.db.query.trainingCycle.findMany({
+          where: eq(trainingCycle.userId, userId),
+        }),
+      ).resolves.toHaveLength(1);
+      const stored = await database.db.query.questionRecommendation.findFirst({
+        where: eq(questionRecommendation.id, recommendationId),
+      });
+      expect(["STARTED", "ABANDONED"]).toContain(stored?.status);
+    });
+
+    it("rejects conflicting disposition ids and another learner's fallback recommendation", async () => {
+      const suffix = newDomainId();
+      const actorId = `cycle-disposition-actor-${suffix}`;
+      const ownerId = `cycle-disposition-owner-${suffix}`;
+      const questionId = newDomainId();
+      const recommendationId = newDomainId();
+      const externalId = `cycle-disposition-manual-${suffix}`;
+      createdUsers.push(actorId, ownerId);
+      routeState.actor.id = actorId;
+      routeState.actor.email = `${actorId}@example.test`;
+      await database.db.insert(user).values([
+        {
+          id: actorId,
+          name: routeState.actor.name,
+          email: routeState.actor.email,
+          role: "learner",
+        },
+        {
+          id: ownerId,
+          name: "Recommendation owner",
+          email: `${ownerId}@example.test`,
+          role: "learner",
+        },
+      ]);
+      await database.db.insert(question).values({
+        id: questionId,
+        externalId,
+        ownerId: actorId,
+        source: "private_test",
+        visibility: "private",
+        questionType: "opinion",
+        topic: "education",
+        prompt: "Should schools teach practical decision-making?",
+      });
+      await database.db.insert(questionRecommendation).values({
+        id: recommendationId,
+        userId: ownerId,
+        questionExternalId: externalId,
+        action: "INITIAL",
+        status: "READY",
+        shownAt: new Date(),
+      });
+      const makeRequest = (key: string, body: Record<string, unknown>) =>
+        new Request("https://coach.test/api/v1/training-cycles", {
+          body: JSON.stringify({ ...body, timezone: "UTC" }),
+          headers: {
+            "content-type": "application/json",
+            "idempotency-key": key,
+            origin: "https://coach.test",
+          },
+          method: "POST",
+        });
+
+      const conflicting = await createCycle(
+        makeRequest(`cycle-disposition-conflict-${suffix}`, {
+          question_id: externalId,
+          recommendation_id: recommendationId,
+          abandon_recommendation_id: recommendationId,
+        }),
+      );
+      const otherOwned = await createCycle(
+        makeRequest(`cycle-disposition-other-${suffix}`, {
+          question_id: externalId,
+          abandon_recommendation_id: recommendationId,
+        }),
+      );
+
+      expect(conflicting.status).toBe(422);
+      expect(otherOwned.status).toBe(404);
+      await expect(
+        database.db.query.trainingCycle.findMany({
+          where: eq(trainingCycle.userId, actorId),
+        }),
+      ).resolves.toHaveLength(0);
+    });
+
     it("rejects concurrent and replayed recommendations at the active-cycle limit without side effects", async () => {
       const suffix = newDomainId();
       const userId = `http-recommend-limit-${suffix}`;

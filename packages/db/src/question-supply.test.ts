@@ -70,6 +70,7 @@ integration("adaptive question supply persistence", () => {
       "READY",
       "UNAVAILABLE",
       "ABANDONED",
+      "STARTED",
     ]);
   });
 

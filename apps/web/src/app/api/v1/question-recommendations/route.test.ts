@@ -16,7 +16,6 @@ const state = vi.hoisted(() => ({
   complete: vi.fn(),
   settle: vi.fn(),
   create: vi.fn(),
-  assertForCycle: vi.fn(),
 }));
 
 vi.mock("@/lib/server/context", () => ({
@@ -34,11 +33,9 @@ vi.mock("@/lib/server/security", () => ({
 }));
 vi.mock("@/lib/server/question-recommendation", () => ({
   createQuestionRecommendation: state.create,
-  assertRecommendationForCycle: state.assertForCycle,
 }));
 
 import { POST } from "./route";
-import { POST as POSTTrainingCycle } from "../training-cycles/route";
 
 function request(body: unknown, headers: HeadersInit = {}): Request {
   return new Request("https://coach.test/api/v1/question-recommendations", {
@@ -77,7 +74,6 @@ describe("POST /api/v1/question-recommendations", () => {
         visibility: "public",
       },
     });
-    state.assertForCycle.mockReset().mockResolvedValue(undefined);
   });
 
   it("protects, rate-limits, bounds, and idempotently returns READY", async () => {
@@ -116,44 +112,6 @@ describe("POST /api/v1/question-recommendations", () => {
           visibility: "public",
         },
       },
-    });
-  });
-
-  it("makes cycle creation reject a recommendation whose question does not match", async () => {
-    state.assertForCycle.mockRejectedValue(
-      new ApiProblem({
-        title: "Recommendation does not match question",
-        status: 409,
-        code: "RECOMMENDATION_QUESTION_MISMATCH",
-        detail: "The recommendation belongs to another question.",
-      }),
-    );
-    const recommendationId = "a20a840b-b511-44c2-aee6-8ab65ca6d97d";
-    const response = await POSTTrainingCycle(
-      new Request("https://coach.test/api/v1/training-cycles", {
-        method: "POST",
-        headers: {
-          origin: "https://coach.test",
-          "content-type": "application/json",
-          "idempotency-key": "cycle-with-recommendation-1",
-        },
-        body: JSON.stringify({
-          question_id: "different-question",
-          recommendation_id: recommendationId,
-          timezone: "UTC",
-        }),
-      }),
-    );
-
-    expect(response.status).toBe(409);
-    expect(state.assertForCycle).toHaveBeenCalledWith(
-      state.db,
-      state.actor.id,
-      recommendationId,
-      "different-question",
-    );
-    await expect(response.json()).resolves.toMatchObject({
-      code: "RECOMMENDATION_QUESTION_MISMATCH",
     });
   });
 

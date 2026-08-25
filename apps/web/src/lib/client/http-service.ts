@@ -46,6 +46,7 @@ import type {
   QuestionOption,
   QuestionRecommendation,
   QuestionRecommendationRequest,
+  TrainingCycleRecommendationLink,
   QuestionSupplyRetryResult,
   QuestionTopic,
   QuestionType,
@@ -2312,18 +2313,6 @@ export class HttpLearningClient implements LearningClient {
     return projectQuestionRecommendation(data);
   }
 
-  async abandonQuestionRecommendation(id: string): Promise<void> {
-    const { data, response } = await this.request<unknown>(
-      `/question-recommendations/${encodeURIComponent(id)}`,
-      { idempotent: true, method: "DELETE" },
-    );
-    if (response.status !== 204 || data !== undefined)
-      throw new LearningClientError(
-        "The server did not confirm recommendation abandonment.",
-        { code: "INVALID_RESPONSE" },
-      );
-  }
-
   async createCustomQuestion(
     input: CustomQuestionInput,
   ): Promise<QuestionOption> {
@@ -2364,14 +2353,22 @@ export class HttpLearningClient implements LearningClient {
 
   async startTrainingCycle(
     questionId: string,
-    recommendationId?: string,
+    recommendation: TrainingCycleRecommendationLink = {},
   ): Promise<string> {
     const { data } = await this.request<{ cycle?: { id?: string } }>(
       "/training-cycles",
       {
         body: {
           question_id: questionId,
-          ...(recommendationId ? { recommendation_id: recommendationId } : {}),
+          ...(recommendation.recommendationId
+            ? { recommendation_id: recommendation.recommendationId }
+            : {}),
+          ...(recommendation.abandonRecommendationId
+            ? {
+                abandon_recommendation_id:
+                  recommendation.abandonRecommendationId,
+              }
+            : {}),
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         },
         idempotent: true,

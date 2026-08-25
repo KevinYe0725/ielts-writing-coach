@@ -556,7 +556,9 @@ describe("HttpLearningClient protocol", () => {
       },
     });
     await expect(
-      client.startTrainingCycle("question-1", "recommendation-1"),
+      client.startTrainingCycle("question-1", {
+        recommendationId: "recommendation-1",
+      }),
     ).resolves.toBe("cycle-1");
 
     const recommendationCall = fetcher.mock.calls[0] ?? [];
@@ -622,57 +624,58 @@ describe("HttpLearningClient protocol", () => {
     });
   });
 
-  it("strictly abandons a recommendation with an empty protected idempotent DELETE", async () => {
+  it("has no standalone recommendation-reset client mutation", () => {
+    const client = new HttpLearningClient({
+      baseUrl: "https://coach.test/api/v1",
+      fetch: async () => new Response(null, { status: 204 }),
+      origin: "https://coach.test",
+    });
+
+    expect(
+      (client as unknown as { abandonQuestionRecommendation?: unknown })
+        .abandonQuestionRecommendation,
+    ).toBeUndefined();
+  });
+
+  it("couples fallback abandonment to the existing cycle request", async () => {
     const fetcher = vi.fn<typeof fetch>(async (input, init) => {
-      expect(String(input)).toBe(
-        "https://coach.test/api/v1/question-recommendations/recommendation-abandon%2Fencoded",
+      expect(String(input)).toBe("https://coach.test/api/v1/training-cycles");
+      expect(init?.method).toBe("POST");
+      expect(JSON.parse(String(init?.body))).toMatchObject({
+        question_id: "manual-question",
+        abandon_recommendation_id: "recommendation-pending",
+      });
+      expect(JSON.parse(String(init?.body))).not.toHaveProperty(
+        "recommendation_id",
       );
-      expect(init?.method).toBe("DELETE");
-      expect(init?.body).toBeUndefined();
-      return new Response(null, { status: 204 });
+      return jsonResponse({ cycle: { id: "cycle-fallback" } }, { status: 201 });
     });
     const client = new HttpLearningClient({
       baseUrl: "https://coach.test/api/v1",
       fetch: fetcher,
-      idempotencyKey: () => "recommendation-abandon-idempotency",
+      idempotencyKey: () => "cycle-fallback-idempotency",
       origin: "https://coach.test",
     });
-    const abandon = (
+    const start = (
       client as unknown as {
-        abandonQuestionRecommendation?: (id: string) => Promise<void>;
+        startTrainingCycle: (
+          questionId: string,
+          options: { abandonRecommendationId: string },
+        ) => Promise<string>;
       }
-    ).abandonQuestionRecommendation;
-    expect(abandon).toEqual(expect.any(Function));
-    if (!abandon) return;
+    ).startTrainingCycle;
 
     await expect(
-      abandon.call(client, "recommendation-abandon/encoded"),
-    ).resolves.toBeUndefined();
+      start.call(client, "manual-question", {
+        abandonRecommendationId: "recommendation-pending",
+      }),
+    ).resolves.toBe("cycle-fallback");
 
     const call = fetcher.mock.calls[0] ?? [];
     expect(requestHeaders(call).get("origin")).toBe("https://coach.test");
     expect(requestHeaders(call).get("idempotency-key")).toBe(
-      "recommendation-abandon-idempotency",
+      "cycle-fallback-idempotency",
     );
-  });
-
-  it("rejects a non-204 abandonment response even when HTTP reports success", async () => {
-    const client = new HttpLearningClient({
-      baseUrl: "https://coach.test/api/v1",
-      fetch: async () => jsonResponse({ abandoned: true }),
-      origin: "https://coach.test",
-    });
-    const abandon = (
-      client as unknown as {
-        abandonQuestionRecommendation?: (id: string) => Promise<void>;
-      }
-    ).abandonQuestionRecommendation;
-    expect(abandon).toEqual(expect.any(Function));
-    if (!abandon) return;
-
-    await expect(
-      abandon.call(client, "recommendation-1"),
-    ).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
   });
 
   it("rejects PENDING recommendations without a non-empty runtime string id", async () => {

@@ -270,6 +270,16 @@ test.describe("deterministic setup and Today experience", () => {
         ),
       )
       .not.toBeNull();
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const value = localStorage.getItem(
+            "iwc.demo.question-recommendation-active",
+          );
+          return value ? JSON.parse(value).status : null;
+        }),
+      )
+      .toBe("STARTED");
     await expect(page.locator("main")).not.toContainText(
       /provider|job id|ranking|score|候选|供应商/i,
     );
@@ -427,7 +437,7 @@ async function routeTodayHttpFixture(page: Page, state: TodayHttpState) {
     "**/api/v1/question-recommendations/recommendation-http",
     async (route) => {
       if (route.request().method() === "DELETE") {
-        await route.fulfill({ status: 204, body: "" });
+        await route.fulfill({ status: 405, body: "" });
         return;
       }
       await route.fulfill({
@@ -507,8 +517,9 @@ async function routePreparingFallbackFixture(page: Page) {
     releasePoll = resolve;
   });
   let polls = 0;
-  const abandonIds: string[] = [];
+  let standaloneDeletes = 0;
   const cycleBodies: Array<Record<string, unknown>> = [];
+  const customBodies: Array<Record<string, unknown>> = [];
 
   await page.route("**/api/v1/question-recommendations", async (route) => {
     if (route.request().method() !== "POST") return route.fallback();
@@ -528,8 +539,8 @@ async function routePreparingFallbackFixture(page: Page) {
     "**/api/v1/question-recommendations/recommendation-preparing-fallback",
     async (route) => {
       if (route.request().method() === "DELETE") {
-        abandonIds.push("recommendation-preparing-fallback");
-        await route.fulfill({ status: 204, body: "" });
+        standaloneDeletes += 1;
+        await route.fulfill({ status: 405, body: "" });
         return;
       }
       polls += 1;
@@ -565,6 +576,7 @@ async function routePreparingFallbackFixture(page: Page) {
   await page.route("**/api/v1/questions", async (route) => {
     if (route.request().method() === "POST") {
       const input = route.request().postDataJSON();
+      customBodies.push(input);
       await route.fulfill({
         contentType: "application/json",
         status: 201,
@@ -585,10 +597,11 @@ async function routePreparingFallbackFixture(page: Page) {
   });
 
   return {
-    abandonIds,
     cycleBodies,
+    customBodies,
     polls: () => polls,
     releasePoll,
+    standaloneDeletes: () => standaloneDeletes,
   };
 }
 
@@ -605,7 +618,7 @@ async function routeSwapPreparingFallbackFixture(page: Page) {
   let polls = 0;
   const cycleBodies: Array<Record<string, unknown>> = [];
   const customBodies: Array<Record<string, unknown>> = [];
-  const abandonIds: string[] = [];
+  let standaloneDeletes = 0;
   const recommendationActions: string[] = [];
 
   await page.route("**/api/v1/question-recommendations", async (route) => {
@@ -649,8 +662,8 @@ async function routeSwapPreparingFallbackFixture(page: Page) {
     "**/api/v1/question-recommendations/recommendation-swap-preparing",
     async (route) => {
       if (route.request().method() === "DELETE") {
-        abandonIds.push("recommendation-swap-preparing");
-        await route.fulfill({ status: 204, body: "" });
+        standaloneDeletes += 1;
+        await route.fulfill({ status: 405, body: "" });
         return;
       }
       polls += 1;
@@ -677,9 +690,8 @@ async function routeSwapPreparingFallbackFixture(page: Page) {
   await page.route(
     "**/api/v1/question-recommendations/recommendation-swap-source",
     async (route) => {
-      expect(route.request().method()).toBe("DELETE");
-      abandonIds.push("recommendation-swap-source");
-      await route.fulfill({ status: 204, body: "" });
+      standaloneDeletes += 1;
+      await route.fulfill({ status: 405, body: "" });
     },
   );
   await page.route("**/api/v1/training-cycles", async (route) => {
@@ -715,13 +727,13 @@ async function routeSwapPreparingFallbackFixture(page: Page) {
   });
 
   return {
-    abandonIds,
     cycleBodies,
     customBodies,
     polls: () => polls,
     recommendationActions,
     releaseCycle,
     releasePoll,
+    standaloneDeletes: () => standaloneDeletes,
   };
 }
 
@@ -735,7 +747,6 @@ async function routeDelayedRecommendationFallbackFixture(page: Page) {
   const postStarted = new Promise<void>((resolve) => {
     markPostStarted = resolve;
   });
-  const abandonIds: string[] = [];
   const cycleBodies: Array<Record<string, unknown>> = [];
 
   await page.route("**/api/v1/question-recommendations", async (route) => {
@@ -763,9 +774,8 @@ async function routeDelayedRecommendationFallbackFixture(page: Page) {
   await page.route(
     "**/api/v1/question-recommendations/recommendation-delayed-post",
     async (route) => {
-      expect(route.request().method()).toBe("DELETE");
-      abandonIds.push("recommendation-delayed-post");
-      await route.fulfill({ status: 204, body: "" });
+      expect(route.request().method()).toBe("GET");
+      await route.fallback();
     },
   );
   await page.route("**/api/v1/training-cycles", async (route) => {
@@ -777,7 +787,7 @@ async function routeDelayedRecommendationFallbackFixture(page: Page) {
     });
   });
 
-  return { abandonIds, cycleBodies, postStarted, releasePost };
+  return { cycleBodies, postStarted, releasePost };
 }
 
 async function routeRetryCycleFenceFixture(page: Page) {
@@ -808,7 +818,7 @@ async function routeRetryCycleFenceFixture(page: Page) {
     "**/api/v1/question-recommendations/recommendation-retry-cycle-fence",
     async (route) => {
       if (route.request().method() === "DELETE") {
-        await route.fulfill({ status: 204, body: "" });
+        await route.fulfill({ status: 405, body: "" });
         return;
       }
       recommendationGets += 1;
@@ -971,14 +981,17 @@ test.describe("Today query states at the HTTP boundary", () => {
       button?.click();
       button?.click();
     });
-    await expect.poll(() => fixture.abandonIds.length).toBe(1);
     await expect.poll(() => fixture.cycleBodies.length).toBe(1);
     fixture.releasePoll();
     await expect(page).toHaveURL(/\/write\?cycle=cycle-manual-fallback$/);
     expect(fixture.cycleBodies).toEqual([
-      expect.objectContaining({ question_id: "http-question-education" }),
+      expect.objectContaining({
+        question_id: "http-question-education",
+        abandon_recommendation_id: "recommendation-preparing-fallback",
+      }),
     ]);
     expect(fixture.cycleBodies[0]).not.toHaveProperty("recommendation_id");
+    expect(fixture.standaloneDeletes()).toBe(0);
     await page.waitForTimeout(100);
     expect(fixture.cycleBodies).toHaveLength(1);
   });
@@ -1003,14 +1016,17 @@ test.describe("Today query states at the HTTP boundary", () => {
       button?.click();
       button?.click();
     });
-    await expect.poll(() => fixture.abandonIds.length).toBe(1);
     await expect.poll(() => fixture.cycleBodies.length).toBe(1);
     fixture.releasePoll();
     await expect(page).toHaveURL(/\/write\?cycle=cycle-manual-fallback$/);
     expect(fixture.cycleBodies).toEqual([
-      expect.objectContaining({ question_id: "custom-fallback-question" }),
+      expect.objectContaining({
+        question_id: "custom-fallback-question",
+        abandon_recommendation_id: "recommendation-preparing-fallback",
+      }),
     ]);
     expect(fixture.cycleBodies[0]).not.toHaveProperty("recommendation_id");
+    expect(fixture.standaloneDeletes()).toBe(0);
     await page.waitForTimeout(100);
     expect(fixture.cycleBodies).toHaveLength(1);
   });
@@ -1037,7 +1053,6 @@ test.describe("Today query states at the HTTP boundary", () => {
       button.click();
     });
 
-    await expect.poll(() => fixture.abandonIds.length).toBe(1);
     await expect.poll(() => fixture.cycleBodies.length).toBe(1);
     fixture.releasePoll();
     await expect(
@@ -1046,9 +1061,13 @@ test.describe("Today query states at the HTTP boundary", () => {
     fixture.releaseCycle();
     await expect(page).toHaveURL(/\/write\?cycle=cycle-swap-fallback$/);
     expect(fixture.cycleBodies).toEqual([
-      expect.objectContaining({ question_id: "http-question-education" }),
+      expect.objectContaining({
+        question_id: "http-question-education",
+        abandon_recommendation_id: "recommendation-swap-preparing",
+      }),
     ]);
     expect(fixture.cycleBodies[0]).not.toHaveProperty("recommendation_id");
+    expect(fixture.standaloneDeletes()).toBe(0);
   });
 
   test("READY swap polling does not block a double-event custom create/start fallback", async ({
@@ -1075,7 +1094,6 @@ test.describe("Today query states at the HTTP boundary", () => {
       button.click();
     });
 
-    await expect.poll(() => fixture.abandonIds.length).toBe(1);
     await expect.poll(() => fixture.cycleBodies.length).toBe(1);
     fixture.releasePoll();
     await expect(
@@ -1086,9 +1104,11 @@ test.describe("Today query states at the HTTP boundary", () => {
     expect(fixture.cycleBodies).toEqual([
       expect.objectContaining({
         question_id: "custom-swap-fallback-question",
+        abandon_recommendation_id: "recommendation-swap-preparing",
       }),
     ]);
     expect(fixture.cycleBodies[0]).not.toHaveProperty("recommendation_id");
+    expect(fixture.standaloneDeletes()).toBe(0);
   });
 
   test("manual fallback waits for an unresolved recommendation POST, abandons its READY id, then starts exactly once", async ({
@@ -1108,15 +1128,14 @@ test.describe("Today query states at the HTTP boundary", () => {
       .click();
     await page.waitForTimeout(100);
     expect(fixture.cycleBodies).toHaveLength(0);
-    expect(fixture.abandonIds).toHaveLength(0);
 
     fixture.releasePost();
-    await expect
-      .poll(() => fixture.abandonIds)
-      .toEqual(["recommendation-delayed-post"]);
     await expect.poll(() => fixture.cycleBodies.length).toBe(1);
     await expect(page).toHaveURL(/\/write\?cycle=cycle-delayed-fallback$/);
     expect(fixture.cycleBodies[0]).not.toHaveProperty("recommendation_id");
+    expect(fixture.cycleBodies[0]).toMatchObject({
+      abandon_recommendation_id: "recommendation-delayed-post",
+    });
     await expect(
       page.getByText("STALE DELAYED READY MUST NEVER RENDER"),
     ).toHaveCount(0);
@@ -1126,21 +1145,19 @@ test.describe("Today query states at the HTTP boundary", () => {
     page,
   }) => {
     const fixture = await routePreparingFallbackFixture(page);
-    await page.route(
-      "**/api/v1/question-recommendations/recommendation-preparing-fallback",
-      async (route) => {
-        if (route.request().method() !== "DELETE") return route.fallback();
-        await route.fulfill({
-          contentType: "application/problem+json",
+    const failedCycleBodies: Array<Record<string, unknown>> = [];
+    await page.route("**/api/v1/training-cycles", async (route) => {
+      failedCycleBodies.push(route.request().postDataJSON());
+      await route.fulfill({
+        contentType: "application/problem+json",
+        status: 503,
+        body: JSON.stringify({
+          code: "CYCLE_RECOMMENDATION_COUPLING_UNAVAILABLE",
+          detail: "server detail must remain hidden",
           status: 503,
-          body: JSON.stringify({
-            code: "ABANDONMENT_UNAVAILABLE",
-            detail: "server detail must remain hidden",
-            status: 503,
-          }),
-        });
-      },
-    );
+        }),
+      });
+    });
     await page.goto("/today?new-essay=1");
     await page.getByText("浏览全部题库").click();
     await page.getByLabel("题库").selectOption("http-question-education");
@@ -1158,10 +1175,63 @@ test.describe("Today query states at the HTTP boundary", () => {
       { exact: true },
     );
     await expect(abandonmentError).toBeVisible();
+    expect(failedCycleBodies).toEqual([
+      expect.objectContaining({
+        question_id: "http-question-education",
+        abandon_recommendation_id: "recommendation-preparing-fallback",
+      }),
+    ]);
     expect(fixture.cycleBodies).toHaveLength(0);
+    expect(fixture.standaloneDeletes()).toBe(0);
     await expect(abandonmentError).not.toContainText(
       "server detail must remain hidden",
     );
+    fixture.releasePoll();
+  });
+
+  test("failed coupled custom cycle keeps the saved question actionable without a standalone reset", async ({
+    page,
+  }) => {
+    const fixture = await routePreparingFallbackFixture(page);
+    const failedCycleBodies: Array<Record<string, unknown>> = [];
+    await page.route("**/api/v1/training-cycles", async (route) => {
+      failedCycleBodies.push(route.request().postDataJSON());
+      await route.fulfill({
+        contentType: "application/problem+json",
+        status: 503,
+        body: JSON.stringify({
+          code: "CYCLE_RECOMMENDATION_COUPLING_UNAVAILABLE",
+          detail: "server detail must remain hidden",
+          status: 503,
+        }),
+      });
+    });
+    await page.goto("/today?new-essay=1");
+    await page.getByText("粘贴我自己的题目").click();
+    await page
+      .getByLabel("完整英文题目")
+      .fill(
+        "Some people believe every city should provide free public libraries. To what extent do you agree or disagree?",
+      );
+    await expect.poll(fixture.polls, { timeout: 5_000 }).toBe(1);
+
+    await page.getByRole("button", { name: "保存并开始写作" }).click();
+
+    await expect(
+      page.getByText(
+        "自己的题目已保存，但未能安全关闭当前推荐题。请从题库中选择该题后重试。",
+        { exact: true },
+      ),
+    ).toBeVisible();
+    expect(fixture.customBodies).toHaveLength(1);
+    expect(failedCycleBodies).toEqual([
+      expect.objectContaining({
+        question_id: "custom-fallback-question",
+        abandon_recommendation_id: "recommendation-preparing-fallback",
+      }),
+    ]);
+    expect(fixture.standaloneDeletes()).toBe(0);
+    await expect(page).toHaveURL(/\/today\?new-essay=1$/);
     fixture.releasePoll();
   });
 
@@ -1195,6 +1265,10 @@ test.describe("Today query states at the HTTP boundary", () => {
     fixture.releaseCycle();
     await expect(page).toHaveURL(/\/write\?cycle=cycle-swap-fallback$/);
     expect(fixture.cycleBodies[0]).not.toHaveProperty("recommendation_id");
+    expect(fixture.cycleBodies[0]).toMatchObject({
+      abandon_recommendation_id: "recommendation-swap-source",
+    });
+    expect(fixture.standaloneDeletes()).toBe(0);
   });
 
   test("custom create/start synchronously fences a following swap and creates once", async ({
@@ -1230,6 +1304,10 @@ test.describe("Today query states at the HTTP boundary", () => {
     fixture.releaseCycle();
     await expect(page).toHaveURL(/\/write\?cycle=cycle-swap-fallback$/);
     expect(fixture.cycleBodies[0]).not.toHaveProperty("recommendation_id");
+    expect(fixture.cycleBodies[0]).toMatchObject({
+      abandon_recommendation_id: "recommendation-swap-source",
+    });
+    expect(fixture.standaloneDeletes()).toBe(0);
   });
 
   test("recommended start synchronously fences a following swap and keeps its attribution", async ({
@@ -1302,6 +1380,9 @@ test.describe("Today query states at the HTTP boundary", () => {
     fixture.releaseCycle();
     await expect(page).toHaveURL(/\/write\?cycle=cycle-retry-fence$/);
     expect(fixture.cycleBodies[0]).not.toHaveProperty("recommendation_id");
+    expect(fixture.cycleBodies[0]).toMatchObject({
+      abandon_recommendation_id: "recommendation-retry-cycle-fence",
+    });
   });
 
   test("failed cycle creation releases the cycle lock for a later swap", async ({

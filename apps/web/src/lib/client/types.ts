@@ -170,6 +170,20 @@ export interface QuestionRecommendationRequest {
   excludedQuestionId?: string;
 }
 
+export type TrainingCycleRecommendationLink =
+  | {
+      recommendationId: string;
+      abandonRecommendationId?: never;
+    }
+  | {
+      recommendationId?: never;
+      abandonRecommendationId: string;
+    }
+  | {
+      recommendationId?: undefined;
+      abandonRecommendationId?: undefined;
+    };
+
 export interface CustomQuestionInput {
   prompt: string;
   type: QuestionType;
@@ -971,11 +985,10 @@ export interface LearningClient {
     input: QuestionRecommendationRequest,
   ): Promise<QuestionRecommendation>;
   getQuestionRecommendation(id: string): Promise<QuestionRecommendation>;
-  abandonQuestionRecommendation(id: string): Promise<void>;
   createCustomQuestion(input: CustomQuestionInput): Promise<QuestionOption>;
   startTrainingCycle(
     questionId: string,
-    recommendationId?: string,
+    recommendation?: TrainingCycleRecommendationLink,
   ): Promise<string>;
   getAttempt(version: 1 | 2, cycleId: string): Promise<AttemptData>;
   saveDraft(attemptId: string, draft: string): Promise<void>;

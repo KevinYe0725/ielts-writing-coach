@@ -1,65 +1,96 @@
-# Final remediation F1 — durable recommendation abandonment
+# Final remediation F1 — cycle-coupled recommendation disposition
 
-## Finding disposition
+## Fix Round 1 disposition
 
-Completed. Manual-bank and private-question fallbacks now close the current
-recommendation durably before creating a question or cycle. `ABANDONED` is an
-internal terminal status: it has no learner-visible supply internals, never
-counts as an exposure or SWAP cooldown, cannot be finalized by a refill batch,
-and is omitted from Admin's READY / PENDING / UNAVAILABLE aggregate.
+Completed. The initial standalone recommendation DELETE was removed after
+review because it let a learner erase a READY exposure without starting a
+cycle. There is no learner-facing recommendation reset endpoint or client
+method now.
 
-The owner-only mutation is `DELETE
-/api/v1/question-recommendations/{id}`. It requires the common Origin boundary,
-authenticated-actor rate limit, UUID path, a strict empty body of at most 1 KiB,
-and an Idempotency-Key. The learner row and owned recommendation row are locked
-before PENDING, READY, or UNAVAILABLE becomes ABANDONED; replaying an already
-ABANDONED row is safe. The state change and 204 idempotency completion commit in
-one transaction. Responses contain neither batch nor job identity.
+Cycle creation is the sole disposition authority. `POST
+/api/v1/training-cycles` accepts at most one of:
 
-## Linearizable fallback flow
+- `recommendation_id` for a recommended start;
+- `abandon_recommendation_id` for a manual-bank or private-question fallback.
 
-- GET polling and DELETE abandonment acquire the same learner lock before the
-  recommendation row lock. Real PostgreSQL barriers cover both orderings.
-- If polling finalizes first, DELETE clears `question_external_id` and
-  `shown_at` before commit, removing the READY exposure.
-- If DELETE commits first, GET projects a generic unavailable result and never
-  finalizes the batch-linked row.
-- Today retains the unresolved recommendation POST promise. A manual/private
-  fallback cancels UI polling, awaits an in-flight POST when no ID is known,
-  abandons the returned ID, and only then proceeds without `recommendation_id`.
-- A failed DELETE renders locale-owned actionable copy and creates neither a
-  custom question nor a training cycle.
-- Demo mode persists `{ status: "ABANDONED" }`, removes the READY exposure, and
-  allows the abandoned question to be selected again.
+After resolving the canonical question, the route opens its existing
+learner-locked cycle transaction. Inside that transaction it locks the owned
+recommendation row `FOR UPDATE`, validates and transitions the recommendation,
+then inserts the cycle. Any later mixed-review or cycle insertion failure rolls
+back both mutations.
+
+## State and exposure semantics
+
+- Recommended start requires owned READY with the exact external question ID
+  and transitions it to terminal STARTED.
+- Fallback requires owned PENDING or READY and transitions it to terminal
+  ABANDONED.
+- STARTED and ABANDONED cannot be transitioned or finalized again. Owner GET
+  projects either as the existing generic unavailable state.
+- A READY row that becomes STARTED or ABANDONED retains its
+  `question_external_id` and `shown_at`. STARTED/ABANDONED shown rows remain in
+  the open 72-hour exclusion window.
+- A PENDING row that becomes ABANDONED has no question or `shown_at`, therefore
+  creates no exposure.
+- Refill workers still update only PENDING rows, so neither terminal status can
+  be finalized by a later batch.
+
+This is the explicit resolution of “no invisible READY”: the row becomes
+terminal ABANDONED, so it cannot appear as usable READY or finalize later, but
+its already-incurred shown exposure is conservatively retained. Manual fallback
+cannot be used to reset the three-day cooldown.
+
+## Today and Demo flow
+
+Today retains the unresolved recommendation POST promise. A fallback cancels
+obsolete UI polling, awaits the POST when necessary, retains the resulting ID,
+and passes it as `abandon_recommendation_id` on the one cycle request. During an
+active poll it passes the known ID. Custom flow saves the private question,
+then creates its cycle with the same abandonment ID. It never sends
+`recommendation_id` for a fallback and never issues DELETE.
+
+If the coupled cycle request fails, the database transaction leaves the
+recommendation unchanged. Today renders locale-owned actionable copy; a saved
+private question remains available in the bank for retry. Demo mode mirrors
+READY/PENDING → ABANDONED and READY → STARTED only inside cycle creation while
+preserving READY exposure.
 
 ## Strict RED → GREEN evidence
 
-- Schema RED: fresh PostgreSQL returned only PENDING / READY / UNAVAILABLE; the
-  enum assertion failed until unreleased migration 0013 was regenerated.
-- Service/route RED: 7 intended failures for the absent abandon service and
-  DELETE route.
-- Client/Demo RED: 3 intended failures for the absent strict client mutation
-  and durable Demo transition.
-- Browser RED: 6/6 focused non-Demo cases failed because fallback created a
-  cycle before abandonment or never showed the local abandonment error.
-- GREEN PostgreSQL/backend matrix: 84/84; focused client/Demo: 117/117.
-- GREEN non-Demo Chromium: 6/6. Chromium, Firefox, WebKit, and iPhone 14
-  emulation: 24/24.
+- PostgreSQL RED: enum lacked STARTED; STARTED admin/privacy/worker fixtures
+  failed.
+- Service/route RED: the transaction abandon helper was absent, recommended
+  assertion left READY, fallback payloads returned 422, and concurrent
+  disposition tests could not produce the required 201/409 pair.
+- Surface/client RED: recommendation DELETE and the client reset method still
+  existed; fallback cycle requests omitted `abandon_recommendation_id`.
+- Demo RED: coupled start left the durable state READY.
+- Browser RED: all 6 initial focused Chromium cases failed before a valid
+  coupled cycle request was observed.
+- GREEN focused PostgreSQL/client/admin/privacy/worker matrix: 214/214.
+- GREEN full non-Demo Chromium Today file: 16 passed / 12 Demo-only skips.
+- GREEN four-project fallback matrix: 28/28 across Chromium, Firefox, WebKit,
+  and iPhone 14 emulation.
+- GREEN Demo recommended-start check: 1/1 with durable STARTED.
 
-## Migration identity and verification
+Real PostgreSQL barriers cover poll-finalize first and fallback first.
+Recommended-start versus fallback contention returns one 201 and one 409 with
+exactly one cycle. Tests also cover transaction rollback, other-user 404,
+mutually exclusive IDs, READY cooldown, PENDING without exposure, terminal
+replay rejection, and idempotent recommended/fallback HTTP replay.
 
-Migration `0013_adaptive_question_supply` remains unreleased and was regenerated
-from the 0012 snapshot. Its journal timestamp is `1787651956397`; SHA-256 is
-`8e8caf64e59c8392e1cbdd76ef5f0cf3c85ea4dfca2393ada08902802266857e`.
-A newly created tmpfs `postgres:17.6-bookworm` database accepted the complete
-migration chain.
+## Migration identity and full gates
 
-Fresh package gates:
+Unreleased migration `0013_adaptive_question_supply` was regenerated from the
+0012 snapshot. Journal timestamp: `1787653611445`. SHA-256:
+`b04e6006eb1bf21b6bbbfe8b49f4096ee02c37cae1cc093e344bb337c327f333`.
+A fresh tmpfs `postgres:17.6-bookworm` database accepted the complete migration
+chain under Node 24.19.0.
 
 ```text
 @iwc/db: 2 files / 12 passed
 @iwc/worker: 14 files / 212 passed
-@iwc/web: 54 files / 462 passed
+@iwc/web: 54 files / 465 passed
 format: pass
 lint: pass, 0 errors / 4 existing Fast Refresh warnings
 typecheck: pass
@@ -68,14 +99,9 @@ Worker build: pass, 2 ESM entries plus source maps
 git diff --check: pass
 ```
 
-## Boundaries and remaining work
+## Remaining boundary
 
-- The current training-cycle schema does not persist `recommendation_id`; it is
-  validated at cycle creation but provides no later durable audit link from a
-  cycle back to a recommendation. F1 therefore cannot infer that an arbitrary
-  READY row was already used after the fact. The fallback path never supplies
-  `recommendation_id`, and its cycle cannot create that ambiguity.
-- Final remediation F2 (global refill-admission lock ordering) is separate and
-  remains pending.
-- Real Brave/provider acceptance and real-account/manual zoom checks remain the
-  existing external-pending boundaries; no credential was requested or used.
+Final remediation F2 (global refill-admission lock ordering) remains separate
+and pending. Real Brave/provider acceptance and real-account/manual zoom checks
+remain the established external-pending boundaries; no credential was
+requested or used.

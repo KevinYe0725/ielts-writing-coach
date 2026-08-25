@@ -65,6 +65,7 @@ describe.skipIf(!databaseUrl)(
       newDomainId(),
       newDomainId(),
       newDomainId(),
+      newDomainId(),
     ];
     const auditEventId = newDomainId();
     const forbiddenValues = {
@@ -197,6 +198,14 @@ describe.skipIf(!databaseUrl)(
           userId: ownerId,
           action: "INITIAL",
           status: "ABANDONED",
+        },
+        {
+          id: recommendationIds[4],
+          userId: ownerId,
+          questionExternalId: `iwc-dynamic-admin-${suffix}`,
+          action: "INITIAL",
+          status: "STARTED",
+          shownAt: new Date(),
         },
       ]);
       await database.db.insert(auditEvent).values({
