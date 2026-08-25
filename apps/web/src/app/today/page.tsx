@@ -133,6 +133,7 @@ export default function TodayPage() {
   const recommendationStartRef = useRef<HTMLButtonElement>(null);
   const recommendationOperation = useRef(0);
   const recommendationTimers = useRef(new Map<number, () => void>());
+  const recommendationInteractionLocked = useRef(false);
   const [customOpen, setCustomOpen] = useState(false);
   const [customPrompt, setCustomPrompt] = useState("");
   const [customType, setCustomType] = useState<QuestionType>("opinion");
@@ -306,7 +307,13 @@ export default function TodayPage() {
     question: QuestionOption | undefined,
     recommendationId?: string,
   ) => {
-    if (!question || recommendationBusy) return;
+    if (
+      !question ||
+      recommendationBusy ||
+      recommendationInteractionLocked.current
+    )
+      return;
+    recommendationInteractionLocked.current = true;
     setQuestionLoading(true);
     setQuestionError(null);
     try {
@@ -320,6 +327,7 @@ export default function TodayPage() {
         error instanceof Error ? error.message : "The cycle could not start.",
       );
     } finally {
+      recommendationInteractionLocked.current = false;
       setQuestionLoading(false);
     }
   };
@@ -328,16 +336,22 @@ export default function TodayPage() {
     if (
       recommendation?.state !== "READY" ||
       recommendationBusy ||
-      questionLoading
+      questionLoading ||
+      recommendationInteractionLocked.current
     )
       return;
-    await requestRecommendation(
-      {
-        action: "SWAP",
-        excludedQuestionId: recommendation.question.id,
-      },
-      true,
-    );
+    recommendationInteractionLocked.current = true;
+    try {
+      await requestRecommendation(
+        {
+          action: "SWAP",
+          excludedQuestionId: recommendation.question.id,
+        },
+        true,
+      );
+    } finally {
+      recommendationInteractionLocked.current = false;
+    }
   };
 
   const retryPendingJob = async () => {

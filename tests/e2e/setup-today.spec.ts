@@ -245,6 +245,15 @@ test.describe("deterministic setup and Today experience", () => {
       expect(startBox!.y + startBox!.height).toBeLessThanOrEqual(
         viewport.height - 8,
       );
+      if (viewport.width === 390) {
+        const accountBox = await page
+          .getByRole("button", { name: "Open Next.js Dev Tools" })
+          .boundingBox();
+        expect(accountBox).not.toBeNull();
+        expect(startBox!.x).toBeGreaterThan(
+          accountBox!.x + accountBox!.width + 8,
+        );
+      }
     }
   });
 
@@ -513,6 +522,67 @@ test.describe("Today query states at the HTTP boundary", () => {
     await expect(
       page.getByRole("button", { name: "用这道题开始写作" }),
     ).toBeVisible();
+  });
+
+  test("synchronously dispatched start events create one training cycle", async ({
+    page,
+  }) => {
+    let starts = 0;
+    page.on("request", (request) => {
+      if (
+        request.method() === "POST" &&
+        request.url().endsWith("/api/v1/training-cycles")
+      )
+        starts += 1;
+    });
+    await routeTodayHttpFixture(page, "mixed-review");
+    await page.route("**/api/v1/training-cycles", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ cycle: { id: "cycle-double-start" } }),
+      });
+    });
+    await page.goto("/today?mixed-review=1");
+    await expect(
+      page.getByRole("button", { name: "用这道题开始写作" }),
+    ).toBeVisible();
+
+    await page.evaluate(() => {
+      const start = [...document.querySelectorAll("button")].find((button) =>
+        button.textContent?.includes("用这道题开始写作"),
+      );
+      start?.click();
+      start?.click();
+    });
+
+    await expect.poll(() => starts).toBe(1);
+  });
+
+  test("synchronously dispatched swap events create one recommendation request", async ({
+    page,
+  }) => {
+    let swaps = 0;
+    page.on("request", (request) => {
+      if (
+        request.method() === "POST" &&
+        request.url().endsWith("/api/v1/question-recommendations") &&
+        request.postDataJSON()?.action === "SWAP"
+      )
+        swaps += 1;
+    });
+    await routeTodayHttpFixture(page, "mixed-review");
+    await page.goto("/today?mixed-review=1");
+    await expect(page.getByRole("button", { name: "换一题" })).toBeVisible();
+
+    await page.evaluate(() => {
+      const swap = [...document.querySelectorAll("button")].find((button) =>
+        button.textContent?.includes("换一题"),
+      );
+      swap?.click();
+      swap?.click();
+    });
+
+    await expect.poll(() => swaps).toBe(1);
   });
 
   test("feedback-waiting notice keeps the queued state and refresh action", async ({
