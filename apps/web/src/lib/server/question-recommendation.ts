@@ -9,12 +9,14 @@ import {
   inArray,
   isNotNull,
   isNull,
+  lte,
   or,
   sql,
 } from "drizzle-orm";
 
 import {
   auditEvent,
+  mixedReviewTask,
   newDomainId,
   question,
   questionGenerationBatch,
@@ -36,6 +38,7 @@ import {
   automaticQuestionBankRefillDecision,
   enqueueQuestionBankRefill,
 } from "./jobs";
+import { lockLearnerAndAssertActiveCycleCapacity } from "./active-cycle-limit";
 import { ApiProblem } from "./problem";
 import {
   exposureCutoff,
@@ -223,7 +226,7 @@ export async function createQuestionRecommendation(
     options.randomIndex ?? ((upperExclusive) => randomInt(upperExclusive));
 
   return database.transaction(async (transaction) => {
-    await lockLearner(transaction, actorId);
+    await lockLearnerAndAssertActiveCycleCapacity(transaction, actorId);
     const selection = await selectForLearner(transaction, actorId, {
       now,
       randomIndex,
@@ -625,6 +628,25 @@ async function selectForLearner(
     .from(transferTask)
     .innerJoin(question, eq(transferTask.questionId, question.id))
     .where(eq(transferTask.userId, actorId));
+  const [dueMixedReview] = await transaction
+    .select({ sourceTopic: question.topic })
+    .from(mixedReviewTask)
+    .innerJoin(
+      trainingCycle,
+      eq(mixedReviewTask.sourceCycleId, trainingCycle.id),
+    )
+    .innerJoin(question, eq(trainingCycle.questionId, question.id))
+    .where(
+      and(
+        eq(mixedReviewTask.userId, actorId),
+        eq(trainingCycle.userId, actorId),
+        inArray(mixedReviewTask.status, ["PLANNED", "READY", "RESCHEDULED"]),
+        isNull(mixedReviewTask.targetCycleId),
+        lte(mixedReviewTask.dueAt, input.now),
+      ),
+    )
+    .orderBy(asc(mixedReviewTask.dueAt), asc(mixedReviewTask.id))
+    .limit(1);
   const exposures = await transaction
     .select({
       id: questionRecommendation.questionExternalId,
@@ -666,6 +688,9 @@ async function selectForLearner(
     candidates,
     priorCycles: scoredPrior,
     recentCycles: scoredRecent,
+    ...(dueMixedReview && isQuestionTopic(dueMixedReview.sourceTopic)
+      ? { dueSourceTopic: dueMixedReview.sourceTopic }
+      : {}),
   });
   const selected = selectTopBucket(ranked, input.randomIndex);
   const selectedQuestion = selected

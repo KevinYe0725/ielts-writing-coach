@@ -1,9 +1,10 @@
-import { and, asc, desc, eq, inArray, isNull, lte, ne } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, lte } from "drizzle-orm";
 import { z } from "zod";
 
 import { LEARNING_CONTRACT_VERSION } from "@iwc/learning-contracts";
-import { mixedReviewTask, trainingCycle, user } from "@iwc/db";
+import { mixedReviewTask, trainingCycle } from "@iwc/db";
 
+import { lockLearnerAndAssertActiveCycleCapacity } from "@/lib/server/active-cycle-limit";
 import { getServerContext } from "@/lib/server/context";
 import { ApiProblem, apiRoute } from "@/lib/server/problem";
 import { assertRecommendationForCycle } from "@/lib/server/question-recommendation";
@@ -66,43 +67,9 @@ export const POST = apiRoute(async (request) => {
       payload.question_id,
     );
     const cycle = await db.transaction(async (transaction) => {
-      // The limit is per learner, so lock the learner row before counting. A
-      // plain count followed by an insert allows two concurrent requests to
-      // observe the same stale count and both create a third active cycle.
-      // Holding this row lock until commit serializes only this learner's
-      // cycle creation while unrelated learners remain independent.
-      const [lockedLearner] = await transaction
-        .select({ id: user.id })
-        .from(user)
-        .where(eq(user.id, actor.id))
-        .for("update");
-      if (!lockedLearner) {
-        throw new ApiProblem({
-          title: "Learner not found",
-          status: 404,
-          code: "LEARNER_NOT_FOUND",
-          detail: "The learner account no longer exists.",
-        });
-      }
-      const active = await transaction
-        .select({ id: trainingCycle.id })
-        .from(trainingCycle)
-        .where(
-          and(
-            eq(trainingCycle.userId, actor.id),
-            isNull(trainingCycle.archivedAt),
-            ne(trainingCycle.status, "CORE_CYCLE_COMPLETED"),
-          ),
-        );
-      if (active.length >= 8) {
-        throw new ApiProblem({
-          title: "Eight essays are already in progress",
-          status: 409,
-          code: "ACTIVE_CYCLE_LIMIT",
-          detail:
-            "You already have eight essays in progress. Continue one of them before starting another.",
-        });
-      }
+      // Recommendation and cycle creation share this exact learner-locked
+      // capacity predicate so neither mutation can drift from the other.
+      await lockLearnerAndAssertActiveCycleCapacity(transaction, actor.id);
 
       // A due D14 review is passively attached to the next ordinary timed essay.
       // The old skill is never returned to the browser, so the first draft stays

@@ -220,6 +220,27 @@ describe("POST /api/v1/question-recommendations", () => {
     expect(state.complete).not.toHaveBeenCalled();
   });
 
+  it("returns ACTIVE_CYCLE_LIMIT without exposing a recommendation", async () => {
+    state.create.mockRejectedValue(
+      new ApiProblem({
+        title: "Eight essays are already in progress",
+        status: 409,
+        code: "ACTIVE_CYCLE_LIMIT",
+        detail:
+          "You already have eight essays in progress. Continue one of them before starting another.",
+      }),
+    );
+
+    const response = await POST(request({ action: "INITIAL" }));
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({
+      code: "ACTIVE_CYCLE_LIMIT",
+      status: 409,
+    });
+    expect(state.complete).not.toHaveBeenCalled();
+  });
+
   it("rejects malformed, unexpected, and oversized bodies before reservation", async () => {
     for (const body of [
       { action: "UNKNOWN" },

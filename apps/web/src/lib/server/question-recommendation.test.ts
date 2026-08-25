@@ -5,6 +5,7 @@ import {
   aiJob,
   auditEvent,
   createDatabase,
+  mixedReviewTask,
   newDomainId,
   question,
   questionGenerationBatch,
@@ -639,6 +640,73 @@ integration("question recommendation service (PostgreSQL)", () => {
     expect(result).toMatchObject({
       status: "READY",
       question: { id: opinionEducation.id },
+    });
+  });
+
+  it("selects a different-topic question for the actual deterministic due mixed review", async () => {
+    const learnerId = await createLearner("recommend-due-mixed-review");
+    const sameTopic = QUESTION_BANK.find(
+      (item) => item.type === "discussion" && item.topic === "health",
+    )!;
+    const differentTopic = QUESTION_BANK.find(
+      (item) => item.type === "discussion" && item.topic === "education",
+    )!;
+    await exposeAllExcept(learnerId, [sameTopic.id, differentTopic.id]);
+
+    const history = [
+      { label: "source", topic: "health", createdAtOffset: 5 },
+      { label: "education", topic: "education", createdAtOffset: 3 },
+      { label: "technology", topic: "technology", createdAtOffset: 2 },
+      { label: "environment", topic: "environment", createdAtOffset: 1 },
+    ] as const;
+    const sourceQuestionId = await insertStoredQuestion({
+      externalId: `due-source-${learnerId}`,
+      type: "opinion",
+      topic: "health",
+    });
+    const [sourceCycle] = await database.db
+      .insert(trainingCycle)
+      .values({
+        userId: learnerId,
+        questionId: sourceQuestionId,
+        status: "CORE_CYCLE_COMPLETED",
+        schemaVersion: "1.0.0",
+        timezone: "UTC",
+        createdAt: new Date(now.getTime() - 5 * 60_000),
+      })
+      .returning({ id: trainingCycle.id });
+    for (const item of history.slice(1)) {
+      const questionId = await insertStoredQuestion({
+        externalId: `due-history-${item.label}-${learnerId}`,
+        type: "opinion",
+        topic: item.topic,
+      });
+      await database.db.insert(trainingCycle).values({
+        userId: learnerId,
+        questionId,
+        status: "CORE_CYCLE_COMPLETED",
+        schemaVersion: "1.0.0",
+        timezone: "UTC",
+        createdAt: new Date(now.getTime() - item.createdAtOffset * 60_000),
+      });
+    }
+    await database.db.insert(mixedReviewTask).values({
+      sourceCycleId: sourceCycle!.id,
+      userId: learnerId,
+      status: "PLANNED",
+      dueAt: now,
+    });
+
+    const result = await createQuestionRecommendation(
+      database.db,
+      learnerId,
+      { action: "INITIAL" },
+      options,
+    );
+
+    expect(result).toMatchObject({
+      status: "READY",
+      question: { id: differentTopic.id },
     });
   });
 

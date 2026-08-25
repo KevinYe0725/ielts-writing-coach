@@ -7,6 +7,8 @@ import {
   idempotencyRecord,
   newDomainId,
   question,
+  questionGenerationBatch,
+  questionRecommendation,
   rewriteTask,
   trainingCycle,
   transferTask,
@@ -41,6 +43,7 @@ import { POST as submitAttemptRoute } from "../../app/api/v1/writing-attempts/[i
 import { POST as rescheduleRewriteRoute } from "../../app/api/v1/rewrite-tasks/[id]/reschedule/route";
 import { GET as getToday } from "../../app/api/v1/today/route";
 import { POST as createCycle } from "../../app/api/v1/training-cycles/route";
+import { POST as createRecommendation } from "../../app/api/v1/question-recommendations/route";
 import { GET as getCycle } from "../../app/api/v1/training-cycles/[id]/route";
 import { POST as startCycle } from "../../app/api/v1/training-cycles/[id]/start/route";
 import { POST as rescheduleTransferRoute } from "../../app/api/v1/transfer-tasks/[id]/reschedule/route";
@@ -274,6 +277,101 @@ describe.skipIf(!databaseUrl)(
         code: "ACTIVE_CYCLE_LIMIT",
         detail: expect.stringMatching(/eight essays/i),
       });
+    });
+
+    it("rejects concurrent and replayed recommendations at the active-cycle limit without side effects", async () => {
+      const suffix = newDomainId();
+      const userId = `http-recommend-limit-${suffix}`;
+      const questionId = newDomainId();
+      createdUsers.push(userId);
+      routeState.actor.id = userId;
+      routeState.actor.email = `${suffix}@example.test`;
+
+      await database.db.insert(user).values({
+        id: userId,
+        name: routeState.actor.name,
+        email: routeState.actor.email,
+        role: "learner",
+      });
+      await database.db.insert(question).values({
+        id: questionId,
+        externalId: `recommend-limit-${suffix}`,
+        ownerId: userId,
+        source: "private_test",
+        visibility: "private",
+        questionType: "opinion",
+        topic: "education",
+        prompt: "Should schools teach practical decision-making?",
+      });
+      await database.db.insert(trainingCycle).values(
+        Array.from({ length: 8 }, () => ({
+          userId,
+          questionId,
+          status: "QUESTION_READY" as const,
+          schemaVersion: "1.0.0",
+          timezone: "UTC",
+        })),
+      );
+
+      const makeRequest = (key: string) =>
+        new Request("https://coach.test/api/v1/question-recommendations", {
+          body: JSON.stringify({ action: "INITIAL" }),
+          headers: {
+            "content-type": "application/json",
+            "idempotency-key": key,
+            origin: "https://coach.test",
+          },
+          method: "POST",
+        });
+      const firstKey = `recommend-limit-${suffix}-a`;
+      const responses = await Promise.all([
+        createRecommendation(makeRequest(firstKey)),
+        createRecommendation(makeRequest(`recommend-limit-${suffix}-b`)),
+      ]);
+      const replay = await createRecommendation(makeRequest(firstKey));
+
+      expect(responses.map((response) => response.status)).toEqual([409, 409]);
+      for (const response of [...responses, replay]) {
+        await expect(response.clone().json()).resolves.toMatchObject({
+          code: "ACTIVE_CYCLE_LIMIT",
+          status: 409,
+        });
+      }
+      expect(replay.status).toBe(409);
+      expect(replay.headers.get("idempotency-replayed")).toBe("true");
+      await expect(
+        database.db.query.questionRecommendation.findMany({
+          where: eq(questionRecommendation.userId, userId),
+        }),
+      ).resolves.toHaveLength(0);
+      await expect(
+        database.db.query.questionGenerationBatch.findMany({
+          where: eq(questionGenerationBatch.triggeredByUserId, userId),
+        }),
+      ).resolves.toHaveLength(0);
+      await expect(
+        database.db.query.aiJob.findMany({ where: eq(aiJob.ownerId, userId) }),
+      ).resolves.toHaveLength(0);
+      await expect(
+        database.db.query.trainingCycle.findMany({
+          where: eq(trainingCycle.userId, userId),
+        }),
+      ).resolves.toHaveLength(8);
+      await expect(
+        database.db.query.writingAttempt.findMany({
+          where: eq(writingAttempt.userId, userId),
+        }),
+      ).resolves.toHaveLength(0);
+      await expect(
+        database.db
+          .select({ id: writingAttemptRevision.id })
+          .from(writingAttemptRevision)
+          .innerJoin(
+            writingAttempt,
+            eq(writingAttemptRevision.attemptId, writingAttempt.id),
+          )
+          .where(eq(writingAttempt.userId, userId)),
+      ).resolves.toHaveLength(0);
     });
 
     it("opens the explicitly requested cycle even when Today prioritizes another active cycle", async () => {

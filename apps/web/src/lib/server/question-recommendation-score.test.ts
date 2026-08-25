@@ -52,6 +52,28 @@ describe("question recommendation scoring", () => {
     expect(ranked[0]?.score).toBe(75);
   });
 
+  it("restores topic-diversity points for a due review candidate on a different topic", () => {
+    const ranked = rankQuestionCandidates({
+      candidates: [candidate("q1", "discussion", "education")],
+      priorCycles: [],
+      recentCycles: [candidate("recent", "discussion", "education")],
+      dueSourceTopic: "health",
+    });
+
+    expect(ranked[0]?.score).toBe(85);
+  });
+
+  it("keeps a due review candidate on the source topic under the ordinary recent-topic rule", () => {
+    const ranked = rankQuestionCandidates({
+      candidates: [candidate("q1", "discussion", "health")],
+      priorCycles: [],
+      recentCycles: [candidate("recent", "discussion", "health")],
+      dueSourceTopic: "health",
+    });
+
+    expect(ranked[0]?.score).toBe(75);
+  });
+
   it("uses every recent cycle supplied by the caller", () => {
     const ranked = rankQuestionCandidates({
       candidates: [candidate("q1")],

@@ -21,6 +21,7 @@ export function rankQuestionCandidates(input: {
   candidates: readonly RecommendationCandidate[];
   priorCycles: readonly RecommendationCandidate[];
   recentCycles: readonly RecommendationCandidate[];
+  dueSourceTopic?: QuestionTopic;
 }): RankedQuestion[] {
   const usedQuestionIds = new Set(input.priorCycles.map((cycle) => cycle.id));
   const typeCounts = countBy(input.priorCycles, (cycle) => cycle.type);
@@ -32,14 +33,20 @@ export function rankQuestionCandidates(input: {
   return input.candidates
     .filter((candidate) => candidate.visibility !== "private")
     .filter((candidate) => !usedQuestionIds.has(candidate.id))
-    .map((candidate) => ({
-      ...candidate,
-      score:
-        40 / (1 + (typeCounts.get(candidate.type) ?? 0)) +
-        35 / (1 + (topicCounts.get(candidate.topic) ?? 0)) +
-        (recentTypes.has(candidate.type) ? 0 : 15) +
-        (recentTopics.has(candidate.topic) ? 0 : 10),
-    }))
+    .map((candidate) => {
+      const earnsRecentTopicDiversity =
+        (input.dueSourceTopic !== undefined &&
+          candidate.topic !== input.dueSourceTopic) ||
+        !recentTopics.has(candidate.topic);
+      return {
+        ...candidate,
+        score:
+          40 / (1 + (typeCounts.get(candidate.type) ?? 0)) +
+          35 / (1 + (topicCounts.get(candidate.topic) ?? 0)) +
+          (recentTypes.has(candidate.type) ? 0 : 15) +
+          (earnsRecentTopicDiversity ? 10 : 0),
+      };
+    })
     .sort(compareRankedQuestions);
 }
 
