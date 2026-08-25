@@ -20,6 +20,7 @@ import {
   modelRoute,
   newDomainId,
   providerConnection,
+  searchConnection,
   user,
 } from "@iwc/db";
 
@@ -39,6 +40,92 @@ export interface ClaimedJob {
 
 type InstanceDeploymentMode = "personal" | "shared";
 type UserRole = "owner" | "admin" | "learner";
+
+export interface WorkerSearchConnectionRecord {
+  id: string;
+  configuredByUserId: string;
+  configuredByUserRole: UserRole;
+  kind: "BRAVE";
+  encryptedApiKey: string;
+  encryptedApiKeyNonce: string;
+  encryptionKeyVersion: number;
+  createdAt: Date;
+}
+
+export function selectCanonicalSearchConnection(input: {
+  deploymentMode: InstanceDeploymentMode;
+  jobOwnerId: string;
+  candidates: readonly WorkerSearchConnectionRecord[];
+}): WorkerSearchConnectionRecord | undefined {
+  const eligible = input.candidates.filter((candidate) =>
+    input.deploymentMode === "personal"
+      ? candidate.configuredByUserId === input.jobOwnerId
+      : candidate.configuredByUserRole === "owner" ||
+        candidate.configuredByUserRole === "admin",
+  );
+  return eligible.sort((left, right) => {
+    if (input.deploymentMode === "shared") {
+      const leftPriority = left.configuredByUserRole === "owner" ? 0 : 1;
+      const rightPriority = right.configuredByUserRole === "owner" ? 0 : 1;
+      if (leftPriority !== rightPriority) return leftPriority - rightPriority;
+    }
+    return (
+      right.createdAt.getTime() - left.createdAt.getTime() ||
+      left.configuredByUserId.localeCompare(right.configuredByUserId) ||
+      left.id.localeCompare(right.id)
+    );
+  })[0];
+}
+
+/** Resolve only verified ACTIVE credentials; decryption remains Worker-only. */
+export async function resolveSearchConnectionForJob(
+  jobOwnerId: string,
+): Promise<WorkerSearchConnectionRecord | undefined> {
+  const mode = await deploymentMode();
+  const records = await databaseContext.db.query.searchConnection.findMany({
+    where: eq(searchConnection.status, "ACTIVE"),
+    with: {
+      configuredByUser: {
+        columns: { id: true, role: true },
+      },
+    },
+  });
+  const candidates = records.flatMap((record) => {
+    if (!record.configuredByUserId || !record.configuredByUser) return [];
+    return [
+      {
+        id: record.id,
+        configuredByUserId: record.configuredByUserId,
+        configuredByUserRole: record.configuredByUser.role,
+        kind: record.kind,
+        encryptedApiKey: record.encryptedApiKey,
+        encryptedApiKeyNonce: record.encryptedApiKeyNonce,
+        encryptionKeyVersion: record.encryptionKeyVersion,
+        createdAt: record.createdAt,
+      } satisfies WorkerSearchConnectionRecord,
+    ];
+  });
+  return selectCanonicalSearchConnection({
+    deploymentMode: mode,
+    jobOwnerId,
+    candidates,
+  });
+}
+
+export function decryptSearchConnectionApiKey(
+  connection: WorkerSearchConnectionRecord,
+  encodedMasterKey: string,
+): string {
+  return decryptProviderSecret(
+    {
+      ciphertext: connection.encryptedApiKey,
+      nonce: connection.encryptedApiKeyNonce,
+      keyVersion: connection.encryptionKeyVersion,
+    },
+    parseMasterKey(encodedMasterKey),
+    `search:${connection.configuredByUserId}:${connection.id}`,
+  );
+}
 
 export function providerConnectionAuthorizedForJob(input: {
   connectionOwnerId: string;

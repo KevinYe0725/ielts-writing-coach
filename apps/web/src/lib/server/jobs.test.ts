@@ -14,12 +14,15 @@ import {
   newDomainId,
   providerConnection,
   question,
+  questionGenerationBatch,
   trainingCycle,
   user,
 } from "@iwc/db";
 
 import {
   enqueueAIJob,
+  enqueueQuestionBankRefill,
+  automaticQuestionBankRefillDecision,
   recoverFailedFocusedGeneration,
   requeueFailedAIJob,
   resolveAIJobRoute,
@@ -67,6 +70,47 @@ describe("AI job routing without an explicit model route", () => {
       model: "unconfigured",
       sourceOwnedFallback: true,
     });
+  });
+});
+
+describe("automatic question-bank refill admission", () => {
+  const now = new Date("2026-08-25T10:00:00.000Z");
+
+  it("admits a batch when there is no other non-terminal batch or cooldown", () => {
+    expect(
+      automaticQuestionBankRefillDecision({
+        hasOtherNonTerminalBatch: false,
+        latestFailedAt: null,
+        now,
+      }),
+    ).toEqual({ allowed: true });
+  });
+
+  it("rejects a second non-terminal batch", () => {
+    expect(
+      automaticQuestionBankRefillDecision({
+        hasOtherNonTerminalBatch: true,
+        latestFailedAt: null,
+        now,
+      }),
+    ).toEqual({ allowed: false, code: "QUESTION_BANK_REFILL_ACTIVE" });
+  });
+
+  it("enforces six hours after failure with an exact boundary", () => {
+    expect(
+      automaticQuestionBankRefillDecision({
+        hasOtherNonTerminalBatch: false,
+        latestFailedAt: new Date("2026-08-25T04:00:00.001Z"),
+        now,
+      }),
+    ).toEqual({ allowed: false, code: "QUESTION_BANK_REFILL_COOLDOWN" });
+    expect(
+      automaticQuestionBankRefillDecision({
+        hasOtherNonTerminalBatch: false,
+        latestFailedAt: new Date("2026-08-25T04:00:00.000Z"),
+        now,
+      }),
+    ).toEqual({ allowed: true });
   });
 });
 
@@ -484,6 +528,12 @@ integration("shared-instance AI job routing and repair", () => {
   const adminProviderId = newDomainId();
   const routeId = newDomainId();
   const adminRouteId = newDomainId();
+  const refillRouteId = newDomainId();
+  const refillBatchId = newDomainId();
+  const waitingRefillBatchId = newDomainId();
+  const waitingRefillJobId = newDomainId();
+  const blockedRefillBatchId = newDomainId();
+  const blockedRefillJobId = newDomainId();
   const waitingJobId = newDomainId();
   const blockedJobId = newDomainId();
   const personalJobId = newDomainId();
@@ -556,6 +606,13 @@ integration("shared-instance AI job routing and repair", () => {
         providerConnectionId: adminProviderId,
         model: "admin-shared-model",
       },
+      {
+        id: refillRouteId,
+        ownerId,
+        taskKind: "question_bank_refill",
+        providerConnectionId: providerId,
+        model: "owner-refill-model",
+      },
     ]);
     await database.db.insert(aiJob).values([
       {
@@ -596,6 +653,32 @@ integration("shared-instance AI job routing and repair", () => {
         },
         idempotencyKey: `personal-waiting:${suffix}`,
       },
+      {
+        id: waitingRefillJobId,
+        ownerId: learnerId,
+        taskKind: "question_bank_refill",
+        status: "WAITING_FOR_CONSENT",
+        protectedReference: { generationBatchId: waitingRefillBatchId },
+        versionSnapshot: {
+          providerKind: "unconfigured",
+          providerConnectionId: "unconfigured",
+        },
+        idempotencyKey: `question-bank-refill:${waitingRefillBatchId}`,
+      },
+      {
+        id: blockedRefillJobId,
+        ownerId: learnerId,
+        taskKind: "question_bank_refill",
+        status: "AI_BLOCKED",
+        providerConnectionId: providerId,
+        protectedReference: { generationBatchId: blockedRefillBatchId },
+        versionSnapshot: {
+          providerKind: "mock",
+          providerConnectionId: providerId,
+        },
+        idempotencyKey: `question-bank-refill:${blockedRefillBatchId}`,
+        lastErrorCode: "AUTHENTICATION",
+      },
     ]);
   });
 
@@ -611,6 +694,9 @@ integration("shared-instance AI job routing and repair", () => {
         );
     }
     await database.db.delete(aiJob).where(eq(aiJob.ownerId, learnerId));
+    await database.db
+      .delete(questionGenerationBatch)
+      .where(eq(questionGenerationBatch.triggeredByUserId, learnerId));
     await database.db.delete(user).where(eq(user.id, ownerId));
     await database.db.delete(user).where(eq(user.id, adminId));
     await database.db.delete(user).where(eq(user.id, learnerId));
@@ -666,6 +752,71 @@ integration("shared-instance AI job routing and repair", () => {
     expect(job?.versionSnapshot.model).toBe("owner-shared-model");
   });
 
+  it("queues one IDs-only refill job on the privileged shared route and links its batch", async () => {
+    await database.db.insert(questionGenerationBatch).values({
+      id: refillBatchId,
+      triggeredByUserId: learnerId,
+      status: "QUEUED",
+      mode: "OFFLINE",
+      targetMix: [{ questionType: "opinion", topic: "government", count: 2 }],
+      promptVersion: "1.0.0",
+      rubricVersion: "iwc-question-bank-refill-1.0.0",
+    });
+    const result = await database.db.transaction(async (transaction) => {
+      const instance = await transaction.query.instanceConfiguration.findFirst({
+        where: eq(instanceConfiguration.id, testInstanceId),
+      });
+      expect(instance).toBeDefined();
+      await transaction
+        .update(instanceConfiguration)
+        .set({ deploymentMode: "shared" })
+        .where(eq(instanceConfiguration.id, instance!.id));
+      const first = await enqueueQuestionBankRefill(
+        transaction,
+        learnerId,
+        refillBatchId,
+      );
+      const replay = await enqueueQuestionBankRefill(
+        transaction,
+        learnerId,
+        refillBatchId,
+      );
+      await transaction
+        .update(instanceConfiguration)
+        .set({ deploymentMode: instance!.deploymentMode })
+        .where(eq(instanceConfiguration.id, instance!.id));
+      expect(replay).toEqual(first);
+      return first;
+    });
+
+    const [job, batch, jobs] = await Promise.all([
+      database.db.query.aiJob.findFirst({ where: eq(aiJob.id, result.id) }),
+      database.db.query.questionGenerationBatch.findFirst({
+        where: eq(questionGenerationBatch.id, refillBatchId),
+      }),
+      database.db.query.aiJob.findMany({
+        where: eq(
+          aiJob.idempotencyKey,
+          `question-bank-refill:${refillBatchId}`,
+        ),
+      }),
+    ]);
+    expect(jobs).toHaveLength(1);
+    expect(job).toMatchObject({
+      ownerId: learnerId,
+      taskKind: "question_bank_refill",
+      providerConnectionId: providerId,
+      modelRouteId: refillRouteId,
+      status: "QUEUED",
+      protectedReference: { generationBatchId: refillBatchId },
+      idempotencyKey: `question-bank-refill:${refillBatchId}`,
+    });
+    expect(Object.keys(job?.protectedReference ?? {})).toEqual([
+      "generationBatchId",
+    ]);
+    expect(batch?.aiJobId).toBe(result.id);
+  });
+
   it("makes an Admin change to the canonical shared route visible to later Learner jobs", async () => {
     await database.db.transaction(async (transaction) => {
       const canonical = await resolveAIJobRoute(transaction, {
@@ -706,6 +857,27 @@ integration("shared-instance AI job routing and repair", () => {
   });
 
   it("repairs matching learner jobs instance-wide only in shared mode", async () => {
+    await database.db.insert(questionGenerationBatch).values({
+      id: waitingRefillBatchId,
+      triggeredByUserId: learnerId,
+      status: "QUEUED",
+      mode: "OFFLINE",
+      targetMix: [{ questionType: "opinion", topic: "government", count: 1 }],
+      aiJobId: waitingRefillJobId,
+      promptVersion: "1.0.0",
+      rubricVersion: "iwc-question-bank-refill-1.0.0",
+    });
+    await database.db.insert(questionGenerationBatch).values({
+      id: blockedRefillBatchId,
+      triggeredByUserId: learnerId,
+      status: "FAILED",
+      mode: "OFFLINE",
+      targetMix: [{ questionType: "opinion", topic: "government", count: 1 }],
+      aiJobId: blockedRefillJobId,
+      promptVersion: "1.0.0",
+      rubricVersion: "iwc-question-bank-refill-1.0.0",
+      safeFailureCode: "AI_UNAVAILABLE",
+    });
     const binding = {
       taskKind: "issue_classification" as const,
       routeId,
@@ -729,6 +901,23 @@ integration("shared-instance AI job routing and repair", () => {
         [binding],
       ),
     );
+    const refillRepair = await database.db.transaction((transaction) =>
+      resumeWaitingAIJobsForRoutes(
+        transaction,
+        { actorId: ownerId, deploymentMode: "shared" },
+        [
+          {
+            taskKind: "question_bank_refill",
+            routeId: refillRouteId,
+            providerConnectionId: providerId,
+            providerKind: "mock",
+            model: "owner-refill-model",
+            routeVersion: 1,
+            fallbackEnabled: false,
+          },
+        ],
+      ),
+    );
     const blockedRepair = await database.db.transaction((transaction) =>
       resumeBlockedAIJobsForProvider(
         transaction,
@@ -738,11 +927,30 @@ integration("shared-instance AI job routing and repair", () => {
     );
     expect(personalRepair).toBe(0);
     expect(sharedRepair).toBe(1);
+    expect(refillRepair).toBe(1);
     expect(blockedRepair).toBe(1);
     expect(
       await database.db.query.aiJob.findFirst({
         where: eq(aiJob.id, personalJobId),
       }),
     ).toMatchObject({ status: "WAITING_FOR_CONSENT" });
+    expect(
+      await database.db.query.aiJob.findFirst({
+        where: eq(aiJob.id, waitingRefillJobId),
+      }),
+    ).toMatchObject({
+      status: "QUEUED",
+      modelRouteId: refillRouteId,
+      providerConnectionId: providerId,
+      protectedReference: { generationBatchId: waitingRefillBatchId },
+    });
+    expect(
+      await database.db.query.aiJob.findFirst({
+        where: eq(aiJob.id, blockedRefillJobId),
+      }),
+    ).toMatchObject({
+      status: "AI_BLOCKED",
+      protectedReference: { generationBatchId: blockedRefillBatchId },
+    });
   });
 });

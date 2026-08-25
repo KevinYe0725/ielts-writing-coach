@@ -120,6 +120,7 @@ import {
   validatePracticePaperItemContent,
 } from "../learning";
 import { buildMixedReviewObservation } from "../mixed-review";
+import { refillQuestionBank } from "./question-supply";
 
 interface RunAIJobPayload {
   jobId?: string;
@@ -2668,12 +2669,7 @@ async function execute(
     case "objective_prioritization":
       return {};
     case "question_bank_refill":
-      throw Object.assign(
-        new Error(
-          "Question-bank refill requires the supply pipeline before execution.",
-        ),
-        { code: "QUESTION_BANK_REFILL_NOT_IMPLEMENTED" },
-      );
+      return refillQuestionBank(job, helpers);
   }
 }
 

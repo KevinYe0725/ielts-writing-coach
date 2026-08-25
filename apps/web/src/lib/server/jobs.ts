@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
 
 import { promptSnapshot, type AITaskKind } from "@iwc/ai";
 import {
@@ -7,6 +7,7 @@ import {
   modelRoute,
   newDomainId,
   providerConnection,
+  questionGenerationBatch,
   user,
   type Database,
 } from "@iwc/db";
@@ -159,6 +160,31 @@ export function sourceOwnedFocusedGenerationDecision(
     status: "QUEUED",
     sourceOwnedFallback: true,
   };
+}
+
+const QUESTION_BANK_REFILL_COOLDOWN_MS = 6 * 60 * 60 * 1_000;
+
+export function automaticQuestionBankRefillDecision(input: {
+  hasOtherNonTerminalBatch: boolean;
+  latestFailedAt: Date | null;
+  now: Date;
+}):
+  | { allowed: true }
+  | {
+      allowed: false;
+      code: "QUESTION_BANK_REFILL_ACTIVE" | "QUESTION_BANK_REFILL_COOLDOWN";
+    } {
+  if (input.hasOtherNonTerminalBatch) {
+    return { allowed: false, code: "QUESTION_BANK_REFILL_ACTIVE" };
+  }
+  if (
+    input.latestFailedAt &&
+    input.now.getTime() - input.latestFailedAt.getTime() <
+      QUESTION_BANK_REFILL_COOLDOWN_MS
+  ) {
+    return { allowed: false, code: "QUESTION_BANK_REFILL_COOLDOWN" };
+  }
+  return { allowed: true };
 }
 
 async function addGraphileJob(
@@ -394,6 +420,97 @@ export async function enqueueAIJob(
   };
 }
 
+/**
+ * Atomically binds an already-reserved supply batch to the provider-neutral
+ * AI queue. Task 7 creates the batch in this same transaction; an error here
+ * therefore rolls that reservation back.
+ */
+export async function enqueueQuestionBankRefill(
+  transaction: DatabaseTransaction,
+  triggerUserId: string,
+  batchId: string,
+): Promise<EnqueuedAIJob> {
+  await transaction.execute(
+    sql`select pg_advisory_xact_lock(hashtext('question-bank-refill'))`,
+  );
+  const [batch] = await transaction
+    .select()
+    .from(questionGenerationBatch)
+    .where(eq(questionGenerationBatch.id, batchId))
+    .for("update");
+  if (
+    !batch ||
+    batch.triggeredByUserId !== triggerUserId ||
+    batch.status !== "QUEUED"
+  ) {
+    throw Object.assign(
+      new Error("The question-bank refill reservation is unavailable."),
+      { code: "QUESTION_BANK_REFILL_RESERVATION_INVALID" },
+    );
+  }
+  if (batch.aiJobId) {
+    const existing = await transaction.query.aiJob.findFirst({
+      where: eq(aiJob.id, batch.aiJobId),
+    });
+    if (existing) {
+      return {
+        id: existing.id,
+        status:
+          existing.status === "WAITING_FOR_CONSENT"
+            ? "WAITING_FOR_CONSENT"
+            : "QUEUED",
+        location: `/api/v1/ai-jobs/${existing.id}`,
+      };
+    }
+  }
+
+  const [otherNonTerminal, latestFailed] = await Promise.all([
+    transaction.query.questionGenerationBatch.findFirst({
+      columns: { id: true },
+      where: and(
+        ne(questionGenerationBatch.id, batchId),
+        inArray(questionGenerationBatch.status, [
+          "QUEUED",
+          "SEARCHING",
+          "GENERATING",
+          "VALIDATING",
+        ]),
+      ),
+    }),
+    transaction.query.questionGenerationBatch.findFirst({
+      columns: { updatedAt: true },
+      where: and(
+        ne(questionGenerationBatch.id, batchId),
+        eq(questionGenerationBatch.status, "FAILED"),
+      ),
+      orderBy: [desc(questionGenerationBatch.updatedAt)],
+    }),
+  ]);
+  const decision = automaticQuestionBankRefillDecision({
+    hasOtherNonTerminalBatch: Boolean(otherNonTerminal),
+    latestFailedAt: latestFailed?.updatedAt ?? null,
+    now: new Date(),
+  });
+  if (!decision.allowed) {
+    throw Object.assign(
+      new Error("Automatic question-bank refill is not available yet."),
+      { code: decision.code },
+    );
+  }
+
+  const enqueued = await enqueueAIJob(transaction, {
+    ownerId: triggerUserId,
+    taskKind: "question_bank_refill",
+    protectedReference: { generationBatchId: batchId },
+    idempotencyKey: `question-bank-refill:${batchId}`,
+  });
+  await transaction
+    .update(questionGenerationBatch)
+    .set({ aiJobId: enqueued.id })
+    .where(eq(questionGenerationBatch.id, batchId));
+  return enqueued;
+}
+
 export async function resumeWaitingAIJobsForRoutes(
   transaction: DatabaseTransaction,
   scope: AIJobRepairScope,
@@ -461,6 +578,7 @@ export async function resumeBlockedAIJobsForProvider(
         scope.deploymentMode === "personal"
           ? eq(aiJob.ownerId, scope.actorId)
           : undefined,
+        ne(aiJob.taskKind, "question_bank_refill"),
         eq(aiJob.providerConnectionId, providerConnectionId),
         eq(aiJob.status, "AI_BLOCKED"),
         inArray(aiJob.lastErrorCode, [

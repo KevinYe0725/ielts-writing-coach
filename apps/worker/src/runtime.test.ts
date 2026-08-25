@@ -24,8 +24,10 @@ import {
   claimableAIJobDelivery,
   createChildJob,
   databaseContext,
+  decryptSearchConnectionApiKey,
   environment,
   providerConnectionAuthorizedForJob,
+  selectCanonicalSearchConnection,
 } from "./runtime";
 
 describe("AI job claim fence", () => {
@@ -77,6 +79,78 @@ describe("provider connection ownership policy", () => {
         jobOwnerId: "learner-a",
       }),
     ).toBe(false);
+  });
+});
+
+describe("Worker search connection resolution", () => {
+  it("selects an active Owner connection in shared mode and never a Learner credential", () => {
+    const createdAt = new Date("2026-08-25T00:00:00.000Z");
+    const canonical = selectCanonicalSearchConnection({
+      deploymentMode: "shared",
+      jobOwnerId: "trigger-learner",
+      candidates: [
+        {
+          id: "learner-search",
+          configuredByUserId: "trigger-learner",
+          configuredByUserRole: "learner",
+          kind: "BRAVE",
+          encryptedApiKey: "learner-ciphertext",
+          encryptedApiKeyNonce: "learner-nonce",
+          encryptionKeyVersion: 1,
+          createdAt: new Date(createdAt.getTime() + 10_000),
+        },
+        {
+          id: "admin-search",
+          configuredByUserId: "admin-a",
+          configuredByUserRole: "admin",
+          kind: "BRAVE",
+          encryptedApiKey: "admin-ciphertext",
+          encryptedApiKeyNonce: "admin-nonce",
+          encryptionKeyVersion: 1,
+          createdAt: new Date(createdAt.getTime() + 20_000),
+        },
+        {
+          id: "owner-search",
+          configuredByUserId: "owner-a",
+          configuredByUserRole: "owner",
+          kind: "BRAVE",
+          encryptedApiKey: "owner-ciphertext",
+          encryptedApiKeyNonce: "owner-nonce",
+          encryptionKeyVersion: 1,
+          createdAt,
+        },
+      ],
+    });
+
+    expect(canonical?.id).toBe("owner-search");
+  });
+
+  it("decrypts the canonical credential with its configuring-owner AAD", () => {
+    const id = newDomainId();
+    const configuredByUserId = "owner-search-decrypt";
+    const encodedMasterKey = Buffer.alloc(32, 19).toString("base64");
+    const encrypted = encryptProviderSecret(
+      "brave-private-key",
+      parseMasterKey(encodedMasterKey),
+      1,
+      `search:${configuredByUserId}:${id}`,
+    );
+
+    expect(
+      decryptSearchConnectionApiKey(
+        {
+          id,
+          configuredByUserId,
+          configuredByUserRole: "owner",
+          kind: "BRAVE",
+          encryptedApiKey: encrypted.ciphertext,
+          encryptedApiKeyNonce: encrypted.nonce,
+          encryptionKeyVersion: encrypted.keyVersion,
+          createdAt: new Date(),
+        },
+        encodedMasterKey,
+      ),
+    ).toBe("brave-private-key");
   });
 });
 
