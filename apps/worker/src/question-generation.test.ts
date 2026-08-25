@@ -135,10 +135,240 @@ describe("generated question quality gate", () => {
       proposals: Object.values(validProposals),
       existingQuestions: [],
       researchSources: [],
+      targetMix: Object.values(validProposals).map((proposal) => ({
+        questionType: proposal.type,
+        topic: proposal.topic,
+        count: 1,
+      })),
     });
 
     expect(result.accepted).toEqual(Object.values(validProposals));
     expect(result.rejected).toEqual([]);
+  });
+
+  it("rejects a schema-valid proposal outside the approved target mix", async () => {
+    const { validateGeneratedQuestionBatch } = await contract();
+    const proposal = validProposals.discussion;
+
+    const result = validateGeneratedQuestionBatch({
+      proposals: [proposal],
+      existingQuestions: [],
+      researchSources: [],
+      targetMix: [{ questionType: "opinion", topic: "education", count: 1 }],
+    });
+
+    expect(result).toEqual({
+      accepted: [],
+      pendingSemanticReview: [],
+      rejected: [{ proposal, reason: "TARGET_MIX_PAIR_UNAPPROVED" }],
+    });
+  });
+
+  it("rejects later valid proposals after an approved pair reaches its count", async () => {
+    const { validateGeneratedQuestionBatch } = await contract();
+    const first = validProposals.opinion;
+    const second = {
+      ...first,
+      prompt:
+        "Public colleges should guarantee every learner a funded placement with a local charity before graduation. Do you agree or disagree?",
+    };
+    const third = {
+      ...first,
+      prompt:
+        "Schools should make participation in neighbourhood decision-making a compulsory part of the final year. Do you agree or disagree?",
+    };
+
+    const result = validateGeneratedQuestionBatch({
+      proposals: [first, second, third],
+      existingQuestions: [],
+      researchSources: [],
+      targetMix: [{ questionType: "opinion", topic: "education", count: 1 }],
+    });
+
+    expect(result.accepted).toEqual([first]);
+    expect(result.pendingSemanticReview).toEqual([]);
+    expect(result.rejected).toEqual([
+      { proposal: second, reason: "TARGET_MIX_COUNT_EXCEEDED" },
+      { proposal: third, reason: "TARGET_MIX_COUNT_EXCEEDED" },
+    ]);
+  });
+
+  it("does not let deterministically rejected candidates consume pair quota", async () => {
+    const { validateGeneratedQuestionBatch } = await contract();
+    const schemaInvalid = {
+      ...validProposals.opinion,
+      internalRationale: undefined,
+    };
+    const leakage = {
+      ...validProposals.opinion,
+      internalRationale: "A model answer would make this prompt easy to reuse.",
+    };
+    const valid = {
+      ...validProposals.opinion,
+      prompt:
+        "Universities should reserve places in local volunteering programmes for final-year students. Do you agree or disagree?",
+    };
+
+    const result = validateGeneratedQuestionBatch({
+      proposals: [schemaInvalid, leakage, valid],
+      existingQuestions: [],
+      researchSources: [],
+      targetMix: [{ questionType: "opinion", topic: "education", count: 1 }],
+    });
+
+    expect(result.accepted).toEqual([valid]);
+    expect(result.rejected).toEqual([
+      { proposal: schemaInvalid, reason: "SCHEMA_INVALID" },
+      { proposal: leakage, reason: "PROMPT_LEAKAGE" },
+    ]);
+  });
+
+  it.each([
+    ["is not an array", null],
+    ["is empty", []],
+    [
+      "uses unsupported taxonomy",
+      [{ questionType: "letter", topic: "education", count: 1 }],
+    ],
+    [
+      "uses a zero count",
+      [{ questionType: "opinion", topic: "education", count: 0 }],
+    ],
+    [
+      "uses a fractional count",
+      [{ questionType: "opinion", topic: "education", count: 1.5 }],
+    ],
+    [
+      "uses a count above the batch cap",
+      [{ questionType: "opinion", topic: "education", count: 16 }],
+    ],
+    [
+      "duplicates a type-topic pair",
+      [
+        { questionType: "opinion", topic: "education", count: 1 },
+        { questionType: "opinion", topic: "education", count: 1 },
+      ],
+    ],
+    [
+      "has a total above the batch cap",
+      [
+        { questionType: "opinion", topic: "education", count: 8 },
+        { questionType: "discussion", topic: "technology", count: 8 },
+      ],
+    ],
+    [
+      "contains non-canonical fields",
+      [
+        {
+          questionType: "opinion",
+          topic: "education",
+          count: 1,
+          learnerId: "private",
+        },
+      ],
+    ],
+  ])(
+    "fails closed when the internal target mix %s",
+    async (_label, targetMix) => {
+      const { validateGeneratedQuestionBatch } = await contract();
+
+      const result = validateGeneratedQuestionBatch({
+        proposals: [validProposals.opinion],
+        existingQuestions: [],
+        researchSources: [],
+        targetMix,
+      });
+
+      expect(result).toEqual({
+        accepted: [],
+        pendingSemanticReview: [],
+        rejected: [
+          {
+            proposal: validProposals.opinion,
+            reason: "TARGET_MIX_INVALID",
+          },
+        ],
+      });
+    },
+  );
+
+  it("keeps target quota and original semantic indexes consistent across both passes", async () => {
+    const { validateGeneratedQuestionBatch } = await contract();
+    const first = validProposals.opinion;
+    const later = {
+      ...first,
+      prompt:
+        "Public colleges should arrange neighbourhood placements for students who want practical civic experience. Do you agree or disagree?",
+    };
+    const input = {
+      proposals: [first, later],
+      existingQuestions: [
+        {
+          ...first,
+          prompt:
+            "Universities should include organised public service in degree programmes. Do you agree or disagree?",
+        },
+      ],
+      researchSources: [],
+      targetMix: [{ questionType: "opinion", topic: "education", count: 1 }],
+    } as const;
+
+    const firstPass = validateGeneratedQuestionBatch(input);
+    expect(firstPass.pendingSemanticReview).toEqual([first]);
+    expect(firstPass.rejected).toEqual([
+      { proposal: later, reason: "TARGET_MIX_COUNT_EXCEEDED" },
+    ]);
+
+    const finalPass = validateGeneratedQuestionBatch({
+      ...input,
+      semanticJudgments: {
+        0: {
+          duplicate: false,
+          confidence: 0.95,
+          rationale: "The requested policy and civic setting are distinct.",
+        },
+      },
+    });
+    expect(finalPass.accepted).toEqual([first]);
+    expect(finalPass.pendingSemanticReview).toEqual([]);
+    expect(finalPass.rejected).toEqual([
+      { proposal: later, reason: "TARGET_MIX_COUNT_EXCEEDED" },
+    ]);
+  });
+
+  it("releases pair quota when the earlier semantic candidate is rejected", async () => {
+    const { validateGeneratedQuestionBatch } = await contract();
+    const first = validProposals.opinion;
+    const later = {
+      ...first,
+      prompt:
+        "Public colleges should arrange neighbourhood placements for learners seeking practical civic experience. Do you agree or disagree?",
+    };
+    const result = validateGeneratedQuestionBatch({
+      proposals: [first, later],
+      existingQuestions: [
+        {
+          ...first,
+          prompt:
+            "Universities should include organised public service in degree programmes. Do you agree or disagree?",
+        },
+      ],
+      researchSources: [],
+      targetMix: [{ questionType: "opinion", topic: "education", count: 1 }],
+      semanticJudgments: {
+        0: {
+          duplicate: true,
+          confidence: 0.95,
+          rationale: "The first proposal duplicates the existing task.",
+        },
+      },
+    });
+
+    expect(result.accepted).toEqual([]);
+    expect(result.pendingSemanticReview).toEqual([later]);
+    expect(result.rejected).toEqual([
+      { proposal: first, reason: "SEMANTIC_DUPLICATE" },
+    ]);
   });
 
   it("enforces the fifteen-proposal cap at the exported validation boundary", async () => {
@@ -152,6 +382,7 @@ describe("generated question quality gate", () => {
       proposals: proposals.slice(0, 15),
       existingQuestions: [],
       researchSources: [],
+      targetMix: [{ questionType: "opinion", topic: "education", count: 15 }],
     });
     expect(withinLimit.accepted).toHaveLength(1);
     expect(withinLimit.pendingSemanticReview).toHaveLength(14);
@@ -161,6 +392,7 @@ describe("generated question quality gate", () => {
       proposals,
       existingQuestions: [],
       researchSources: [],
+      targetMix: [{ questionType: "opinion", topic: "education", count: 15 }],
     });
     expect(oversized.accepted).toEqual([]);
     expect(oversized.pendingSemanticReview).toEqual([]);
@@ -203,6 +435,7 @@ describe("generated question quality gate", () => {
       proposals: [proposal],
       existingQuestions: [],
       researchSources: [],
+      targetMix: [{ questionType: "opinion", topic: "education", count: 1 }],
     });
 
     expect(result.accepted).toEqual([]);
@@ -256,6 +489,14 @@ describe("generated question quality gate", () => {
       proposals: [proposal],
       existingQuestions: [],
       researchSources: [],
+      targetMix: [
+        {
+          questionType:
+            (proposal.type as string) === "letter" ? "opinion" : proposal.type,
+          topic: proposal.topic,
+          count: 1,
+        },
+      ],
     });
 
     expect(result.rejected).toEqual([
@@ -274,6 +515,7 @@ describe("generated question quality gate", () => {
         },
       ],
       researchSources: [],
+      targetMix: [{ questionType: "opinion", topic: "education", count: 1 }],
     });
 
     expect(result.accepted).toEqual([]);
@@ -292,6 +534,7 @@ describe("generated question quality gate", () => {
       ],
       existingQuestions: [],
       researchSources: [],
+      targetMix: [{ questionType: "opinion", topic: "education", count: 2 }],
     });
 
     expect(result.accepted).toEqual([validProposals.opinion]);
@@ -309,6 +552,9 @@ describe("generated question quality gate", () => {
       proposals: [first, nearDuplicate],
       existingQuestions: [],
       researchSources: [],
+      targetMix: [
+        { questionType: "discussion", topic: "technology", count: 2 },
+      ],
     });
 
     expect(result.accepted).toEqual([first]);
@@ -329,6 +575,7 @@ describe("generated question quality gate", () => {
       proposals: [first, semanticDuplicate],
       existingQuestions: [],
       researchSources: [],
+      targetMix: [{ questionType: "opinion", topic: "education", count: 2 }],
       semanticJudgments: {
         1: {
           duplicate: true,
@@ -356,6 +603,7 @@ describe("generated question quality gate", () => {
       proposals: [first, candidate],
       existingQuestions: [],
       researchSources: [],
+      targetMix: [{ questionType: "opinion", topic: "education", count: 2 }],
     });
 
     expect(result.accepted).toEqual([first]);
@@ -380,6 +628,10 @@ describe("generated question quality gate", () => {
       proposals: [first, pending, nearPending],
       existingQuestions: [],
       researchSources: [],
+      targetMix: [
+        { questionType: "opinion", topic: "education", count: 1 },
+        { questionType: "opinion", topic: "work_economy", count: 2 },
+      ],
     });
 
     expect(result.accepted).toEqual([first]);
@@ -397,6 +649,7 @@ describe("generated question quality gate", () => {
         proposals: [{ ...validProposals.opinion, prompt }],
         existingQuestions: [],
         researchSources: [],
+        targetMix: [{ questionType: "opinion", topic: "education", count: 1 }],
       });
       expect(result.accepted).toEqual([]);
       expect(result.rejected).toHaveLength(1);
@@ -412,6 +665,13 @@ describe("generated question quality gate", () => {
         {
           ...validProposals.advantages_disadvantages,
           prompt: `Some towns support projects where ${copied}. Do the advantages of this development outweigh the disadvantages?`,
+        },
+      ],
+      targetMix: [
+        {
+          questionType: "advantages_disadvantages",
+          topic: "environment",
+          count: 1,
         },
       ],
       existingQuestions: [],
@@ -472,6 +732,7 @@ describe("generated question quality gate", () => {
       proposals: [proposal],
       existingQuestions: [],
       researchSources,
+      targetMix: [{ questionType: "opinion", topic: "education", count: 1 }],
     });
 
     expect(result.rejected).toEqual([{ proposal, reason }]);
@@ -506,6 +767,9 @@ describe("generated question quality gate", () => {
         { ...candidate, prompt: twoPartPrompt(nearDuplicateWords) },
       ],
       researchSources: [],
+      targetMix: [
+        { questionType: "two_part", topic: "urban_transport", count: 1 },
+      ],
     });
     expect(
       normalizedWordFiveGramJaccard(
@@ -528,6 +792,9 @@ describe("generated question quality gate", () => {
         },
       ],
       researchSources: [],
+      targetMix: [
+        { questionType: "two_part", topic: "urban_transport", count: 1 },
+      ],
     });
     expect(belowThresholdResult.rejected).toEqual([]);
     expect(belowThresholdResult.pendingSemanticReview).toEqual([
@@ -551,6 +818,9 @@ describe("generated question quality gate", () => {
           },
         ],
         researchSources: [],
+        targetMix: [
+          { questionType: "discussion", topic: "technology", count: 1 },
+        ],
         semanticJudgments: { 0: semanticJudgment },
       });
       expect(result.accepted).toEqual([]);

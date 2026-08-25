@@ -41,8 +41,17 @@ export interface ExistingGeneratedQuestion {
   prompt: string;
 }
 
+export interface QuestionGenerationTarget {
+  questionType: QuestionType;
+  topic: QuestionTopic;
+  count: number;
+}
+
 export type QuestionGenerationRejectionReason =
   | "BATCH_TOO_LARGE"
+  | "TARGET_MIX_INVALID"
+  | "TARGET_MIX_PAIR_UNAPPROVED"
+  | "TARGET_MIX_COUNT_EXCEEDED"
   | "SCHEMA_INVALID"
   | "TASK2_SURFACE_INVALID"
   | "PROMPT_LEAKAGE"
@@ -69,6 +78,8 @@ export interface ValidateGeneratedQuestionBatchInput {
   proposals: readonly unknown[];
   existingQuestions: readonly ExistingGeneratedQuestion[];
   researchSources: readonly QuestionGenerationResearchSource[];
+  /** Untrusted persisted JSON; malformed internal target data fails closed. */
+  targetMix: unknown;
   /**
    * Semantic duplicate judgments keyed by the original provider proposal
    * index. A candidate with a same-type or same-topic shortlist stays pending
@@ -87,6 +98,52 @@ const validateDuplicateJudgment = ajv.compile(
 const questionTypeSet = new Set<string>(QUESTION_TYPES);
 const questionTopicSet = new Set<string>(TOPICS);
 const minimumSemanticConfidence = 0.8;
+const maximumGenerationBatchSize = 15;
+
+function targetPairKey(questionType: string, topic: string): string {
+  return JSON.stringify([questionType, topic]);
+}
+
+function canonicalTargetMixQuotas(value: unknown): Map<string, number> | null {
+  if (
+    !Array.isArray(value) ||
+    value.length === 0 ||
+    value.length > maximumGenerationBatchSize
+  ) {
+    return null;
+  }
+  const quotas = new Map<string, number>();
+  let total = 0;
+  for (const target of value) {
+    if (
+      typeof target !== "object" ||
+      target === null ||
+      Array.isArray(target) ||
+      Object.keys(target).sort().join(",") !== "count,questionType,topic"
+    ) {
+      return null;
+    }
+    const { questionType, topic, count } = target as Record<string, unknown>;
+    if (
+      typeof questionType !== "string" ||
+      !questionTypeSet.has(questionType) ||
+      typeof topic !== "string" ||
+      !questionTopicSet.has(topic) ||
+      typeof count !== "number" ||
+      !Number.isInteger(count) ||
+      count < 1 ||
+      count > maximumGenerationBatchSize
+    ) {
+      return null;
+    }
+    const key = targetPairKey(questionType, topic);
+    if (quotas.has(key)) return null;
+    quotas.set(key, count);
+    total += count;
+    if (total > maximumGenerationBatchSize) return null;
+  }
+  return quotas;
+}
 
 function normalizedWords(value: string): string[] {
   return value.toLocaleLowerCase("en-US").match(/[a-z0-9]+/gu) ?? [];
@@ -223,7 +280,18 @@ function semanticShortlist(
 export function validateGeneratedQuestionBatch(
   input: ValidateGeneratedQuestionBatchInput,
 ): QuestionGenerationValidationResult {
-  if (input.proposals.length > 15) {
+  const targetQuotas = canonicalTargetMixQuotas(input.targetMix);
+  if (!targetQuotas) {
+    return {
+      accepted: [],
+      pendingSemanticReview: [],
+      rejected: input.proposals.map((proposal) => ({
+        proposal,
+        reason: "TARGET_MIX_INVALID" as const,
+      })),
+    };
+  }
+  if (input.proposals.length > maximumGenerationBatchSize) {
     return {
       accepted: [],
       pendingSemanticReview: [],
@@ -237,6 +305,7 @@ export function validateGeneratedQuestionBatch(
   const pendingSemanticReview: GeneratedQuestionProposal[] = [];
   const rejected: RejectedGeneratedQuestion[] = [];
   const priorAcceptedOrPending: GeneratedQuestionProposal[] = [];
+  const occupiedTargetCounts = new Map<string, number>();
   const knownHashes = new Set(
     input.existingQuestions.map((question) =>
       questionPromptHash(question.prompt),
@@ -246,6 +315,15 @@ export function validateGeneratedQuestionBatch(
   input.proposals.forEach((candidate, index) => {
     if (!isGeneratedQuestionProposal(candidate)) {
       rejected.push({ proposal: candidate, reason: "SCHEMA_INVALID" });
+      return;
+    }
+    const targetKey = targetPairKey(candidate.type, candidate.topic);
+    const targetQuota = targetQuotas.get(targetKey);
+    if (targetQuota === undefined) {
+      rejected.push({
+        proposal: candidate,
+        reason: "TARGET_MIX_PAIR_UNAPPROVED",
+      });
       return;
     }
     if (
@@ -292,7 +370,21 @@ export function validateGeneratedQuestionBatch(
       return;
     }
 
+    const occupyTarget = (): boolean => {
+      const occupied = occupiedTargetCounts.get(targetKey) ?? 0;
+      if (occupied >= targetQuota) {
+        rejected.push({
+          proposal: candidate,
+          reason: "TARGET_MIX_COUNT_EXCEEDED",
+        });
+        return false;
+      }
+      occupiedTargetCounts.set(targetKey, occupied + 1);
+      return true;
+    };
+
     if (shortlist.length === 0) {
+      if (!occupyTarget()) return;
       knownHashes.add(candidateHash);
       accepted.push(candidate);
       priorAcceptedOrPending.push(candidate);
@@ -300,6 +392,7 @@ export function validateGeneratedQuestionBatch(
     }
     const semanticJudgment = input.semanticJudgments?.[index];
     if (semanticJudgment === undefined) {
+      if (!occupyTarget()) return;
       knownHashes.add(candidateHash);
       pendingSemanticReview.push(candidate);
       priorAcceptedOrPending.push(candidate);
@@ -324,6 +417,7 @@ export function validateGeneratedQuestionBatch(
       rejected.push({ proposal: candidate, reason: "SEMANTIC_DUPLICATE" });
       return;
     }
+    if (!occupyTarget()) return;
     knownHashes.add(candidateHash);
     accepted.push(candidate);
     priorAcceptedOrPending.push(candidate);

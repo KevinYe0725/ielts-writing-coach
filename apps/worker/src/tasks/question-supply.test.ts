@@ -94,7 +94,7 @@ class MemoryStore implements QuestionSupplyStore {
       triggeredByUserId: "learner-trigger",
       status: "QUEUED",
       mode: "WEB_RESEARCH",
-      targetMix: [{ questionType: "opinion", topic: "government", count: 2 }],
+      targetMix: [{ questionType: "opinion", topic: "government", count: 15 }],
       researchSources: [],
       searchConnectionId: null,
       aiJobId: null,
@@ -617,6 +617,108 @@ describe("question-bank refill pipeline", () => {
     expect(store.batch.rejectedCount).toBe(3);
   });
 
+  it("publishes at most the approved count when all fifteen proposals use one pair", async () => {
+    const batchId = newDomainId();
+    const store = new MemoryStore(batchId);
+    store.batch.targetMix = [
+      { questionType: "opinion", topic: "government", count: 1 },
+    ];
+
+    await refillQuestionBank(
+      claimedJob(batchId),
+      helpers,
+      dependencies(store, {
+        generation: {
+          proposals: Array.from({ length: 15 }, (_, index) => proposal(index)),
+        },
+      }),
+    );
+
+    expect(store.published).toHaveLength(1);
+    expect(store.batch).toMatchObject({
+      status: "SUCCEEDED",
+      acceptedCount: 1,
+      rejectedCount: 14,
+      safeFailureCode: null,
+    });
+  });
+
+  it("publishes no schema-valid proposal outside the approved pairs", async () => {
+    const batchId = newDomainId();
+    const store = new MemoryStore(batchId);
+    store.batch.targetMix = [
+      { questionType: "opinion", topic: "education", count: 1 },
+    ];
+
+    await refillQuestionBank(claimedJob(batchId), helpers, dependencies(store));
+
+    expect(store.published).toEqual([]);
+    expect(store.batch).toMatchObject({
+      status: "FAILED",
+      acceptedCount: 0,
+      rejectedCount: 1,
+      safeFailureCode: "QUESTION_VALIDATION_REJECTED",
+    });
+    expect(JSON.stringify(store.batch)).not.toContain(
+      "TARGET_MIX_PAIR_UNAPPROVED",
+    );
+  });
+
+  it("counts mixed invalid, out-of-mix, and accepted proposals atomically", async () => {
+    const batchId = newDomainId();
+    const store = new MemoryStore(batchId);
+    store.batch.targetMix = [
+      { questionType: "opinion", topic: "government", count: 2 },
+    ];
+    const malformed = { ...proposal(20), internalRationale: undefined };
+    const outOfMix = {
+      type: "discussion",
+      topic: "technology",
+      track: "academic",
+      prompt:
+        "Some people support strict public rules for online services, while others prefer company self-regulation. Discuss both views and give your own opinion.",
+      internalRationale: "A durable technology governance trade-off.",
+    };
+
+    await refillQuestionBank(
+      claimedJob(batchId),
+      helpers,
+      dependencies(store, {
+        generation: {
+          proposals: [malformed, outOfMix, proposal(21), proposal(22)],
+        },
+      }),
+    );
+
+    expect(store.published).toHaveLength(2);
+    expect(store.batch).toMatchObject({
+      status: "SUCCEEDED",
+      acceptedCount: 2,
+      rejectedCount: 2,
+      safeFailureCode: null,
+    });
+  });
+
+  it("fails malformed persisted target mix closed without exposing internal reasons", async () => {
+    const batchId = newDomainId();
+    const store = new MemoryStore(batchId);
+    store.batch.targetMix = [
+      { questionType: "opinion", topic: "government", count: 1 },
+      { questionType: "opinion", topic: "government", count: 1 },
+    ];
+
+    await refillQuestionBank(claimedJob(batchId), helpers, dependencies(store));
+
+    expect(store.published).toEqual([]);
+    expect(store.batch).toMatchObject({
+      status: "FAILED",
+      acceptedCount: 0,
+      rejectedCount: 1,
+      safeFailureCode: "QUESTION_VALIDATION_REJECTED",
+    });
+    expect(JSON.stringify(store.batch)).not.toContain("TARGET_MIX_INVALID");
+  });
+
   it("obtains a typed semantic judgment before publishing a shortlisted proposal", async () => {
     const batchId = newDomainId();
     const store = new MemoryStore(batchId);
@@ -790,6 +892,14 @@ integration("question-bank refill PostgreSQL publication", () => {
   const terminalRaceJobId = newDomainId();
   const transitionRecoveryBatchId = newDomainId();
   const transitionRecoveryJobId = newDomainId();
+  const targetQuotaBatchId = newDomainId();
+  const targetQuotaJobId = newDomainId();
+  const outOfMixBatchId = newDomainId();
+  const outOfMixJobId = newDomainId();
+  const mixedTargetBatchId = newDomainId();
+  const mixedTargetJobId = newDomainId();
+  const malformedTargetBatchId = newDomainId();
+  const malformedTargetJobId = newDomainId();
 
   beforeAll(async () => {
     await databaseContext.db.insert(user).values({
@@ -910,6 +1020,26 @@ integration("question-bank refill PostgreSQL publication", () => {
         idempotencyKey: `question-bank-refill:${transitionRecoveryBatchId}`,
         attemptCount: 1,
       },
+      ...[
+        [targetQuotaJobId, targetQuotaBatchId],
+        [outOfMixJobId, outOfMixBatchId],
+        [mixedTargetJobId, mixedTargetBatchId],
+        [malformedTargetJobId, malformedTargetBatchId],
+      ].map(([jobId, batchId]) => ({
+        id: jobId!,
+        ownerId: userId,
+        taskKind: "question_bank_refill" as const,
+        status: "RUNNING" as const,
+        protectedReference: { generationBatchId: batchId! },
+        versionSnapshot: {
+          model: "test-model",
+          promptVersion: "1.0.0",
+          providerKind: "mock",
+          providerConnectionId: "mock",
+        },
+        idempotencyKey: `question-bank-refill:${batchId}`,
+        attemptCount: 1,
+      })),
     ]);
     await databaseContext.db.insert(questionGenerationBatch).values([
       {
@@ -994,6 +1124,49 @@ integration("question-bank refill PostgreSQL publication", () => {
         promptVersion: "1.0.0",
         rubricVersion: "iwc-question-bank-refill-1.0.0",
       },
+      {
+        id: targetQuotaBatchId,
+        triggeredByUserId: userId,
+        status: "QUEUED",
+        mode: "OFFLINE",
+        targetMix: [{ questionType: "opinion", topic: "government", count: 1 }],
+        aiJobId: targetQuotaJobId,
+        promptVersion: "1.0.0",
+        rubricVersion: "iwc-question-bank-refill-1.0.0",
+      },
+      {
+        id: outOfMixBatchId,
+        triggeredByUserId: userId,
+        status: "QUEUED",
+        mode: "OFFLINE",
+        targetMix: [{ questionType: "opinion", topic: "education", count: 1 }],
+        aiJobId: outOfMixJobId,
+        promptVersion: "1.0.0",
+        rubricVersion: "iwc-question-bank-refill-1.0.0",
+      },
+      {
+        id: mixedTargetBatchId,
+        triggeredByUserId: userId,
+        status: "QUEUED",
+        mode: "OFFLINE",
+        targetMix: [{ questionType: "opinion", topic: "government", count: 2 }],
+        aiJobId: mixedTargetJobId,
+        promptVersion: "1.0.0",
+        rubricVersion: "iwc-question-bank-refill-1.0.0",
+      },
+      {
+        id: malformedTargetBatchId,
+        triggeredByUserId: userId,
+        status: "QUEUED",
+        mode: "OFFLINE",
+        targetMix: [
+          { questionType: "opinion", topic: "government", count: 1 },
+          { questionType: "opinion", topic: "government", count: 1 },
+        ],
+        aiJobId: malformedTargetJobId,
+        promptVersion: "1.0.0",
+        rubricVersion: "iwc-question-bank-refill-1.0.0",
+      },
     ]);
     await databaseContext.db.insert(questionRecommendation).values({
       id: recommendationId,
@@ -1013,6 +1186,10 @@ integration("question-bank refill PostgreSQL publication", () => {
           concurrentSuccessBatchId,
           recoveredRaceBatchId,
           terminalRaceBatchId,
+          targetQuotaBatchId,
+          outOfMixBatchId,
+          mixedTargetBatchId,
+          malformedTargetBatchId,
         ]),
       );
     await databaseContext.db
@@ -1060,6 +1237,139 @@ integration("question-bank refill PostgreSQL publication", () => {
       generationBatchId: successBatchId,
     });
     expect(saved[0]?.externalId).toMatch(/^iwc-dynamic-[a-f0-9]{64}$/u);
+  });
+
+  it("atomically enforces persisted target pairs and counts across the real publication pipeline", async () => {
+    const quotaDependencies = dependencies(databaseQuestionSupplyStore, {
+      generation: {
+        proposals: Array.from({ length: 15 }, (_, index) =>
+          proposal(index + 100),
+        ),
+      },
+    });
+    const quotaAdapter = await quotaDependencies.resolveAIAdapter(
+      claimedJob(targetQuotaBatchId),
+    );
+    quotaDependencies.resolveAIAdapter = async () => quotaAdapter;
+
+    await refillQuestionBank(
+      {
+        ...claimedJob(targetQuotaBatchId),
+        id: targetQuotaJobId,
+        ownerId: userId,
+      },
+      helpers,
+      quotaDependencies,
+    );
+    await refillQuestionBank(
+      {
+        ...claimedJob(outOfMixBatchId),
+        id: outOfMixJobId,
+        ownerId: userId,
+      },
+      helpers,
+      dependencies(databaseQuestionSupplyStore, {
+        generation: { proposals: [proposal(300)] },
+      }),
+    );
+    const malformed = { ...proposal(400), internalRationale: undefined };
+    const outOfMix = {
+      type: "discussion",
+      topic: "technology",
+      track: "academic",
+      prompt:
+        "Some people support firm public rules for digital services, while others prefer industry self-regulation. Discuss both views and give your own opinion.",
+      internalRationale: "A durable technology governance trade-off.",
+    };
+    await refillQuestionBank(
+      {
+        ...claimedJob(mixedTargetBatchId),
+        id: mixedTargetJobId,
+        ownerId: userId,
+      },
+      helpers,
+      dependencies(databaseQuestionSupplyStore, {
+        generation: {
+          proposals: [malformed, outOfMix, proposal(401), proposal(402)],
+        },
+      }),
+    );
+    await refillQuestionBank(
+      {
+        ...claimedJob(malformedTargetBatchId),
+        id: malformedTargetJobId,
+        ownerId: userId,
+      },
+      helpers,
+      dependencies(databaseQuestionSupplyStore, {
+        generation: { proposals: [proposal(500)] },
+      }),
+    );
+
+    const [quotaBatch, outOfMixBatch, mixedBatch, malformedBatch, rows] =
+      await Promise.all([
+        databaseContext.db.query.questionGenerationBatch.findFirst({
+          where: eq(questionGenerationBatch.id, targetQuotaBatchId),
+        }),
+        databaseContext.db.query.questionGenerationBatch.findFirst({
+          where: eq(questionGenerationBatch.id, outOfMixBatchId),
+        }),
+        databaseContext.db.query.questionGenerationBatch.findFirst({
+          where: eq(questionGenerationBatch.id, mixedTargetBatchId),
+        }),
+        databaseContext.db.query.questionGenerationBatch.findFirst({
+          where: eq(questionGenerationBatch.id, malformedTargetBatchId),
+        }),
+        databaseContext.db.query.question.findMany({
+          where: inArray(question.generationBatchId, [
+            targetQuotaBatchId,
+            outOfMixBatchId,
+            mixedTargetBatchId,
+            malformedTargetBatchId,
+          ]),
+        }),
+      ]);
+
+    expect(quotaBatch).toMatchObject({
+      status: "SUCCEEDED",
+      acceptedCount: 1,
+      rejectedCount: 14,
+      safeFailureCode: null,
+    });
+    expect(outOfMixBatch).toMatchObject({
+      status: "FAILED",
+      acceptedCount: 0,
+      rejectedCount: 1,
+      safeFailureCode: "QUESTION_VALIDATION_REJECTED",
+    });
+    expect(mixedBatch).toMatchObject({
+      status: "SUCCEEDED",
+      acceptedCount: 2,
+      rejectedCount: 2,
+      safeFailureCode: null,
+    });
+    expect(malformedBatch).toMatchObject({
+      status: "FAILED",
+      acceptedCount: 0,
+      rejectedCount: 1,
+      safeFailureCode: "QUESTION_VALIDATION_REJECTED",
+    });
+    expect(
+      rows.filter((row) => row.generationBatchId === targetQuotaBatchId),
+    ).toHaveLength(1);
+    expect(
+      rows.filter((row) => row.generationBatchId === mixedTargetBatchId),
+    ).toHaveLength(2);
+    expect(
+      rows.filter(
+        (row) =>
+          row.generationBatchId === outOfMixBatchId ||
+          row.generationBatchId === malformedTargetBatchId,
+      ),
+    ).toEqual([]);
+    expect(JSON.stringify([outOfMixBatch, malformedBatch])).not.toMatch(
+      /TARGET_MIX_(?:INVALID|PAIR_UNAPPROVED|COUNT_EXCEEDED)/u,
+    );
   });
 
   it("marks the batch and pending recommendation unavailable without inserting on AI failure", async () => {
