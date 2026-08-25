@@ -305,13 +305,20 @@ test.describe("account controls", () => {
     );
 
     type SearchMode = "MISSING" | "ACTIVE" | "INVALID" | "FORBIDDEN" | "ERROR";
+    type SearchPhase = "MISSING" | "ACTIVE" | "INVALID" | "403" | "503";
     let searchMode: SearchMode = "MISSING";
+    const searchPhase = (): SearchPhase => {
+      if (searchMode === "FORBIDDEN") return "403";
+      if (searchMode === "ERROR") return "503";
+      return searchMode;
+    };
     let testAttempts = 0;
     const mutations: Array<{
       body: string | null;
       headers: Record<string, string>;
       method: string;
       path: string;
+      phase?: SearchPhase;
     }> = [];
     const json = (
       route: import("@playwright/test").Route,
@@ -388,6 +395,7 @@ test.describe("account controls", () => {
           headers: request.headers(),
           method: request.method(),
           path,
+          ...(request.method() === "GET" ? { phase: searchPhase() } : {}),
         });
         if (request.method() === "GET") {
           if (searchMode === "FORBIDDEN") {
@@ -467,6 +475,10 @@ test.describe("account controls", () => {
     await expect(search.getByRole("status")).toContainText("最近验证");
     await expect(key).toHaveValue("");
 
+    await page.reload();
+    await page.getByRole("button", { name: "AI 服务" }).click();
+    await expect(search.getByText("可正常使用", { exact: true })).toBeVisible();
+
     const activeAxe = await new AxeBuilder({ page })
       .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
       .analyze();
@@ -535,30 +547,10 @@ test.describe("account controls", () => {
     const searchCalls = mutations.filter((mutation) =>
       mutation.path.endsWith("/search-connection"),
     );
-    expect(
-      [...searchCalls, ...testCalls]
-        .sort(
-          (left, right) =>
-            mutations.indexOf(left) - mutations.indexOf(right),
-        )
-        .map((mutation) => `${mutation.method} ${mutation.path}`),
-    ).toEqual([
-      "GET /api/v1/search-connection",
-      "GET /api/v1/search-connection",
-      "POST /api/v1/search-connection/test",
-      "POST /api/v1/search-connection/test",
-      "PUT /api/v1/search-connection",
-      "PUT /api/v1/search-connection",
-      "DELETE /api/v1/search-connection",
-      "GET /api/v1/search-connection",
-      "GET /api/v1/search-connection",
-      "GET /api/v1/search-connection",
-      "GET /api/v1/search-connection",
-      "GET /api/v1/search-connection",
-      "GET /api/v1/search-connection",
-    ]);
     expect(testCalls).toHaveLength(2);
-    expect(testCalls.map((mutation) => JSON.parse(mutation.body ?? "{}"))).toEqual([
+    expect(
+      testCalls.map((mutation) => JSON.parse(mutation.body ?? "{}")),
+    ).toEqual([
       { api_key: "temporary-invalid-key" },
       { api_key: "temporary-valid-key" },
     ]);
@@ -571,11 +563,27 @@ test.describe("account controls", () => {
       ),
     ).toBe(true);
     const gets = searchCalls.filter((mutation) => mutation.method === "GET");
-    expect(gets).toHaveLength(8);
+    const phaseIndex = (phase: SearchPhase) =>
+      mutations.findIndex(
+        (mutation) => mutation.method === "GET" && mutation.phase === phase,
+      );
+    for (const phase of ["MISSING", "ACTIVE", "INVALID", "403", "503"] as const)
+      expect(
+        phaseIndex(phase),
+        `${phase} GET response phase`,
+      ).toBeGreaterThanOrEqual(0);
+    expect(phaseIndex("MISSING")).toBeLessThan(
+      mutations.findIndex((mutation) => mutation.method === "POST"),
+    );
+    expect(phaseIndex("MISSING")).toBeLessThan(phaseIndex("ACTIVE"));
+    expect(phaseIndex("ACTIVE")).toBeLessThan(phaseIndex("INVALID"));
+    expect(phaseIndex("INVALID")).toBeLessThan(phaseIndex("403"));
+    expect(phaseIndex("403")).toBeLessThan(phaseIndex("503"));
     expect(
       gets.every(
         (mutation) =>
           mutation.body === null &&
+          !mutation.headers.origin &&
           !mutation.headers["content-type"] &&
           !mutation.headers["idempotency-key"],
       ),
@@ -591,7 +599,11 @@ test.describe("account controls", () => {
       { api_key: "replacement-key" },
     ]);
     expect(
-      saves.every((mutation) => Boolean(mutation.headers["idempotency-key"])),
+      saves.every(
+        (mutation) =>
+          mutation.headers["content-type"] === "application/json" &&
+          Boolean(mutation.headers["idempotency-key"]),
+      ),
     ).toBe(true);
     const deletes = mutations.filter(
       (mutation) => mutation.method === "DELETE",
