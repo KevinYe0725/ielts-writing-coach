@@ -1,6 +1,7 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { MockAdapter } from "@iwc/ai";
 import {
   aiJob,
   auditEvent,
@@ -21,6 +22,8 @@ import {
 } from "@iwc/db";
 import { QUESTION_BANK, QUESTION_TYPES, TOPICS } from "@iwc/question-bank";
 
+import { validateGeneratedQuestionBatch } from "../../../../worker/src/question-generation";
+import { questionBankRefillSchema } from "../../../../worker/src/schemas";
 import * as questionRecommendationModule from "./question-recommendation";
 import { completeIdempotentResponse, reserveIdempotencyKey } from "./security";
 
@@ -516,6 +519,63 @@ integration("question recommendation service (PostgreSQL)", () => {
     expect(
       Math.max(...topicCounts) - Math.min(...topicCounts),
     ).toBeLessThanOrEqual(1);
+  });
+
+  it("feeds the real balanced baseline into Mock and validates all approved targets", async () => {
+    const targetMix = await database.db.transaction((transaction) =>
+      buildQuestionBankRefillTargetMix(transaction),
+    );
+    const adapter = new MockAdapter();
+    const generation = await adapter.generateStructured({
+      model: "mock-deterministic-v1",
+      input: "Create the approved bounded question-bank refill.",
+      schemaName: "iwc_question_bank_refill_v1",
+      schema: questionBankRefillSchema as unknown as Record<string, unknown>,
+      contractContext: { kind: "question_bank_refill_v1", targetMix },
+      validate: (
+        value: unknown,
+      ): value is {
+        proposals: Array<{
+          type: (typeof QUESTION_TYPES)[number];
+          topic: (typeof TOPICS)[number];
+          track: "academic" | "general_training";
+          prompt: string;
+          internalRationale: string;
+        }>;
+      } =>
+        typeof value === "object" &&
+        value !== null &&
+        Array.isArray((value as { proposals?: unknown }).proposals),
+    });
+    const semanticJudgments = Object.fromEntries(
+      generation.value.proposals.map((_, index) => [
+        index,
+        {
+          duplicate: false,
+          confidence: 0.99,
+          rationale: "The deterministic variant has a distinct durable focus.",
+        },
+      ]),
+    );
+    const validation = validateGeneratedQuestionBatch({
+      proposals: generation.value.proposals,
+      existingQuestions: QUESTION_BANK,
+      researchSources: [],
+      targetMix,
+      semanticJudgments,
+    });
+
+    expect(generation.value.proposals).toHaveLength(15);
+    expect(validation.accepted).toHaveLength(15);
+    expect(validation.pendingSemanticReview).toEqual([]);
+    expect(validation.rejected).toEqual([]);
+    expect(
+      generation.value.proposals.map(({ type, topic }) => ({
+        questionType: type,
+        topic,
+        count: 1,
+      })),
+    ).toEqual(targetMix);
   });
 
   it("prioritizes lower pair counts while balancing types when one type is overrepresented", async () => {

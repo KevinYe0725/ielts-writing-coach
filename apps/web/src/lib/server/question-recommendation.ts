@@ -834,7 +834,13 @@ async function reserveRefill(
 
 export async function buildQuestionBankRefillTargetMix(
   transaction: DatabaseTransaction,
-): Promise<Array<{ questionType: string; topic: string; count: number }>> {
+): Promise<
+  Array<{
+    questionType: QuestionType;
+    topic: QuestionTopic;
+    count: number;
+  }>
+> {
   const catalog = await listPublicQuestionCatalog(transaction);
   const pairCounts = new Map<string, number>();
   const typeMarginals = new Map(QUESTION_TYPES.map((type) => [type, 0]));
@@ -858,8 +864,8 @@ export async function buildQuestionBankRefillTargetMix(
     })),
   );
   const targetMix: Array<{
-    questionType: string;
-    topic: string;
+    questionType: QuestionType;
+    topic: QuestionTopic;
     count: number;
   }> = [];
   while (targetMix.length < REFILL_PROPOSAL_COUNT && candidates.length > 0) {

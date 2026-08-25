@@ -250,6 +250,9 @@ importers:
 
   packages/ai:
     dependencies:
+      '@iwc/question-bank':
+        specifier: workspace:*
+        version: link:../question-bank
       ajv:
         specifier: 'catalog:'
         version: 8.20.0

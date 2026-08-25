@@ -1,5 +1,12 @@
 import { createHash } from "node:crypto";
 
+import {
+  QUESTION_TYPES,
+  TOPICS,
+  type QuestionTopic,
+  type QuestionType,
+} from "@iwc/question-bank";
+
 import { mockValueFromSchema } from "./json";
 import { normalizeProviderError } from "./errors";
 import type {
@@ -14,6 +21,246 @@ import type {
 } from "./types";
 
 const MODEL = "mock-deterministic-v1";
+const MAX_REFILL_PROPOSALS = 15;
+
+const refillSubjects: Readonly<
+  Record<QuestionTopic, readonly [string, string, string, string, string]>
+> = {
+  education: [
+    "local secondary schools",
+    "adult learning centres",
+    "public libraries",
+    "vocational colleges",
+    "teacher-training programmes",
+  ],
+  technology: [
+    "small online businesses",
+    "community technology hubs",
+    "public service teams",
+    "independent repair workshops",
+    "neighbourhood health clinics",
+  ],
+  environment: [
+    "coastal communities",
+    "urban housing associations",
+    "local food markets",
+    "regional park managers",
+    "small manufacturing firms",
+  ],
+  health: [
+    "neighbourhood health centres",
+    "local sports clubs",
+    "workplace wellbeing teams",
+    "community pharmacies",
+    "rural medical practices",
+  ],
+  government: [
+    "municipal councils",
+    "regional public agencies",
+    "local consultation panels",
+    "public service offices",
+    "community planning boards",
+  ],
+  work_economy: [
+    "small employers",
+    "local trade associations",
+    "worker training centres",
+    "cooperative businesses",
+    "regional employment offices",
+  ],
+  society_culture: [
+    "community arts groups",
+    "local history organisations",
+    "neighbourhood volunteer networks",
+    "public cultural centres",
+    "intergenerational clubs",
+  ],
+  urban_transport: [
+    "suburban transport authorities",
+    "city neighbourhood committees",
+    "regional bus operators",
+    "pedestrian planning teams",
+    "local mobility centres",
+  ],
+};
+
+const refillActions: Readonly<
+  Record<QuestionTopic, readonly [string, string, string]>
+> = {
+  education: [
+    "share specialist teachers across nearby institutions",
+    "reserve weekly lessons for practical decision-making skills",
+    "offer mentoring projects led by trained community volunteers",
+  ],
+  technology: [
+    "lend repairable devices instead of requiring individual purchases",
+    "provide face-to-face guidance for essential digital services",
+    "adopt software that keeps personal records on local equipment",
+  ],
+  environment: [
+    "reward households that share rarely used equipment",
+    "convert unused paved areas into shaded public gardens",
+    "coordinate reusable packaging across independent shops",
+  ],
+  health: [
+    "offer preventive appointments outside standard working hours",
+    "organise low-cost activities for residents with limited mobility",
+    "bring routine advice to isolated neighbourhood meeting places",
+  ],
+  government: [
+    "publish plain-language explanations before major spending decisions",
+    "rotate public meetings among different neighbourhoods",
+    "let residents test proposed services before permanent adoption",
+  ],
+  work_economy: [
+    "share paid training places with workers from smaller organisations",
+    "trial shorter recruitment processes based on practical tasks",
+    "create part-time routes into occupations with persistent vacancies",
+  ],
+  society_culture: [
+    "pair new residents with volunteers for local cultural projects",
+    "open rehearsal and workshop spaces during quiet daytime periods",
+    "record community traditions through projects led by young people",
+  ],
+  urban_transport: [
+    "combine flexible shuttle routes with the main public network",
+    "turn selected parking areas into sheltered interchange points",
+    "coordinate late-evening services with major shift-work locations",
+  ],
+};
+
+const refillOutcomes: Readonly<Record<QuestionTopic, string>> = {
+  education: "access to useful learning",
+  technology: "people's confidence with digital services",
+  environment: "everyday use of local resources",
+  health: "access to preventive care",
+  government: "trust in local decisions",
+  work_economy: "routes into stable employment",
+  society_culture: "participation in community life",
+  urban_transport: "access to work and essential services",
+};
+
+const refillCircumstances = [
+  "during evening hours",
+  "through voluntary neighbourhood trials",
+  "with places reserved for low-income residents",
+  "after consulting people who use the service",
+  "across several small districts",
+  "with support from trained local volunteers",
+  "during periods when buildings are usually quiet",
+  "under rules reviewed by an independent community panel",
+  "with simple alternatives for people who opt out",
+  "through partnerships between nearby organisations",
+  "with results explained in plain language",
+  "after a limited trial in one neighbourhood",
+  "with priority for people facing access barriers",
+  "alongside existing face-to-face services",
+  "using a budget fixed before the programme begins",
+] as const;
+
+function isClosedObject(
+  value: unknown,
+  keys: readonly string[],
+): value is Record<string, unknown> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    Object.keys(value).sort().join(",") === [...keys].sort().join(",")
+  );
+}
+
+function refillTargetMix(value: unknown): Array<{
+  questionType: QuestionType;
+  topic: QuestionTopic;
+  count: number;
+}> | null {
+  if (!isClosedObject(value, ["kind", "targetMix"])) return null;
+  if (value.kind !== "question_bank_refill_v1") return null;
+  if (
+    !Array.isArray(value.targetMix) ||
+    value.targetMix.length < 1 ||
+    value.targetMix.length > MAX_REFILL_PROPOSALS
+  ) {
+    return null;
+  }
+  const typeSet = new Set<string>(QUESTION_TYPES);
+  const topicSet = new Set<string>(TOPICS);
+  const pairs = new Set<string>();
+  const targets: Array<{
+    questionType: QuestionType;
+    topic: QuestionTopic;
+    count: number;
+  }> = [];
+  let total = 0;
+  for (const target of value.targetMix) {
+    if (!isClosedObject(target, ["questionType", "topic", "count"]))
+      return null;
+    if (
+      typeof target.questionType !== "string" ||
+      !typeSet.has(target.questionType) ||
+      typeof target.topic !== "string" ||
+      !topicSet.has(target.topic) ||
+      typeof target.count !== "number" ||
+      !Number.isInteger(target.count) ||
+      target.count < 1 ||
+      target.count > MAX_REFILL_PROPOSALS
+    ) {
+      return null;
+    }
+    const pair = `${target.questionType}:${target.topic}`;
+    if (pairs.has(pair)) return null;
+    pairs.add(pair);
+    total += target.count;
+    if (total > MAX_REFILL_PROPOSALS) return null;
+    targets.push({
+      questionType: target.questionType as QuestionType,
+      topic: target.topic as QuestionTopic,
+      count: target.count,
+    });
+  }
+  return targets;
+}
+
+function refillPrompt(
+  type: QuestionType,
+  topic: QuestionTopic,
+  pairIndex: number,
+): string {
+  const subjects = refillSubjects[topic];
+  const actions = refillActions[topic];
+  const subject = subjects[pairIndex % subjects.length]!;
+  const action = actions[pairIndex % actions.length]!;
+  const circumstance = refillCircumstances[pairIndex]!;
+  switch (type) {
+    case "opinion":
+      return `${subject} could ${action} ${circumstance}. Public funding should support this approach even when other local projects must wait. Do you agree or disagree?`;
+    case "discussion":
+      return `${subject} could ${action} ${circumstance}. Supporters say this would widen access, whereas opponents believe institutions should choose a different priority. Discuss both views and give your own opinion.`;
+    case "advantages_disadvantages":
+      return `${subject} are beginning to ${action} ${circumstance}. Do the advantages of this development outweigh the disadvantages?`;
+    case "problems_solutions":
+      return `${subject} often struggle when they try to ${action} ${circumstance}. What problems does this situation create, and what measures could address them?`;
+    case "two_part":
+      return `${subject} are increasingly choosing to ${action} ${circumstance}. Why might this choice suit their needs? How could it change ${refillOutcomes[topic]}?`;
+  }
+}
+
+function mockQuestionBankRefill(request: StructuredGenerationRequest<unknown>) {
+  const targetMix = refillTargetMix(request.contractContext);
+  if (!targetMix) return { proposals: [] };
+  return {
+    proposals: targetMix.flatMap((target) =>
+      Array.from({ length: target.count }, (_, pairIndex) => ({
+        type: target.questionType,
+        topic: target.topic,
+        track: pairIndex % 2 === 0 ? "academic" : "general_training",
+        prompt: refillPrompt(target.questionType, target.topic, pairIndex),
+        internalRationale: `A durable ${target.topic.replaceAll("_", " ")} scenario for ${target.questionType.replaceAll("_", " ")} practice, variant ${pairIndex + 1}.`,
+      })),
+    ),
+  };
+}
 
 function section(input: string, label: string): string {
   const line = input
@@ -519,27 +766,14 @@ function mockStructuredValue(
     };
   }
   if (request.schemaName === "iwc_question_bank_refill_v1") {
+    return mockQuestionBankRefill(request);
+  }
+  if (request.schemaName === "iwc_question_generation_duplicate_judgment_v1") {
     return {
-      proposals: [
-        {
-          type: "opinion",
-          topic: "government",
-          track: "academic",
-          prompt:
-            "Local governments should reserve a fixed part of their budgets for maintaining public spaces rather than building new landmarks. Do you agree or disagree?",
-          internalRationale:
-            "Public-space maintenance creates a stable civic trade-off for Task 2 argument practice.",
-        },
-        {
-          type: "problems_solutions",
-          topic: "urban_transport",
-          track: "general_training",
-          prompt:
-            "Many people who live outside city centres find it difficult to reach essential services without a car. What problems does this situation create, and what measures could address them?",
-          internalRationale:
-            "Access to services is a durable transport issue without requiring current facts.",
-        },
-      ],
+      duplicate: false,
+      confidence: 0.99,
+      rationale:
+        "The deterministic proposal uses a distinct durable scenario and focus.",
     };
   }
   return generated;
@@ -608,7 +842,9 @@ export class MockAdapter implements AIProviderAdapter {
     }
     const serialized = JSON.stringify(value);
     const digest = createHash("sha256")
-      .update(`${request.schemaName}:${request.input}`)
+      .update(
+        `${request.schemaName}:${request.input}:${JSON.stringify(request.contractContext ?? null)}`,
+      )
       .digest("hex")
       .slice(0, 12);
     return {

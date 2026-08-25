@@ -2,6 +2,14 @@ import Ajv2020, { type AnySchemaObject } from "ajv/dist/2020.js";
 import { describe, expect, it } from "vitest";
 
 import {
+  QUESTION_BANK,
+  QUESTION_TYPES,
+  TOPICS,
+  type QuestionTopic,
+  type QuestionType,
+} from "../../question-bank/src";
+
+import {
   type FocusedLearningPackage,
   validateFocusedLearningPackage,
 } from "../../../apps/worker/src/learning";
@@ -10,12 +18,14 @@ import {
   teachingPracticeAnalysisSchema,
 } from "../../../apps/worker/src/schemas";
 import * as workerSchemas from "../../../apps/worker/src/schemas";
+import { validateGeneratedQuestionBatch } from "../../../apps/worker/src/question-generation";
 import { MockAdapter } from "./mock";
+import type { StructuredGenerationContractContext } from "./types";
 
 const ajv = new Ajv2020({ allErrors: true, strict: true });
 
 describe("deterministic Mock Provider", () => {
-  it("returns two original offline question-bank proposals without research claims", async () => {
+  it("uses the exact bounded refill target mix across every task form and topic", async () => {
     const adapter = new MockAdapter();
     expect(workerSchemas).toHaveProperty("questionBankRefillSchema");
     const questionBankRefillSchema = (workerSchemas as Record<string, unknown>)
@@ -25,31 +35,197 @@ describe("deterministic Mock Provider", () => {
       questionBankRefillSchema as AnySchemaObject,
     );
 
-    const result = await adapter.generateStructured({
+    const targetMix = [
+      { questionType: "opinion", topic: "education", count: 2 },
+      { questionType: "discussion", topic: "technology", count: 1 },
+      {
+        questionType: "advantages_disadvantages",
+        topic: "environment",
+        count: 1,
+      },
+      { questionType: "problems_solutions", topic: "health", count: 1 },
+      { questionType: "two_part", topic: "government", count: 1 },
+      { questionType: "opinion", topic: "work_economy", count: 1 },
+      { questionType: "discussion", topic: "society_culture", count: 1 },
+      {
+        questionType: "advantages_disadvantages",
+        topic: "urban_transport",
+        count: 1,
+      },
+    ] as const;
+    const request = {
       model: "mock-deterministic-v1",
       input:
         "Create an original shared question-bank refill without web research.",
       schemaName: "iwc_question_bank_refill_v1",
       schema: questionBankRefillSchema as unknown as Record<string, unknown>,
+      contractContext: {
+        kind: "question_bank_refill_v1",
+        targetMix,
+      },
       validate: (
         value: unknown,
       ): value is {
-        proposals: Array<{ prompt: string }>;
+        proposals: Array<{
+          type: QuestionType;
+          topic: QuestionTopic;
+          prompt: string;
+        }>;
       } => validate(value) === true,
-    });
+    } as const;
+    const result = await adapter.generateStructured(request);
+    const replay = await adapter.generateStructured(request);
 
     expect(validate(result.value), ajv.errorsText(validate.errors)).toBe(true);
-    expect(result.value).toMatchObject({
-      proposals: expect.any(Array),
-    });
-    expect(result.value.proposals).toHaveLength(2);
+    expect(result.value.proposals).toHaveLength(9);
+    expect(replay).toEqual(result);
+    expect(
+      result.value.proposals.map((proposal) => [proposal.type, proposal.topic]),
+    ).toEqual([
+      ["opinion", "education"],
+      ["opinion", "education"],
+      ["discussion", "technology"],
+      ["advantages_disadvantages", "environment"],
+      ["problems_solutions", "health"],
+      ["two_part", "government"],
+      ["opinion", "work_economy"],
+      ["discussion", "society_culture"],
+      ["advantages_disadvantages", "urban_transport"],
+    ]);
+    expect(new Set(result.value.proposals.map(({ type }) => type))).toEqual(
+      new Set(QUESTION_TYPES),
+    );
+    expect(new Set(result.value.proposals.map(({ topic }) => topic))).toEqual(
+      new Set(TOPICS),
+    );
     expect(JSON.stringify(result.value)).not.toMatch(
       /web[_ -]?research|https?:\/\/|www\.|citation|source url/i,
     );
     expect(
       new Set(result.value.proposals.map((proposal) => proposal.prompt)).size,
-    ).toBe(2);
+    ).toBe(9);
+
+    const semanticJudgments = Object.fromEntries(
+      result.value.proposals.map((_, index) => [
+        index,
+        {
+          duplicate: false,
+          confidence: 0.99,
+          rationale: "The deterministic variant has a distinct durable focus.",
+        },
+      ]),
+    );
+    const validation = validateGeneratedQuestionBatch({
+      proposals: result.value.proposals,
+      existingQuestions: QUESTION_BANK,
+      researchSources: [],
+      targetMix,
+      semanticJudgments,
+    });
+    expect(validation.accepted).toHaveLength(9);
+    expect(validation.pendingSemanticReview).toEqual([]);
+    expect(validation.rejected).toEqual([]);
   });
+
+  it.each(QUESTION_TYPES)(
+    "creates fifteen distinct valid %s variants for one approved pair",
+    async (questionType) => {
+      const adapter = new MockAdapter();
+      const validate = ajv.compile(
+        workerSchemas.questionBankRefillSchema as AnySchemaObject,
+      );
+      const targetMix = [
+        { questionType, topic: "urban_transport", count: 15 },
+      ] as const;
+      const result = await adapter.generateStructured({
+        model: "mock-deterministic-v1",
+        input: "Create a bounded deterministic refill.",
+        schemaName: "iwc_question_bank_refill_v1",
+        schema: workerSchemas.questionBankRefillSchema as unknown as Record<
+          string,
+          unknown
+        >,
+        contractContext: { kind: "question_bank_refill_v1", targetMix },
+        validate: (
+          value: unknown,
+        ): value is {
+          proposals: Array<{
+            type: QuestionType;
+            topic: QuestionTopic;
+            prompt: string;
+          }>;
+        } => validate(value) === true,
+      });
+      const semanticJudgments = Object.fromEntries(
+        result.value.proposals.map((_, index) => [
+          index,
+          {
+            duplicate: false,
+            confidence: 0.99,
+            rationale:
+              "The deterministic variant has a distinct durable focus.",
+          },
+        ]),
+      );
+
+      expect(result.value.proposals).toHaveLength(15);
+      expect(
+        new Set(result.value.proposals.map(({ prompt }) => prompt)).size,
+      ).toBe(15);
+      expect(
+        validateGeneratedQuestionBatch({
+          proposals: result.value.proposals,
+          existingQuestions: QUESTION_BANK,
+          researchSources: [],
+          targetMix,
+          semanticJudgments,
+        }),
+      ).toMatchObject({ accepted: expect.any(Array), rejected: [] });
+    },
+  );
+
+  it.each([
+    ["missing", undefined],
+    [
+      "malformed",
+      {
+        kind: "question_bank_refill_v1",
+        targetMix: [
+          { questionType: "opinion", topic: "government", count: 16 },
+        ],
+      },
+    ],
+  ])(
+    "fails refill generation closed when contract context is %s",
+    async (_label, contractContext) => {
+      const adapter = new MockAdapter();
+      const validate = ajv.compile(
+        workerSchemas.questionBankRefillSchema as AnySchemaObject,
+      );
+
+      await expect(
+        adapter.generateStructured({
+          model: "mock-deterministic-v1",
+          input: "Create a bounded deterministic refill.",
+          schemaName: "iwc_question_bank_refill_v1",
+          schema: workerSchemas.questionBankRefillSchema as unknown as Record<
+            string,
+            unknown
+          >,
+          ...(contractContext === undefined
+            ? {}
+            : {
+                contractContext:
+                  contractContext as StructuredGenerationContractContext,
+              }),
+          validate: (value: unknown): value is { proposals: unknown[] } =>
+            validate(value) === true,
+        }),
+      ).rejects.toThrow(
+        "The deterministic mock could not satisfy schema iwc_question_bank_refill_v1.",
+      );
+    },
+  );
 
   it("returns repeatable structured values that satisfy the caller validator", async () => {
     const adapter = new MockAdapter();

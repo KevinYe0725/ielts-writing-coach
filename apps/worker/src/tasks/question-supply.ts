@@ -29,6 +29,7 @@ import {
 import { BraveSearchAdapter, type SearchAdapter } from "@iwc/search";
 
 import {
+  canonicalQuestionGenerationTargetMix,
   questionPromptHash,
   validateGeneratedQuestionBatch,
   type ExistingGeneratedQuestion,
@@ -569,6 +570,9 @@ export async function refillQuestionBank(
   let adapter: AIProviderAdapter | undefined;
   try {
     adapter = await dependencies.resolveAIAdapter(job);
+    const approvedTargetMix = canonicalQuestionGenerationTargetMix(
+      batch.targetMix,
+    );
     const generation = await adapter.generateStructured({
       model: job.versionSnapshot.model ?? "",
       system: PROMPT_REGISTRY.question_bank_refill.system,
@@ -579,6 +583,14 @@ export async function refillQuestionBank(
       )}\nPropose at most 15 original IELTS Writing Task 2 questions. Use only the approved target mix and taxonomy.`,
       schemaName: "iwc_question_bank_refill_v1",
       schema: questionBankRefillSchema as unknown as Record<string, unknown>,
+      ...(approvedTargetMix
+        ? {
+            contractContext: {
+              kind: "question_bank_refill_v1" as const,
+              targetMix: approvedTargetMix,
+            },
+          }
+        : {}),
       validate: (value): value is { proposals: GeneratedQuestionProposal[] } =>
         validateProposalResponse(value),
       idempotencyKey: job.id,

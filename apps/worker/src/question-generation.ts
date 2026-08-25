@@ -104,7 +104,9 @@ function targetPairKey(questionType: string, topic: string): string {
   return JSON.stringify([questionType, topic]);
 }
 
-function canonicalTargetMixQuotas(value: unknown): Map<string, number> | null {
+export function canonicalQuestionGenerationTargetMix(
+  value: unknown,
+): QuestionGenerationTarget[] | null {
   if (
     !Array.isArray(value) ||
     value.length === 0 ||
@@ -112,7 +114,8 @@ function canonicalTargetMixQuotas(value: unknown): Map<string, number> | null {
   ) {
     return null;
   }
-  const quotas = new Map<string, number>();
+  const pairs = new Set<string>();
+  const targets: QuestionGenerationTarget[] = [];
   let total = 0;
   for (const target of value) {
     if (
@@ -137,12 +140,28 @@ function canonicalTargetMixQuotas(value: unknown): Map<string, number> | null {
       return null;
     }
     const key = targetPairKey(questionType, topic);
-    if (quotas.has(key)) return null;
-    quotas.set(key, count);
+    if (pairs.has(key)) return null;
+    pairs.add(key);
+    targets.push({
+      questionType: questionType as QuestionType,
+      topic: topic as QuestionTopic,
+      count,
+    });
     total += count;
     if (total > maximumGenerationBatchSize) return null;
   }
-  return quotas;
+  return targets;
+}
+
+function canonicalTargetMixQuotas(value: unknown): Map<string, number> | null {
+  const targets = canonicalQuestionGenerationTargetMix(value);
+  if (!targets) return null;
+  return new Map(
+    targets.map((target) => [
+      targetPairKey(target.questionType, target.topic),
+      target.count,
+    ]),
+  );
 }
 
 function normalizedWords(value: string): string[] {

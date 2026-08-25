@@ -115,6 +115,63 @@ describe("CompatibleAdapter pinned provider requests", () => {
     }
   });
 
+  it("keeps structured contract context out of compatible-provider payloads", async () => {
+    let requestBody: Record<string, unknown> | undefined;
+    const server = createServer((request, response) => {
+      const chunks: Buffer[] = [];
+      request.on("data", (chunk: Buffer) => chunks.push(chunk));
+      request.on("end", () => {
+        requestBody = JSON.parse(
+          Buffer.concat(chunks).toString("utf8"),
+        ) as Record<string, unknown>;
+        response.setHeader("content-type", "application/json");
+        response.end(
+          JSON.stringify({
+            model: "safe-model",
+            choices: [{ message: { content: '{"ok":true}' } }],
+          }),
+        );
+      });
+    });
+    const port = await listen(server);
+    const baseUrl = `http://provider.test:${port}`;
+    const adapter = new CompatibleAdapter({
+      baseUrl,
+      localBaseUrlAllowlist: [baseUrl],
+      addressResolver: async () => [{ address: "127.0.0.1", family: 4 }],
+    });
+
+    try {
+      await adapter.generateStructured({
+        model: "safe-model",
+        input: "Return JSON.",
+        schemaName: "context_is_internal",
+        schema: {
+          type: "object",
+          additionalProperties: false,
+          required: ["ok"],
+          properties: { ok: { type: "boolean" } },
+        },
+        contractContext: {
+          kind: "question_bank_refill_v1",
+          targetMix: [
+            { questionType: "opinion", topic: "education", count: 1 },
+          ],
+        },
+        validate: (value): value is { ok: true } =>
+          typeof value === "object" &&
+          value !== null &&
+          (value as { ok?: unknown }).ok === true,
+      });
+      expect(JSON.stringify(requestBody)).not.toContain("contractContext");
+      expect(JSON.stringify(requestBody)).not.toContain(
+        "question_bank_refill_v1",
+      );
+    } finally {
+      await close(server);
+    }
+  });
+
   it("classifies exhausted structured validation as an invalid response", async () => {
     const server = createServer((_request, response) => {
       response.setHeader("content-type", "application/json");

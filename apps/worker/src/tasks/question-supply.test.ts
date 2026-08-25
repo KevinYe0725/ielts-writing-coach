@@ -1,5 +1,6 @@
 import {
   encryptProviderSecret,
+  MockAdapter,
   parseMasterKey,
   type AIProviderAdapter,
   type StructuredGenerationRequest,
@@ -22,6 +23,7 @@ import { runAIJob } from "./ai";
 import {
   databaseQuestionSupplyStore,
   refillQuestionBank,
+  type PublishableQuestion,
   type QuestionSupplyDependencies,
   type QuestionSupplyStore,
   type StoredGenerationBatch,
@@ -74,11 +76,7 @@ function claimedJob(batchId: string): ClaimedJob {
 
 class MemoryStore implements QuestionSupplyStore {
   readonly transitions: string[] = [];
-  readonly published: Array<{
-    externalId: string;
-    source: string;
-    prompt: string;
-  }> = [];
+  readonly published: PublishableQuestion[] = [];
   readonly invalidatedConnections: string[] = [];
   readonly unavailableUsers: string[] = [];
   batch: StoredGenerationBatch;
@@ -138,11 +136,7 @@ class MemoryStore implements QuestionSupplyStore {
   async publish(
     _batchId: string,
     _fence: { aiJobId: string; attemptCount: number },
-    questions: readonly {
-      externalId: string;
-      source: string;
-      prompt: string;
-    }[],
+    questions: readonly PublishableQuestion[],
     rejectedCount: number,
   ): Promise<number> {
     if (this.batch.status === "SUCCEEDED" || this.batch.status === "FAILED")
@@ -224,6 +218,7 @@ function dependencies(
     aiError?: Error;
     capturedSearchKey?: string[];
     capturedIdempotencyKeys?: string[];
+    capturedContractContexts?: unknown[];
   } = {},
 ): QuestionSupplyDependencies {
   let structuredCall = 0;
@@ -263,6 +258,7 @@ function dependencies(
         probeCapabilities: vi.fn(),
         generateText: vi.fn(),
         async generateStructured<T>(request: StructuredGenerationRequest<T>) {
+          options.capturedContractContexts?.push(request.contractContext);
           if (options.aiError) throw options.aiError;
           if (request.idempotencyKey !== undefined) {
             options.capturedIdempotencyKeys?.push(request.idempotencyKey);
@@ -324,6 +320,85 @@ function dependencies(
 const helpers = { job: { attempts: 1 } } as never;
 
 describe("question-bank refill pipeline", () => {
+  it("passes the exact persisted approved target mix as typed contract context", async () => {
+    const batchId = newDomainId();
+    const store = new MemoryStore(batchId);
+    store.batch.targetMix = [
+      { questionType: "discussion", topic: "health", count: 2 },
+      { questionType: "two_part", topic: "technology", count: 1 },
+    ];
+    const capturedContractContexts: unknown[] = [];
+
+    await refillQuestionBank(
+      claimedJob(batchId),
+      helpers,
+      dependencies(store, { capturedContractContexts }),
+    );
+
+    expect(capturedContractContexts[0]).toEqual({
+      kind: "question_bank_refill_v1",
+      targetMix: [
+        { questionType: "discussion", topic: "health", count: 2 },
+        { questionType: "two_part", topic: "technology", count: 1 },
+      ],
+    });
+  });
+
+  it("publishes deterministic Mock proposals for every approved pair and replays idempotently", async () => {
+    const batchId = newDomainId();
+    const store = new MemoryStore(batchId);
+    store.batch.targetMix = [
+      { questionType: "opinion", topic: "education", count: 2 },
+      { questionType: "discussion", topic: "technology", count: 1 },
+      {
+        questionType: "advantages_disadvantages",
+        topic: "environment",
+        count: 1,
+      },
+      { questionType: "problems_solutions", topic: "health", count: 1 },
+      { questionType: "two_part", topic: "government", count: 1 },
+      { questionType: "opinion", topic: "work_economy", count: 1 },
+      { questionType: "discussion", topic: "society_culture", count: 1 },
+      {
+        questionType: "advantages_disadvantages",
+        topic: "urban_transport",
+        count: 1,
+      },
+    ];
+    const deps: QuestionSupplyDependencies = {
+      store,
+      createSearchAdapter: () => fakeSearch(async () => []),
+      resolveAIAdapter: async () => new MockAdapter(),
+    };
+    const job = claimedJob(batchId);
+
+    await refillQuestionBank(job, helpers, deps);
+    await refillQuestionBank(job, helpers, deps);
+
+    expect(
+      store.published.map(({ questionType, topic }) => [questionType, topic]),
+    ).toEqual([
+      ["opinion", "education"],
+      ["opinion", "education"],
+      ["discussion", "technology"],
+      ["advantages_disadvantages", "environment"],
+      ["problems_solutions", "health"],
+      ["two_part", "government"],
+      ["opinion", "work_economy"],
+      ["discussion", "society_culture"],
+      ["advantages_disadvantages", "urban_transport"],
+    ]);
+    expect(store.batch).toMatchObject({
+      status: "SUCCEEDED",
+      acceptedCount: 9,
+      rejectedCount: 0,
+      safeFailureCode: null,
+    });
+    expect(
+      new Set(store.published.map(({ externalId }) => externalId)).size,
+    ).toBe(9);
+  });
+
   it("decrypts the canonical Brave key and advances SEARCHING through SUCCEEDED", async () => {
     const batchId = newDomainId();
     const store = new MemoryStore(batchId);
@@ -1157,7 +1232,17 @@ integration("question-bank refill PostgreSQL publication", () => {
         triggeredByUserId: userId,
         status: "QUEUED",
         mode: "OFFLINE",
-        targetMix: [{ questionType: "opinion", topic: "government", count: 1 }],
+        targetMix: [
+          { questionType: "opinion", topic: "education", count: 1 },
+          { questionType: "discussion", topic: "technology", count: 1 },
+          {
+            questionType: "advantages_disadvantages",
+            topic: "environment",
+            count: 1,
+          },
+          { questionType: "problems_solutions", topic: "health", count: 1 },
+          { questionType: "two_part", topic: "government", count: 1 },
+        ],
         aiJobId: dispatchJobId,
         promptVersion: "1.0.0",
         rubricVersion: "iwc-question-bank-refill-1.0.0",
@@ -1273,6 +1358,7 @@ integration("question-bank refill PostgreSQL publication", () => {
       .where(
         inArray(question.generationBatchId, [
           successBatchId,
+          dispatchBatchId,
           concurrentSuccessBatchId,
           recoveredRaceBatchId,
           terminalRaceBatchId,
@@ -1898,12 +1984,15 @@ integration("question-bank refill PostgreSQL publication", () => {
   it("dispatches question_bank_refill through runAIJob instead of the removed fail-closed placeholder", async () => {
     await runAIJob({ jobId: dispatchJobId }, { job: { attempts: 1 } } as never);
 
-    const [job, batch] = await Promise.all([
+    const [job, batch, saved] = await Promise.all([
       databaseContext.db.query.aiJob.findFirst({
         where: eq(aiJob.id, dispatchJobId),
       }),
       databaseContext.db.query.questionGenerationBatch.findFirst({
         where: eq(questionGenerationBatch.id, dispatchBatchId),
+      }),
+      databaseContext.db.query.question.findMany({
+        where: eq(question.generationBatchId, dispatchBatchId),
       }),
     ]);
     expect(job).toMatchObject({
@@ -1911,9 +2000,24 @@ integration("question-bank refill PostgreSQL publication", () => {
       lastErrorCode: null,
       lastErrorSafeMessage: null,
     });
-    expect(batch?.status).not.toBe("QUEUED");
-    expect(batch?.safeFailureCode).not.toBe(
-      "QUESTION_BANK_REFILL_NOT_IMPLEMENTED",
+    expect(batch).toMatchObject({
+      status: "SUCCEEDED",
+      acceptedCount: 5,
+      rejectedCount: 0,
+      safeFailureCode: null,
+    });
+    expect(saved).toHaveLength(5);
+    expect(
+      saved.map(({ questionType, topic }) => [questionType, topic]),
+    ).toEqual(
+      expect.arrayContaining([
+        ["opinion", "education"],
+        ["discussion", "technology"],
+        ["advantages_disadvantages", "environment"],
+        ["problems_solutions", "health"],
+        ["two_part", "government"],
+      ]),
     );
+    expect(JSON.stringify(batch)).not.toMatch(/TARGET_MIX|COOLDOWN/u);
   });
 });

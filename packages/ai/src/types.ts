@@ -1,3 +1,5 @@
+import type { QuestionTopic, QuestionType } from "@iwc/question-bank";
+
 export type ProviderKind = "openai" | "compatible" | "mock";
 
 export interface ProviderCredentials {
@@ -53,9 +55,29 @@ export interface TextGenerationRequest {
   timeoutMs?: number;
 }
 
+export interface QuestionBankRefillContractTarget {
+  readonly questionType: QuestionType;
+  readonly topic: QuestionTopic;
+  readonly count: number;
+}
+
+/**
+ * Server-owned, non-sensitive contract data for deterministic local adapters.
+ * It is not provider prompt content and provider adapters must not serialize it.
+ * Runtime consumers enforce the closed 15-proposal bound.
+ */
+export interface QuestionBankRefillContractContext {
+  readonly kind: "question_bank_refill_v1";
+  readonly targetMix: readonly QuestionBankRefillContractTarget[];
+}
+
+export type StructuredGenerationContractContext =
+  QuestionBankRefillContractContext;
+
 export interface StructuredGenerationRequest<T> extends TextGenerationRequest {
   schemaName: string;
   schema: Record<string, unknown>;
+  contractContext?: StructuredGenerationContractContext;
   validate: (value: unknown) => value is T;
 }
 

@@ -217,9 +217,9 @@ Final remediation F1: fix round 2/5 complete (fallback disposition is resolved
 against the cycle question so exact READY use becomes STARTED; every recent
 SWAP row cools excluded_external_id by created_at independent of status; two
 PostgreSQL barriers force both recommended-vs-fallback commit orderings)
-Current final evidence scope: baseline 85a6eaa plus the focused F2 Fix Round 1
-remediation and updated report. Earlier broad ranges through d897490 remain
-historical review evidence rather than the current final baseline.
+Current final evidence scope: baseline f44cae4 plus the focused G2 remediation
+and updated report. Earlier broad ranges through d897490 remain historical
+review evidence rather than the current final baseline.
 Third final broad review: changes requested at 82d7767 (3 Important — cycle
 idempotency atomicity, post-header client retry/deadline, Mock target contract;
 1 stale-evidence Minor)
@@ -233,4 +233,9 @@ UPDATE/RETURNING reservation; real zero-row and concurrent learning-delete
 barriers roll back cycle/disposition/D14; 201 cycle replay preserves exact
 body/Location and Date wire values; realistic streams, keyed HTTP no-retry, and
 new Today logical-key acceptance run under Node 24.19.0; see report)
-Final remediation G2: pending (Mock target-mix contract)
+Final remediation G2: complete (closed provider-neutral contract context;
+Worker passes the exact canonical approved target mix; Mock deterministically
+covers all five forms/eight topics through real validation and PostgreSQL
+publication; real provider payloads remain unchanged; 94 files / 905 tests,
+type, lint, format, and production builds green on Node 24.19.0 with fresh
+PostgreSQL 17.6; see final-remediation-g2-report.md)
