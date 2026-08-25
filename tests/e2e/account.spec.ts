@@ -335,6 +335,15 @@ test.describe("account controls", () => {
       const request = route.request();
       const url = new URL(request.url());
       const path = url.pathname;
+      if (/^\/api\/v1\/search-connection(?:\/|$)/.test(path)) {
+        mutations.push({
+          body: request.postData(),
+          headers: request.headers(),
+          method: request.method(),
+          path,
+          ...(request.method() === "GET" ? { phase: searchPhase() } : {}),
+        });
+      }
       if (path.endsWith("/auth/get-session")) {
         await json(route, {
           session: { token: "never-rendered" },
@@ -362,12 +371,6 @@ test.describe("account controls", () => {
         return;
       }
       if (path.endsWith("/search-connection/test")) {
-        mutations.push({
-          body: request.postData(),
-          headers: request.headers(),
-          method: request.method(),
-          path,
-        });
         testAttempts += 1;
         if (testAttempts === 1) {
           await json(
@@ -390,13 +393,6 @@ test.describe("account controls", () => {
         return;
       }
       if (path.endsWith("/search-connection")) {
-        mutations.push({
-          body: request.postData(),
-          headers: request.headers(),
-          method: request.method(),
-          path,
-          ...(request.method() === "GET" ? { phase: searchPhase() } : {}),
-        });
         if (request.method() === "GET") {
           if (searchMode === "FORBIDDEN") {
             await json(
@@ -547,7 +543,25 @@ test.describe("account controls", () => {
     const searchCalls = mutations.filter((mutation) =>
       mutation.path.endsWith("/search-connection"),
     );
+    expect(
+      mutations
+        .map((mutation) => `${mutation.method} ${mutation.path}`)
+        .filter(
+          (requestLine) =>
+            ![
+              "GET /api/v1/search-connection",
+              "PUT /api/v1/search-connection",
+              "DELETE /api/v1/search-connection",
+              "POST /api/v1/search-connection/test",
+            ].includes(requestLine),
+        ),
+      "unexpected search-connection method/path combinations",
+    ).toEqual([]);
     expect(testCalls).toHaveLength(2);
+    expect(testCalls.map((mutation) => mutation.method)).toEqual([
+      "POST",
+      "POST",
+    ]);
     expect(
       testCalls.map((mutation) => JSON.parse(mutation.body ?? "{}")),
     ).toEqual([
@@ -563,22 +577,25 @@ test.describe("account controls", () => {
       ),
     ).toBe(true);
     const gets = searchCalls.filter((mutation) => mutation.method === "GET");
-    const phaseIndex = (phase: SearchPhase) =>
-      mutations.findIndex(
-        (mutation) => mutation.method === "GET" && mutation.phase === phase,
+    const collapsedGetPhases = gets
+      .map((mutation) => mutation.phase)
+      .filter(
+        (phase, index, phases) => index === 0 || phase !== phases[index - 1],
       );
-    for (const phase of ["MISSING", "ACTIVE", "INVALID", "403", "503"] as const)
-      expect(
-        phaseIndex(phase),
-        `${phase} GET response phase`,
-      ).toBeGreaterThanOrEqual(0);
-    expect(phaseIndex("MISSING")).toBeLessThan(
+    expect(collapsedGetPhases, "collapsed GET response phase stream").toEqual([
+      "MISSING",
+      "ACTIVE",
+      "INVALID",
+      "403",
+      "503",
+    ]);
+    expect(
+      mutations.findIndex(
+        (mutation) => mutation.method === "GET" && mutation.phase === "MISSING",
+      ),
+    ).toBeLessThan(
       mutations.findIndex((mutation) => mutation.method === "POST"),
     );
-    expect(phaseIndex("MISSING")).toBeLessThan(phaseIndex("ACTIVE"));
-    expect(phaseIndex("ACTIVE")).toBeLessThan(phaseIndex("INVALID"));
-    expect(phaseIndex("INVALID")).toBeLessThan(phaseIndex("403"));
-    expect(phaseIndex("403")).toBeLessThan(phaseIndex("503"));
     expect(
       gets.every(
         (mutation) =>
