@@ -2,6 +2,7 @@ import {
   encryptProviderSecret,
   parseMasterKey,
   type AIProviderAdapter,
+  type StructuredGenerationRequest,
 } from "@iwc/ai";
 import {
   aiJob,
@@ -222,6 +223,7 @@ function dependencies(
     semanticSequence?: readonly unknown[];
     aiError?: Error;
     capturedSearchKey?: string[];
+    capturedIdempotencyKeys?: string[];
   } = {},
 ): QuestionSupplyDependencies {
   let structuredCall = 0;
@@ -260,8 +262,11 @@ function dependencies(
         listModels: vi.fn(),
         probeCapabilities: vi.fn(),
         generateText: vi.fn(),
-        async generateStructured<T>() {
+        async generateStructured<T>(request: StructuredGenerationRequest<T>) {
           if (options.aiError) throw options.aiError;
+          if (request.idempotencyKey !== undefined) {
+            options.capturedIdempotencyKeys?.push(request.idempotencyKey);
+          }
           structuredCall += 1;
           const generatedValue =
             structuredCall === 1
@@ -740,6 +745,76 @@ describe("question-bank refill pipeline", () => {
     expect(store.published).toHaveLength(1);
   });
 
+  it("iteratively judges a later same-pair candidate after a semantic duplicate releases quota", async () => {
+    const batchId = newDomainId();
+    const store = new MemoryStore(batchId);
+    store.batch.targetMix = [
+      { questionType: "opinion", topic: "government", count: 1 },
+    ];
+    store.existingQuestions = [
+      {
+        type: "opinion",
+        topic: "government",
+        prompt:
+          "National governments should pay for every local cultural festival. Do you agree or disagree?",
+      },
+    ];
+    const first = {
+      type: "opinion" as const,
+      topic: "government" as const,
+      track: "academic" as const,
+      prompt:
+        "Municipal authorities should require residents to volunteer before they can vote in local elections. Do you agree or disagree?",
+      internalRationale: "A durable civic participation question.",
+    };
+    const later = {
+      type: "opinion" as const,
+      topic: "government" as const,
+      track: "academic" as const,
+      prompt:
+        "National agencies should guarantee free legal advice for people challenging administrative decisions. Do you agree or disagree?",
+      internalRationale: "A durable public-service access question.",
+    };
+    const capturedIdempotencyKeys: string[] = [];
+    const job = claimedJob(batchId);
+
+    await refillQuestionBank(
+      job,
+      helpers,
+      dependencies(store, {
+        generation: { proposals: [first, later] },
+        semanticSequence: [
+          {
+            duplicate: true,
+            confidence: 0.96,
+            rationale: "The first candidate duplicates an existing task.",
+          },
+          {
+            duplicate: false,
+            confidence: 0.95,
+            rationale: "The later candidate asks about a distinct service.",
+          },
+        ],
+        capturedIdempotencyKeys,
+      }),
+    );
+
+    expect(store.published.map((question) => question.prompt)).toEqual([
+      later.prompt,
+    ]);
+    expect(store.batch).toMatchObject({
+      status: "SUCCEEDED",
+      acceptedCount: 1,
+      rejectedCount: 1,
+      safeFailureCode: null,
+    });
+    expect(capturedIdempotencyKeys).toEqual([
+      job.id,
+      `${job.id}:semantic:0:0`,
+      `${job.id}:semantic:1:0`,
+    ]);
+  });
+
   it("rejects a low-confidence semantic judgment rather than publishing", async () => {
     const batchId = newDomainId();
     const store = new MemoryStore(batchId);
@@ -900,6 +975,8 @@ integration("question-bank refill PostgreSQL publication", () => {
   const mixedTargetJobId = newDomainId();
   const malformedTargetBatchId = newDomainId();
   const malformedTargetJobId = newDomainId();
+  const semanticReleaseBatchId = newDomainId();
+  const semanticReleaseJobId = newDomainId();
 
   beforeAll(async () => {
     await databaseContext.db.insert(user).values({
@@ -1025,6 +1102,7 @@ integration("question-bank refill PostgreSQL publication", () => {
         [outOfMixJobId, outOfMixBatchId],
         [mixedTargetJobId, mixedTargetBatchId],
         [malformedTargetJobId, malformedTargetBatchId],
+        [semanticReleaseJobId, semanticReleaseBatchId],
       ].map(([jobId, batchId]) => ({
         id: jobId!,
         ownerId: userId,
@@ -1167,6 +1245,16 @@ integration("question-bank refill PostgreSQL publication", () => {
         promptVersion: "1.0.0",
         rubricVersion: "iwc-question-bank-refill-1.0.0",
       },
+      {
+        id: semanticReleaseBatchId,
+        triggeredByUserId: userId,
+        status: "QUEUED",
+        mode: "OFFLINE",
+        targetMix: [{ questionType: "opinion", topic: "government", count: 1 }],
+        aiJobId: semanticReleaseJobId,
+        promptVersion: "1.0.0",
+        rubricVersion: "iwc-question-bank-refill-1.0.0",
+      },
     ]);
     await databaseContext.db.insert(questionRecommendation).values({
       id: recommendationId,
@@ -1190,6 +1278,7 @@ integration("question-bank refill PostgreSQL publication", () => {
           outOfMixBatchId,
           mixedTargetBatchId,
           malformedTargetBatchId,
+          semanticReleaseBatchId,
         ]),
       );
     await databaseContext.db
@@ -1370,6 +1459,74 @@ integration("question-bank refill PostgreSQL publication", () => {
     expect(JSON.stringify([outOfMixBatch, malformedBatch])).not.toMatch(
       /TARGET_MIX_(?:INVALID|PAIR_UNAPPROVED|COUNT_EXCEEDED)/u,
     );
+  });
+
+  it("iteratively publishes B after semantic duplicate A releases the one-pair quota", async () => {
+    const first = {
+      type: "opinion" as const,
+      topic: "government" as const,
+      track: "academic" as const,
+      prompt:
+        "Municipal authorities should require residents to volunteer before they can vote in local elections. Do you agree or disagree?",
+      internalRationale: "A durable civic participation question.",
+    };
+    const later = {
+      type: "opinion" as const,
+      topic: "government" as const,
+      track: "academic" as const,
+      prompt:
+        "National agencies should guarantee free legal advice for people challenging administrative decisions. Do you agree or disagree?",
+      internalRationale: "A durable public-service access question.",
+    };
+    const capturedIdempotencyKeys: string[] = [];
+    const job = {
+      ...claimedJob(semanticReleaseBatchId),
+      id: semanticReleaseJobId,
+      ownerId: userId,
+    };
+
+    await refillQuestionBank(
+      job,
+      helpers,
+      dependencies(databaseQuestionSupplyStore, {
+        generation: { proposals: [first, later] },
+        semanticSequence: [
+          {
+            duplicate: true,
+            confidence: 0.96,
+            rationale: "The first candidate duplicates an existing task.",
+          },
+        ],
+        capturedIdempotencyKeys,
+      }),
+    );
+
+    const [batch, rows] = await Promise.all([
+      databaseContext.db.query.questionGenerationBatch.findFirst({
+        where: eq(questionGenerationBatch.id, semanticReleaseBatchId),
+      }),
+      databaseContext.db.query.question.findMany({
+        where: eq(question.generationBatchId, semanticReleaseBatchId),
+      }),
+    ]);
+    const semanticKeys = capturedIdempotencyKeys.filter((key) =>
+      key.includes(":semantic:"),
+    );
+
+    expect(batch).toMatchObject({
+      status: "SUCCEEDED",
+      acceptedCount: 1,
+      rejectedCount: 1,
+      safeFailureCode: null,
+    });
+    expect(rows.map((row) => row.prompt)).toEqual([later.prompt]);
+    expect(new Set(semanticKeys).size).toBe(semanticKeys.length);
+    expect(
+      new Set(semanticKeys.map((key) => key.match(/:semantic:(\d+):/u)?.[1])),
+    ).toEqual(new Set(["0", "1"]));
+    expect(
+      semanticKeys.filter((key) => key.includes(":semantic:0:")).length,
+    ).toBe(1);
   });
 
   it("marks the batch and pending recommendation unavailable without inserting on AI failure", async () => {

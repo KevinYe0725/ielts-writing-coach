@@ -67,8 +67,8 @@ Neither failed batch projection contained a `TARGET_MIX_*` reason.
 ## Fresh verification
 
 ```text
-Focused Worker quality + real-PG pipeline: 2 files / 76 tests passed
-Full @iwc/worker: 14 files / 210 tests passed
+Focused Worker quality + real-PG pipeline: 2 files / 78 tests passed
+Full @iwc/worker: 14 files / 212 tests passed
 Full @iwc/db: 2 files / 11 tests passed
 Relevant Web PostgreSQL gates, independently isolated: 5 files / 57 tests passed
 @iwc/worker typecheck: passed
@@ -93,3 +93,39 @@ made for that test-environment collision.
   the durable handoff.
 
 Commit: the commit containing this report.
+
+## Fix Round 1/5 — bounded iterative semantic quota release
+
+### RED evidence
+
+- In memory, an approved count-1 pair with candidates `[A, B]` judged A as a
+  high-confidence semantic duplicate. The one-shot Worker revalidation released
+  the quota but left B pending, so the batch published zero instead of B.
+- The same regression failed on fresh PostgreSQL 17.6 with a terminal
+  `0 accepted / 2 rejected` batch instead of `1 accepted / 1 rejected`.
+
+### Fix
+
+- The Worker now revalidates after every bounded semantic round and requests
+  judgments for every newly pending original proposal index that has not been
+  attempted.
+- A per-index attempt set prevents duplicate calls. Chunk calls retain the exact
+  `${jobId}:semantic:${proposalIndex}:${chunkIndex}` idempotency identity.
+- Invalid, missing, low-confidence, and duplicate judgments remain fail-closed
+  and release their pair quota. A newly eligible later candidate is judged in a
+  following round rather than being counted as unresolved immediately.
+- The loop processes all current pending candidates per round and stops when no
+  unattempted pending index remains or after 15 iterations, matching the maximum
+  provider proposal count. Final validation still counts unresolved pending
+  candidates as rejected and never publishes them.
+
+### Fresh GREEN
+
+```text
+In-memory A duplicate / B nonduplicate: B only, 1 accepted / 1 rejected, exact semantic indexes 0 then 1
+Real PostgreSQL A duplicate / B nonduplicate: B only, 1 accepted / 1 rejected, no duplicate chunk key
+Focused Worker quality + real-PG pipeline: 2 files / 78 tests passed
+Full @iwc/worker: 14 files / 212 tests passed
+Full @iwc/db: 2 files / 11 tests passed
+Relevant isolated Web PostgreSQL gates: 5 files / 57 tests passed
+```
