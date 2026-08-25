@@ -177,7 +177,7 @@ async function installAdminHttpFixtures(page: Page): Promise<void> {
               mode: "WEB_RESEARCH",
               accepted_count: 7,
               rejected_count: 2,
-              safe_failure_code: "SEARCH_UNAVAILABLE",
+              safe_failure_code: "AI_UNAVAILABLE",
               triggered_by_user_id: "must-not-render-user-id",
               prompt: "must-not-render-private-prompt",
               research_sources: [
@@ -196,8 +196,8 @@ async function installAdminHttpFixtures(page: Page): Promise<void> {
               id: "fixture-audit-1",
               occurred_at: "2026-08-12T12:00:00.000Z",
               result: "success",
-              target_id: "fixture-provider",
-              target_type: "provider_connection",
+              target_id: "must-not-render-audit-user-id",
+              target_type: "user",
             },
           ],
           smtp_configured: mailState !== "missing",
@@ -318,7 +318,7 @@ test.describe("secure administration surfaces", () => {
     await expect(supply.getByText("联网调研", { exact: true })).toBeVisible();
     await expect(supply.getByText("7 / 2", { exact: true })).toBeVisible();
     await expect(
-      supply.getByText("SEARCH_UNAVAILABLE", { exact: true }),
+      supply.getByText("AI_UNAVAILABLE", { exact: true }),
     ).toBeVisible();
 
     const pageText = await page.getByRole("main").innerText();
@@ -329,6 +329,7 @@ test.describe("secure administration surfaces", () => {
       "must-not-render-source-snippet",
       "must-not-render-provider-response",
       "must-not-render-encrypted-key",
+      "must-not-render-audit-user-id",
     ]) {
       expect(pageText).not.toContain(forbidden);
     }
@@ -392,6 +393,9 @@ test.describe("secure administration surfaces", () => {
     await expect(
       page.getByText("provider.test", { exact: true }),
     ).toBeVisible();
+    await expect(page.getByText("must-not-render-audit-user-id")).toHaveCount(
+      0,
+    );
   });
 
   test("administrators can inspect status but cannot open backup export", async ({

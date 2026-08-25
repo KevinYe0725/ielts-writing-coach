@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { readServerEnvironment } from "@iwc/config";
 import {
+  auditEvent,
   createDatabase,
   newDomainId,
   question,
@@ -60,6 +61,7 @@ describe.skipIf(!databaseUrl)(
     const latestBatchId = newDomainId();
     const dynamicQuestionId = newDomainId();
     const recommendationIds = [newDomainId(), newDomainId(), newDomainId()];
+    const auditEventId = newDomainId();
     const forbiddenValues = {
       ownerId,
       prompt: `private prompt ${suffix}`,
@@ -144,7 +146,7 @@ describe.skipIf(!databaseUrl)(
           rubricVersion: "iwc-question-bank-refill-1.0.0",
           acceptedCount: 7,
           rejectedCount: 2,
-          safeFailureCode: "SEARCH_UNAVAILABLE",
+          safeFailureCode: "AI_UNAVAILABLE",
           createdAt: new Date("2099-08-25T12:00:00.000Z"),
           updatedAt: new Date("2099-08-25T12:00:00.000Z"),
         },
@@ -186,9 +188,21 @@ describe.skipIf(!databaseUrl)(
           safeFailureCode: "QUESTION_SUPPLY_UNAVAILABLE",
         },
       ]);
+      await database.db.insert(auditEvent).values({
+        id: auditEventId,
+        actorId: ownerId,
+        action: "account.recovery_link.create",
+        targetType: "user",
+        targetId: ownerId,
+        result: "success",
+        occurredAt: new Date("2099-08-25T12:00:01.000Z"),
+      });
     });
 
     afterAll(async () => {
+      await database.db
+        .delete(auditEvent)
+        .where(eq(auditEvent.id, auditEventId));
       await database.db
         .delete(questionRecommendation)
         .where(eq(questionRecommendation.userId, ownerId));
@@ -225,7 +239,7 @@ describe.skipIf(!databaseUrl)(
             mode: "WEB_RESEARCH",
             accepted_count: 7,
             rejected_count: 2,
-            safe_failure_code: "SEARCH_UNAVAILABLE",
+            safe_failure_code: "AI_UNAVAILABLE",
           },
         },
       });
@@ -247,14 +261,26 @@ describe.skipIf(!databaseUrl)(
       expect(serialized).not.toContain("encrypted_api_key");
       expect(serialized).not.toContain("research_sources");
       expect(serialized).not.toContain("triggered_by_user_id");
+      expect(JSON.stringify(body)).not.toContain(ownerId);
+      const recoveryAudit = (
+        body.recent_audit as Array<Record<string, unknown>>
+      ).find((event) => event.action === "account.recovery_link.create");
+      expect(recoveryAudit).toMatchObject({
+        action: "account.recovery_link.create",
+        target_type: "user",
+        result: "success",
+      });
+      expect(recoveryAudit).not.toHaveProperty("target_id");
     });
 
-    it("fails closed when a stored failure field is not a safe code", async () => {
-      await database.db
-        .update(questionGenerationBatch)
-        .set({ safeFailureCode: forbiddenValues.providerResponse })
-        .where(eq(questionGenerationBatch.id, latestBatchId));
-      try {
+    it.each(["AI_UNAVAILABLE", "QUESTION_VALIDATION_REJECTED"])(
+      "projects the producer-owned batch failure code %s",
+      async (knownCode) => {
+        await database.db
+          .update(questionGenerationBatch)
+          .set({ safeFailureCode: knownCode })
+          .where(eq(questionGenerationBatch.id, latestBatchId));
+
         const response = await GET(
           new Request("https://coach.test/api/v1/admin/status"),
         );
@@ -265,16 +291,47 @@ describe.skipIf(!databaseUrl)(
         };
 
         expect(response.status).toBe(200);
-        expect(body.question_supply.latest_batch.safe_failure_code).toBeNull();
-        expect(JSON.stringify(body.question_supply)).not.toContain(
-          forbiddenValues.providerResponse,
+        expect(body.question_supply.latest_batch.safe_failure_code).toBe(
+          knownCode,
         );
-      } finally {
+      },
+    );
+
+    it.each([
+      "SEARCH_UNAVAILABLE",
+      "ai_unavailable",
+      "sk-redacted-credential-shaped-value",
+    ])(
+      "fails closed for unknown batch failure value %#",
+      async (unknownCode) => {
         await database.db
           .update(questionGenerationBatch)
-          .set({ safeFailureCode: "SEARCH_UNAVAILABLE" })
+          .set({ safeFailureCode: unknownCode })
           .where(eq(questionGenerationBatch.id, latestBatchId));
-      }
-    });
+        try {
+          const response = await GET(
+            new Request("https://coach.test/api/v1/admin/status"),
+          );
+          const body = (await response.json()) as {
+            question_supply: {
+              latest_batch: { safe_failure_code: string | null };
+            };
+          };
+
+          expect(response.status).toBe(200);
+          expect(
+            body.question_supply.latest_batch.safe_failure_code,
+          ).toBeNull();
+          expect(JSON.stringify(body.question_supply)).not.toContain(
+            unknownCode,
+          );
+        } finally {
+          await database.db
+            .update(questionGenerationBatch)
+            .set({ safeFailureCode: "AI_UNAVAILABLE" })
+            .where(eq(questionGenerationBatch.id, latestBatchId));
+        }
+      },
+    );
   },
 );

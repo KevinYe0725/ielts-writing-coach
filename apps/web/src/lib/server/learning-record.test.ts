@@ -214,6 +214,29 @@ describe.skipIf(!databaseUrl)("learner data rights (PostgreSQL)", () => {
           where: eq(idempotencyRecord.userId, userId),
         }),
       ).toHaveLength(1);
+      expect(
+        await db.query.questionRecommendation.findMany({
+          where: eq(questionRecommendation.userId, userId),
+        }),
+      ).toHaveLength(0);
+      await expect(
+        db.query.questionGenerationBatch.findFirst({
+          where: eq(questionGenerationBatch.id, generationBatchId),
+        }),
+      ).resolves.toMatchObject({
+        id: generationBatchId,
+        triggeredByUserId: userId,
+        status: "SUCCEEDED",
+        acceptedCount: 1,
+        rejectedCount: 4,
+      });
+      await expect(
+        db.query.question.findFirst({ where: eq(question.id, questionId) }),
+      ).resolves.toMatchObject({
+        id: questionId,
+        ownerId: null,
+        generationBatchId,
+      });
     } finally {
       await db.delete(trainingCycle).where(eq(trainingCycle.userId, userId));
       await db.delete(question).where(eq(question.id, questionId));

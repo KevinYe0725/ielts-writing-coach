@@ -896,7 +896,7 @@ export interface SystemStatus {
       mode: "WEB_RESEARCH" | "OFFLINE";
       acceptedCount: number;
       rejectedCount: number;
-      safeFailureCode: string | null;
+      safeFailureCode: "AI_UNAVAILABLE" | "QUESTION_VALIDATION_REJECTED" | null;
     } | null;
   };
   users: {
@@ -911,7 +911,6 @@ export interface SystemStatus {
       id: string;
       action: string;
       targetType: string;
-      targetId: string | null;
       result: string;
       occurredAt: string;
     }>;

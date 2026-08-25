@@ -600,10 +600,7 @@ export default function AdminPage() {
                   <li key={event.id}>
                     <span>
                       <strong>{event.action}</strong>
-                      <small data-admin-auxiliary>
-                        {event.targetType}
-                        {event.targetId ? ` · ${event.targetId}` : ""}
-                      </small>
+                      <small data-admin-auxiliary>{event.targetType}</small>
                     </span>
                     <span>
                       <Badge

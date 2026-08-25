@@ -19,8 +19,20 @@ import { publicVersionDescriptor } from "@/lib/server/version";
 
 export const dynamic = "force-dynamic";
 
-function safeFailureCode(value: string | null): string | null {
-  return value && /^[A-Z][A-Z0-9_]{0,79}$/u.test(value) ? value : null;
+type QuestionBatchFailureCode =
+  | "AI_UNAVAILABLE"
+  | "QUESTION_VALIDATION_REJECTED";
+
+function safeFailureCode(
+  value: string | null,
+): QuestionBatchFailureCode | null {
+  switch (value) {
+    case "AI_UNAVAILABLE":
+    case "QUESTION_VALIDATION_REJECTED":
+      return value;
+    default:
+      return null;
+  }
 }
 
 export const GET = apiRoute(async (request) => {
@@ -109,7 +121,6 @@ export const GET = apiRoute(async (request) => {
         id: event.id,
         action: event.action,
         target_type: event.targetType,
-        target_id: event.targetId,
         result: event.result,
         occurred_at: event.occurredAt.toISOString(),
       })),

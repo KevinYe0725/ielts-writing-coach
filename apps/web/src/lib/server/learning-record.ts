@@ -10,6 +10,7 @@ import {
   learningSlot,
   notification,
   question,
+  questionRecommendation,
   skillEvidenceEvent,
   trainingCycle,
   user,
@@ -350,6 +351,9 @@ export async function deleteLearningRecord(
     await transaction
       .delete(importRecord)
       .where(eq(importRecord.userId, userId));
+    await transaction
+      .delete(questionRecommendation)
+      .where(eq(questionRecommendation.userId, userId));
     await transaction.delete(aiJob).where(eq(aiJob.ownerId, userId));
     const deletedCycles = await transaction
       .delete(trainingCycle)

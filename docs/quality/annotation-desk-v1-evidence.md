@@ -240,6 +240,19 @@ browser zoom.
 
 **Status: REPOSITORY_GATES_VERIFIED_WITH_REAL_PROVIDER_EXTERNAL_PENDING.**
 
+Fix Round 1 closed the four review findings against the Task 10 candidate:
+
+- batch failure codes now use the producer-owned closed set
+  `AI_UNAVAILABLE | QUESTION_VALIDATION_REJECTED`; unknown uppercase,
+  lowercase, and credential-shaped values project as `null`;
+- the full-backup test reconstructs the encrypted search envelope from the
+  authenticated database dump, decrypts the inner secret archive, and proves
+  recovery only with the archived master key plus exact owner/connection AAD;
+- learning-data deletion transactionally removes the learner's recommendation
+  and cooldown history while retaining the shared generation batch/question;
+- the complete Admin DTO, client projection, and rendered audit rows omit raw
+  target IDs while retaining event, resource class, result, and time context.
+
 This addendum verifies the adaptive recommendation and shared question-supply
 work based on `a9c2fbada3a9a8e735dd513a42c73aa3cb933b87` plus the Task 10
 release-gate diff. It does not replace the external real-account and rendered
@@ -273,7 +286,7 @@ zoom boundaries above.
 | Gate                               | Result                                                                                 |
 | ---------------------------------- | -------------------------------------------------------------------------------------- |
 | Isolated PostgreSQL 17.6 migration | VERIFIED, exit 0 on tmpfs `iwc-question-supply-final-pg17`                             |
-| Exact DB-backed `pnpm test`        | VERIFIED, 91 files / 798 passed / 0 skipped / 0 failed                                 |
+| Exact DB-backed `pnpm test`        | VERIFIED, 91 files / 802 passed / 0 skipped / 0 failed                                 |
 | Format                             | VERIFIED, all matched files use Prettier style                                         |
 | Lint                               | VERIFIED, 0 errors / 4 existing Fast Refresh warnings                                  |
 | Typecheck                          | VERIFIED, all packages and scripts                                                     |
@@ -282,6 +295,7 @@ zoom boundaries above.
 | Compose operation regressions      | VERIFIED, 2 files / 13 passed / 0 skipped / 0 failed                                   |
 | Demo browser matrix                | VERIFIED, 896 enumerated / 658 passed / 238 intentional skips / 0 failed               |
 | Non-Demo HTTP matrix               | VERIFIED, 196 enumerated / 123 passed / 73 intentional skips / 0 failed                |
+| Fix Round 1 Admin matrix           | VERIFIED, 52/52 passed across Chromium, Firefox, WebKit, and mobile                    |
 | Whitespace                         | VERIFIED, `git diff --check` exit 0                                                    |
 | Real Brave connection and refill   | `EXTERNAL_PENDING`; no credential requested, read, stored, synthesized, or transmitted |
 

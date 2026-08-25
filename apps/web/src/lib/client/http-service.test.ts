@@ -77,6 +77,7 @@ describe("browser-safe core imports", () => {
 
 describe("Admin question-supply status projection", () => {
   it("maps only aggregate counts and safe latest-batch fields", async () => {
+    let failureCode = "AI_UNAVAILABLE";
     const fetcher = vi.fn<typeof fetch>(async (input) => {
       const pathname = new URL(String(input)).pathname;
       if (pathname.endsWith("/providers")) {
@@ -86,6 +87,16 @@ describe("Admin question-supply status projection", () => {
         return jsonResponse({
           actor_role: "owner",
           deployment_mode: "personal",
+          recent_audit: [
+            {
+              id: "audit-event-safe-id",
+              action: "account.recovery_link.create",
+              target_type: "user",
+              target_id: "must-not-project-audit-user-id",
+              result: "success",
+              occurred_at: "2026-08-25T12:00:00.000Z",
+            },
+          ],
           question_supply: {
             eligible_question_count: 121,
             recommendations: { READY: 8, PENDING: 2, UNAVAILABLE: 1 },
@@ -94,7 +105,7 @@ describe("Admin question-supply status projection", () => {
               mode: "WEB_RESEARCH",
               accepted_count: 7,
               rejected_count: 2,
-              safe_failure_code: "SEARCH_UNAVAILABLE",
+              safe_failure_code: failureCode,
               triggered_by_user_id: "must-not-project-user-id",
               prompt: "must-not-project-prompt",
               research_sources: ["must-not-project-source"],
@@ -122,12 +133,28 @@ describe("Admin question-supply status projection", () => {
         mode: "WEB_RESEARCH",
         acceptedCount: 7,
         rejectedCount: 2,
-        safeFailureCode: "SEARCH_UNAVAILABLE",
+        safeFailureCode: "AI_UNAVAILABLE",
       },
     });
     expect(JSON.stringify(status.questionSupply)).not.toMatch(
       /must-not-project/u,
     );
+    expect(status.privacy.recentAudit).toEqual([
+      {
+        id: "audit-event-safe-id",
+        action: "account.recovery_link.create",
+        targetType: "user",
+        result: "success",
+        occurredAt: "2026-08-25T12:00:00.000Z",
+      },
+    ]);
+    expect(JSON.stringify(status.privacy)).not.toContain(
+      "must-not-project-audit-user-id",
+    );
+
+    failureCode = "SEARCH_UNAVAILABLE";
+    const unknown = await client.getSystemStatus();
+    expect(unknown.questionSupply.latestBatch?.safeFailureCode).toBeNull();
   });
 });
 

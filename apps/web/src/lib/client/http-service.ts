@@ -1768,6 +1768,20 @@ function assertExactSearchConnectionTest(payload: unknown): void {
     );
 }
 
+function projectQuestionBatchFailureCode(
+  value: unknown,
+): NonNullable<
+  SystemStatus["questionSupply"]["latestBatch"]
+>["safeFailureCode"] {
+  switch (value) {
+    case "AI_UNAVAILABLE":
+    case "QUESTION_VALIDATION_REJECTED":
+      return value;
+    default:
+      return null;
+  }
+}
+
 async function readBoundedResponseText(
   response: Response,
   maximumBytes: number,
@@ -4342,7 +4356,6 @@ export class HttpLearningClient implements LearningClient {
           id?: string;
           occurred_at?: string;
           result?: string;
-          target_id?: string | null;
           target_type?: string;
         }>;
         smtp_configured?: boolean;
@@ -4376,11 +4389,9 @@ export class HttpLearningClient implements LearningClient {
       "SUCCEEDED",
       "FAILED",
     ]);
-    const safeFailureCode =
-      typeof latestBatch?.safe_failure_code === "string" &&
-      /^[A-Z][A-Z0-9_]{0,79}$/u.test(latestBatch.safe_failure_code)
-        ? latestBatch.safe_failure_code
-        : null;
+    const safeFailureCode = projectQuestionBatchFailureCode(
+      latestBatch?.safe_failure_code,
+    );
     const projectedLatestBatch: SystemStatus["questionSupply"]["latestBatch"] =
       latestBatch &&
       typeof latestBatch.status === "string" &&
@@ -4443,7 +4454,6 @@ export class HttpLearningClient implements LearningClient {
           id: event.id ?? "unknown-audit-event",
           action: event.action ?? "unknown",
           targetType: event.target_type ?? "unknown",
-          targetId: event.target_id ?? null,
           result: event.result ?? "unknown",
           occurredAt: event.occurred_at ?? "",
         })),

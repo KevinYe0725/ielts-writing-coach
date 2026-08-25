@@ -2363,7 +2363,6 @@ export class MockLearningClient implements LearningClient {
             id: "demo-audit-1",
             action: "provider.test",
             targetType: "provider_connection",
-            targetId: "demo-provider",
             result: "success",
             occurredAt: "2026-08-12T12:00:00.000Z",
           },

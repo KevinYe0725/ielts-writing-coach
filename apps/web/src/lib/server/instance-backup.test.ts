@@ -6,6 +6,11 @@ import { promisify } from "node:util";
 import { eq } from "drizzle-orm";
 import { afterAll, describe, expect, it } from "vitest";
 
+import {
+  decryptProviderSecret,
+  encryptProviderSecret,
+  parseMasterKey,
+} from "@iwc/ai";
 import { readServerEnvironment } from "@iwc/config";
 import { createDatabase, newDomainId, searchConnection, user } from "@iwc/db";
 
@@ -16,7 +21,28 @@ import {
   encryptInstanceBackupArchive,
   encryptBackupSecrets,
   postgresClientEnvironment,
+  readEncryptedSecretsForTest,
 } from "./instance-backup";
+
+function restoredSearchConnection(
+  sqlDump: string,
+  connectionId: string,
+): Record<string, string> {
+  const copy = sqlDump.match(
+    /COPY public\.search_connection \(([^)]+)\) FROM stdin;\n/u,
+  );
+  if (!copy?.[1]) throw new Error("search_connection COPY header is missing");
+  const columns = copy[1]
+    .split(", ")
+    .map((column) => column.replaceAll('"', ""));
+  const row = sqlDump
+    .split("\n")
+    .find((line) => line.startsWith(`${connectionId}\t`));
+  if (!row) throw new Error("search_connection backup row is missing");
+  return Object.fromEntries(
+    columns.map((column, index) => [column, row.split("\t")[index] ?? ""]),
+  );
+}
 
 describe("encrypted instance backups", () => {
   it("round-trips instance secrets only with the supplied passphrase", async () => {
@@ -153,13 +179,23 @@ integration("PostgreSQL instance backup", () => {
     const suffix = newDomainId();
     const ownerId = `backup-search-owner-${suffix}`;
     const connectionId = newDomainId();
-    const encryptedSentinel = `encrypted-search-connection-${suffix}`;
+    const fixtureSecret = `fixture-search-secret-${suffix}`;
+    const masterKey = Buffer.alloc(32, 2);
+    const keyVersion = 7;
+    const additionalData = `search:${ownerId}:${connectionId}`;
+    const encrypted = encryptProviderSecret(
+      fixtureSecret,
+      masterKey,
+      keyVersion,
+      additionalData,
+    );
     const directory = await mkdtemp(join(tmpdir(), "iwc-backup-search-test-"));
     const environment = readServerEnvironment({
       NODE_ENV: "test",
       DATABASE_URL: integrationUrl,
       AUTH_SECRET: "b".repeat(32),
-      APP_ENCRYPTION_KEY: Buffer.alloc(32, 2).toString("base64"),
+      APP_ENCRYPTION_KEY: masterKey.toString("base64"),
+      APP_ENCRYPTION_KEY_VERSION: String(keyVersion),
       SETUP_TOKEN: "test-only-setup-token",
     });
     try {
@@ -173,9 +209,9 @@ integration("PostgreSQL instance backup", () => {
         id: connectionId,
         configuredByUserId: ownerId,
         kind: "BRAVE",
-        encryptedApiKey: encryptedSentinel,
-        encryptedApiKeyNonce: Buffer.alloc(12, 9).toString("base64"),
-        encryptionKeyVersion: 1,
+        encryptedApiKey: encrypted.ciphertext,
+        encryptedApiKeyNonce: encrypted.nonce,
+        encryptionKeyVersion: encrypted.keyVersion,
         status: "ACTIVE",
       });
 
@@ -188,7 +224,8 @@ integration("PostgreSQL instance backup", () => {
       try {
         const archiveBytes = await readFile(backup.archivePath);
         expect(archiveBytes.includes(Buffer.from(connectionId))).toBe(false);
-        expect(archiveBytes.includes(Buffer.from(encryptedSentinel))).toBe(
+        expect(archiveBytes.includes(Buffer.from(fixtureSecret))).toBe(false);
+        expect(archiveBytes.includes(Buffer.from(encrypted.ciphertext))).toBe(
           false,
         );
 
@@ -214,7 +251,23 @@ integration("PostgreSQL instance backup", () => {
           "-C",
           directory,
           "database.dump",
+          "secrets.enc.json",
         ]);
+        const secretsEnvelope = await readEncryptedSecretsForTest(
+          join(directory, "secrets.enc.json"),
+        );
+        await expect(
+          decryptBackupSecrets(secretsEnvelope, "wrong inner passphrase"),
+        ).rejects.toThrow();
+        const archivedSecrets = await decryptBackupSecrets(
+          secretsEnvelope,
+          "authenticated archive passphrase",
+        );
+        expect(JSON.stringify(archivedSecrets)).not.toContain(fixtureSecret);
+        expect(archivedSecrets).toMatchObject({
+          encryptionKey: masterKey.toString("base64"),
+          encryptionKeyVersion: keyVersion,
+        });
         const { stdout } = await promisify(execFile)(
           process.env.IWC_PG_RESTORE_PATH ?? "pg_restore",
           [
@@ -225,8 +278,43 @@ integration("PostgreSQL instance backup", () => {
           ],
           { maxBuffer: 8 * 1_024 * 1_024 },
         );
-        expect(stdout).toContain(connectionId);
-        expect(stdout).toContain(encryptedSentinel);
+        const restored = restoredSearchConnection(stdout, connectionId);
+        const restoredEnvelope = {
+          ciphertext: restored.encrypted_api_key!,
+          nonce: restored.encrypted_api_key_nonce!,
+          keyVersion: Number(restored.encryption_key_version),
+        };
+        const archivedMasterKey = parseMasterKey(
+          String(archivedSecrets.encryptionKey),
+        );
+        const recovered = decryptProviderSecret(
+          restoredEnvelope,
+          archivedMasterKey,
+          additionalData,
+        );
+        expect(recovered === fixtureSecret).toBe(true);
+        expect(restoredEnvelope.keyVersion).toBe(keyVersion);
+        expect(() =>
+          decryptProviderSecret(
+            restoredEnvelope,
+            Buffer.alloc(32, 99),
+            additionalData,
+          ),
+        ).toThrow();
+        expect(() =>
+          decryptProviderSecret(
+            restoredEnvelope,
+            archivedMasterKey,
+            `search:wrong-owner:${connectionId}`,
+          ),
+        ).toThrow();
+        expect(() =>
+          decryptProviderSecret(
+            restoredEnvelope,
+            archivedMasterKey,
+            `search:${ownerId}:${newDomainId()}`,
+          ),
+        ).toThrow();
       } finally {
         await backup.cleanup();
       }
