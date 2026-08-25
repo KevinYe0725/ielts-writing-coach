@@ -211,7 +211,8 @@ export default function TodayPage() {
       input: { action: "INITIAL" | "SWAP"; excludedQuestionId?: string },
       focusStart = false,
     ) => {
-      if (recommendationActionLocked.current) return;
+      if (recommendationActionLocked.current || cycleOperationLocked.current)
+        return;
       recommendationActionLocked.current = true;
       cancelRecommendationOperation();
       const operation = recommendationOperation.current;
@@ -249,7 +250,8 @@ export default function TodayPage() {
     if (
       !recommendationRetryId ||
       recommendationBusy ||
-      recommendationActionLocked.current
+      recommendationActionLocked.current ||
+      cycleOperationLocked.current
     )
       return;
     recommendationActionLocked.current = true;
@@ -359,7 +361,8 @@ export default function TodayPage() {
       recommendation?.state !== "READY" ||
       recommendationBusy ||
       questionLoading ||
-      recommendationActionLocked.current
+      recommendationActionLocked.current ||
+      cycleOperationLocked.current
     )
       return;
     await requestRecommendation(

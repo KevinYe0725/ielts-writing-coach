@@ -593,10 +593,13 @@ async function routeSwapPreparingFallbackFixture(page: Page) {
   });
   let polls = 0;
   const cycleBodies: Array<Record<string, unknown>> = [];
+  const customBodies: Array<Record<string, unknown>> = [];
+  const recommendationActions: string[] = [];
 
   await page.route("**/api/v1/question-recommendations", async (route) => {
     if (route.request().method() !== "POST") return route.fallback();
     const input = route.request().postDataJSON();
+    recommendationActions.push(input.action);
     if (input.action === "SWAP") {
       await route.fulfill({
         contentType: "application/json",
@@ -666,6 +669,7 @@ async function routeSwapPreparingFallbackFixture(page: Page) {
   await page.route("**/api/v1/questions", async (route) => {
     if (route.request().method() === "POST") {
       const input = route.request().postDataJSON();
+      customBodies.push(input);
       await route.fulfill({
         contentType: "application/json",
         status: 201,
@@ -687,9 +691,91 @@ async function routeSwapPreparingFallbackFixture(page: Page) {
 
   return {
     cycleBodies,
+    customBodies,
     polls: () => polls,
+    recommendationActions,
     releaseCycle,
     releasePoll,
+  };
+}
+
+async function routeRetryCycleFenceFixture(page: Page) {
+  await routeTodayHttpFixture(page, "mixed-review");
+  let releaseCycle!: () => void;
+  const cycleRelease = new Promise<void>((resolve) => {
+    releaseCycle = resolve;
+  });
+  let recommendationGets = 0;
+  const cycleBodies: Array<Record<string, unknown>> = [];
+  const customBodies: Array<Record<string, unknown>> = [];
+
+  await page.route("**/api/v1/question-recommendations", async (route) => {
+    if (route.request().method() !== "POST") return route.fallback();
+    await route.fulfill({
+      contentType: "application/json",
+      status: 202,
+      body: JSON.stringify({
+        recommendation: {
+          id: "recommendation-retry-cycle-fence",
+          status: "PENDING",
+          retry_after_seconds: 1,
+        },
+      }),
+    });
+  });
+  await page.route(
+    "**/api/v1/question-recommendations/recommendation-retry-cycle-fence",
+    async (route) => {
+      recommendationGets += 1;
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          recommendation: {
+            id: "recommendation-retry-cycle-fence",
+            status: "PENDING",
+            retry_after_seconds: 1,
+          },
+        }),
+      });
+    },
+  );
+  await page.route("**/api/v1/training-cycles", async (route) => {
+    cycleBodies.push(route.request().postDataJSON());
+    await cycleRelease;
+    await route.fulfill({
+      contentType: "application/json",
+      status: 201,
+      body: JSON.stringify({ cycle: { id: "cycle-retry-fence" } }),
+    });
+  });
+  await page.route("**/api/v1/questions", async (route) => {
+    if (route.request().method() === "POST") {
+      const input = route.request().postDataJSON();
+      customBodies.push(input);
+      await route.fulfill({
+        contentType: "application/json",
+        status: 201,
+        body: JSON.stringify({
+          question: {
+            id: "custom-retry-fence-question",
+            prompt: input.prompt,
+            type: input.type,
+            topic: input.topic,
+            ielts_track: input.ielts_track,
+            visibility: "private",
+          },
+        }),
+      });
+      return;
+    }
+    await route.fallback();
+  });
+
+  return {
+    cycleBodies,
+    customBodies,
+    recommendationGets: () => recommendationGets,
+    releaseCycle,
   };
 }
 
@@ -914,6 +1000,231 @@ test.describe("Today query states at the HTTP boundary", () => {
       }),
     ]);
     expect(fixture.cycleBodies[0]).not.toHaveProperty("recommendation_id");
+  });
+
+  test("manual start synchronously fences a following swap before React renders", async ({
+    page,
+  }) => {
+    const fixture = await routeSwapPreparingFallbackFixture(page);
+    await page.goto("/today?new-essay=1");
+    await expect(page.getByRole("button", { name: "换一题" })).toBeVisible();
+    await page.getByText("浏览全部题库").click();
+    await page.getByLabel("题库").selectOption("http-question-education");
+
+    await page.evaluate(() => {
+      const bank =
+        document.querySelector<HTMLSelectElement>("#question-choice");
+      const manualStart = bank
+        ?.closest(".form-grid")
+        ?.querySelector<HTMLButtonElement>("button");
+      const swap = [...document.querySelectorAll("button")].find((button) =>
+        button.textContent?.includes("换一题"),
+      );
+      manualStart?.click();
+      swap?.click();
+    });
+
+    await expect.poll(() => fixture.cycleBodies.length).toBe(1);
+    expect(fixture.recommendationActions).toEqual(["INITIAL"]);
+    expect(fixture.polls()).toBe(0);
+    await expect(page).toHaveURL(/\/today\?new-essay=1$/);
+    fixture.releasePoll();
+    fixture.releaseCycle();
+    await expect(page).toHaveURL(/\/write\?cycle=cycle-swap-fallback$/);
+    expect(fixture.cycleBodies[0]).not.toHaveProperty("recommendation_id");
+  });
+
+  test("custom create/start synchronously fences a following swap and creates once", async ({
+    page,
+  }) => {
+    const fixture = await routeSwapPreparingFallbackFixture(page);
+    await page.goto("/today?new-essay=1");
+    await expect(page.getByRole("button", { name: "换一题" })).toBeVisible();
+    await page.getByText("粘贴我自己的题目").click();
+    await page
+      .getByLabel("完整英文题目")
+      .fill(
+        "Some people believe every city should provide free public libraries. To what extent do you agree or disagree?",
+      );
+
+    await page.evaluate(() => {
+      const customStart = [...document.querySelectorAll("button")].find(
+        (button) => button.textContent?.includes("保存并开始写作"),
+      );
+      const swap = [...document.querySelectorAll("button")].find((button) =>
+        button.textContent?.includes("换一题"),
+      );
+      customStart?.click();
+      swap?.click();
+    });
+
+    await expect.poll(() => fixture.cycleBodies.length).toBe(1);
+    expect(fixture.customBodies).toHaveLength(1);
+    expect(fixture.recommendationActions).toEqual(["INITIAL"]);
+    expect(fixture.polls()).toBe(0);
+    await expect(page).toHaveURL(/\/today\?new-essay=1$/);
+    fixture.releasePoll();
+    fixture.releaseCycle();
+    await expect(page).toHaveURL(/\/write\?cycle=cycle-swap-fallback$/);
+    expect(fixture.cycleBodies[0]).not.toHaveProperty("recommendation_id");
+  });
+
+  test("recommended start synchronously fences a following swap and keeps its attribution", async ({
+    page,
+  }) => {
+    const fixture = await routeSwapPreparingFallbackFixture(page);
+    await page.goto("/today?new-essay=1");
+    const recommendedStart = page.getByRole("button", {
+      name: "用这道题开始写作",
+    });
+    await expect(recommendedStart).toBeVisible();
+
+    await page.evaluate(() => {
+      const recommended = [...document.querySelectorAll("button")].find(
+        (button) => button.textContent?.includes("用这道题开始写作"),
+      );
+      const swap = [...document.querySelectorAll("button")].find((button) =>
+        button.textContent?.includes("换一题"),
+      );
+      recommended?.click();
+      swap?.click();
+    });
+
+    await expect.poll(() => fixture.cycleBodies.length).toBe(1);
+    expect(fixture.recommendationActions).toEqual(["INITIAL"]);
+    expect(fixture.polls()).toBe(0);
+    await expect(page).toHaveURL(/\/today\?new-essay=1$/);
+    fixture.releasePoll();
+    fixture.releaseCycle();
+    await expect(page).toHaveURL(/\/write\?cycle=cycle-swap-fallback$/);
+    expect(fixture.cycleBodies).toEqual([
+      expect.objectContaining({
+        question_id: "http-question-education",
+        recommendation_id: "recommendation-swap-source",
+      }),
+    ]);
+  });
+
+  test("custom create/start synchronously fences a following retry", async ({
+    page,
+  }) => {
+    const fixture = await routeRetryCycleFenceFixture(page);
+    await page.goto("/today?new-essay=1");
+    await page.getByText("粘贴我自己的题目").click();
+    await page
+      .getByLabel("完整英文题目")
+      .fill(
+        "Some people believe every city should provide free public libraries. To what extent do you agree or disagree?",
+      );
+    const retry = page.getByRole("button", { name: "再试一次" });
+    await expect(retry).toBeVisible({ timeout: 8_000 });
+    const completedWindowGets = fixture.recommendationGets();
+
+    await page.evaluate(() => {
+      const customStart = [...document.querySelectorAll("button")].find(
+        (button) => button.textContent?.includes("保存并开始写作"),
+      );
+      const retryRecommendation = [...document.querySelectorAll("button")].find(
+        (button) => button.textContent?.includes("再试一次"),
+      );
+      customStart?.click();
+      retryRecommendation?.click();
+    });
+
+    await expect.poll(() => fixture.cycleBodies.length).toBe(1);
+    expect(fixture.customBodies).toHaveLength(1);
+    await page.waitForTimeout(1_200);
+    expect(fixture.recommendationGets()).toBe(completedWindowGets);
+    await expect(page).toHaveURL(/\/today\?new-essay=1$/);
+    fixture.releaseCycle();
+    await expect(page).toHaveURL(/\/write\?cycle=cycle-retry-fence$/);
+    expect(fixture.cycleBodies[0]).not.toHaveProperty("recommendation_id");
+  });
+
+  test("failed cycle creation releases the cycle lock for a later swap", async ({
+    page,
+  }) => {
+    await routeTodayHttpFixture(page, "mixed-review");
+    let swaps = 0;
+    await page.route("**/api/v1/training-cycles", async (route) => {
+      await route.fulfill({
+        contentType: "application/problem+json",
+        status: 503,
+        body: JSON.stringify({
+          code: "CYCLE_UNAVAILABLE",
+          detail: "Cycle creation is temporarily unavailable.",
+          status: 503,
+        }),
+      });
+    });
+    page.on("request", (request) => {
+      if (
+        request.method() === "POST" &&
+        request.url().endsWith("/api/v1/question-recommendations") &&
+        request.postDataJSON()?.action === "SWAP"
+      )
+        swaps += 1;
+    });
+    await page.goto("/today?new-essay=1");
+
+    await page.getByRole("button", { name: "用这道题开始写作" }).click();
+    await expect(page.locator(".inline-probe[role='alert']")).toBeVisible();
+    await page.getByRole("button", { name: "换一题" }).click();
+
+    await expect.poll(() => swaps).toBe(1);
+  });
+
+  test("failed swap releases the recommendation lock for a later swap", async ({
+    page,
+  }) => {
+    await routeTodayHttpFixture(page, "mixed-review");
+    let swaps = 0;
+    await page.route("**/api/v1/question-recommendations", async (route) => {
+      if (route.request().method() !== "POST") return route.fallback();
+      const input = route.request().postDataJSON();
+      if (input.action === "SWAP") {
+        swaps += 1;
+        if (swaps === 1) {
+          await route.fulfill({
+            contentType: "application/problem+json",
+            status: 503,
+            body: JSON.stringify({
+              code: "QUESTION_SUPPLY_UNAVAILABLE",
+              detail: "A swap is temporarily unavailable.",
+              status: 503,
+            }),
+          });
+          return;
+        }
+      }
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          recommendation: {
+            id: "recommendation-after-failure",
+            status: "READY",
+            question: {
+              id: "http-question-education",
+              prompt:
+                "Some people believe schools should teach financial literacy. To what extent do you agree or disagree?",
+              type: "opinion",
+              topic: "education",
+              ielts_track: "academic",
+              visibility: "public",
+            },
+          },
+        }),
+      });
+    });
+    await page.goto("/today?new-essay=1");
+    const swap = page.getByRole("button", { name: "换一题" });
+
+    await swap.click();
+    await expect(page.locator(".inline-probe[role='alert']")).toBeVisible();
+    await expect(swap).toBeEnabled();
+    await swap.click();
+
+    await expect.poll(() => swaps).toBe(2);
   });
 
   test("feedback-waiting notice keeps the queued state and refresh action", async ({

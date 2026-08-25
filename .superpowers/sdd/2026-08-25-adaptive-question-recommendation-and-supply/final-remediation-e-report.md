@@ -135,3 +135,64 @@ changed only the Today interaction controller and its non-Demo regression
 fixture. External boundaries are unchanged.
 
 Fix-round commit: the commit containing this section.
+
+## Fix Round 2/5 — cycle-first exclusion of recommendation actions
+
+### Root cause and RED
+
+Fix Round 1 separated the mutexes but only made cycle actions respect an active
+recommendation action. In the inverse same-task ordering, a manual, private, or
+recommended start acquired `cycleOperationLocked` before React rendered its
+busy state, then a following swap or retry could still acquire
+`recommendationActionLocked` and issue recommendation traffic.
+
+- A controlled mutation without the central and swap cycle guards made all
+  three start → swap tests fail with `[INITIAL, SWAP]` rather than `[INITIAL]`.
+- The direct custom → retry RED observed a sixth recommendation GET after the
+  completed five-GET bounded window; the required count was unchanged at five.
+
+### Fix
+
+- The central `requestRecommendation` pre-await guard now rejects when either
+  recommendation or cycle/custom work is locked.
+- `retryRecommendation` and the direct swap entry apply the same cycle guard
+  before acquiring the recommendation-action mutex.
+- Initial recommendation loading is unchanged because no cycle operation is
+  held on mount.
+- The existing `finally` blocks remain the lock-release authority. Dedicated
+  HTTP characterizations prove a failed cycle permits a later swap and a
+  failed swap permits the next swap.
+
+### Direct browser contract
+
+The non-Demo inverse-order tests dispatch both native click events inside one
+browser task, before React can commit `disabled`:
+
+- manual start → swap;
+- private create/start → swap;
+- recommended start → swap;
+- private create/start → retry.
+
+Each observes one cycle, one private creation where applicable, and zero new
+recommendation POST/GET after the cycle mutex is acquired. The cycle response
+is held so Today remains unchanged until release; manual/private cycles omit
+`recommendation_id`, while recommended start retains the original ID.
+
+### Fresh focused verification
+
+```text
+Swap-guard mutation RED: 3/3 failed with one unexpected SWAP each
+Custom→retry RED: 1 failed with GET count 6 instead of 5
+Chromium inverse-order GREEN: 4/4 passed
+Chromium + WebKit + mobile forward/inverse matrix: 18/18 passed
+Failure-path lock release: Chromium 2/2 passed
+Client suites: 2 files / 114 passed
+Web typecheck: passed
+Web lint: passed, 0 errors / 4 existing Fast Refresh warnings
+Web production build: passed, 48/48 static pages
+Targeted Prettier and git diff checks: passed
+```
+
+External boundaries and the complete E release baseline remain unchanged.
+
+Fix-round commit: the commit containing this section.

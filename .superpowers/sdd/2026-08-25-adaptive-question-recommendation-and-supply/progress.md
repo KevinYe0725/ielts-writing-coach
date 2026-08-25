@@ -190,3 +190,7 @@ Final remediation E: fix round 1/5 complete (separate recommendation-action
 and cycle/custom mutexes; READY → SWAP → PENDING manual/private double-event
 fallbacks each create one unattributed cycle and ignore the stale in-flight
 poll; see final-remediation-e-report.md)
+Final remediation E: fix round 2/5 complete (cycle-first central request,
+retry, and swap guards; same-task manual/private/recommended start excludes
+later recommendation traffic; both mutexes release after failure; see
+final-remediation-e-report.md)
