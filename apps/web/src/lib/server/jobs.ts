@@ -168,6 +168,7 @@ export function automaticQuestionBankRefillDecision(input: {
   hasOtherNonTerminalBatch: boolean;
   latestFailedAt: Date | null;
   now: Date;
+  bypassFailedCooldown?: boolean;
 }):
   | { allowed: true }
   | {
@@ -178,6 +179,7 @@ export function automaticQuestionBankRefillDecision(input: {
     return { allowed: false, code: "QUESTION_BANK_REFILL_ACTIVE" };
   }
   if (
+    !input.bypassFailedCooldown &&
     input.latestFailedAt &&
     input.now.getTime() - input.latestFailedAt.getTime() <
       QUESTION_BANK_REFILL_COOLDOWN_MS
@@ -336,14 +338,26 @@ export async function enqueueAIJob(
     transaction,
     environment.DEPLOYMENT_MODE,
   );
-  const { route, provider: routeProvider } = await resolveAIJobRoute(
-    transaction,
-    {
-      deploymentMode,
-      jobOwnerId: input.ownerId,
-      taskKind: input.taskKind,
-    },
-  );
+  const resolution = await resolveAIJobRoute(transaction, {
+    deploymentMode,
+    jobOwnerId: input.ownerId,
+    taskKind: input.taskKind,
+  });
+  return enqueueAIJobWithResolution(transaction, input, resolution);
+}
+
+async function enqueueAIJobWithResolution(
+  transaction: DatabaseTransaction,
+  input: {
+    ownerId: string;
+    taskKind: AITaskKind;
+    protectedReference: Record<string, string>;
+    idempotencyKey: string;
+  },
+  resolution: ResolvedAIJobRoute,
+): Promise<EnqueuedAIJob> {
+  const { environment } = getServerContext();
+  const { route, provider: routeProvider } = resolution;
 
   const configured = route
     ? route.providerConnectionId
@@ -429,6 +443,7 @@ export async function enqueueQuestionBankRefill(
   transaction: DatabaseTransaction,
   triggerUserId: string,
   batchId: string,
+  options: { bypassFailedCooldown?: boolean } = {},
 ): Promise<EnqueuedAIJob> {
   await transaction.execute(
     sql`select pg_advisory_xact_lock(hashtext('question-bank-refill'))`,
@@ -490,6 +505,9 @@ export async function enqueueQuestionBankRefill(
     hasOtherNonTerminalBatch: Boolean(otherNonTerminal),
     latestFailedAt: latestFailed?.updatedAt ?? null,
     now: new Date(),
+    ...(options.bypassFailedCooldown === undefined
+      ? {}
+      : { bypassFailedCooldown: options.bypassFailedCooldown }),
   });
   if (!decision.allowed) {
     throw Object.assign(
@@ -498,12 +516,51 @@ export async function enqueueQuestionBankRefill(
     );
   }
 
-  const enqueued = await enqueueAIJob(transaction, {
-    ownerId: triggerUserId,
+  const { environment } = getServerContext();
+  const deploymentMode = await resolveInstanceDeploymentMode(
+    transaction,
+    environment.DEPLOYMENT_MODE,
+  );
+  const resolution = await resolveAIJobRoute(transaction, {
+    deploymentMode,
+    jobOwnerId: triggerUserId,
     taskKind: "question_bank_refill",
-    protectedReference: { generationBatchId: batchId },
-    idempotencyKey: `question-bank-refill:${batchId}`,
   });
+  let jobOwnerId = triggerUserId;
+  if (deploymentMode === "shared") {
+    if (resolution.route) {
+      jobOwnerId = resolution.route.ownerId;
+    } else {
+      const privilegedOwners = await transaction.query.user.findMany({
+        columns: { id: true, role: true },
+        where: inArray(user.role, ["owner", "admin"]),
+      });
+      privilegedOwners.sort(
+        (left, right) =>
+          (left.role === right.role ? 0 : left.role === "owner" ? -1 : 1) ||
+          left.id.localeCompare(right.id),
+      );
+      const canonicalOwner = privilegedOwners[0];
+      if (!canonicalOwner) {
+        throw Object.assign(
+          new Error("The shared instance has no privileged refill owner."),
+          { code: "QUESTION_BANK_REFILL_OWNER_UNAVAILABLE" },
+        );
+      }
+      jobOwnerId = canonicalOwner.id;
+    }
+  }
+
+  const enqueued = await enqueueAIJobWithResolution(
+    transaction,
+    {
+      ownerId: jobOwnerId,
+      taskKind: "question_bank_refill",
+      protectedReference: { generationBatchId: batchId },
+      idempotencyKey: `question-bank-refill:${batchId}`,
+    },
+    resolution,
+  );
   await transaction
     .update(questionGenerationBatch)
     .set({ aiJobId: enqueued.id })

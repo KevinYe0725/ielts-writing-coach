@@ -46,6 +46,7 @@ import type {
   QuestionOption,
   QuestionRecommendation,
   QuestionRecommendationRequest,
+  QuestionSupplyRetryResult,
   QuestionTopic,
   QuestionType,
   RewriteData,
@@ -1780,6 +1781,31 @@ function projectQuestionBatchFailureCode(
     default:
       return null;
   }
+}
+
+function projectQuestionSupplyRetryResult(
+  payload: unknown,
+): QuestionSupplyRetryResult {
+  if (
+    !isRecord(payload) ||
+    Object.keys(payload).length !== 2 ||
+    !("state" in payload) ||
+    !("batch_status" in payload) ||
+    (payload.state !== "STARTED" && payload.state !== "ATTACHED") ||
+    !["QUEUED", "SEARCHING", "GENERATING", "VALIDATING"].includes(
+      String(payload.batch_status),
+    )
+  ) {
+    throw new LearningClientError(
+      "The server did not return a usable question-supply retry status.",
+      { code: "INVALID_RESPONSE" },
+    );
+  }
+  return {
+    state: payload.state,
+    batchStatus:
+      payload.batch_status as QuestionSupplyRetryResult["batchStatus"],
+  };
 }
 
 async function readBoundedResponseText(
@@ -4325,6 +4351,14 @@ export class HttpLearningClient implements LearningClient {
       idempotent: true,
       method: "DELETE",
     });
+  }
+
+  async retryQuestionSupply(): Promise<QuestionSupplyRetryResult> {
+    const response = await this.request<unknown>(
+      "/admin/question-supply/retry",
+      { body: {}, idempotent: true, method: "POST" },
+    );
+    return projectQuestionSupplyRetryResult(response.data);
   }
 
   async getSystemStatus(): Promise<SystemStatus> {

@@ -265,10 +265,20 @@ questions. Only one non-terminal batch may exist per instance. After a failed
 automatic batch, another automatic refill cannot start for six hours; an
 Owner/Admin may request an explicit retry sooner.
 
+The explicit retry is a protected administrator mutation. It creates a fresh,
+immutable batch only when the latest batch failed, bypasses only that six-hour
+cooldown, and safely attaches when another non-terminal batch won the race. Its
+response contains only STARTED/ATTACHED and aggregate batch status; batch, AI
+job, search connection, route, and user identifiers remain server-internal.
+
 In personal mode the refill uses the personal canonical AI route. In shared
 mode it uses the instance canonical Owner/Admin AI route and never borrows a
 learner session-only connection. The generated prompts remain instance assets
-rather than learner-owned AI output.
+rather than learner-owned AI output. The AI job owner is the canonical route
+owner (or the deterministic privileged instance owner when no route is yet
+configured), while triggered_by_user_id remains batch-only waiter/audit
+context. Learner-data deletion never removes a question_bank_refill AI job or
+its Graphile queue row, including legacy learner-owned rows.
 
 ### 9.1 Web-research path
 
@@ -351,6 +361,7 @@ Owner/Admin only:
 - PUT /api/v1/search-connection
 - POST /api/v1/search-connection/test
 - DELETE /api/v1/search-connection
+- POST /api/v1/admin/question-supply/retry
 
 Learners receive 403 with no connection metadata. API responses expose provider
 kind, status, and tested time only. The API key is write-only.
@@ -462,6 +473,12 @@ written to ordinary application logs.
 - Failed cycle creation does not count as practice.
 - Dynamic shared question is selectable by another learner.
 - Low-pool trigger creates one refill batch.
+- Shared refill jobs are privileged-owner-owned while retaining only the
+  triggering learner on the batch.
+- QUEUED and RUNNING legacy refill jobs survive learner-data deletion with
+  their Graphile queue rows, and later refill admission remains recoverable.
+- Concurrent privileged early retries create one balanced batch and safely
+  attach the loser; idempotent replay creates no additional batch.
 
 ### Search adapter
 
@@ -521,6 +538,8 @@ No existing training cycle, question, essay, or learning evidence is rewritten.
 - Settings remain visually consistent and responsive.
 - Learner-facing UI exposes no search, provider, job, schema, score, or source
   internals.
+- Owner/Admin can retry a failed refill before six hours without bypassing the
+  one-non-terminal-batch invariant or receiving operational identifiers.
 
 ## 19. Technical References
 

@@ -330,7 +330,12 @@ export async function deleteLearningRecord(
   const jobs = await db
     .select({ key: aiJob.graphileJobKey })
     .from(aiJob)
-    .where(eq(aiJob.ownerId, userId));
+    .where(
+      and(
+        eq(aiJob.ownerId, userId),
+        ne(aiJob.taskKind, "question_bank_refill"),
+      ),
+    );
   return db.transaction(async (transaction) => {
     for (const job of jobs) {
       if (job.key)
@@ -354,7 +359,14 @@ export async function deleteLearningRecord(
     await transaction
       .delete(questionRecommendation)
       .where(eq(questionRecommendation.userId, userId));
-    await transaction.delete(aiJob).where(eq(aiJob.ownerId, userId));
+    await transaction
+      .delete(aiJob)
+      .where(
+        and(
+          eq(aiJob.ownerId, userId),
+          ne(aiJob.taskKind, "question_bank_refill"),
+        ),
+      );
     const deletedCycles = await transaction
       .delete(trainingCycle)
       .where(eq(trainingCycle.userId, userId))

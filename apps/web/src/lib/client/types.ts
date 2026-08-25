@@ -917,6 +917,11 @@ export interface SystemStatus {
   };
 }
 
+export interface QuestionSupplyRetryResult {
+  state: "STARTED" | "ATTACHED";
+  batchStatus: "QUEUED" | "SEARCHING" | "GENERATING" | "VALIDATING";
+}
+
 export interface BootstrapInput {
   deploymentMode: DeploymentMode;
   adminName: string;
@@ -1067,5 +1072,6 @@ export interface LearningClient {
   completeBootstrap(input: BootstrapInput): Promise<void>;
   configureAiConnection(input: AiConnectionInput): Promise<void>;
   deleteAiConnection(connectionId: string): Promise<void>;
+  retryQuestionSupply(): Promise<QuestionSupplyRetryResult>;
   getSystemStatus(): Promise<SystemStatus>;
 }

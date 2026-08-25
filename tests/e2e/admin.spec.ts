@@ -335,6 +335,77 @@ test.describe("secure administration surfaces", () => {
     }
   });
 
+  test("Owner and Admin can safely start or attach an early question-supply retry", async ({
+    page,
+  }) => {
+    for (const actorRole of ["owner", "admin"] as const) {
+      await useAdminStatusFixture(page, { actorRole });
+      await page.goto("/admin");
+      await expect(
+        page.getByRole("button", { name: "立即重试补充" }),
+      ).toBeVisible();
+    }
+
+    let releaseRequest!: () => void;
+    const requestReleased = new Promise<void>((resolve) => {
+      releaseRequest = resolve;
+    });
+    let requestCount = 0;
+    await page.route("**/api/v1/admin/question-supply/retry", async (route) => {
+      const request = route.request();
+      requestCount += 1;
+      expect(request.method()).toBe("POST");
+      expect(request.headers()["idempotency-key"]).toBeTruthy();
+      expect(request.postDataJSON()).toEqual({});
+      if (requestCount === 1) await requestReleased;
+      if (requestCount === 3) {
+        await route.fulfill({
+          status: 409,
+          contentType: "application/problem+json",
+          body: JSON.stringify({
+            type: "https://ielts-writing-coach.dev/problems/question_bank_refill_retry_not_available",
+            title: "Question supply retry unavailable",
+            status: 409,
+            code: "QUESTION_BANK_REFILL_RETRY_NOT_AVAILABLE",
+            detail: "当前没有可重试的失败补充任务。",
+          }),
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 202,
+        contentType: "application/json",
+        body: JSON.stringify(
+          requestCount === 1
+            ? { state: "STARTED", batch_status: "QUEUED" }
+            : { state: "ATTACHED", batch_status: "GENERATING" },
+        ),
+      });
+    });
+
+    const retryButton = page.getByRole("button", { name: "立即重试补充" });
+    await retryButton.click();
+    await expect(
+      page.getByRole("button", { name: "正在重试补充…" }),
+    ).toBeDisabled();
+    releaseRequest();
+    await expect(page.getByText("已创建新的题库补充任务。")).toBeVisible();
+
+    await page.getByRole("button", { name: "立即重试补充" }).click();
+    await expect(page.getByText("已有补充任务，已安全附着。")).toBeVisible();
+
+    await page.getByRole("button", { name: "立即重试补充" }).click();
+    await expect(
+      page.getByText("当前没有可重试的失败补充任务。"),
+    ).toHaveAttribute("role", "alert");
+    expect(requestCount).toBe(3);
+
+    const supplyText = await page
+      .locator('[data-question-supply-status="aggregate"]')
+      .innerText();
+    expect(supplyText).not.toMatch(/(?:batch|job|search)[-_ ]?id/iu);
+  });
+
   test("Owner creates a one-time recovery link from an HTTP fixture", async ({
     page,
   }) => {

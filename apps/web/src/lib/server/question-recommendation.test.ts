@@ -3,6 +3,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   aiJob,
+  auditEvent,
   createDatabase,
   newDomainId,
   question,
@@ -16,6 +17,7 @@ import {
 } from "@iwc/db";
 import { QUESTION_BANK } from "@iwc/question-bank";
 
+import * as questionRecommendationModule from "./question-recommendation";
 import { completeIdempotentResponse, reserveIdempotencyKey } from "./security";
 
 import {
@@ -194,6 +196,9 @@ integration("question recommendation service (PostgreSQL)", () => {
 
   afterEach(async () => {
     for (const userId of createdUsers.splice(0)) {
+      await database.db
+        .delete(auditEvent)
+        .where(eq(auditEvent.actorId, userId));
       const [jobs, batches] = await Promise.all([
         database.db.query.aiJob.findMany({
           columns: { graphileJobKey: true },
@@ -754,6 +759,99 @@ integration("question recommendation service (PostgreSQL)", () => {
       generationBatchId: null,
       safeFailureCode: "QUESTION_BANK_REFILL_COOLDOWN",
     });
+  });
+
+  it("serializes privileged early retries into one fresh auditable balanced batch and one safe attachment", async () => {
+    const actorId = await createLearner("question-supply-retry-owner");
+    await database.db
+      .update(user)
+      .set({ role: "owner" })
+      .where(eq(user.id, actorId));
+    const failedBatchId = await insertBatch(actorId, "FAILED", new Date());
+    const retryQuestionSupply = (
+      questionRecommendationModule as unknown as {
+        retryQuestionBankRefill?: (
+          database: Database,
+          actorId: string,
+        ) => Promise<{ state: "STARTED" | "ATTACHED"; batchStatus: string }>;
+      }
+    ).retryQuestionBankRefill;
+    expect(retryQuestionSupply).toEqual(expect.any(Function));
+    if (!retryQuestionSupply) return;
+
+    const results = await Promise.all([
+      retryQuestionSupply(database.db, actorId),
+      retryQuestionSupply(database.db, actorId),
+    ]);
+
+    expect(results.map((result) => result.state).sort()).toEqual([
+      "ATTACHED",
+      "STARTED",
+    ]);
+    expect(results.every((result) => result.batchStatus === "QUEUED")).toBe(
+      true,
+    );
+    const batches = await database.db.query.questionGenerationBatch.findMany({
+      where: eq(questionGenerationBatch.triggeredByUserId, actorId),
+    });
+    const retries = batches.filter((batch) => batch.id !== failedBatchId);
+    expect(retries).toHaveLength(1);
+    expect(retries[0]?.targetMix).toHaveLength(15);
+    expect(retries[0]?.targetMix.every((item) => item.count === 1)).toBe(true);
+    expect(
+      new Set(
+        retries[0]?.targetMix.map(
+          (item) => `${item.questionType}:${item.topic}`,
+        ),
+      ).size,
+    ).toBe(15);
+    const audits = await database.db.query.auditEvent.findMany({
+      where: eq(auditEvent.actorId, actorId),
+    });
+    expect(audits).toHaveLength(2);
+    expect(
+      audits.every(
+        (event) =>
+          event.action === "question_supply.retry" &&
+          event.targetType === "question_generation_batch",
+      ),
+    ).toBe(true);
+  });
+
+  it("refuses an explicit retry when the latest batch did not fail", async () => {
+    const actorId = await createLearner("question-supply-retry-unavailable");
+    await database.db
+      .update(user)
+      .set({ role: "admin" })
+      .where(eq(user.id, actorId));
+    await insertBatch(actorId, "SUCCEEDED", new Date());
+    const retryQuestionSupply = (
+      questionRecommendationModule as unknown as {
+        retryQuestionBankRefill: (
+          database: Database,
+          actorId: string,
+        ) => Promise<unknown>;
+      }
+    ).retryQuestionBankRefill;
+
+    await expect(
+      retryQuestionSupply(database.db, actorId),
+    ).rejects.toMatchObject({
+      problem: {
+        code: "QUESTION_BANK_REFILL_RETRY_NOT_AVAILABLE",
+        status: 409,
+      },
+    });
+    await expect(
+      database.db.query.questionGenerationBatch.findMany({
+        where: eq(questionGenerationBatch.triggeredByUserId, actorId),
+      }),
+    ).resolves.toHaveLength(1);
+    await expect(
+      database.db.query.auditEvent.findMany({
+        where: eq(auditEvent.actorId, actorId),
+      }),
+    ).resolves.toHaveLength(0);
   });
 
   it("polling a completed batch finalizes its linked recommendation as READY", async () => {

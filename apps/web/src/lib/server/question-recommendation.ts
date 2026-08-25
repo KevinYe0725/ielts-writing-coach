@@ -14,6 +14,7 @@ import {
 } from "drizzle-orm";
 
 import {
+  auditEvent,
   newDomainId,
   question,
   questionGenerationBatch,
@@ -91,6 +92,18 @@ export interface QuestionRecommendationServiceOptions {
   afterPersist?: (
     transaction: DatabaseTransaction,
     result: QuestionRecommendationProjection,
+  ) => Promise<void>;
+}
+
+export interface QuestionSupplyRetryProjection {
+  state: "STARTED" | "ATTACHED";
+  batchStatus: (typeof questionGenerationBatch.$inferSelect)["status"];
+}
+
+export interface QuestionSupplyRetryOptions {
+  afterPersist?: (
+    transaction: DatabaseTransaction,
+    result: QuestionSupplyRetryProjection,
   ) => Promise<void>;
 }
 
@@ -459,6 +472,101 @@ export async function assertRecommendationForCycle(
   }
 }
 
+export async function retryQuestionBankRefill(
+  database: Database,
+  actorId: string,
+  options: QuestionSupplyRetryOptions = {},
+): Promise<QuestionSupplyRetryProjection> {
+  return database.transaction(async (transaction) => {
+    await transaction.execute(
+      sql`select pg_advisory_xact_lock(hashtext('question-bank-refill'))`,
+    );
+    const [active] = await transaction
+      .select({
+        id: questionGenerationBatch.id,
+        status: questionGenerationBatch.status,
+      })
+      .from(questionGenerationBatch)
+      .where(
+        inArray(questionGenerationBatch.status, [
+          ...NON_TERMINAL_BATCH_STATUSES,
+        ]),
+      )
+      .orderBy(
+        asc(questionGenerationBatch.createdAt),
+        asc(questionGenerationBatch.id),
+      )
+      .limit(1)
+      .for("update");
+    if (active) {
+      const result: QuestionSupplyRetryProjection = {
+        state: "ATTACHED",
+        batchStatus: active.status,
+      };
+      await transaction.insert(auditEvent).values({
+        actorId,
+        action: "question_supply.retry",
+        targetType: "question_generation_batch",
+        targetId: active.id,
+        result: "attached",
+        metadata: { outcome: "active_batch" },
+      });
+      await options.afterPersist?.(transaction, result);
+      return result;
+    }
+
+    const [latest] = await transaction
+      .select({
+        id: questionGenerationBatch.id,
+        status: questionGenerationBatch.status,
+      })
+      .from(questionGenerationBatch)
+      .orderBy(
+        desc(questionGenerationBatch.updatedAt),
+        desc(questionGenerationBatch.id),
+      )
+      .limit(1)
+      .for("update");
+    if (!latest || latest.status !== "FAILED") {
+      throw new ApiProblem({
+        title: "Question supply retry unavailable",
+        status: 409,
+        code: "QUESTION_BANK_REFILL_RETRY_NOT_AVAILABLE",
+        detail: "There is no failed question-supply batch to retry.",
+      });
+    }
+
+    const batchId = newDomainId();
+    const targetMix = await buildQuestionBankRefillTargetMix(transaction);
+    await transaction.insert(questionGenerationBatch).values({
+      id: batchId,
+      triggeredByUserId: actorId,
+      status: "QUEUED",
+      mode: "OFFLINE",
+      targetMix,
+      promptVersion: "1.0.0",
+      rubricVersion: "iwc-question-bank-refill-1.0.0",
+    });
+    await enqueueQuestionBankRefill(transaction, actorId, batchId, {
+      bypassFailedCooldown: true,
+    });
+    const result: QuestionSupplyRetryProjection = {
+      state: "STARTED",
+      batchStatus: "QUEUED",
+    };
+    await transaction.insert(auditEvent).values({
+      actorId,
+      action: "question_supply.retry",
+      targetType: "question_generation_batch",
+      targetId: batchId,
+      result: "success",
+      metadata: { outcome: "new_batch" },
+    });
+    await options.afterPersist?.(transaction, result);
+    return result;
+  });
+}
+
 async function lockLearner(
   transaction: DatabaseTransaction,
   actorId: string,
@@ -598,7 +706,7 @@ async function reserveRefill(
   try {
     const batchId = await transaction.transaction(async (savepoint) => {
       const reservedBatchId = newDomainId();
-      const targetMix = await buildRefillTargetMix(savepoint);
+      const targetMix = await buildQuestionBankRefillTargetMix(savepoint);
       await savepoint.insert(questionGenerationBatch).values({
         id: reservedBatchId,
         triggeredByUserId: actorId,
@@ -648,7 +756,7 @@ async function reserveRefill(
   }
 }
 
-async function buildRefillTargetMix(
+export async function buildQuestionBankRefillTargetMix(
   transaction: DatabaseTransaction,
 ): Promise<Array<{ questionType: string; topic: string; count: number }>> {
   const catalog = await listPublicQuestionCatalog(transaction);

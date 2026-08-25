@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
@@ -111,6 +111,25 @@ describe("automatic question-bank refill admission", () => {
         now,
       }),
     ).toEqual({ allowed: true });
+  });
+
+  it("lets an explicit privileged retry bypass only the failed cooldown", () => {
+    expect(
+      automaticQuestionBankRefillDecision({
+        hasOtherNonTerminalBatch: false,
+        latestFailedAt: new Date("2026-08-25T09:59:59.999Z"),
+        now,
+        bypassFailedCooldown: true,
+      }),
+    ).toEqual({ allowed: true });
+    expect(
+      automaticQuestionBankRefillDecision({
+        hasOtherNonTerminalBatch: true,
+        latestFailedAt: new Date("2026-08-25T09:59:59.999Z"),
+        now,
+        bypassFailedCooldown: true,
+      }),
+    ).toEqual({ allowed: false, code: "QUESTION_BANK_REFILL_ACTIVE" });
   });
 });
 
@@ -530,6 +549,7 @@ integration("shared-instance AI job routing and repair", () => {
   const adminRouteId = newDomainId();
   const refillRouteId = newDomainId();
   const refillBatchId = newDomainId();
+  const fallbackRefillBatchId = newDomainId();
   const waitingRefillBatchId = newDomainId();
   const waitingRefillJobId = newDomainId();
   const blockedRefillBatchId = newDomainId();
@@ -685,7 +705,7 @@ integration("shared-instance AI job routing and repair", () => {
   afterAll(async () => {
     const jobs = await database.db.query.aiJob.findMany({
       columns: { graphileJobKey: true },
-      where: eq(aiJob.ownerId, learnerId),
+      where: inArray(aiJob.ownerId, [ownerId, adminId, learnerId]),
     });
     for (const job of jobs) {
       if (job.graphileJobKey)
@@ -693,7 +713,9 @@ integration("shared-instance AI job routing and repair", () => {
           sql`select graphile_worker.remove_job(${job.graphileJobKey})`,
         );
     }
-    await database.db.delete(aiJob).where(eq(aiJob.ownerId, learnerId));
+    await database.db
+      .delete(aiJob)
+      .where(inArray(aiJob.ownerId, [ownerId, adminId, learnerId]));
     await database.db
       .delete(questionGenerationBatch)
       .where(eq(questionGenerationBatch.triggeredByUserId, learnerId));
@@ -752,7 +774,7 @@ integration("shared-instance AI job routing and repair", () => {
     expect(job?.versionSnapshot.model).toBe("owner-shared-model");
   });
 
-  it("queues one IDs-only refill job on the privileged shared route and links its batch", async () => {
+  it("owns a shared refill job by the canonical privileged route owner while retaining the learner trigger on the batch", async () => {
     await database.db.insert(questionGenerationBatch).values({
       id: refillBatchId,
       triggeredByUserId: learnerId,
@@ -803,7 +825,7 @@ integration("shared-instance AI job routing and repair", () => {
     ]);
     expect(jobs).toHaveLength(1);
     expect(job).toMatchObject({
-      ownerId: learnerId,
+      ownerId,
       taskKind: "question_bank_refill",
       providerConnectionId: providerId,
       modelRouteId: refillRouteId,
@@ -815,6 +837,80 @@ integration("shared-instance AI job routing and repair", () => {
       "generationBatchId",
     ]);
     expect(batch?.aiJobId).toBe(result.id);
+    expect(batch?.triggeredByUserId).toBe(learnerId);
+  });
+
+  it("falls back to the deterministic instance Owner when a shared refill route is not configured", async () => {
+    await database.db
+      .update(questionGenerationBatch)
+      .set({ status: "SUCCEEDED" })
+      .where(eq(questionGenerationBatch.id, refillBatchId));
+    await database.db.insert(questionGenerationBatch).values({
+      id: fallbackRefillBatchId,
+      triggeredByUserId: learnerId,
+      status: "QUEUED",
+      mode: "OFFLINE",
+      targetMix: [{ questionType: "discussion", topic: "health", count: 1 }],
+      promptVersion: "1.0.0",
+      rubricVersion: "iwc-question-bank-refill-1.0.0",
+    });
+    const result = await database.db.transaction(async (transaction) => {
+      const instance = await transaction.query.instanceConfiguration.findFirst({
+        where: eq(instanceConfiguration.id, testInstanceId),
+      });
+      expect(instance).toBeDefined();
+      await transaction
+        .update(instanceConfiguration)
+        .set({ deploymentMode: "shared" })
+        .where(eq(instanceConfiguration.id, instance!.id));
+      await transaction
+        .update(modelRoute)
+        .set({ taskKind: "question_bank_refill_test_disabled" })
+        .where(eq(modelRoute.id, refillRouteId));
+      try {
+        return await enqueueQuestionBankRefill(
+          transaction,
+          learnerId,
+          fallbackRefillBatchId,
+        );
+      } finally {
+        await transaction
+          .update(modelRoute)
+          .set({ taskKind: "question_bank_refill" })
+          .where(eq(modelRoute.id, refillRouteId));
+        await transaction
+          .update(instanceConfiguration)
+          .set({ deploymentMode: instance!.deploymentMode })
+          .where(eq(instanceConfiguration.id, instance!.id));
+      }
+    });
+
+    const fallbackJob = await database.db.query.aiJob.findFirst({
+      where: eq(aiJob.id, result.id),
+    });
+    expect(fallbackJob).toMatchObject({
+      ownerId,
+      taskKind: "question_bank_refill",
+      providerConnectionId: null,
+      modelRouteId: null,
+      protectedReference: { generationBatchId: fallbackRefillBatchId },
+    });
+    await expect(
+      database.db.query.questionGenerationBatch.findFirst({
+        where: eq(questionGenerationBatch.id, fallbackRefillBatchId),
+      }),
+    ).resolves.toMatchObject({
+      triggeredByUserId: learnerId,
+      aiJobId: result.id,
+    });
+    if (fallbackJob?.graphileJobKey)
+      await database.db.execute(
+        sql`select graphile_worker.remove_job(${fallbackJob.graphileJobKey})`,
+      );
+    await database.db
+      .delete(questionGenerationBatch)
+      .where(eq(questionGenerationBatch.id, fallbackRefillBatchId));
+    await database.db.delete(aiJob).where(eq(aiJob.id, result.id));
   });
 
   it("makes an Admin change to the canonical shared route visible to later Learner jobs", async () => {

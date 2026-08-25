@@ -40,6 +40,13 @@ export default function AdminPage() {
   const [showAudit, setShowAudit] = useState(false);
   const [testingSmtp, setTestingSmtp] = useState(false);
   const [smtpTestMessage, setSmtpTestMessage] = useState<string | null>(null);
+  const [retryingQuestionSupply, setRetryingQuestionSupply] = useState(false);
+  const [questionSupplyRetryMessage, setQuestionSupplyRetryMessage] = useState<
+    string | null
+  >(null);
+  const [questionSupplyRetryError, setQuestionSupplyRetryError] = useState<
+    string | null
+  >(null);
   if (loading)
     return (
       <Skeleton label={text("正在检查系统状态…", "Checking system status…")} />
@@ -163,6 +170,34 @@ export default function AdminPage() {
       );
     } finally {
       setTestingSmtp(false);
+    }
+  };
+  const retryQuestionSupply = async () => {
+    setRetryingQuestionSupply(true);
+    setQuestionSupplyRetryMessage(null);
+    setQuestionSupplyRetryError(null);
+    try {
+      const result = await learningClient.retryQuestionSupply();
+      setQuestionSupplyRetryMessage(
+        result.state === "STARTED"
+          ? text(
+              "已创建新的题库补充任务。",
+              "A new question-supply refill was created.",
+            )
+          : text(
+              "已有补充任务，已安全附着。",
+              "An existing refill is active; attached safely.",
+            ),
+      );
+      retry();
+    } catch (error) {
+      setQuestionSupplyRetryError(
+        error instanceof Error
+          ? error.message
+          : text("无法重试题库补充。", "Could not retry question supply."),
+      );
+    } finally {
+      setRetryingQuestionSupply(false);
     }
   };
   return (
@@ -421,6 +456,37 @@ export default function AdminPage() {
                       {data.questionSupply.latestBatch.safeFailureCode}
                     </Badge>
                   </div>
+                ) : null}
+                {data.questionSupply.latestBatch.status === "FAILED" ? (
+                  <div className="policy-row">
+                    <span>
+                      {text(
+                        "可绕过本次失败后的六小时冷却",
+                        "Bypass only this failure's six-hour cooldown",
+                      )}
+                    </span>
+                    <Button
+                      disabled={retryingQuestionSupply}
+                      onClick={() => void retryQuestionSupply()}
+                      size="sm"
+                      variant="secondary"
+                    >
+                      <RefreshCw aria-hidden="true" size={15} />
+                      {retryingQuestionSupply
+                        ? text("正在重试补充…", "Retrying refill…")
+                        : text("立即重试补充", "Retry refill now")}
+                    </Button>
+                  </div>
+                ) : null}
+                {questionSupplyRetryMessage ? (
+                  <p data-admin-auxiliary role="status">
+                    {questionSupplyRetryMessage}
+                  </p>
+                ) : null}
+                {questionSupplyRetryError ? (
+                  <p data-admin-auxiliary role="alert">
+                    {questionSupplyRetryError}
+                  </p>
                 ) : null}
               </>
             ) : null}

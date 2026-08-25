@@ -158,6 +158,57 @@ describe("Admin question-supply status projection", () => {
   });
 });
 
+describe("Admin question-supply retry client", () => {
+  it("sends an idempotent protected retry and accepts only the aggregate DTO", async () => {
+    const fetcher = vi.fn<typeof fetch>(async (input, init) => {
+      expect(String(input)).toBe(
+        "https://coach.test/api/v1/admin/question-supply/retry",
+      );
+      expect(init?.method).toBe("POST");
+      const headers = new Headers(init?.headers);
+      expect(headers.get("origin")).toBe("https://coach.test");
+      expect(headers.get("idempotency-key")).toBe("supply-retry-client-key");
+      expect(init?.body).toBe("{}");
+      return jsonResponse(
+        { state: "STARTED", batch_status: "QUEUED" },
+        { status: 202 },
+      );
+    });
+    const client = new HttpLearningClient({
+      baseUrl: "https://coach.test/api/v1",
+      fetch: fetcher,
+      idempotencyKey: () => "supply-retry-client-key",
+      origin: "https://coach.test",
+    });
+
+    await expect(client.retryQuestionSupply()).resolves.toEqual({
+      state: "STARTED",
+      batchStatus: "QUEUED",
+    });
+  });
+
+  it("rejects retry payloads that smuggle operational identifiers", async () => {
+    const client = new HttpLearningClient({
+      baseUrl: "https://coach.test/api/v1",
+      fetch: async () =>
+        jsonResponse(
+          {
+            state: "ATTACHED",
+            batch_status: "QUEUED",
+            job_id: "must-not-cross-client-boundary",
+          },
+          { status: 202 },
+        ),
+      idempotencyKey: () => "supply-retry-client-invalid",
+      origin: "https://coach.test",
+    });
+
+    await expect(client.retryQuestionSupply()).rejects.toMatchObject({
+      code: "INVALID_RESPONSE",
+    });
+  });
+});
+
 describe("legacy practice recovery client", () => {
   it("returns a safe continuation state instead of waiting on a blocked replacement", async () => {
     const fetcher = vi.fn<typeof fetch>(async (input) => {

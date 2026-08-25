@@ -2327,6 +2327,11 @@ export class MockLearningClient implements LearningClient {
     await delay(120);
   }
 
+  async retryQuestionSupply() {
+    await delay(120);
+    return { state: "STARTED" as const, batchStatus: "QUEUED" as const };
+  }
+
   async getSystemStatus(): Promise<SystemStatus> {
     await delay();
     return {

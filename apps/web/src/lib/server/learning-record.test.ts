@@ -4,12 +4,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
 import { createLearningRecordArchive } from "@iwc/exchange";
 import {
   auditEvent,
+  aiJob,
   createDatabase,
   idempotencyRecord,
   learningPreference,
@@ -29,6 +30,7 @@ import {
   deleteLearningRecord,
   learningRecordMarkdown,
 } from "./learning-record";
+import { enqueueQuestionBankRefill } from "./jobs";
 
 const databaseUrl =
   process.env.IWC_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
@@ -251,4 +253,141 @@ describe.skipIf(!databaseUrl)("learner data rights (PostgreSQL)", () => {
       await pool.end();
     }
   });
+
+  it.each(["QUEUED", "RUNNING"] as const)(
+    "preserves a legacy learner-owned %s refill queue/job during learning-data deletion and permits a later refill after it terminates",
+    async (jobStatus) => {
+      const { db, pool } = createDatabase(databaseUrl!);
+      const suffix = newDomainId();
+      const userId = `refill-delete-${jobStatus.toLowerCase()}-${suffix}`;
+      const jobId = newDomainId();
+      const batchId = newDomainId();
+      const laterBatchId = newDomainId();
+      const graphileJobKey = `ai-job:${jobId}`;
+      let laterJobId: string | null = null;
+      let laterGraphileJobKey: string | null = null;
+      try {
+        await db.insert(user).values({
+          id: userId,
+          name: `Refill deletion ${jobStatus}`,
+          email: `${userId}@example.test`,
+          role: "learner",
+        });
+        await db.execute(sql`select graphile_worker.add_job(
+          'run_ai_job',
+          ${JSON.stringify({ jobId })}::json,
+          max_attempts := 5,
+          job_key := ${graphileJobKey},
+          job_key_mode := 'preserve_run_at'
+        )`);
+        await db.insert(aiJob).values({
+          id: jobId,
+          ownerId: userId,
+          taskKind: "question_bank_refill",
+          status: jobStatus,
+          protectedReference: { generationBatchId: batchId },
+          versionSnapshot: {
+            providerKind: "unconfigured",
+            providerConnectionId: "unconfigured",
+          },
+          idempotencyKey: `question-bank-refill:${batchId}`,
+          graphileJobKey,
+          ...(jobStatus === "RUNNING"
+            ? { leasedAt: new Date(), startedAt: new Date(), attemptCount: 1 }
+            : {}),
+        });
+        await db.insert(questionGenerationBatch).values({
+          id: batchId,
+          triggeredByUserId: userId,
+          status: jobStatus === "RUNNING" ? "GENERATING" : "QUEUED",
+          mode: "OFFLINE",
+          targetMix: [
+            { questionType: "opinion", topic: "education", count: 1 },
+          ],
+          aiJobId: jobId,
+          promptVersion: "1.0.0",
+          rubricVersion: "iwc-question-bank-refill-1.0.0",
+        });
+
+        const result = await deleteLearningRecord(
+          db,
+          userId,
+          `delete:${suffix}`,
+        );
+
+        expect(result.queuedJobs).toBe(0);
+        await expect(
+          db.query.aiJob.findFirst({ where: eq(aiJob.id, jobId) }),
+        ).resolves.toMatchObject({
+          id: jobId,
+          ownerId: userId,
+          taskKind: "question_bank_refill",
+          status: jobStatus,
+        });
+        await expect(
+          db.query.questionGenerationBatch.findFirst({
+            where: eq(questionGenerationBatch.id, batchId),
+          }),
+        ).resolves.toMatchObject({ id: batchId, aiJobId: jobId });
+        const queued = await db.execute<{ present: boolean }>(sql`
+          select exists(
+            select 1 from graphile_worker._private_jobs where key = ${graphileJobKey}
+          ) as present
+        `);
+        expect(queued.rows[0]?.present).toBe(true);
+
+        await db
+          .update(aiJob)
+          .set({ status: "FAILED", completedAt: new Date() })
+          .where(eq(aiJob.id, jobId));
+        await db
+          .update(questionGenerationBatch)
+          .set({
+            status: "FAILED",
+            safeFailureCode: "AI_UNAVAILABLE",
+            updatedAt: new Date(Date.now() - 7 * 60 * 60 * 1_000),
+          })
+          .where(eq(questionGenerationBatch.id, batchId));
+        await db.insert(questionGenerationBatch).values({
+          id: laterBatchId,
+          triggeredByUserId: userId,
+          status: "QUEUED",
+          mode: "OFFLINE",
+          targetMix: [
+            { questionType: "discussion", topic: "government", count: 1 },
+          ],
+          promptVersion: "1.0.0",
+          rubricVersion: "iwc-question-bank-refill-1.0.0",
+        });
+        const later = await db.transaction((transaction) =>
+          enqueueQuestionBankRefill(transaction, userId, laterBatchId),
+        );
+        laterJobId = later.id;
+        const laterJob = await db.query.aiJob.findFirst({
+          where: eq(aiJob.id, later.id),
+        });
+        laterGraphileJobKey = laterJob?.graphileJobKey ?? null;
+        expect(later).toMatchObject({
+          id: expect.any(String),
+          status: expect.stringMatching(/^(QUEUED|WAITING_FOR_CONSENT)$/u),
+        });
+      } finally {
+        for (const key of [laterGraphileJobKey, graphileJobKey]) {
+          if (key)
+            await db.execute(sql`select graphile_worker.remove_job(${key})`);
+        }
+        await db
+          .delete(questionGenerationBatch)
+          .where(eq(questionGenerationBatch.id, laterBatchId));
+        await db
+          .delete(questionGenerationBatch)
+          .where(eq(questionGenerationBatch.id, batchId));
+        if (laterJobId) await db.delete(aiJob).where(eq(aiJob.id, laterJobId));
+        await db.delete(aiJob).where(eq(aiJob.id, jobId));
+        await db.delete(auditEvent).where(eq(auditEvent.targetId, userId));
+        await db.delete(user).where(eq(user.id, userId));
+        await pool.end();
+      }
+    },
+  );
 });
