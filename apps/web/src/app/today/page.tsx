@@ -129,6 +129,8 @@ export default function TodayPage() {
     string | null
   >(null);
   const recommendationCurrent = useRef<QuestionRecommendation | null>(null);
+  const recommendationRequestPending =
+    useRef<Promise<QuestionRecommendation> | null>(null);
   const focusRecommendationStart = useRef(false);
   const recommendationStartRef = useRef<HTMLButtonElement>(null);
   const recommendationOperation = useRef(0);
@@ -221,7 +223,11 @@ export default function TodayPage() {
       setQuestionError(null);
       if (focusStart) focusRecommendationStart.current = true;
       try {
-        const next = await learningClient.requestQuestionRecommendation(input);
+        const request = learningClient.requestQuestionRecommendation(input);
+        recommendationRequestPending.current = request;
+        const next = await request;
+        if (recommendationRequestPending.current === request)
+          recommendationRequestPending.current = null;
         if (recommendationOperation.current !== operation) return;
         setCurrentRecommendation(next);
         if (next.state === "PREPARING")
@@ -234,6 +240,7 @@ export default function TodayPage() {
             : "A question could not be prepared.",
         );
       } finally {
+        recommendationRequestPending.current = null;
         if (recommendationOperation.current === operation)
           setRecommendationBusy(false);
         recommendationActionLocked.current = false;
@@ -309,12 +316,17 @@ export default function TodayPage() {
     (question) => question.id === selectedQuestionId,
   );
 
-  const chooseManualFallback = useCallback(() => {
+  const abandonRecommendationForFallback = useCallback(async () => {
+    const knownRecommendation = recommendationCurrent.current;
+    const pendingRequest = recommendationRequestPending.current;
     cancelRecommendationOperation();
     focusRecommendationStart.current = false;
-    setRecommendationBusy(false);
     setRecommendationRetryId(null);
-  }, [cancelRecommendationOperation]);
+    const target = pendingRequest ? await pendingRequest : knownRecommendation;
+    if (target) await learningClient.abandonQuestionRecommendation(target.id);
+    setCurrentRecommendation(null);
+    setRecommendationBusy(false);
+  }, [cancelRecommendationOperation, setCurrentRecommendation]);
 
   useEffect(() => {
     if (recommendation?.state !== "READY" || !focusRecommendationStart.current)
@@ -337,10 +349,23 @@ export default function TodayPage() {
     )
       return;
     cycleOperationLocked.current = true;
-    if (!recommendedStart) chooseManualFallback();
     setQuestionLoading(true);
     setQuestionError(null);
     try {
+      if (!recommendedStart) {
+        try {
+          await abandonRecommendationForFallback();
+        } catch {
+          setRecommendationBusy(false);
+          setQuestionError(
+            text(
+              "未能安全关闭当前推荐题，请重试后再开始写作。",
+              "The current recommendation could not be closed safely. Retry before starting to write.",
+            ),
+          );
+          return;
+        }
+      }
       const cycleId = await learningClient.startTrainingCycle(
         question.id,
         recommendationId,
@@ -401,10 +426,21 @@ export default function TodayPage() {
     )
       return;
     cycleOperationLocked.current = true;
-    chooseManualFallback();
     setQuestionLoading(true);
     setQuestionError(null);
     try {
+      try {
+        await abandonRecommendationForFallback();
+      } catch {
+        setRecommendationBusy(false);
+        setQuestionError(
+          text(
+            "未能安全关闭当前推荐题，请重试后再保存自己的题目。",
+            "The current recommendation could not be closed safely. Retry before saving your own question.",
+          ),
+        );
+        return;
+      }
       const created = await learningClient.createCustomQuestion({
         prompt: customPrompt.trim(),
         type: customType,

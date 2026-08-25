@@ -971,6 +971,7 @@ export interface LearningClient {
     input: QuestionRecommendationRequest,
   ): Promise<QuestionRecommendation>;
   getQuestionRecommendation(id: string): Promise<QuestionRecommendation>;
+  abandonQuestionRecommendation(id: string): Promise<void>;
   createCustomQuestion(input: CustomQuestionInput): Promise<QuestionOption>;
   startTrainingCycle(
     questionId: string,

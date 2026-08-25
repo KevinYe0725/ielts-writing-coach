@@ -622,6 +622,59 @@ describe("HttpLearningClient protocol", () => {
     });
   });
 
+  it("strictly abandons a recommendation with an empty protected idempotent DELETE", async () => {
+    const fetcher = vi.fn<typeof fetch>(async (input, init) => {
+      expect(String(input)).toBe(
+        "https://coach.test/api/v1/question-recommendations/recommendation-abandon%2Fencoded",
+      );
+      expect(init?.method).toBe("DELETE");
+      expect(init?.body).toBeUndefined();
+      return new Response(null, { status: 204 });
+    });
+    const client = new HttpLearningClient({
+      baseUrl: "https://coach.test/api/v1",
+      fetch: fetcher,
+      idempotencyKey: () => "recommendation-abandon-idempotency",
+      origin: "https://coach.test",
+    });
+    const abandon = (
+      client as unknown as {
+        abandonQuestionRecommendation?: (id: string) => Promise<void>;
+      }
+    ).abandonQuestionRecommendation;
+    expect(abandon).toEqual(expect.any(Function));
+    if (!abandon) return;
+
+    await expect(
+      abandon.call(client, "recommendation-abandon/encoded"),
+    ).resolves.toBeUndefined();
+
+    const call = fetcher.mock.calls[0] ?? [];
+    expect(requestHeaders(call).get("origin")).toBe("https://coach.test");
+    expect(requestHeaders(call).get("idempotency-key")).toBe(
+      "recommendation-abandon-idempotency",
+    );
+  });
+
+  it("rejects a non-204 abandonment response even when HTTP reports success", async () => {
+    const client = new HttpLearningClient({
+      baseUrl: "https://coach.test/api/v1",
+      fetch: async () => jsonResponse({ abandoned: true }),
+      origin: "https://coach.test",
+    });
+    const abandon = (
+      client as unknown as {
+        abandonQuestionRecommendation?: (id: string) => Promise<void>;
+      }
+    ).abandonQuestionRecommendation;
+    expect(abandon).toEqual(expect.any(Function));
+    if (!abandon) return;
+
+    await expect(
+      abandon.call(client, "recommendation-1"),
+    ).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
+  });
+
   it("rejects PENDING recommendations without a non-empty runtime string id", async () => {
     for (const id of [undefined, null, 7, "", "   "]) {
       const client = new HttpLearningClient({

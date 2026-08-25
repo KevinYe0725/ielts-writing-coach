@@ -74,4 +74,43 @@ describe("browser-only Demo administration boundary", () => {
       "unrelated-navigation",
     );
   });
+
+  it("durably abandons Demo exposure and makes the question selectable again", async () => {
+    const localStorage = testStorage({});
+    const sessionStorage = testStorage({});
+    vi.stubGlobal("window", { localStorage, sessionStorage, setTimeout });
+    const client = new MockLearningClient();
+    const first = await client.requestQuestionRecommendation({
+      action: "INITIAL",
+    });
+    expect(first.state).toBe("READY");
+    const abandon = (
+      client as unknown as {
+        abandonQuestionRecommendation?: (id: string) => Promise<void>;
+      }
+    ).abandonQuestionRecommendation;
+    expect(abandon).toEqual(expect.any(Function));
+    if (!abandon) return;
+
+    await abandon.call(client, first.id);
+
+    expect(
+      JSON.parse(
+        localStorage.getItem("iwc.demo.question-recommendation-active") ??
+          "null",
+      ),
+    ).toEqual({ id: first.id, status: "ABANDONED" });
+    expect(
+      JSON.parse(
+        localStorage.getItem("iwc.demo.question-recommendation-exposure") ??
+          "null",
+      ),
+    ).toEqual([]);
+    await expect(
+      client.requestQuestionRecommendation({ action: "INITIAL" }),
+    ).resolves.toMatchObject({
+      state: "READY",
+      id: first.id,
+    });
+  });
 });

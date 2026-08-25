@@ -98,6 +98,10 @@ export interface QuestionRecommendationServiceOptions {
   ) => Promise<void>;
 }
 
+export interface AbandonQuestionRecommendationOptions {
+  afterPersist?: (transaction: DatabaseTransaction) => Promise<void>;
+}
+
 export interface QuestionSupplyRetryProjection {
   state: "STARTED" | "ATTACHED";
   batchStatus: (typeof questionGenerationBatch.$inferSelect)["status"];
@@ -381,7 +385,7 @@ export async function getQuestionRecommendation(
       }
       return { id: stored.id, status: "READY", question: projected };
     }
-    if (stored.status === "UNAVAILABLE") {
+    if (stored.status === "UNAVAILABLE" || stored.status === "ABANDONED") {
       return { id: stored.id, status: "UNAVAILABLE", question: null };
     }
     if (!stored.generationBatchId) {
@@ -438,6 +442,46 @@ export async function getQuestionRecommendation(
       await reserveRefillWithoutRollingBackReady(transaction, actorId);
     }
     return { id: stored.id, status: "READY", question: selection.question };
+  });
+}
+
+export async function abandonQuestionRecommendation(
+  database: Database,
+  actorId: string,
+  recommendationId: string,
+  options: AbandonQuestionRecommendationOptions = {},
+): Promise<void> {
+  await database.transaction(async (transaction) => {
+    await lockLearner(transaction, actorId);
+    const [stored] = await transaction
+      .select({ status: questionRecommendation.status })
+      .from(questionRecommendation)
+      .where(
+        and(
+          eq(questionRecommendation.id, recommendationId),
+          eq(questionRecommendation.userId, actorId),
+        ),
+      )
+      .limit(1)
+      .for("update");
+    if (!stored) throw recommendationNotFound();
+    if (stored.status !== "ABANDONED") {
+      await transaction
+        .update(questionRecommendation)
+        .set({
+          status: "ABANDONED",
+          questionExternalId: null,
+          shownAt: null,
+          safeFailureCode: null,
+        })
+        .where(
+          and(
+            eq(questionRecommendation.id, recommendationId),
+            eq(questionRecommendation.userId, actorId),
+          ),
+        );
+    }
+    await options.afterPersist?.(transaction);
   });
 }
 
@@ -663,6 +707,11 @@ async function selectForLearner(
           ),
           and(
             eq(questionRecommendation.action, "SWAP"),
+            inArray(questionRecommendation.status, [
+              "PENDING",
+              "READY",
+              "UNAVAILABLE",
+            ]),
             isNotNull(questionRecommendation.excludedExternalId),
             gt(
               sql`coalesce(${questionRecommendation.shownAt}, ${questionRecommendation.createdAt})`,

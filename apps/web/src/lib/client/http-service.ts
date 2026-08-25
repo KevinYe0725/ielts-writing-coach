@@ -2312,6 +2312,18 @@ export class HttpLearningClient implements LearningClient {
     return projectQuestionRecommendation(data);
   }
 
+  async abandonQuestionRecommendation(id: string): Promise<void> {
+    const { data, response } = await this.request<unknown>(
+      `/question-recommendations/${encodeURIComponent(id)}`,
+      { idempotent: true, method: "DELETE" },
+    );
+    if (response.status !== 204 || data !== undefined)
+      throw new LearningClientError(
+        "The server did not confirm recommendation abandonment.",
+        { code: "INVALID_RESPONSE" },
+      );
+  }
+
   async createCustomQuestion(
     input: CustomQuestionInput,
   ): Promise<QuestionOption> {

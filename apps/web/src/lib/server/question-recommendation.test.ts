@@ -22,6 +22,7 @@ import * as questionRecommendationModule from "./question-recommendation";
 import { completeIdempotentResponse, reserveIdempotencyKey } from "./security";
 
 import {
+  abandonQuestionRecommendation,
   assertRecommendationForCycle,
   buildQuestionBankRefillTargetMix,
   createQuestionRecommendation,
@@ -181,6 +182,34 @@ integration("question recommendation service (PostgreSQL)", () => {
           return callback(transactionProxy);
         }),
     } as unknown as Database;
+  }
+
+  function databaseWithCommitBarrier(input: {
+    reached: () => void;
+    release: () => Promise<void>;
+  }): Database {
+    return {
+      transaction: (callback: (transaction: unknown) => Promise<unknown>) =>
+        database.db.transaction(async (transaction) => {
+          const result = await callback(transaction);
+          input.reached();
+          await input.release();
+          return result;
+        }),
+    } as unknown as Database;
+  }
+
+  async function waitForLockWaiter(): Promise<void> {
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      const result = await database.pool.query<{ waiting: string }>(`
+        select count(*)::text as waiting
+        from pg_locks
+        where not granted
+      `);
+      if (Number(result.rows[0]?.waiting ?? 0) > 0) return;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    throw new Error("Timed out waiting for a PostgreSQL lock waiter");
   }
 
   beforeEach(async () => {
@@ -1063,6 +1092,212 @@ integration("question recommendation service (PostgreSQL)", () => {
         where: eq(questionRecommendation.id, pending.id),
       }),
     ).resolves.toMatchObject({ status: "READY", shownAt: now });
+  });
+
+  it("abandons READY without exposure and makes its question immediately selectable again", async () => {
+    const learnerId = await createLearner("recommend-abandon-ready");
+    const candidate = QUESTION_BANK[0]!;
+    await exposeAllExcept(learnerId, [candidate.id]);
+    const ready = await createQuestionRecommendation(
+      database.db,
+      learnerId,
+      { action: "INITIAL" },
+      options,
+    );
+    expect(ready).toMatchObject({
+      status: "READY",
+      question: { id: candidate.id },
+    });
+
+    await abandonQuestionRecommendation(database.db, learnerId, ready.id);
+    await abandonQuestionRecommendation(database.db, learnerId, ready.id);
+
+    await expect(
+      database.db.query.questionRecommendation.findFirst({
+        where: eq(questionRecommendation.id, ready.id),
+      }),
+    ).resolves.toMatchObject({
+      status: "ABANDONED",
+      questionExternalId: null,
+      shownAt: null,
+      safeFailureCode: null,
+    });
+    await expect(
+      createQuestionRecommendation(
+        database.db,
+        learnerId,
+        { action: "INITIAL" },
+        options,
+      ),
+    ).resolves.toMatchObject({
+      status: "READY",
+      question: { id: candidate.id },
+    });
+  });
+
+  it("abandons PENDING for its owner, projects it generically, and rejects another learner", async () => {
+    const learnerId = await createLearner("recommend-abandon-pending");
+    const otherId = await createLearner("recommend-abandon-other");
+    await exposeAllExcept(learnerId, []);
+    const pending = await createQuestionRecommendation(
+      database.db,
+      learnerId,
+      { action: "INITIAL" },
+      options,
+    );
+    expect(pending.status).toBe("PENDING");
+
+    await expect(
+      abandonQuestionRecommendation(database.db, otherId, pending.id),
+    ).rejects.toMatchObject({ problem: { status: 404 } });
+    await abandonQuestionRecommendation(database.db, learnerId, pending.id);
+
+    await expect(
+      getQuestionRecommendation(database.db, learnerId, pending.id, options),
+    ).resolves.toEqual({
+      id: pending.id,
+      status: "UNAVAILABLE",
+      question: null,
+    });
+    await expect(
+      database.db.query.questionRecommendation.findFirst({
+        where: eq(questionRecommendation.id, pending.id),
+      }),
+    ).resolves.toMatchObject({ status: "ABANDONED", shownAt: null });
+  });
+
+  it("linearizes poll finalization before abandonment and removes the READY exposure", async () => {
+    const learnerId = await createLearner("recommend-finalize-before-abandon");
+    await exposeAllExcept(learnerId, []);
+    const pending = await createQuestionRecommendation(
+      database.db,
+      learnerId,
+      { action: "INITIAL" },
+      options,
+    );
+    const stored = await database.db.query.questionRecommendation.findFirst({
+      where: eq(questionRecommendation.id, pending.id),
+    });
+    const generatedExternalId = `iwc-dynamic-${newDomainId()}`;
+    await insertStoredQuestion({
+      externalId: generatedExternalId,
+      generationBatchId: stored!.generationBatchId,
+      source: "AI_GENERATED",
+      type: "two_part",
+      topic: "urban_transport",
+    });
+    await database.db
+      .update(questionGenerationBatch)
+      .set({ status: "SUCCEEDED", acceptedCount: 1 })
+      .where(eq(questionGenerationBatch.id, stored!.generationBatchId!));
+    let reached!: () => void;
+    const atCommit = new Promise<void>((resolve) => {
+      reached = resolve;
+    });
+    let release!: () => void;
+    const released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const pollingDatabase = databaseWithCommitBarrier({
+      reached,
+      release: () => released,
+    });
+
+    const poll = getQuestionRecommendation(
+      pollingDatabase,
+      learnerId,
+      pending.id,
+      options,
+    );
+    await atCommit;
+    const abandonment = abandonQuestionRecommendation(
+      database.db,
+      learnerId,
+      pending.id,
+    );
+    await waitForLockWaiter();
+    release();
+
+    await expect(poll).resolves.toMatchObject({ status: "READY" });
+    await expect(abandonment).resolves.toBeUndefined();
+    await expect(
+      database.db.query.questionRecommendation.findFirst({
+        where: eq(questionRecommendation.id, pending.id),
+      }),
+    ).resolves.toMatchObject({
+      status: "ABANDONED",
+      questionExternalId: null,
+      shownAt: null,
+    });
+  });
+
+  it("linearizes abandonment before polling so the batch cannot finalize it", async () => {
+    const learnerId = await createLearner("recommend-abandon-before-finalize");
+    await exposeAllExcept(learnerId, []);
+    const pending = await createQuestionRecommendation(
+      database.db,
+      learnerId,
+      { action: "INITIAL" },
+      options,
+    );
+    const stored = await database.db.query.questionRecommendation.findFirst({
+      where: eq(questionRecommendation.id, pending.id),
+    });
+    const generatedExternalId = `iwc-dynamic-${newDomainId()}`;
+    await insertStoredQuestion({
+      externalId: generatedExternalId,
+      generationBatchId: stored!.generationBatchId,
+      source: "AI_GENERATED",
+      type: "discussion",
+      topic: "health",
+    });
+    await database.db
+      .update(questionGenerationBatch)
+      .set({ status: "SUCCEEDED", acceptedCount: 1 })
+      .where(eq(questionGenerationBatch.id, stored!.generationBatchId!));
+    let reached!: () => void;
+    const atCommit = new Promise<void>((resolve) => {
+      reached = resolve;
+    });
+    let release!: () => void;
+    const released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const abandoningDatabase = databaseWithCommitBarrier({
+      reached,
+      release: () => released,
+    });
+
+    const abandonment = abandonQuestionRecommendation(
+      abandoningDatabase,
+      learnerId,
+      pending.id,
+    );
+    await atCommit;
+    const poll = getQuestionRecommendation(
+      database.db,
+      learnerId,
+      pending.id,
+      options,
+    );
+    await waitForLockWaiter();
+    release();
+
+    await expect(abandonment).resolves.toBeUndefined();
+    await expect(poll).resolves.toEqual({
+      id: pending.id,
+      status: "UNAVAILABLE",
+      question: null,
+    });
+    await expect(
+      database.db.query.questionRecommendation.findFirst({
+        where: eq(questionRecommendation.id, pending.id),
+      }),
+    ).resolves.toMatchObject({
+      status: "ABANDONED",
+      questionExternalId: null,
+      shownAt: null,
+    });
   });
 
   it("polling a failed batch finalizes UNAVAILABLE without creating learning rows", async () => {

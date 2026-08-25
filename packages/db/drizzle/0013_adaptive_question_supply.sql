@@ -1,7 +1,7 @@
 CREATE TYPE "public"."question_generation_batch_mode" AS ENUM('WEB_RESEARCH', 'OFFLINE');--> statement-breakpoint
 CREATE TYPE "public"."question_generation_batch_status" AS ENUM('QUEUED', 'SEARCHING', 'GENERATING', 'VALIDATING', 'SUCCEEDED', 'FAILED');--> statement-breakpoint
 CREATE TYPE "public"."question_recommendation_action" AS ENUM('INITIAL', 'SWAP');--> statement-breakpoint
-CREATE TYPE "public"."question_recommendation_status" AS ENUM('PENDING', 'READY', 'UNAVAILABLE');--> statement-breakpoint
+CREATE TYPE "public"."question_recommendation_status" AS ENUM('PENDING', 'READY', 'UNAVAILABLE', 'ABANDONED');--> statement-breakpoint
 CREATE TYPE "public"."search_connection_kind" AS ENUM('BRAVE');--> statement-breakpoint
 CREATE TYPE "public"."search_connection_status" AS ENUM('ACTIVE', 'INVALID', 'REVOKED');--> statement-breakpoint
 CREATE TABLE "question_generation_batch" (

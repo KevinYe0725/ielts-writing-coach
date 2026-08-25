@@ -6,6 +6,6 @@
 export const DATABASE_SCHEMA_VERSION = "0013_adaptive_question_supply" as const;
 export const EXPECTED_DATABASE_MIGRATION_COUNT = 14 as const;
 export const EXPECTED_DATABASE_MIGRATION_CREATED_AT =
-  1_787_588_543_138 as const;
+  1_787_651_956_397 as const;
 export const EXPECTED_DATABASE_MIGRATION_HASH =
-  "8bc678125245aeb2775d2a0283c2162872909082ad0203de15c1b60d57168367" as const;
+  "8e8caf64e59c8392e1cbdd76ef5f0cf3c85ea4dfca2393ada08902802266857e" as const;

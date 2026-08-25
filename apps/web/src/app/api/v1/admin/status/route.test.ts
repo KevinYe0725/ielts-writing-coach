@@ -60,7 +60,12 @@ describe.skipIf(!databaseUrl)(
     const succeededBatchId = newDomainId();
     const latestBatchId = newDomainId();
     const dynamicQuestionId = newDomainId();
-    const recommendationIds = [newDomainId(), newDomainId(), newDomainId()];
+    const recommendationIds = [
+      newDomainId(),
+      newDomainId(),
+      newDomainId(),
+      newDomainId(),
+    ];
     const auditEventId = newDomainId();
     const forbiddenValues = {
       ownerId,
@@ -187,6 +192,12 @@ describe.skipIf(!databaseUrl)(
           status: "UNAVAILABLE",
           safeFailureCode: "QUESTION_SUPPLY_UNAVAILABLE",
         },
+        {
+          id: recommendationIds[3],
+          userId: ownerId,
+          action: "INITIAL",
+          status: "ABANDONED",
+        },
       ]);
       await database.db.insert(auditEvent).values({
         id: auditEventId,
@@ -251,6 +262,11 @@ describe.skipIf(!databaseUrl)(
       expect(recommendations.READY).toBeGreaterThanOrEqual(1);
       expect(recommendations.PENDING).toBeGreaterThanOrEqual(1);
       expect(recommendations.UNAVAILABLE).toBeGreaterThanOrEqual(1);
+      expect(Object.keys(recommendations).sort()).toEqual([
+        "PENDING",
+        "READY",
+        "UNAVAILABLE",
+      ]);
 
       const serialized = JSON.stringify(body.question_supply);
       for (const value of Object.values(forbiddenValues)) {

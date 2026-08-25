@@ -62,6 +62,7 @@ describe.skipIf(!databaseUrl)("learner data rights (PostgreSQL)", () => {
     const searchConnectionId = newDomainId();
     const generationBatchId = newDomainId();
     const recommendationId = newDomainId();
+    const abandonedRecommendationId = newDomainId();
     const cycleId = newDomainId();
     const preservedKey = `delete:${suffix}`;
     const operationalSentinels = [
@@ -70,6 +71,7 @@ describe.skipIf(!databaseUrl)("learner data rights (PostgreSQL)", () => {
       `research snippet ${suffix}`,
       generationBatchId,
       recommendationId,
+      abandonedRecommendationId,
       "AI_RESEARCHED",
       "question-bank-refill@1.0.0",
     ];
@@ -136,6 +138,13 @@ describe.skipIf(!databaseUrl)("learner data rights (PostgreSQL)", () => {
         action: "INITIAL",
         status: "READY",
         shownAt: new Date(),
+      });
+      await db.insert(questionRecommendation).values({
+        id: abandonedRecommendationId,
+        userId,
+        generationBatchId,
+        action: "SWAP",
+        status: "ABANDONED",
       });
       await db.insert(skillEvidenceEvent).values({
         userId,

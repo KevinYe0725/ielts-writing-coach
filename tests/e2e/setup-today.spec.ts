@@ -426,6 +426,10 @@ async function routeTodayHttpFixture(page: Page, state: TodayHttpState) {
   await page.route(
     "**/api/v1/question-recommendations/recommendation-http",
     async (route) => {
+      if (route.request().method() === "DELETE") {
+        await route.fulfill({ status: 204, body: "" });
+        return;
+      }
       await route.fulfill({
         contentType: "application/json",
         body: JSON.stringify({
@@ -503,6 +507,7 @@ async function routePreparingFallbackFixture(page: Page) {
     releasePoll = resolve;
   });
   let polls = 0;
+  const abandonIds: string[] = [];
   const cycleBodies: Array<Record<string, unknown>> = [];
 
   await page.route("**/api/v1/question-recommendations", async (route) => {
@@ -522,6 +527,11 @@ async function routePreparingFallbackFixture(page: Page) {
   await page.route(
     "**/api/v1/question-recommendations/recommendation-preparing-fallback",
     async (route) => {
+      if (route.request().method() === "DELETE") {
+        abandonIds.push("recommendation-preparing-fallback");
+        await route.fulfill({ status: 204, body: "" });
+        return;
+      }
       polls += 1;
       await pollRelease;
       await route.fulfill({
@@ -575,6 +585,7 @@ async function routePreparingFallbackFixture(page: Page) {
   });
 
   return {
+    abandonIds,
     cycleBodies,
     polls: () => polls,
     releasePoll,
@@ -594,6 +605,7 @@ async function routeSwapPreparingFallbackFixture(page: Page) {
   let polls = 0;
   const cycleBodies: Array<Record<string, unknown>> = [];
   const customBodies: Array<Record<string, unknown>> = [];
+  const abandonIds: string[] = [];
   const recommendationActions: string[] = [];
 
   await page.route("**/api/v1/question-recommendations", async (route) => {
@@ -636,6 +648,11 @@ async function routeSwapPreparingFallbackFixture(page: Page) {
   await page.route(
     "**/api/v1/question-recommendations/recommendation-swap-preparing",
     async (route) => {
+      if (route.request().method() === "DELETE") {
+        abandonIds.push("recommendation-swap-preparing");
+        await route.fulfill({ status: 204, body: "" });
+        return;
+      }
       polls += 1;
       await pollRelease;
       await route.fulfill({
@@ -655,6 +672,14 @@ async function routeSwapPreparingFallbackFixture(page: Page) {
           },
         }),
       });
+    },
+  );
+  await page.route(
+    "**/api/v1/question-recommendations/recommendation-swap-source",
+    async (route) => {
+      expect(route.request().method()).toBe("DELETE");
+      abandonIds.push("recommendation-swap-source");
+      await route.fulfill({ status: 204, body: "" });
     },
   );
   await page.route("**/api/v1/training-cycles", async (route) => {
@@ -690,6 +715,7 @@ async function routeSwapPreparingFallbackFixture(page: Page) {
   });
 
   return {
+    abandonIds,
     cycleBodies,
     customBodies,
     polls: () => polls,
@@ -697,6 +723,61 @@ async function routeSwapPreparingFallbackFixture(page: Page) {
     releaseCycle,
     releasePoll,
   };
+}
+
+async function routeDelayedRecommendationFallbackFixture(page: Page) {
+  await routeTodayHttpFixture(page, "mixed-review");
+  let releasePost!: () => void;
+  const postRelease = new Promise<void>((resolve) => {
+    releasePost = resolve;
+  });
+  let markPostStarted!: () => void;
+  const postStarted = new Promise<void>((resolve) => {
+    markPostStarted = resolve;
+  });
+  const abandonIds: string[] = [];
+  const cycleBodies: Array<Record<string, unknown>> = [];
+
+  await page.route("**/api/v1/question-recommendations", async (route) => {
+    if (route.request().method() !== "POST") return route.fallback();
+    markPostStarted();
+    await postRelease;
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        recommendation: {
+          id: "recommendation-delayed-post",
+          status: "READY",
+          question: {
+            id: "stale-delayed-question",
+            prompt: "STALE DELAYED READY MUST NEVER RENDER",
+            type: "discussion",
+            topic: "technology",
+            ielts_track: "academic",
+            visibility: "public",
+          },
+        },
+      }),
+    });
+  });
+  await page.route(
+    "**/api/v1/question-recommendations/recommendation-delayed-post",
+    async (route) => {
+      expect(route.request().method()).toBe("DELETE");
+      abandonIds.push("recommendation-delayed-post");
+      await route.fulfill({ status: 204, body: "" });
+    },
+  );
+  await page.route("**/api/v1/training-cycles", async (route) => {
+    cycleBodies.push(route.request().postDataJSON());
+    await route.fulfill({
+      contentType: "application/json",
+      status: 201,
+      body: JSON.stringify({ cycle: { id: "cycle-delayed-fallback" } }),
+    });
+  });
+
+  return { abandonIds, cycleBodies, postStarted, releasePost };
 }
 
 async function routeRetryCycleFenceFixture(page: Page) {
@@ -726,6 +807,10 @@ async function routeRetryCycleFenceFixture(page: Page) {
   await page.route(
     "**/api/v1/question-recommendations/recommendation-retry-cycle-fence",
     async (route) => {
+      if (route.request().method() === "DELETE") {
+        await route.fulfill({ status: 204, body: "" });
+        return;
+      }
       recommendationGets += 1;
       await route.fulfill({
         contentType: "application/json",
@@ -886,6 +971,7 @@ test.describe("Today query states at the HTTP boundary", () => {
       button?.click();
       button?.click();
     });
+    await expect.poll(() => fixture.abandonIds.length).toBe(1);
     await expect.poll(() => fixture.cycleBodies.length).toBe(1);
     fixture.releasePoll();
     await expect(page).toHaveURL(/\/write\?cycle=cycle-manual-fallback$/);
@@ -917,6 +1003,7 @@ test.describe("Today query states at the HTTP boundary", () => {
       button?.click();
       button?.click();
     });
+    await expect.poll(() => fixture.abandonIds.length).toBe(1);
     await expect.poll(() => fixture.cycleBodies.length).toBe(1);
     fixture.releasePoll();
     await expect(page).toHaveURL(/\/write\?cycle=cycle-manual-fallback$/);
@@ -950,6 +1037,7 @@ test.describe("Today query states at the HTTP boundary", () => {
       button.click();
     });
 
+    await expect.poll(() => fixture.abandonIds.length).toBe(1);
     await expect.poll(() => fixture.cycleBodies.length).toBe(1);
     fixture.releasePoll();
     await expect(
@@ -987,6 +1075,7 @@ test.describe("Today query states at the HTTP boundary", () => {
       button.click();
     });
 
+    await expect.poll(() => fixture.abandonIds.length).toBe(1);
     await expect.poll(() => fixture.cycleBodies.length).toBe(1);
     fixture.releasePoll();
     await expect(
@@ -1000,6 +1089,80 @@ test.describe("Today query states at the HTTP boundary", () => {
       }),
     ]);
     expect(fixture.cycleBodies[0]).not.toHaveProperty("recommendation_id");
+  });
+
+  test("manual fallback waits for an unresolved recommendation POST, abandons its READY id, then starts exactly once", async ({
+    page,
+  }) => {
+    const fixture = await routeDelayedRecommendationFallbackFixture(page);
+    await page.goto("/today?new-essay=1");
+    await page.getByText("浏览全部题库").click();
+    await page.getByLabel("题库").selectOption("http-question-education");
+    await fixture.postStarted;
+
+    await page
+      .getByLabel("题库")
+      .locator("..")
+      .locator("..")
+      .getByRole("button", { name: "用这道题开始写作" })
+      .click();
+    await page.waitForTimeout(100);
+    expect(fixture.cycleBodies).toHaveLength(0);
+    expect(fixture.abandonIds).toHaveLength(0);
+
+    fixture.releasePost();
+    await expect
+      .poll(() => fixture.abandonIds)
+      .toEqual(["recommendation-delayed-post"]);
+    await expect.poll(() => fixture.cycleBodies.length).toBe(1);
+    await expect(page).toHaveURL(/\/write\?cycle=cycle-delayed-fallback$/);
+    expect(fixture.cycleBodies[0]).not.toHaveProperty("recommendation_id");
+    await expect(
+      page.getByText("STALE DELAYED READY MUST NEVER RENDER"),
+    ).toHaveCount(0);
+  });
+
+  test("failed abandonment keeps manual fallback actionable and creates no cycle", async ({
+    page,
+  }) => {
+    const fixture = await routePreparingFallbackFixture(page);
+    await page.route(
+      "**/api/v1/question-recommendations/recommendation-preparing-fallback",
+      async (route) => {
+        if (route.request().method() !== "DELETE") return route.fallback();
+        await route.fulfill({
+          contentType: "application/problem+json",
+          status: 503,
+          body: JSON.stringify({
+            code: "ABANDONMENT_UNAVAILABLE",
+            detail: "server detail must remain hidden",
+            status: 503,
+          }),
+        });
+      },
+    );
+    await page.goto("/today?new-essay=1");
+    await page.getByText("浏览全部题库").click();
+    await page.getByLabel("题库").selectOption("http-question-education");
+    await expect.poll(fixture.polls, { timeout: 5_000 }).toBe(1);
+
+    await page
+      .getByLabel("题库")
+      .locator("..")
+      .locator("..")
+      .getByRole("button", { name: "用这道题开始写作" })
+      .click();
+
+    const abandonmentError = page.getByText(
+      "未能安全关闭当前推荐题，请重试后再开始写作。",
+      { exact: true },
+    );
+    await expect(abandonmentError).toBeVisible();
+    expect(fixture.cycleBodies).toHaveLength(0);
+    await expect(abandonmentError).not.toContainText(
+      "server detail must remain hidden",
+    );
+    fixture.releasePoll();
   });
 
   test("manual start synchronously fences a following swap before React renders", async ({

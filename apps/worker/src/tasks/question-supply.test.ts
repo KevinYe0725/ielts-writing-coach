@@ -948,6 +948,7 @@ integration("question-bank refill PostgreSQL publication", () => {
   const failedBatchId = newDomainId();
   const failedJobId = newDomainId();
   const recommendationId = newDomainId();
+  const abandonedRecommendationId = newDomainId();
   const rejectedBatchId = newDomainId();
   const rejectedJobId = newDomainId();
   const rejectedRecommendationId = newDomainId();
@@ -1543,6 +1544,13 @@ integration("question-bank refill PostgreSQL publication", () => {
       action: "INITIAL",
       status: "PENDING",
     });
+    await databaseContext.db.insert(questionRecommendation).values({
+      id: abandonedRecommendationId,
+      userId,
+      generationBatchId: failedBatchId,
+      action: "INITIAL",
+      status: "ABANDONED",
+    });
 
     await expect(
       refillQuestionBank(
@@ -1552,20 +1560,24 @@ integration("question-bank refill PostgreSQL publication", () => {
       ),
     ).rejects.toBe(failure);
 
-    const [batch, recommendation, sharedWaiting, saved] = await Promise.all([
-      databaseContext.db.query.questionGenerationBatch.findFirst({
-        where: eq(questionGenerationBatch.id, failedBatchId),
-      }),
-      databaseContext.db.query.questionRecommendation.findFirst({
-        where: eq(questionRecommendation.id, recommendationId),
-      }),
-      databaseContext.db.query.questionRecommendation.findFirst({
-        where: eq(questionRecommendation.id, sharedWaitingRecommendationId),
-      }),
-      databaseContext.db.query.question.findMany({
-        where: eq(question.generationBatchId, failedBatchId),
-      }),
-    ]);
+    const [batch, recommendation, abandoned, sharedWaiting, saved] =
+      await Promise.all([
+        databaseContext.db.query.questionGenerationBatch.findFirst({
+          where: eq(questionGenerationBatch.id, failedBatchId),
+        }),
+        databaseContext.db.query.questionRecommendation.findFirst({
+          where: eq(questionRecommendation.id, recommendationId),
+        }),
+        databaseContext.db.query.questionRecommendation.findFirst({
+          where: eq(questionRecommendation.id, abandonedRecommendationId),
+        }),
+        databaseContext.db.query.questionRecommendation.findFirst({
+          where: eq(questionRecommendation.id, sharedWaitingRecommendationId),
+        }),
+        databaseContext.db.query.question.findMany({
+          where: eq(question.generationBatchId, failedBatchId),
+        }),
+      ]);
     expect(batch).toMatchObject({
       status: "FAILED",
       safeFailureCode: "AI_UNAVAILABLE",
@@ -1574,6 +1586,11 @@ integration("question-bank refill PostgreSQL publication", () => {
     expect(recommendation).toMatchObject({
       status: "UNAVAILABLE",
       safeFailureCode: "AI_UNAVAILABLE",
+    });
+    expect(abandoned).toMatchObject({
+      status: "ABANDONED",
+      safeFailureCode: null,
+      shownAt: null,
     });
     expect(sharedWaiting).toMatchObject({
       status: "PENDING",

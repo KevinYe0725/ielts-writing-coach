@@ -56,6 +56,23 @@ integration("adaptive question supply persistence", () => {
     await pool.end();
   });
 
+  it("persists ABANDONED as an internal recommendation status", async () => {
+    const enumValues = await db.execute(sql`
+      select enumlabel
+      from pg_enum
+      join pg_type on pg_type.oid = pg_enum.enumtypid
+      where pg_type.typname = 'question_recommendation_status'
+      order by enumsortorder
+    `);
+
+    expect(enumValues.rows.map((row) => row.enumlabel)).toEqual([
+      "PENDING",
+      "READY",
+      "UNAVAILABLE",
+      "ABANDONED",
+    ]);
+  });
+
   it("persists pending recommendations and generated-question provenance", async () => {
     const recommendationStatus: QuestionRecommendationStatus = "PENDING";
     const batchStatus: QuestionGenerationBatchStatus = "QUEUED";

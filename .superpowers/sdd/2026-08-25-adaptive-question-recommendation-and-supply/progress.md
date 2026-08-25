@@ -194,3 +194,11 @@ Final remediation E: fix round 2/5 complete (cycle-first central request,
 retry, and swap guards; same-task manual/private/recommended start excludes
 later recommendation traffic; both mutexes release after failure; see
 final-remediation-e-report.md)
+Final broad re-review: changes requested at d897490 (2 Important — durable
+fallback abandonment and refill admission lock ordering; 1 stale-scope Minor)
+Final remediation F1: in progress (durable recommendation abandonment)
+Final remediation F2: pending (global refill admission lock order)
+Final remediation F1: complete (internal ABANDONED state, protected atomic
+DELETE, GET/DELETE PostgreSQL race barriers, strict client/Demo persistence,
+and manual/private fallback abandonment before custom/cycle creation; see
+final-remediation-f1-report.md)

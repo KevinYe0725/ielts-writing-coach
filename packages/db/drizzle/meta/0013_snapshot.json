@@ -1,5 +1,5 @@
 {
-  "id": "86512883-2610-4f94-9b4b-7b300f45b7ab",
+  "id": "b16b1301-bedf-4616-903f-ae480077ef94",
   "prevId": "74cc4566-70b8-4fd2-924f-b3609bd2051a",
   "version": "7",
   "dialect": "postgresql",
@@ -3287,10 +3287,10 @@
             }
           ],
           "isUnique": true,
+          "where": "\"search_connection\".\"status\" in ('ACTIVE', 'INVALID')",
           "concurrently": false,
           "method": "btree",
-          "with": {},
-          "where": "\"search_connection\".\"status\" in ('ACTIVE', 'INVALID')"
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -4745,7 +4745,7 @@
     "public.question_recommendation_status": {
       "name": "question_recommendation_status",
       "schema": "public",
-      "values": ["PENDING", "READY", "UNAVAILABLE"]
+      "values": ["PENDING", "READY", "UNAVAILABLE", "ABANDONED"]
     },
     "public.rewrite_task_status": {
       "name": "rewrite_task_status",

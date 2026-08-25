@@ -155,9 +155,16 @@ function saveDemoRecommendation(
   );
   writeStorage(
     STORAGE_KEYS.questionRecommendationActive,
-    JSON.stringify({ id, question }),
+    JSON.stringify({ id, status: "READY", question }),
   );
   return { state: "READY", id, question };
+}
+
+function saveDemoPendingRecommendation(id: string): void {
+  writeStorage(
+    STORAGE_KEYS.questionRecommendationActive,
+    JSON.stringify({ id, status: "PENDING" }),
+  );
 }
 
 const canUseStorage = (): boolean => typeof window !== "undefined";
@@ -1470,18 +1477,22 @@ export class MockLearningClient implements LearningClient {
   ): Promise<QuestionRecommendation> {
     await delay();
     const forcedState = readStorage(STORAGE_KEYS.questionRecommendationState);
-    if (forcedState === "PREPARING")
+    if (forcedState === "PREPARING") {
+      saveDemoPendingRecommendation("demo-recommendation-preparing");
       return {
         state: "PREPARING",
         id: "demo-recommendation-preparing",
         retryAfterSeconds: 1,
       };
-    if (forcedState === "PREPARING_TIMEOUT")
+    }
+    if (forcedState === "PREPARING_TIMEOUT") {
+      saveDemoPendingRecommendation("demo-recommendation-preparing-timeout");
       return {
         state: "PREPARING",
         id: "demo-recommendation-preparing-timeout",
         retryAfterSeconds: 0.01,
       };
+    }
     if (forcedState === "UNAVAILABLE")
       return {
         state: "UNAVAILABLE",
@@ -1531,6 +1542,36 @@ export class MockLearningClient implements LearningClient {
       id,
       message: "server-supplied detail must never render",
     };
+  }
+
+  async abandonQuestionRecommendation(id: string): Promise<void> {
+    await delay();
+    type StoredDemoRecommendation = {
+      id?: string;
+      status?: string;
+      question?: QuestionOption;
+    };
+    let stored: StoredDemoRecommendation | null = null;
+    try {
+      stored = JSON.parse(
+        readStorage(STORAGE_KEYS.questionRecommendationActive) ?? "null",
+      ) as StoredDemoRecommendation | null;
+    } catch {
+      // Damaged demo state is replaced by the terminal record below.
+    }
+    if (stored?.id === id && stored.question) {
+      const exposures = readDemoRecommendationExposures().filter(
+        (entry) => entry.id !== stored?.question?.id,
+      );
+      writeStorage(
+        STORAGE_KEYS.questionRecommendationExposure,
+        JSON.stringify(exposures),
+      );
+    }
+    writeStorage(
+      STORAGE_KEYS.questionRecommendationActive,
+      JSON.stringify({ id, status: "ABANDONED" }),
+    );
   }
 
   async createCustomQuestion(
