@@ -558,6 +558,68 @@ test.describe("annotation desk redesign contracts", () => {
     ).toBeVisible();
   });
 
+  test("privileged settings manage a write-only question-search connection without exposing it to learners", async ({
+    page,
+  }) => {
+    await page.goto("/settings");
+    await page.getByRole("button", { name: "AI 服务" }).click();
+
+    const advanced = page.getByRole("group", { name: "高级设置" });
+    const search = advanced.getByRole("region", { name: "联网题目检索" });
+    await expect(search).toBeVisible();
+    await expect(search.getByText("未连接", { exact: true })).toBeVisible();
+    const key = search.getByLabel("Brave Search API Key");
+    await key.fill("invalid-demo-key");
+    await search.getByRole("button", { name: "测试连接" }).click();
+    await expect(search.getByRole("status")).toContainText("无法使用");
+
+    await key.fill("brave-demo-key");
+    await search.getByRole("button", { name: "测试连接" }).click();
+    await expect(search.getByRole("status")).toContainText("已通过测试");
+    await expect(key).toHaveValue("");
+    await key.fill("brave-demo-key");
+    await search.getByRole("button", { name: "保存并启用" }).click();
+    await expect(search.getByText("可正常使用", { exact: true })).toBeVisible();
+    await expect(key).toHaveValue("");
+    await expect(search.getByRole("status")).toContainText("最近验证");
+
+    page.once("dialog", (dialog) => dialog.accept());
+    await search.getByRole("button", { name: "撤销连接…" }).click();
+    await expect(search.getByText("未连接", { exact: true })).toBeVisible();
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expectNoHorizontalOverflow(page);
+    await expectVisibleTextFloor(search, "question-search settings at 390px");
+    await expectBasicAccessibility(page);
+
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        "iwc.demo.search-connection",
+        JSON.stringify({
+          kind: "brave",
+          status: "INVALID",
+          testedAt: "2026-08-25T09:30:00.000Z",
+        }),
+      );
+    });
+    await page.reload();
+    await page.getByRole("button", { name: "AI 服务" }).click();
+    await expect(
+      page
+        .getByRole("region", { name: "联网题目检索" })
+        .getByText("需要检查", { exact: true }),
+    ).toBeVisible();
+
+    await page.addInitScript(() => {
+      localStorage.setItem("iwc.demo.search-connection-access", "forbidden");
+    });
+    await page.reload();
+    await page.getByRole("button", { name: "AI 服务" }).click();
+    await expect(
+      page.getByRole("heading", { name: "联网题目检索" }),
+    ).toHaveCount(0);
+  });
+
   test("settings retains every data portability and deletion control", async ({
     page,
   }) => {

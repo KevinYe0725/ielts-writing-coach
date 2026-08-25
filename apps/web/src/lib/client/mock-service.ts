@@ -18,6 +18,7 @@ import type {
   LessonData,
   PracticePaperData,
   ModelRouteSetting,
+  SearchConnectionSetting,
   QuestionOption,
   QuestionRecommendation,
   QuestionRecommendationRequest,
@@ -60,6 +61,8 @@ const STORAGE_KEYS = {
   questionRecommendationActive: "iwc.demo.question-recommendation-active",
   questionRecommendationExposure: "iwc.demo.question-recommendation-exposure",
   questionRecommendationState: "iwc.demo.question-recommendation-state",
+  searchConnection: "iwc.demo.search-connection",
+  searchConnectionAccess: "iwc.demo.search-connection-access",
   transferAnswer: "iwc.demo.transfer-answer",
   transferWindowExpired: "iwc.demo.transfer-window-expired",
   transferResult: "iwc.demo.transfer-result",
@@ -2204,6 +2207,57 @@ export class MockLearningClient implements LearningClient {
       "Model-route administration is unavailable in the browser-only demo.",
       { status: 409, code: "DEMO_ADMIN_UNAVAILABLE" },
     );
+  }
+
+  async getSearchConnection(): Promise<SearchConnectionSetting> {
+    if (readStorage(STORAGE_KEYS.searchConnectionAccess) === "forbidden")
+      throw new LearningClientError("Forbidden", {
+        status: 403,
+        code: "FORBIDDEN",
+      });
+    const stored = readStorage(STORAGE_KEYS.searchConnection);
+    if (!stored) return { kind: "brave", status: "MISSING", testedAt: null };
+    try {
+      const setting = JSON.parse(stored) as Partial<SearchConnectionSetting>;
+      if (
+        setting.kind === "brave" &&
+        (setting.status === "ACTIVE" || setting.status === "INVALID") &&
+        (setting.testedAt === null || typeof setting.testedAt === "string")
+      )
+        return {
+          kind: "brave",
+          status: setting.status,
+          testedAt: setting.testedAt,
+        };
+    } catch {
+      // Invalid demo storage is treated as a missing write-only setting.
+    }
+    return { kind: "brave", status: "MISSING", testedAt: null };
+  }
+
+  async testSearchConnection(apiKey: string): Promise<void> {
+    await delay(180);
+    if (apiKey.trim().toLowerCase().includes("invalid"))
+      throw new LearningClientError("无法使用这把密钥连接题目检索服务。", {
+        status: 422,
+        code: "SEARCH_CONNECTION_TEST_FAILED",
+      });
+  }
+
+  async saveSearchConnection(apiKey: string): Promise<SearchConnectionSetting> {
+    await this.testSearchConnection(apiKey);
+    const setting: SearchConnectionSetting = {
+      kind: "brave",
+      status: "ACTIVE",
+      testedAt: new Date().toISOString(),
+    };
+    writeStorage(STORAGE_KEYS.searchConnection, JSON.stringify(setting));
+    return setting;
+  }
+
+  async deleteSearchConnection(): Promise<void> {
+    await delay(120);
+    removeStorage(STORAGE_KEYS.searchConnection);
   }
 
   async deleteLearningData(): Promise<void> {

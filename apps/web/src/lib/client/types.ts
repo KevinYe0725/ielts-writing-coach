@@ -818,6 +818,13 @@ export interface ModelRouteSetting {
   routeVersion: number;
 }
 
+/** Safe, write-only projection for the optional question-supply research key. */
+export interface SearchConnectionSetting {
+  kind: "brave";
+  status: "ACTIVE" | "INVALID" | "MISSING";
+  testedAt: string | null;
+}
+
 export interface UserPreferences {
   deploymentMode: DeploymentMode;
   locale: Locale;
@@ -1031,6 +1038,10 @@ export interface LearningClient {
     providerConnectionId: string;
     model: string;
   }): Promise<ModelRouteSetting>;
+  getSearchConnection(): Promise<SearchConnectionSetting>;
+  testSearchConnection(apiKey: string): Promise<void>;
+  saveSearchConnection(apiKey: string): Promise<SearchConnectionSetting>;
+  deleteSearchConnection(): Promise<void>;
   deleteLearningData(): Promise<void>;
   testConnection(input: Partial<BootstrapInput>): Promise<ConnectionProbe>;
   completeBootstrap(input: BootstrapInput): Promise<void>;

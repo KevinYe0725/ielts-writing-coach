@@ -13,6 +13,7 @@ import {
   LockKeyhole,
   Mail,
   RefreshCw,
+  Radio,
   Save,
   Settings2,
   ShieldCheck,
@@ -48,6 +49,7 @@ import {
   type CycleExportOption,
   type CycleBundleImportResult,
   type SettingsData,
+  type SearchConnectionSetting,
   type UserPreferences,
 } from "@/lib/client";
 
@@ -82,6 +84,7 @@ const AI_ROUTE_TASK_COPY: Partial<
   },
   version_comparison: { zh: "V1 / V2 比较", en: "V1 / V2 comparison" },
   transfer_evaluation: { zh: "迁移表现判断", en: "Transfer evaluation" },
+  question_bank_refill: { zh: "题库补充", en: "Question bank refill" },
 };
 
 const AI_ROUTE_TASKS = AI_TASK_KINDS.flatMap((id) => {
@@ -1097,6 +1100,14 @@ function AiSettings({
   const [routesLoading, setRoutesLoading] = useState(false);
   const [routeSaving, setRouteSaving] = useState<AiTaskKind | null>(null);
   const [routeMessage, setRouteMessage] = useState<string | null>(null);
+  const [searchSetting, setSearchSetting] =
+    useState<SearchConnectionSetting | null>(null);
+  const [searchVisible, setSearchVisible] = useState<boolean | null>(null);
+  const [searchKey, setSearchKey] = useState("");
+  const [searchMessage, setSearchMessage] = useState<string | null>(null);
+  const [searchTesting, setSearchTesting] = useState(false);
+  const [searchSaving, setSearchSaving] = useState(false);
+  const [searchRevoking, setSearchRevoking] = useState(false);
   const [deletingConnection, setDeletingConnection] = useState(false);
   const [deleteConnectionMessage, setDeleteConnectionMessage] = useState<
     string | null
@@ -1116,6 +1127,123 @@ function AiSettings({
   const [savingProvider, setSavingProvider] = useState(false);
   const [providerMessage, setProviderMessage] = useState<string | null>(null);
   const newProviderPreset = getProviderPreset(newVendor);
+
+  useEffect(() => {
+    let active = true;
+    void learningClient
+      .getSearchConnection()
+      .then((setting) => {
+        if (!active) return;
+        setSearchSetting(setting);
+        setSearchVisible(true);
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        if (error instanceof LearningClientError && error.status === 403) {
+          setSearchVisible(false);
+          return;
+        }
+        setSearchSetting({ kind: "brave", status: "MISSING", testedAt: null });
+        setSearchVisible(true);
+        setSearchMessage(
+          error instanceof Error
+            ? error.message
+            : text(
+                "无法读取联网题目检索状态。",
+                "Could not read question-search status.",
+              ),
+        );
+      });
+    return () => {
+      active = false;
+    };
+  }, [text]);
+
+  const testSearch = async () => {
+    if (!searchKey.trim()) return;
+    setSearchTesting(true);
+    setSearchMessage(null);
+    try {
+      await learningClient.testSearchConnection(searchKey);
+      setSearchKey("");
+      setSearchMessage(
+        text(
+          "已通过测试；保存后才会用于补充新题。",
+          "Test passed. Save before it can support new questions.",
+        ),
+      );
+    } catch (error) {
+      setSearchMessage(
+        error instanceof Error
+          ? error.message
+          : text(
+              "无法使用这把密钥连接题目检索服务。",
+              "The key could not connect to question search.",
+            ),
+      );
+    } finally {
+      setSearchTesting(false);
+    }
+  };
+
+  const saveSearch = async () => {
+    if (!searchKey.trim()) return;
+    setSearchSaving(true);
+    setSearchMessage(null);
+    try {
+      const saved = await learningClient.saveSearchConnection(searchKey);
+      setSearchSetting(saved);
+      setSearchKey("");
+      setSearchMessage(
+        text(
+          `已保存 · 最近验证：${new Date(saved.testedAt ?? Date.now()).toLocaleDateString("zh-CN", { month: "long", day: "numeric" })}`,
+          `Saved · Last checked ${new Date(saved.testedAt ?? Date.now()).toLocaleDateString("en", { month: "short", day: "numeric" })}`,
+        ),
+      );
+    } catch (error) {
+      setSearchMessage(
+        error instanceof Error
+          ? error.message
+          : text(
+              "无法保存联网题目检索。",
+              "Question search could not be saved.",
+            ),
+      );
+    } finally {
+      setSearchSaving(false);
+    }
+  };
+
+  const revokeSearch = async () => {
+    const confirmed = window.confirm(
+      text(
+        "撤销联网题目检索？之后补充新题时不会使用公开议题；已有题目不受影响。",
+        "Revoke question search? Future new-question supply will not use public issue themes. Existing questions remain available.",
+      ),
+    );
+    if (!confirmed) return;
+    setSearchRevoking(true);
+    setSearchMessage(null);
+    try {
+      await learningClient.deleteSearchConnection();
+      setSearchSetting({ kind: "brave", status: "MISSING", testedAt: null });
+      setSearchKey("");
+      setSearchMessage(
+        text("已撤销联网题目检索。", "Question search has been revoked."),
+      );
+    } catch (error) {
+      setSearchMessage(
+        error instanceof Error
+          ? error.message
+          : text(
+              "无法撤销联网题目检索。",
+              "Question search could not be revoked.",
+            ),
+      );
+    } finally {
+      setSearchRevoking(false);
+    }
+  };
 
   const selectNewVendor = (vendor: ProviderVendor) => {
     const preset = getProviderPreset(vendor);
@@ -1140,8 +1268,8 @@ function AiSettings({
       });
       setProviderMessage(
         text(
-          "连接已通过能力测试并设为八类任务的默认服务。",
-          "The connection passed capability testing and is now the default for all eight task types.",
+          "连接已通过能力测试并设为全部开放任务的默认服务。",
+          "The connection passed capability testing and is now the default for every open-ended task.",
         ),
       );
       setNewProviderKey("");
@@ -1573,6 +1701,154 @@ function AiSettings({
               </div>
             ) : null}
           </Card>
+          {searchVisible && searchSetting ? (
+            <section
+              aria-label={text("联网题目检索", "Question-search connection")}
+              className="search-connection-section"
+              role="region"
+            >
+              <div className="settings-section-head">
+                <span className="settings-icon">
+                  <Radio aria-hidden="true" size={20} />
+                </span>
+                <div>
+                  <h2>{text("联网题目检索", "Question-search connection")}</h2>
+                  <p>
+                    {text(
+                      "可选的公开议题参考，只在补充题库时使用。",
+                      "Optional public issue themes, used only when new questions are needed.",
+                    )}
+                  </p>
+                </div>
+                <Badge
+                  tone={
+                    searchSetting.status === "ACTIVE"
+                      ? "blue"
+                      : searchSetting.status === "INVALID"
+                        ? "red"
+                        : "neutral"
+                  }
+                >
+                  {searchSetting.status === "ACTIVE"
+                    ? text("可正常使用", "Ready")
+                    : searchSetting.status === "INVALID"
+                      ? text("需要检查", "Needs checking")
+                      : text("未连接", "Not connected")}
+                </Badge>
+              </div>
+              <div className="search-connection-form">
+                <div className="form-field">
+                  <label htmlFor="question-search-api-key">
+                    Brave Search API Key
+                  </label>
+                  <div className="input-with-icon">
+                    <KeyRound aria-hidden="true" size={16} />
+                    <input
+                      autoComplete="off"
+                      className="text-input"
+                      id="question-search-api-key"
+                      onChange={(event) => setSearchKey(event.target.value)}
+                      placeholder={text(
+                        "输入完整密钥",
+                        "Enter the complete key",
+                      )}
+                      spellCheck={false}
+                      type="password"
+                      value={searchKey}
+                    />
+                  </div>
+                  <p className="field-hint">
+                    <EyeOff aria-hidden="true" size={13} />
+                    {text(
+                      "密钥不会显示或写入学习档案。",
+                      "The key is never displayed or included in learning exports.",
+                    )}
+                  </p>
+                </div>
+                <div className="search-connection-actions">
+                  <div className="inline-actions">
+                    <Button
+                      disabled={
+                        searchTesting ||
+                        searchSaving ||
+                        searchRevoking ||
+                        !searchKey.trim()
+                      }
+                      onClick={() => void testSearch()}
+                      variant="secondary"
+                    >
+                      {searchTesting ? (
+                        <LoadingButtonContent
+                          label={text("测试中…", "Testing…")}
+                        />
+                      ) : (
+                        <>
+                          <RefreshCw aria-hidden="true" size={16} />
+                          {text("测试连接", "Test connection")}
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      disabled={
+                        searchTesting ||
+                        searchSaving ||
+                        searchRevoking ||
+                        !searchKey.trim()
+                      }
+                      onClick={() => void saveSearch()}
+                    >
+                      {searchSaving ? (
+                        <LoadingButtonContent
+                          label={text("保存中…", "Saving…")}
+                        />
+                      ) : searchSetting.status === "MISSING" ? (
+                        text("保存并启用", "Save and enable")
+                      ) : (
+                        text("保存并替换", "Save and replace")
+                      )}
+                    </Button>
+                    <Button
+                      disabled={
+                        searchTesting ||
+                        searchSaving ||
+                        searchRevoking ||
+                        searchSetting.status === "MISSING"
+                      }
+                      onClick={() => void revokeSearch()}
+                      variant="secondary"
+                    >
+                      {searchRevoking ? (
+                        <LoadingButtonContent
+                          label={text("撤销中…", "Revoking…")}
+                        />
+                      ) : (
+                        text("撤销连接…", "Revoke connection…")
+                      )}
+                    </Button>
+                  </div>
+                  <p
+                    aria-live="polite"
+                    className="search-connection-receipt"
+                    role="status"
+                  >
+                    {searchMessage ??
+                      (searchSetting.status === "ACTIVE" &&
+                      searchSetting.testedAt
+                        ? text(
+                            `最近验证：${new Date(searchSetting.testedAt).toLocaleDateString("zh-CN", { month: "long", day: "numeric" })}`,
+                            `Last checked ${new Date(searchSetting.testedAt).toLocaleDateString("en", { month: "short", day: "numeric" })}`,
+                          )
+                        : searchSetting.status === "INVALID"
+                          ? text(
+                              "请测试或替换密钥。",
+                              "Test or replace the key.",
+                            )
+                          : text("尚未连接。", "Not connected yet."))}
+                  </p>
+                </div>
+              </div>
+            </section>
+          ) : null}
           <Card className="settings-section compact-section">
             <div className="settings-section-head">
               <span className="settings-icon">

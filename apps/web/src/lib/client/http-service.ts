@@ -1716,6 +1716,32 @@ function projectQuestionRecommendation(
   );
 }
 
+function projectSearchConnectionSetting(
+  payload: unknown,
+): import("./types").SearchConnectionSetting {
+  if (payload === null)
+    return { kind: "brave", status: "MISSING", testedAt: null };
+  if (!isRecord(payload))
+    throw new LearningClientError(
+      "The server did not return a usable search connection setting.",
+      { code: "INVALID_RESPONSE" },
+    );
+  if (
+    payload.kind !== "brave" ||
+    (payload.status !== "ACTIVE" && payload.status !== "INVALID") ||
+    (payload.tested_at !== null && typeof payload.tested_at !== "string")
+  )
+    throw new LearningClientError(
+      "The server did not return a usable search connection setting.",
+      { code: "INVALID_RESPONSE" },
+    );
+  return {
+    kind: "brave",
+    status: payload.status,
+    testedAt: payload.tested_at,
+  };
+}
+
 async function readBoundedResponseText(
   response: Response,
   maximumBytes: number,
@@ -4003,6 +4029,46 @@ export class HttpLearningClient implements LearningClient {
       fallbackEnabled: route.fallbackEnabled === true,
       routeVersion: route.routeVersion ?? 1,
     };
+  }
+
+  async getSearchConnection(): Promise<
+    import("./types").SearchConnectionSetting
+  > {
+    const { data } = await this.request<unknown>("/search-connection");
+    return projectSearchConnectionSetting(data);
+  }
+
+  async testSearchConnection(apiKey: string): Promise<void> {
+    const { data } = await this.request<{ ok?: unknown }>(
+      "/search-connection/test",
+      {
+        body: { api_key: apiKey },
+        method: "POST",
+      },
+    );
+    if (data.ok !== true)
+      throw new LearningClientError(
+        "The search connection test was not confirmed.",
+        { status: 502, code: "SEARCH_CONNECTION_TEST_UNCONFIRMED" },
+      );
+  }
+
+  async saveSearchConnection(
+    apiKey: string,
+  ): Promise<import("./types").SearchConnectionSetting> {
+    const { data } = await this.request<unknown>("/search-connection", {
+      body: { api_key: apiKey },
+      idempotent: true,
+      method: "PUT",
+    });
+    return projectSearchConnectionSetting(data);
+  }
+
+  async deleteSearchConnection(): Promise<void> {
+    await this.request("/search-connection", {
+      idempotent: true,
+      method: "DELETE",
+    });
   }
 
   async deleteLearningData(): Promise<void> {

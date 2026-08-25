@@ -372,7 +372,7 @@ test.describe("account controls", () => {
         ),
       ).toBeVisible();
       const routeInputs = page.locator(".route-editor-row .text-input:visible");
-      await expect(routeInputs).toHaveCount(9);
+      await expect(routeInputs).toHaveCount(10);
       await expectAllVisibleFontsAtLeast(
         routeInputs,
         "/settings route editor inputs",

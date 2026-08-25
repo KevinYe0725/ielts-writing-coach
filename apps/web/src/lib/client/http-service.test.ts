@@ -213,6 +213,90 @@ function requestHeaders(call: unknown[]): Headers {
 }
 
 describe("HttpLearningClient protocol", () => {
+  it("projects only the public search-connection setting and uses the correct mutation boundaries", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse(null))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ok: true,
+          latency_ms: 21,
+          safe_message: "Brave Search connection validated.",
+          provider_trace: "must-not-reach-settings",
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          kind: "brave",
+          status: "ACTIVE",
+          tested_at: "2026-08-25T09:30:00.000Z",
+          encrypted_api_key: "must-not-reach-settings",
+        }),
+      )
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    const client = new HttpLearningClient({
+      baseUrl: "https://coach.test/api/v1",
+      fetch: fetcher,
+      idempotencyKey: () => "search-setting-idempotency",
+      origin: "https://coach.test",
+    });
+
+    await expect(client.getSearchConnection()).resolves.toEqual({
+      kind: "brave",
+      status: "MISSING",
+      testedAt: null,
+    });
+    await expect(
+      client.testSearchConnection("temporary-key"),
+    ).resolves.toBeUndefined();
+    await expect(client.saveSearchConnection("saved-key")).resolves.toEqual({
+      kind: "brave",
+      status: "ACTIVE",
+      testedAt: "2026-08-25T09:30:00.000Z",
+    });
+    await expect(client.deleteSearchConnection()).resolves.toBeUndefined();
+
+    const testCall = fetcher.mock.calls[1] ?? [];
+    expect(testCall[0]).toBe(
+      "https://coach.test/api/v1/search-connection/test",
+    );
+    expect((testCall[1] as RequestInit).method).toBe("POST");
+    expect(JSON.parse(String((testCall[1] as RequestInit).body))).toEqual({
+      api_key: "temporary-key",
+    });
+    expect(requestHeaders(testCall).get("origin")).toBe("https://coach.test");
+    expect(requestHeaders(testCall).get("idempotency-key")).toBeNull();
+
+    for (const index of [2, 3]) {
+      const call = fetcher.mock.calls[index] ?? [];
+      expect(requestHeaders(call).get("origin")).toBe("https://coach.test");
+      expect(requestHeaders(call).get("idempotency-key")).toBe(
+        "search-setting-idempotency",
+      );
+    }
+    expect((fetcher.mock.calls[2]?.[1] as RequestInit).method).toBe("PUT");
+    expect((fetcher.mock.calls[3]?.[1] as RequestInit).method).toBe("DELETE");
+  });
+
+  it("rejects malformed public search-connection projections", async () => {
+    for (const payload of [
+      { kind: "brave", status: "REVOKED", tested_at: null },
+      { kind: "brave", status: "ACTIVE", tested_at: 7 },
+      { kind: "other", status: "INVALID", tested_at: null },
+      { kind: "brave", status: "INVALID" },
+    ]) {
+      const client = new HttpLearningClient({
+        baseUrl: "https://coach.test/api/v1",
+        fetch: async () => jsonResponse(payload),
+        origin: "https://coach.test",
+      });
+
+      await expect(client.getSearchConnection()).rejects.toMatchObject({
+        code: "INVALID_RESPONSE",
+      });
+    }
+  });
+
   it("projects recommendation responses strictly and carries the recommendation into cycle creation", async () => {
     const fetcher = vi.fn<typeof fetch>(async (input, init) => {
       const url = String(input);
