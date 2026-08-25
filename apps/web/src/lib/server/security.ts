@@ -223,6 +223,24 @@ export async function reserveIdempotencyKey(
       typeof replayBody.job_id === "string"
     ) {
       replayHeaders.location = `/api/v1/ai-jobs/${replayBody.job_id}`;
+    } else if (existing.responseStatus === 202) {
+      const recommendation = replayBody.recommendation;
+      if (
+        recommendation &&
+        typeof recommendation === "object" &&
+        !Array.isArray(recommendation)
+      ) {
+        const recommendationRecord = recommendation as Record<string, unknown>;
+        const recommendationId = recommendationRecord.id;
+        if (
+          recommendationRecord.status === "PENDING" &&
+          typeof recommendationId === "string"
+        ) {
+          replayHeaders.location = `/api/v1/question-recommendations/${encodeURIComponent(
+            recommendationId,
+          )}`;
+        }
+      }
     }
     return {
       key,

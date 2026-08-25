@@ -6,6 +6,7 @@ import {
   newDomainId,
   question,
   questionGenerationBatch,
+  trainingCycle,
   user,
 } from "@iwc/db";
 import { QUESTION_BANK } from "@iwc/question-bank";
@@ -27,6 +28,7 @@ vi.mock("@/lib/server/session", () => ({
   }),
 }));
 
+import { POST as createTrainingCycle } from "../training-cycles/route";
 import { GET } from "./route";
 
 const databaseUrl =
@@ -157,5 +159,201 @@ describe.skipIf(!databaseUrl)("GET /api/v1/questions (PostgreSQL)", () => {
     expect(ids).not.toContain(invalidExternalId);
     expect(new Set(ids).size).toBe(ids.length);
     expect(JSON.stringify(body)).not.toMatch(/AI_GENERATED|AI_RESEARCHED/u);
+  });
+
+  it("rejects direct cycles for unvalidated dynamic rows while keeping valid shared and owned-private questions", async () => {
+    const suffix = newDomainId();
+    const learnerId = `cycle-question-validation-${suffix}`;
+    const succeededBatchId = newDomainId();
+    const failedBatchId = newDomainId();
+    const queuedBatchId = newDomainId();
+    createdUsers.push(learnerId);
+    createdBatchIds.push(succeededBatchId, failedBatchId, queuedBatchId);
+    routeState.actorId = learnerId;
+    await database.db.insert(user).values({
+      id: learnerId,
+      name: "Cycle question learner",
+      email: `${learnerId}@example.test`,
+      role: "learner",
+    });
+    await database.db.insert(questionGenerationBatch).values([
+      {
+        id: succeededBatchId,
+        triggeredByUserId: learnerId,
+        status: "SUCCEEDED",
+        mode: "OFFLINE",
+        targetMix: [],
+        promptVersion: "1.0.0",
+        rubricVersion: "iwc-question-bank-refill-1.0.0",
+      },
+      {
+        id: failedBatchId,
+        triggeredByUserId: learnerId,
+        status: "FAILED",
+        mode: "OFFLINE",
+        targetMix: [],
+        promptVersion: "1.0.0",
+        rubricVersion: "iwc-question-bank-refill-1.0.0",
+      },
+      {
+        id: queuedBatchId,
+        triggeredByUserId: learnerId,
+        status: "QUEUED",
+        mode: "OFFLINE",
+        targetMix: [],
+        promptVersion: "1.0.0",
+        rubricVersion: "iwc-question-bank-refill-1.0.0",
+      },
+    ]);
+    const storedExternalIds = new Set(
+      (
+        await database.db.query.question.findMany({
+          columns: { externalId: true },
+        })
+      ).map((item) => item.externalId),
+    );
+    const staticCollision = QUESTION_BANK.find(
+      (item) => !storedExternalIds.has(item.id),
+    );
+    expect(staticCollision).toBeDefined();
+    const rows = [
+      {
+        label: "failed",
+        generationBatchId: failedBatchId,
+        visibility: "public",
+        questionType: "opinion",
+        topic: "education",
+        ieltsTrack: "academic",
+      },
+      {
+        label: "failed-static-id",
+        externalId: staticCollision!.id,
+        generationBatchId: failedBatchId,
+        visibility: "public",
+        questionType: "opinion",
+        topic: "education",
+        ieltsTrack: "academic",
+      },
+      {
+        label: "queued",
+        generationBatchId: queuedBatchId,
+        visibility: "public",
+        questionType: "opinion",
+        topic: "education",
+        ieltsTrack: "academic",
+      },
+      {
+        label: "private-generated",
+        generationBatchId: succeededBatchId,
+        visibility: "private",
+        questionType: "opinion",
+        topic: "education",
+        ieltsTrack: "academic",
+      },
+      {
+        label: "invalid-type",
+        generationBatchId: succeededBatchId,
+        visibility: "public",
+        questionType: "unsupported",
+        topic: "education",
+        ieltsTrack: "academic",
+      },
+      {
+        label: "invalid-track",
+        generationBatchId: succeededBatchId,
+        visibility: "public",
+        questionType: "opinion",
+        topic: "education",
+        ieltsTrack: "unsupported",
+      },
+      {
+        label: "valid-generated",
+        generationBatchId: succeededBatchId,
+        visibility: "public",
+        questionType: "opinion",
+        topic: "education",
+        ieltsTrack: "academic",
+      },
+    ] as const;
+    const externalIds = new Map<string, string>();
+    for (const row of rows) {
+      const id = newDomainId();
+      const externalId =
+        "externalId" in row ? row.externalId : `${row.label}-${suffix}`;
+      createdQuestionIds.push(id);
+      externalIds.set(row.label, externalId);
+      await database.db.insert(question).values({
+        id,
+        externalId,
+        source: "AI_GENERATED",
+        visibility: row.visibility,
+        questionType: row.questionType,
+        topic: row.topic,
+        ieltsTrack: row.ieltsTrack,
+        prompt: `A direct-cycle fixture for ${row.label}.`,
+        generationBatchId: row.generationBatchId,
+      });
+    }
+    const privateId = newDomainId();
+    const privateExternalId = `owned-private-${suffix}`;
+    createdQuestionIds.push(privateId);
+    await database.db.insert(question).values({
+      id: privateId,
+      externalId: privateExternalId,
+      ownerId: learnerId,
+      source: "user_private",
+      visibility: "private",
+      questionType: "discussion",
+      topic: "health",
+      ieltsTrack: "general_training",
+      prompt: "A valid owned private question for direct cycle creation.",
+    });
+
+    const postCycle = (externalId: string, key: string) =>
+      createTrainingCycle(
+        new Request("https://coach.test/api/v1/training-cycles", {
+          method: "POST",
+          headers: {
+            origin: "https://coach.test",
+            "content-type": "application/json",
+            "idempotency-key": key,
+          },
+          body: JSON.stringify({ question_id: externalId, timezone: "UTC" }),
+        }),
+      );
+    for (const label of [
+      "failed",
+      "failed-static-id",
+      "queued",
+      "private-generated",
+      "invalid-type",
+      "invalid-track",
+    ]) {
+      const response = await postCycle(
+        externalIds.get(label)!,
+        `invalid-cycle-${label}-${suffix}`,
+      );
+      expect(response.status, label).toBe(404);
+      await expect(response.json()).resolves.toMatchObject({
+        code: "QUESTION_NOT_FOUND",
+      });
+    }
+
+    expect(
+      (
+        await postCycle(
+          externalIds.get("valid-generated")!,
+          `valid-generated-${suffix}`,
+        )
+      ).status,
+    ).toBe(201);
+    expect(
+      (await postCycle(privateExternalId, `valid-private-${suffix}`)).status,
+    ).toBe(201);
+    await expect(
+      database.db.query.trainingCycle.findMany({
+        where: eq(trainingCycle.userId, learnerId),
+      }),
+    ).resolves.toHaveLength(2);
   });
 });

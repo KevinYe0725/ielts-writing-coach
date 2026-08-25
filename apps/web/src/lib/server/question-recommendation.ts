@@ -1,6 +1,17 @@
 import { randomInt } from "node:crypto";
 
-import { and, asc, desc, eq, gt, inArray, isNull } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gt,
+  inArray,
+  isNotNull,
+  isNull,
+  or,
+  sql,
+} from "drizzle-orm";
 
 import {
   newDomainId,
@@ -20,7 +31,10 @@ import {
   type QuestionType,
 } from "@iwc/question-bank";
 
-import { enqueueQuestionBankRefill } from "./jobs";
+import {
+  automaticQuestionBankRefillDecision,
+  enqueueQuestionBankRefill,
+} from "./jobs";
 import { ApiProblem } from "./problem";
 import {
   exposureCutoff,
@@ -214,6 +228,51 @@ export async function createQuestionRecommendation(
     }
 
     const refill = await reserveRefill(transaction, actorId);
+    if (refill.kind === "RECHECK") {
+      const refreshed = await selectForLearner(transaction, actorId, {
+        now,
+        randomIndex,
+        ...(input.excludedQuestionId === undefined
+          ? {}
+          : { excludedQuestionId: input.excludedQuestionId }),
+      });
+      if (refreshed.question) {
+        await transaction.insert(questionRecommendation).values({
+          id: recommendationId,
+          userId: actorId,
+          questionExternalId: refreshed.question.id,
+          action: input.action,
+          status: "READY",
+          excludedExternalId: input.excludedQuestionId ?? null,
+          shownAt: now,
+        });
+        const result: QuestionRecommendationProjection = {
+          id: recommendationId,
+          status: "READY",
+          question: refreshed.question,
+        };
+        if (refreshed.remainingEligibleCount < REFILL_THRESHOLD) {
+          await reserveRefillWithoutRollingBackReady(transaction, actorId);
+        }
+        await options.afterPersist?.(transaction, result);
+        return result;
+      }
+      const result: QuestionRecommendationProjection = {
+        id: recommendationId,
+        status: "UNAVAILABLE",
+        question: null,
+      };
+      await transaction.insert(questionRecommendation).values({
+        id: recommendationId,
+        userId: actorId,
+        action: input.action,
+        status: "UNAVAILABLE",
+        excludedExternalId: input.excludedQuestionId ?? null,
+        safeFailureCode: "QUESTION_SUPPLY_STATE_CHANGED",
+      });
+      await options.afterPersist?.(transaction, result);
+      return result;
+    }
     if (refill.kind === "COOLDOWN") {
       const result: QuestionRecommendationProjection = {
         id: recommendationId,
@@ -444,19 +503,35 @@ async function selectForLearner(
     .innerJoin(question, eq(transferTask.questionId, question.id))
     .where(eq(transferTask.userId, actorId));
   const exposures = await transaction
-    .select({ id: questionRecommendation.questionExternalId })
+    .select({
+      id: questionRecommendation.questionExternalId,
+      excludedId: questionRecommendation.excludedExternalId,
+    })
     .from(questionRecommendation)
     .where(
       and(
         eq(questionRecommendation.userId, actorId),
-        eq(questionRecommendation.status, "READY"),
-        gt(questionRecommendation.shownAt, exposureCutoff(input.now)),
+        or(
+          and(
+            eq(questionRecommendation.status, "READY"),
+            gt(questionRecommendation.shownAt, exposureCutoff(input.now)),
+          ),
+          and(
+            eq(questionRecommendation.action, "SWAP"),
+            isNotNull(questionRecommendation.excludedExternalId),
+            gt(
+              sql`coalesce(${questionRecommendation.shownAt}, ${questionRecommendation.createdAt})`,
+              exposureCutoff(input.now),
+            ),
+          ),
+        ),
       ),
     );
   const catalog = await listPublicQuestionCatalog(transaction);
   const hardExcluded = new Set<string>([
     ...transferred.map((item) => item.id),
     ...exposures.flatMap((item) => (item.id ? [item.id] : [])),
+    ...exposures.flatMap((item) => (item.excludedId ? [item.excludedId] : [])),
     ...(input.excludedQuestionId ? [input.excludedQuestionId] : []),
   ]);
   const candidates = catalog
@@ -483,14 +558,27 @@ async function reserveRefillWithoutRollingBackReady(
   transaction: DatabaseTransaction,
   actorId: string,
 ): Promise<void> {
-  await reserveRefill(transaction, actorId);
+  try {
+    await reserveRefill(transaction, actorId);
+  } catch (error) {
+    const code = (error as { code?: string }).code;
+    if (
+      code === "QUESTION_BANK_REFILL_ACTIVE" ||
+      code === "QUESTION_BANK_REFILL_COOLDOWN"
+    ) {
+      return;
+    }
+    throw error;
+  }
 }
 
 async function reserveRefill(
   transaction: DatabaseTransaction,
   actorId: string,
 ): Promise<
-  { kind: "RESERVED" | "ACTIVE"; batchId: string } | { kind: "COOLDOWN" }
+  | { kind: "RESERVED" | "ACTIVE"; batchId: string }
+  | { kind: "COOLDOWN" }
+  | { kind: "RECHECK" }
 > {
   try {
     const batchId = await transaction.transaction(async (savepoint) => {
@@ -522,8 +610,21 @@ async function reserveRefill(
           asc(questionGenerationBatch.id),
         ],
       });
-      if (!active) throw error;
-      return { kind: "ACTIVE", batchId: active.id };
+      if (active) return { kind: "ACTIVE", batchId: active.id };
+      const latestFailed =
+        await transaction.query.questionGenerationBatch.findFirst({
+          columns: { updatedAt: true },
+          where: eq(questionGenerationBatch.status, "FAILED"),
+          orderBy: [desc(questionGenerationBatch.updatedAt)],
+        });
+      const currentDecision = automaticQuestionBankRefillDecision({
+        hasOtherNonTerminalBatch: false,
+        latestFailedAt: latestFailed?.updatedAt ?? null,
+        now: new Date(),
+      });
+      return currentDecision.allowed
+        ? { kind: "RECHECK" }
+        : { kind: "COOLDOWN" };
     }
     if (code === "QUESTION_BANK_REFILL_COOLDOWN") {
       return { kind: "COOLDOWN" };

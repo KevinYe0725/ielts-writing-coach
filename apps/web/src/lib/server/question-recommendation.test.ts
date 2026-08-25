@@ -12,6 +12,7 @@ import {
   transferTask,
   user,
   writingAttempt,
+  type Database,
 } from "@iwc/db";
 import { QUESTION_BANK } from "@iwc/question-bank";
 
@@ -127,6 +128,45 @@ integration("question recommendation service (PostgreSQL)", () => {
     now: () => now,
     randomIndex: () => 0,
   };
+
+  function databaseWithRefillContentionBarrier(input: {
+    observed: () => void;
+    waitForTransition: () => Promise<void>;
+  }): Database {
+    return {
+      transaction: (callback: (transaction: unknown) => Promise<unknown>) =>
+        database.db.transaction(async (transaction) => {
+          let intercepted = false;
+          const transactionProxy = new Proxy(transaction, {
+            get(target, property) {
+              if (property === "transaction") {
+                return async (
+                  nestedCallback: (nested: unknown) => Promise<unknown>,
+                ) => {
+                  try {
+                    return await transaction.transaction(nestedCallback);
+                  } catch (error) {
+                    if (
+                      !intercepted &&
+                      (error as { code?: string }).code ===
+                        "QUESTION_BANK_REFILL_ACTIVE"
+                    ) {
+                      intercepted = true;
+                      input.observed();
+                      await input.waitForTransition();
+                    }
+                    throw error;
+                  }
+                };
+              }
+              const value = Reflect.get(target, property, target);
+              return typeof value === "function" ? value.bind(target) : value;
+            },
+          });
+          return callback(transactionProxy);
+        }),
+    } as unknown as Database;
+  }
 
   beforeEach(async () => {
     adjustedBatchSnapshot =
@@ -358,6 +398,72 @@ integration("question recommendation service (PostgreSQL)", () => {
     });
   });
 
+  it("keeps an expired original question cooling down after SWAP on the next request", async () => {
+    const learnerId = await createLearner("recommend-swap-cooldown");
+    const [original, replacement] = QUESTION_BANK.slice(0, 2);
+    expect(original && replacement).toBeTruthy();
+    await exposeAllExcept(learnerId, [original!.id, replacement!.id]);
+    await database.db.insert(questionRecommendation).values({
+      userId: learnerId,
+      questionExternalId: original!.id,
+      action: "INITIAL",
+      status: "READY",
+      shownAt: new Date(now.getTime() - 72 * 60 * 60 * 1_000),
+    });
+
+    const swap = await createQuestionRecommendation(
+      database.db,
+      learnerId,
+      { action: "SWAP", excludedQuestionId: original!.id },
+      options,
+    );
+    expect(swap).toMatchObject({
+      status: "READY",
+      question: { id: replacement!.id },
+    });
+
+    const next = await createQuestionRecommendation(
+      database.db,
+      learnerId,
+      { action: "INITIAL" },
+      options,
+    );
+
+    expect(next.status).toBe("PENDING");
+    expect(next.question).toBeNull();
+  });
+
+  it.each(["PENDING", "UNAVAILABLE"] as const)(
+    "uses a recent %s SWAP record to cool down its excluded question",
+    async (status) => {
+      const learnerId = await createLearner(
+        `recommend-swap-cooldown-${status}`,
+      );
+      const original = QUESTION_BANK[0]!;
+      await exposeAllExcept(learnerId, [original.id]);
+      await database.db.insert(questionRecommendation).values({
+        userId: learnerId,
+        questionExternalId: null,
+        action: "SWAP",
+        status,
+        excludedExternalId: original.id,
+        createdAt: now,
+        safeFailureCode:
+          status === "UNAVAILABLE" ? "QUESTION_SUPPLY_UNAVAILABLE" : null,
+      });
+
+      const next = await createQuestionRecommendation(
+        database.db,
+        learnerId,
+        { action: "INITIAL" },
+        options,
+      );
+
+      expect(next.status).not.toBe("READY");
+      expect(next.question).toBeNull();
+    },
+  );
+
   it("serializes concurrent INITIAL calls into distinct exposure rows", async () => {
     const learnerId = await createLearner("recommend-concurrent");
     const allowed = QUESTION_BANK.slice(0, 2).map((item) => item.id);
@@ -482,6 +588,60 @@ integration("question recommendation service (PostgreSQL)", () => {
         where: eq(questionRecommendation.userId, learnerId),
       });
     expect(recommendations).toHaveLength(1);
+  });
+
+  it("restores the recommendation polling Location on a real 202 replay", async () => {
+    const learnerId = await createLearner("recommend-pending-replay");
+    await exposeAllExcept(learnerId, []);
+    const payload = { action: "INITIAL" as const };
+    const idempotencyKey = `recommend-pending-replay-${newDomainId()}`;
+    const makeRequest = () =>
+      new Request("https://coach.test/api/v1/question-recommendations", {
+        method: "POST",
+        headers: { "idempotency-key": idempotencyKey },
+        body: JSON.stringify(payload),
+      });
+    const reservation = await reserveIdempotencyKey(
+      database.db,
+      learnerId,
+      makeRequest(),
+      payload,
+    );
+    const pending = await createQuestionRecommendation(
+      database.db,
+      learnerId,
+      payload,
+      {
+        ...options,
+        afterPersist: async (transaction, result) =>
+          completeIdempotentResponse(
+            transaction,
+            learnerId,
+            reservation.key,
+            202,
+            {
+              recommendation: {
+                id: result.id,
+                status: "PENDING",
+                retry_after_seconds: 2,
+              },
+            },
+          ),
+      },
+    );
+    expect(pending.status).toBe("PENDING");
+
+    const replay = await reserveIdempotencyKey(
+      database.db,
+      learnerId,
+      makeRequest(),
+      payload,
+    );
+
+    expect(replay.replay?.status).toBe(202);
+    expect(replay.replay?.headers.get("location")).toBe(
+      `/api/v1/question-recommendations/${pending.id}`,
+    );
   });
 
   it("refills below twelve remaining candidates but not at twelve", async () => {
@@ -711,6 +871,97 @@ integration("question recommendation service (PostgreSQL)", () => {
       ).resolves.toHaveLength(1);
     },
   );
+
+  it("keeps proactive READY when the contending active batch turns terminal before requery", async () => {
+    const learnerId = await createLearner("recommend-ready-transition");
+    const onlyCandidate = QUESTION_BANK[0]!;
+    await exposeAllExcept(learnerId, [onlyCandidate.id]);
+    const activeBatchId = await insertBatch(learnerId, "QUEUED");
+    let observeContention!: () => void;
+    const contentionObserved = new Promise<void>((resolve) => {
+      observeContention = resolve;
+    });
+    let releaseRecommendation!: () => void;
+    const transitionCommitted = new Promise<void>((resolve) => {
+      releaseRecommendation = resolve;
+    });
+    const barrierDatabase = databaseWithRefillContentionBarrier({
+      observed: observeContention,
+      waitForTransition: () => transitionCommitted,
+    });
+
+    const recommendationPromise = createQuestionRecommendation(
+      barrierDatabase,
+      learnerId,
+      { action: "INITIAL" },
+      options,
+    );
+    await contentionObserved;
+    await database.db
+      .update(questionGenerationBatch)
+      .set({ status: "SUCCEEDED" })
+      .where(eq(questionGenerationBatch.id, activeBatchId));
+    releaseRecommendation();
+    const result = await recommendationPromise;
+
+    expect(result).toMatchObject({
+      status: "READY",
+      question: { id: onlyCandidate.id },
+    });
+    await expect(
+      database.db.query.questionRecommendation.findFirst({
+        where: eq(questionRecommendation.id, result.id),
+      }),
+    ).resolves.toMatchObject({
+      status: "READY",
+      questionExternalId: onlyCandidate.id,
+    });
+  });
+
+  it("re-evaluates zero-pool catalog when the contending batch succeeds before requery", async () => {
+    const learnerId = await createLearner("recommend-zero-transition");
+    await exposeAllExcept(learnerId, []);
+    const activeBatchId = await insertBatch(learnerId, "QUEUED");
+    const generatedExternalId = `iwc-dynamic-${newDomainId()}`;
+    await insertStoredQuestion({
+      externalId: generatedExternalId,
+      generationBatchId: activeBatchId,
+      source: "AI_GENERATED",
+      type: "discussion",
+      topic: "health",
+    });
+    let observeContention!: () => void;
+    const contentionObserved = new Promise<void>((resolve) => {
+      observeContention = resolve;
+    });
+    let releaseRecommendation!: () => void;
+    const transitionCommitted = new Promise<void>((resolve) => {
+      releaseRecommendation = resolve;
+    });
+    const barrierDatabase = databaseWithRefillContentionBarrier({
+      observed: observeContention,
+      waitForTransition: () => transitionCommitted,
+    });
+
+    const recommendationPromise = createQuestionRecommendation(
+      barrierDatabase,
+      learnerId,
+      { action: "INITIAL" },
+      options,
+    );
+    await contentionObserved;
+    await database.db
+      .update(questionGenerationBatch)
+      .set({ status: "SUCCEEDED", acceptedCount: 1 })
+      .where(eq(questionGenerationBatch.id, activeBatchId));
+    releaseRecommendation();
+    const result = await recommendationPromise;
+
+    expect(result).toMatchObject({
+      status: "READY",
+      question: { id: generatedExternalId },
+    });
+  });
 
   it("verifies recommendation ownership and exact question before cycle creation", async () => {
     const learnerId = await createLearner("recommend-cycle-audit");
