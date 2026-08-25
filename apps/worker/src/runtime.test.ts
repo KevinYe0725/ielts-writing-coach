@@ -26,6 +26,8 @@ import {
   databaseContext,
   decryptSearchConnectionApiKey,
   environment,
+  markJobFailure,
+  markJobSucceeded,
   providerConnectionAuthorizedForJob,
   selectCanonicalSearchConnection,
 } from "./runtime";
@@ -168,6 +170,7 @@ integration("AI job lease and result idempotency", () => {
   const itemId = newDomainId();
   const attemptId = newDomainId();
   const responseEventId = newDomainId();
+  const deliveryFenceJobId = newDomainId();
   const sharedLearnerId = `worker-shared-learner-${suffix}`;
   const sharedProviderId = newDomainId();
   const encryptedProviderId = newDomainId();
@@ -319,6 +322,16 @@ integration("AI job lease and result idempotency", () => {
         versionSnapshot: { providerKind: "mock" },
         idempotencyKey: `result:${suffix}`,
       },
+      {
+        id: deliveryFenceJobId,
+        ownerId: userId,
+        taskKind: "question_bank_refill",
+        status: "RUNNING",
+        protectedReference: { generationBatchId: newDomainId() },
+        versionSnapshot: { providerKind: "mock", providerConnectionId: "mock" },
+        idempotencyKey: `delivery-fence:${suffix}`,
+        attemptCount: 2,
+      },
     ]);
   });
 
@@ -350,6 +363,42 @@ integration("AI job lease and result idempotency", () => {
     const recovered = await claimAIJob(queuedJobId, 2);
     expect(recovered).toMatchObject({ id: queuedJobId, attemptCount: 2 });
     expect(await claimAIJob(queuedJobId, 2)).toBeNull();
+  });
+
+  it("prevents a recovered delivery from overwriting the current AI job terminal state", async () => {
+    const current = {
+      id: deliveryFenceJobId,
+      ownerId: userId,
+      taskKind: "question_bank_refill" as const,
+      protectedReference: { generationBatchId: newDomainId() },
+      versionSnapshot: { providerKind: "mock", providerConnectionId: "mock" },
+      attemptCount: 2,
+    };
+    const stale = { ...current, attemptCount: 1 };
+
+    await markJobSucceeded(stale, {});
+    expect(
+      await databaseContext.db.query.aiJob.findFirst({
+        where: eq(aiJob.id, deliveryFenceJobId),
+      }),
+    ).toMatchObject({ status: "RUNNING", attemptCount: 2 });
+
+    await markJobSucceeded(current, {});
+    await expect(
+      markJobFailure(
+        stale,
+        Object.assign(new Error("late provider failure"), { status: 503 }),
+      ),
+    ).resolves.toBeUndefined();
+    expect(
+      await databaseContext.db.query.aiJob.findFirst({
+        where: eq(aiJob.id, deliveryFenceJobId),
+      }),
+    ).toMatchObject({
+      status: "SUCCEEDED",
+      attemptCount: 2,
+      lastErrorCode: null,
+    });
   });
 
   it("allows one result per durable job but a later explicit job may append", async () => {

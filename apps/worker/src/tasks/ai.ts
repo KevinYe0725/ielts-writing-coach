@@ -2683,7 +2683,7 @@ export async function runAIJob(
   if (!job) return;
   try {
     const usage = await execute(job, helpers);
-    await markJobSucceeded(job.id, usage);
+    await markJobSucceeded(job, usage);
   } catch (error) {
     await markJobFailure(job, error);
   }

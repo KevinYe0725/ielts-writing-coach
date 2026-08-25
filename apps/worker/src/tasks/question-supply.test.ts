@@ -12,7 +12,7 @@ import {
   user,
 } from "@iwc/db";
 import type { SearchAdapter, SearchQuery } from "@iwc/search";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import type { ClaimedJob } from "../runtime";
@@ -36,6 +36,21 @@ function proposal(index = 0) {
     track: "academic" as const,
     prompt: `Local councils should reserve budget category ${index + 1} for maintaining shared neighbourhood spaces before funding new monuments. Do you agree or disagree?`,
     internalRationale: `A durable civic trade-off number ${index + 1}.`,
+  };
+}
+
+function publishableQuestion(externalId: string, index: number) {
+  return {
+    externalId,
+    source: "AI_GENERATED" as const,
+    visibility: "public" as const,
+    ownerId: null,
+    ieltsTrack: "academic" as const,
+    questionType: "opinion" as const,
+    topic: "government" as const,
+    prompt: `Concurrent generated prompt ${index} asks residents to compare two distinct local budget priorities. Do you agree or disagree?`,
+    attribution: "IWC validated AI-generated question",
+    bankVersion: "dynamic-1.0.0",
   };
 }
 
@@ -101,10 +116,14 @@ class MemoryStore implements QuestionSupplyStore {
 
   async transitionBatch(
     _batchId: string,
+    _fence: { aiJobId: string; attemptCount: number },
     update: Partial<StoredGenerationBatch>,
-  ): Promise<void> {
+  ): Promise<boolean> {
+    if (this.batch.status === "SUCCEEDED" || this.batch.status === "FAILED")
+      return false;
     this.batch = { ...this.batch, ...update };
     if (update.status) this.transitions.push(update.status);
+    return true;
   }
 
   async loadExistingQuestions() {
@@ -117,6 +136,7 @@ class MemoryStore implements QuestionSupplyStore {
 
   async publish(
     _batchId: string,
+    _fence: { aiJobId: string; attemptCount: number },
     questions: readonly {
       externalId: string;
       source: string;
@@ -124,6 +144,8 @@ class MemoryStore implements QuestionSupplyStore {
     }[],
     rejectedCount: number,
   ): Promise<number> {
+    if (this.batch.status === "SUCCEEDED" || this.batch.status === "FAILED")
+      return this.batch.acceptedCount;
     for (const question of questions) {
       if (
         !this.published.some(
@@ -144,11 +166,18 @@ class MemoryStore implements QuestionSupplyStore {
     return this.published.length;
   }
 
-  async fail(_batchId: string, safeFailureCode: string): Promise<void> {
+  async fail(
+    _batchId: string,
+    _fence: { aiJobId: string; attemptCount: number },
+    safeFailureCode: string,
+  ): Promise<boolean> {
+    if (this.batch.status === "SUCCEEDED" || this.batch.status === "FAILED")
+      return false;
     this.batch = { ...this.batch, status: "FAILED", safeFailureCode };
     this.transitions.push("FAILED");
     if (this.batch.triggeredByUserId)
       this.unavailableUsers.push(this.batch.triggeredByUserId);
+    return true;
   }
 }
 
@@ -190,6 +219,7 @@ function dependencies(
     search?: SearchAdapter;
     generation?: unknown;
     semantic?: unknown;
+    semanticSequence?: readonly unknown[];
     aiError?: Error;
     capturedSearchKey?: string[];
   } = {},
@@ -233,15 +263,19 @@ function dependencies(
         async generateStructured<T>() {
           if (options.aiError) throw options.aiError;
           structuredCall += 1;
-          return {
-            value: (structuredCall === 1
+          const generatedValue =
+            structuredCall === 1
               ? (options.generation ?? { proposals: [proposal()] })
-              : (options.semantic ?? {
+              : (options.semanticSequence?.[structuredCall - 2] ??
+                options.semantic ?? {
                   duplicate: false,
                   confidence: 0.95,
                   rationale:
                     "The underlying issue and requested comparison are distinct.",
-                })) as T,
+                });
+          if (generatedValue instanceof Error) throw generatedValue;
+          return {
+            value: generatedValue as T,
             model: "test-model",
             usage: {
               inputTokens: 2,
@@ -633,6 +667,79 @@ describe("question-bank refill pipeline", () => {
     expect(store.batch.safeFailureCode).toBe("QUESTION_VALIDATION_REJECTED");
   });
 
+  it("rejects when only a dynamic candidate beyond shortlist index twenty is semantically duplicate", async () => {
+    const batchId = newDomainId();
+    const store = new MemoryStore(batchId);
+    store.existingQuestions = Array.from({ length: 21 }, (_, index) => ({
+      type: "opinion" as const,
+      topic: "government" as const,
+      prompt:
+        index === 20
+          ? "Municipal authorities ought to prioritise caring for communal neighbourhood areas over constructing symbolic attractions. Do you agree or disagree?"
+          : `Public authorities should consider civic programme ${index + 1} when planning services for residents in different districts. Do you agree or disagree?`,
+    }));
+    const deps = dependencies(store, {
+      semanticSequence: [
+        {
+          duplicate: false,
+          confidence: 0.97,
+          rationale: "No duplicate appears in the first bounded chunk.",
+        },
+        {
+          duplicate: true,
+          confidence: 0.96,
+          rationale:
+            "The tail item asks the same policy trade-off using paraphrased wording.",
+        },
+      ],
+    });
+    const adapter = await deps.resolveAIAdapter(claimedJob(batchId));
+    deps.resolveAIAdapter = async () => adapter;
+
+    await refillQuestionBank(claimedJob(batchId), helpers, deps);
+
+    expect(adapter.generateStructured).toHaveBeenCalledTimes(3);
+    expect(store.published).toEqual([]);
+    expect(store.batch).toMatchObject({
+      status: "FAILED",
+      safeFailureCode: "QUESTION_VALIDATION_REJECTED",
+    });
+  });
+
+  it.each([
+    ["schema-invalid", {}],
+    ["missing", new Error("semantic chunk unavailable")],
+  ])(
+    "fails the proposal closed when the tail semantic chunk is %s",
+    async (_label, tailJudgment) => {
+      const batchId = newDomainId();
+      const store = new MemoryStore(batchId);
+      store.existingQuestions = Array.from({ length: 21 }, (_, index) => ({
+        type: "opinion" as const,
+        topic: "government" as const,
+        prompt: `Government policy comparison ${index + 1} concerns a different durable civic service priority. Do you agree or disagree?`,
+      }));
+      const deps = dependencies(store, {
+        semanticSequence: [
+          {
+            duplicate: false,
+            confidence: 0.97,
+            rationale: "The first chunk contains no semantic duplicate.",
+          },
+          tailJudgment,
+        ],
+      });
+      const adapter = await deps.resolveAIAdapter(claimedJob(batchId));
+      deps.resolveAIAdapter = async () => adapter;
+
+      await refillQuestionBank(claimedJob(batchId), helpers, deps);
+
+      expect(adapter.generateStructured).toHaveBeenCalledTimes(3);
+      expect(store.published).toEqual([]);
+      expect(store.batch.status).toBe("FAILED");
+    },
+  );
+
   it("treats duplicate delivery of a succeeded batch as a no-op", async () => {
     const batchId = newDomainId();
     const store = new MemoryStore(batchId);
@@ -670,11 +777,18 @@ integration("question-bank refill PostgreSQL publication", () => {
   const rejectedRecommendationId = newDomainId();
   const sharedWaitingRecommendationId = newDomainId();
   const collisionBatchId = newDomainId();
+  const collisionJobId = newDomainId();
   const collisionQuestionId = newDomainId();
   const collisionExternalId =
     "iwc-dynamic-ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
   const dispatchBatchId = newDomainId();
   const dispatchJobId = newDomainId();
+  const concurrentSuccessBatchId = newDomainId();
+  const concurrentSuccessJobId = newDomainId();
+  const recoveredRaceBatchId = newDomainId();
+  const recoveredRaceJobId = newDomainId();
+  const terminalRaceBatchId = newDomainId();
+  const terminalRaceJobId = newDomainId();
 
   beforeAll(async () => {
     await databaseContext.db.insert(user).values({
@@ -703,6 +817,7 @@ integration("question-bank refill PostgreSQL publication", () => {
           providerConnectionId: "mock",
         },
         idempotencyKey: `question-bank-refill:${successBatchId}`,
+        attemptCount: 1,
       },
       {
         id: failedJobId,
@@ -717,6 +832,7 @@ integration("question-bank refill PostgreSQL publication", () => {
           providerConnectionId: "mock",
         },
         idempotencyKey: `question-bank-refill:${failedBatchId}`,
+        attemptCount: 1,
       },
       {
         id: rejectedJobId,
@@ -731,6 +847,7 @@ integration("question-bank refill PostgreSQL publication", () => {
           providerConnectionId: "mock",
         },
         idempotencyKey: `question-bank-refill:${rejectedBatchId}`,
+        attemptCount: 1,
       },
       {
         id: dispatchJobId,
@@ -745,6 +862,46 @@ integration("question-bank refill PostgreSQL publication", () => {
           providerConnectionId: "mock",
         },
         idempotencyKey: `question-bank-refill:${dispatchBatchId}`,
+      },
+      {
+        id: concurrentSuccessJobId,
+        ownerId: userId,
+        taskKind: "question_bank_refill",
+        status: "RUNNING",
+        protectedReference: { generationBatchId: concurrentSuccessBatchId },
+        versionSnapshot: { providerKind: "mock", providerConnectionId: "mock" },
+        idempotencyKey: `question-bank-refill:${concurrentSuccessBatchId}`,
+        attemptCount: 2,
+      },
+      {
+        id: collisionJobId,
+        ownerId: userId,
+        taskKind: "question_bank_refill",
+        status: "RUNNING",
+        protectedReference: { generationBatchId: collisionBatchId },
+        versionSnapshot: { providerKind: "mock", providerConnectionId: "mock" },
+        idempotencyKey: `question-bank-refill:${collisionBatchId}`,
+        attemptCount: 2,
+      },
+      {
+        id: recoveredRaceJobId,
+        ownerId: userId,
+        taskKind: "question_bank_refill",
+        status: "RUNNING",
+        protectedReference: { generationBatchId: recoveredRaceBatchId },
+        versionSnapshot: { providerKind: "mock", providerConnectionId: "mock" },
+        idempotencyKey: `question-bank-refill:${recoveredRaceBatchId}`,
+        attemptCount: 2,
+      },
+      {
+        id: terminalRaceJobId,
+        ownerId: userId,
+        taskKind: "question_bank_refill",
+        status: "RUNNING",
+        protectedReference: { generationBatchId: terminalRaceBatchId },
+        versionSnapshot: { providerKind: "mock", providerConnectionId: "mock" },
+        idempotencyKey: `question-bank-refill:${terminalRaceBatchId}`,
+        attemptCount: 2,
       },
     ]);
     await databaseContext.db.insert(questionGenerationBatch).values([
@@ -788,6 +945,38 @@ integration("question-bank refill PostgreSQL publication", () => {
         promptVersion: "1.0.0",
         rubricVersion: "iwc-question-bank-refill-1.0.0",
       },
+      {
+        id: concurrentSuccessBatchId,
+        triggeredByUserId: userId,
+        status: "VALIDATING",
+        mode: "OFFLINE",
+        targetMix: [
+          { questionType: "opinion", topic: "government", count: 12 },
+        ],
+        aiJobId: concurrentSuccessJobId,
+        promptVersion: "1.0.0",
+        rubricVersion: "iwc-question-bank-refill-1.0.0",
+      },
+      {
+        id: recoveredRaceBatchId,
+        triggeredByUserId: userId,
+        status: "VALIDATING",
+        mode: "OFFLINE",
+        targetMix: [{ questionType: "opinion", topic: "government", count: 1 }],
+        aiJobId: recoveredRaceJobId,
+        promptVersion: "1.0.0",
+        rubricVersion: "iwc-question-bank-refill-1.0.0",
+      },
+      {
+        id: terminalRaceBatchId,
+        triggeredByUserId: userId,
+        status: "VALIDATING",
+        mode: "OFFLINE",
+        targetMix: [{ questionType: "opinion", topic: "government", count: 1 }],
+        aiJobId: terminalRaceJobId,
+        promptVersion: "1.0.0",
+        rubricVersion: "iwc-question-bank-refill-1.0.0",
+      },
     ]);
     await databaseContext.db.insert(questionRecommendation).values({
       id: recommendationId,
@@ -800,7 +989,14 @@ integration("question-bank refill PostgreSQL publication", () => {
   afterAll(async () => {
     await databaseContext.db
       .delete(question)
-      .where(eq(question.generationBatchId, successBatchId));
+      .where(
+        inArray(question.generationBatchId, [
+          successBatchId,
+          concurrentSuccessBatchId,
+          recoveredRaceBatchId,
+          terminalRaceBatchId,
+        ]),
+      );
     await databaseContext.db
       .delete(question)
       .where(eq(question.externalId, collisionExternalId));
@@ -895,8 +1091,8 @@ integration("question-bank refill PostgreSQL publication", () => {
       safeFailureCode: "AI_UNAVAILABLE",
     });
     expect(sharedWaiting).toMatchObject({
-      status: "UNAVAILABLE",
-      safeFailureCode: "AI_UNAVAILABLE",
+      status: "PENDING",
+      safeFailureCode: null,
     });
     expect(saved).toEqual([]);
   });
@@ -956,6 +1152,7 @@ integration("question-bank refill PostgreSQL publication", () => {
       status: "VALIDATING",
       mode: "OFFLINE",
       targetMix: [{ questionType: "opinion", topic: "government", count: 1 }],
+      aiJobId: collisionJobId,
       promptVersion: "1.0.0",
       rubricVersion: "iwc-question-bank-refill-1.0.0",
     });
@@ -973,6 +1170,7 @@ integration("question-bank refill PostgreSQL publication", () => {
 
     await databaseQuestionSupplyStore.publish(
       collisionBatchId,
+      { aiJobId: collisionJobId, attemptCount: 2 },
       [
         {
           externalId: collisionExternalId,
@@ -1001,6 +1199,122 @@ integration("question-bank refill PostgreSQL publication", () => {
       rejectedCount: 1,
       safeFailureCode: "QUESTION_VALIDATION_REJECTED",
     });
+  });
+
+  it("serializes overlapping successful deliveries and caps batch-linked rows at twelve", async () => {
+    const first = Array.from({ length: 12 }, (_, index) =>
+      publishableQuestion(
+        `iwc-dynamic-${"a".repeat(62)}${index.toString(16).padStart(2, "0")}`,
+        index,
+      ),
+    );
+    const second = Array.from({ length: 12 }, (_, index) =>
+      publishableQuestion(
+        `iwc-dynamic-${"b".repeat(62)}${index.toString(16).padStart(2, "0")}`,
+        index + 20,
+      ),
+    );
+    const fence = { aiJobId: concurrentSuccessJobId, attemptCount: 2 };
+
+    await Promise.all([
+      databaseQuestionSupplyStore.publish(
+        concurrentSuccessBatchId,
+        fence,
+        first,
+        0,
+      ),
+      databaseQuestionSupplyStore.publish(
+        concurrentSuccessBatchId,
+        fence,
+        second,
+        0,
+      ),
+    ]);
+
+    const [batch, rows] = await Promise.all([
+      databaseContext.db.query.questionGenerationBatch.findFirst({
+        where: eq(questionGenerationBatch.id, concurrentSuccessBatchId),
+      }),
+      databaseContext.db.query.question.findMany({
+        where: eq(question.generationBatchId, concurrentSuccessBatchId),
+      }),
+    ]);
+    expect(rows).toHaveLength(12);
+    expect(batch).toMatchObject({
+      status: "SUCCEEDED",
+      acceptedCount: 12,
+    });
+  });
+
+  it("lets the current recovered success win over a concurrent stale failure", async () => {
+    const currentFence = { aiJobId: recoveredRaceJobId, attemptCount: 2 };
+    const staleFence = { aiJobId: recoveredRaceJobId, attemptCount: 1 };
+
+    await Promise.all([
+      databaseQuestionSupplyStore.publish(
+        recoveredRaceBatchId,
+        currentFence,
+        [publishableQuestion(`iwc-dynamic-${"c".repeat(64)}`, 100)],
+        0,
+      ),
+      databaseQuestionSupplyStore.fail(
+        recoveredRaceBatchId,
+        staleFence,
+        "AI_UNAVAILABLE",
+      ),
+    ]);
+
+    const [batch, rows] = await Promise.all([
+      databaseContext.db.query.questionGenerationBatch.findFirst({
+        where: eq(questionGenerationBatch.id, recoveredRaceBatchId),
+      }),
+      databaseContext.db.query.question.findMany({
+        where: eq(question.generationBatchId, recoveredRaceBatchId),
+      }),
+    ]);
+    expect(batch).toMatchObject({
+      status: "SUCCEEDED",
+      acceptedCount: 1,
+      safeFailureCode: null,
+    });
+    expect(rows).toHaveLength(1);
+  });
+
+  it("allows only one terminal winner when current success and failure overlap", async () => {
+    const fence = { aiJobId: terminalRaceJobId, attemptCount: 2 };
+    await Promise.all([
+      databaseQuestionSupplyStore.publish(
+        terminalRaceBatchId,
+        fence,
+        [publishableQuestion(`iwc-dynamic-${"d".repeat(64)}`, 101)],
+        0,
+      ),
+      databaseQuestionSupplyStore.fail(
+        terminalRaceBatchId,
+        fence,
+        "AI_UNAVAILABLE",
+      ),
+    ]);
+
+    const [batch, rows] = await Promise.all([
+      databaseContext.db.query.questionGenerationBatch.findFirst({
+        where: eq(questionGenerationBatch.id, terminalRaceBatchId),
+      }),
+      databaseContext.db.query.question.findMany({
+        where: eq(question.generationBatchId, terminalRaceBatchId),
+      }),
+    ]);
+    expect(["SUCCEEDED", "FAILED"]).toContain(batch?.status);
+    if (batch?.status === "SUCCEEDED") {
+      expect(batch).toMatchObject({ acceptedCount: 1, safeFailureCode: null });
+      expect(rows).toHaveLength(1);
+    } else {
+      expect(batch).toMatchObject({
+        acceptedCount: 0,
+        safeFailureCode: "AI_UNAVAILABLE",
+      });
+      expect(rows).toHaveLength(0);
+    }
   });
 
   it("dispatches question_bank_refill through runAIJob instead of the removed fail-closed placeholder", async () => {

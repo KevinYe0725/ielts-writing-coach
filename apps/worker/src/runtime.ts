@@ -393,7 +393,7 @@ export async function adapterForJob(
 }
 
 export async function markJobSucceeded(
-  jobId: string,
+  job: ClaimedJob,
   usage: Record<string, number> = {},
 ): Promise<void> {
   await databaseContext.db
@@ -405,7 +405,13 @@ export async function markJobSucceeded(
       lastErrorCode: null,
       lastErrorSafeMessage: null,
     })
-    .where(eq(aiJob.id, jobId));
+    .where(
+      and(
+        eq(aiJob.id, job.id),
+        eq(aiJob.attemptCount, job.attemptCount),
+        eq(aiJob.status, "RUNNING"),
+      ),
+    );
 }
 
 export async function markJobFailure(
@@ -423,7 +429,7 @@ export async function markJobFailure(
     ].includes(internalCode ?? "") || normalized.code === "AUTHENTICATION";
   const retry = !blocked && normalized.retryable && job.attemptCount < 5;
   const status = blocked ? "AI_BLOCKED" : retry ? "RETRY_SCHEDULED" : "FAILED";
-  await databaseContext.db
+  const updated = await databaseContext.db
     .update(aiJob)
     .set({
       status,
@@ -434,10 +440,17 @@ export async function markJobFailure(
       lastErrorCode: internalCode ?? normalized.code,
       lastErrorSafeMessage: normalized.safeMessage,
     })
-    .where(eq(aiJob.id, job.id));
+    .where(
+      and(
+        eq(aiJob.id, job.id),
+        eq(aiJob.attemptCount, job.attemptCount),
+        eq(aiJob.status, "RUNNING"),
+      ),
+    )
+    .returning({ id: aiJob.id });
   // Graphile Worker records thrown errors. Never hand an untrusted provider
   // body back to its logger because upstreams can reflect arbitrary secrets.
-  if (retry) throw safeRetryError(normalized);
+  if (retry && updated.length === 1) throw safeRetryError(normalized);
 }
 
 export async function recoverInterruptedJobs(): Promise<number> {
