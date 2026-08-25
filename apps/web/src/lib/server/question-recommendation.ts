@@ -760,24 +760,59 @@ export async function buildQuestionBankRefillTargetMix(
   transaction: DatabaseTransaction,
 ): Promise<Array<{ questionType: string; topic: string; count: number }>> {
   const catalog = await listPublicQuestionCatalog(transaction);
-  const counts = new Map<string, number>();
+  const pairCounts = new Map<string, number>();
+  const typeMarginals = new Map(QUESTION_TYPES.map((type) => [type, 0]));
+  const topicMarginals = new Map(TOPICS.map((topic) => [topic, 0]));
   for (const type of QUESTION_TYPES) {
-    for (const topic of TOPICS) counts.set(`${type}:${topic}`, 0);
+    for (const topic of TOPICS) pairCounts.set(`${type}:${topic}`, 0);
   }
   for (const item of catalog) {
     const key = `${item.type}:${item.topic}`;
-    counts.set(key, (counts.get(key) ?? 0) + 1);
+    pairCounts.set(key, (pairCounts.get(key) ?? 0) + 1);
+    typeMarginals.set(item.type, (typeMarginals.get(item.type) ?? 0) + 1);
+    topicMarginals.set(item.topic, (topicMarginals.get(item.topic) ?? 0) + 1);
   }
-  return [...counts.entries()]
-    .sort(
-      ([leftKey, leftCount], [rightKey, rightCount]) =>
-        leftCount - rightCount || leftKey.localeCompare(rightKey),
-    )
-    .slice(0, REFILL_PROPOSAL_COUNT)
-    .map(([key]) => {
-      const [questionType, topic] = key.split(":");
-      return { questionType: questionType!, topic: topic!, count: 1 };
+  const candidates = QUESTION_TYPES.flatMap((questionType, typeOrder) =>
+    TOPICS.map((topic, topicOrder) => ({
+      questionType,
+      topic,
+      pairCount: pairCounts.get(`${questionType}:${topic}`) ?? 0,
+      typeOrder,
+      topicOrder,
+    })),
+  );
+  const targetMix: Array<{
+    questionType: string;
+    topic: string;
+    count: number;
+  }> = [];
+  while (targetMix.length < REFILL_PROPOSAL_COUNT && candidates.length > 0) {
+    candidates.sort(
+      (left, right) =>
+        left.pairCount - right.pairCount ||
+        (typeMarginals.get(left.questionType) ?? 0) -
+          (typeMarginals.get(right.questionType) ?? 0) ||
+        (topicMarginals.get(left.topic) ?? 0) -
+          (topicMarginals.get(right.topic) ?? 0) ||
+        left.typeOrder - right.typeOrder ||
+        left.topicOrder - right.topicOrder,
+    );
+    const selected = candidates.shift()!;
+    targetMix.push({
+      questionType: selected.questionType,
+      topic: selected.topic,
+      count: 1,
     });
+    typeMarginals.set(
+      selected.questionType,
+      (typeMarginals.get(selected.questionType) ?? 0) + 1,
+    );
+    topicMarginals.set(
+      selected.topic,
+      (topicMarginals.get(selected.topic) ?? 0) + 1,
+    );
+  }
+  return targetMix;
 }
 
 async function findCatalogQuestion(

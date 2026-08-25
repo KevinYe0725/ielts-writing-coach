@@ -15,13 +15,14 @@ import {
   writingAttempt,
   type Database,
 } from "@iwc/db";
-import { QUESTION_BANK } from "@iwc/question-bank";
+import { QUESTION_BANK, QUESTION_TYPES, TOPICS } from "@iwc/question-bank";
 
 import * as questionRecommendationModule from "./question-recommendation";
 import { completeIdempotentResponse, reserveIdempotencyKey } from "./security";
 
 import {
   assertRecommendationForCycle,
+  buildQuestionBankRefillTargetMix,
   createQuestionRecommendation,
   getQuestionRecommendation,
   listPublicQuestionCatalog,
@@ -130,6 +131,17 @@ integration("question recommendation service (PostgreSQL)", () => {
     now: () => now,
     randomIndex: () => 0,
   };
+
+  function marginalCounts(
+    targetMix: Array<{ questionType: string; topic: string }>,
+    dimension: "questionType" | "topic",
+    values: readonly string[],
+  ): number[] {
+    return values.map(
+      (value) =>
+        targetMix.filter((target) => target[dimension] === value).length,
+    );
+  }
 
   function databaseWithRefillContentionBarrier(input: {
     observed: () => void;
@@ -242,6 +254,92 @@ integration("question recommendation service (PostgreSQL)", () => {
 
   afterAll(async () => {
     await database.pool.end();
+  });
+
+  it("balances a fully tied fifteen-target refill across all five types and eight topics", async () => {
+    const targetMix = await database.db.transaction((transaction) =>
+      buildQuestionBankRefillTargetMix(transaction),
+    );
+
+    expect(targetMix).toHaveLength(15);
+    expect(marginalCounts(targetMix, "questionType", QUESTION_TYPES)).toEqual([
+      3, 3, 3, 3, 3,
+    ]);
+    const topicCounts = marginalCounts(targetMix, "topic", TOPICS);
+    expect(
+      Math.max(...topicCounts) - Math.min(...topicCounts),
+    ).toBeLessThanOrEqual(1);
+  });
+
+  it("prioritizes lower pair counts while balancing types when one type is overrepresented", async () => {
+    const ownerId = await createLearner("target-mix-type-deficit");
+    const batchId = await insertBatch(ownerId, "SUCCEEDED");
+    for (const topic of TOPICS) {
+      await insertStoredQuestion({
+        externalId: `target-type-heavy-${topic}-${newDomainId()}`,
+        generationBatchId: batchId,
+        source: "AI_GENERATED",
+        type: "opinion",
+        topic,
+      });
+    }
+
+    const targetMix = await database.db.transaction((transaction) =>
+      buildQuestionBankRefillTargetMix(transaction),
+    );
+
+    expect(targetMix).toHaveLength(15);
+    expect(targetMix.some((target) => target.questionType === "opinion")).toBe(
+      false,
+    );
+    const underrepresentedTypeCounts = marginalCounts(
+      targetMix,
+      "questionType",
+      QUESTION_TYPES.filter((type) => type !== "opinion"),
+    );
+    expect(
+      Math.max(...underrepresentedTypeCounts) -
+        Math.min(...underrepresentedTypeCounts),
+    ).toBeLessThanOrEqual(1);
+    const topicCounts = marginalCounts(targetMix, "topic", TOPICS);
+    expect(
+      Math.max(...topicCounts) - Math.min(...topicCounts),
+    ).toBeLessThanOrEqual(1);
+  });
+
+  it("prioritizes lower pair counts while balancing topics when one topic is overrepresented", async () => {
+    const ownerId = await createLearner("target-mix-topic-deficit");
+    const batchId = await insertBatch(ownerId, "SUCCEEDED");
+    for (const questionType of QUESTION_TYPES) {
+      await insertStoredQuestion({
+        externalId: `target-topic-heavy-${questionType}-${newDomainId()}`,
+        generationBatchId: batchId,
+        source: "AI_GENERATED",
+        type: questionType,
+        topic: "education",
+      });
+    }
+
+    const targetMix = await database.db.transaction((transaction) =>
+      buildQuestionBankRefillTargetMix(transaction),
+    );
+
+    expect(targetMix).toHaveLength(15);
+    expect(targetMix.some((target) => target.topic === "education")).toBe(
+      false,
+    );
+    expect(marginalCounts(targetMix, "questionType", QUESTION_TYPES)).toEqual([
+      3, 3, 3, 3, 3,
+    ]);
+    const underrepresentedTopicCounts = marginalCounts(
+      targetMix,
+      "topic",
+      TOPICS.filter((topic) => topic !== "education"),
+    );
+    expect(
+      Math.max(...underrepresentedTopicCounts) -
+        Math.min(...underrepresentedTopicCounts),
+    ).toBeLessThanOrEqual(1);
   });
 
   it("permanently excludes cycle and transfer questions", async () => {

@@ -367,7 +367,8 @@ test.describe("secure administration surfaces", () => {
             title: "Question supply retry unavailable",
             status: 409,
             code: "QUESTION_BANK_REFILL_RETRY_NOT_AVAILABLE",
-            detail: "当前没有可重试的失败补充任务。",
+            detail:
+              "There is no failed question-supply batch to retry. backend-only-sentinel",
           }),
         });
         return;
@@ -396,8 +397,9 @@ test.describe("secure administration surfaces", () => {
 
     await page.getByRole("button", { name: "立即重试补充" }).click();
     await expect(
-      page.getByText("当前没有可重试的失败补充任务。"),
+      page.getByText("当前没有失败的题库补充任务可重试，请刷新状态后再试。"),
     ).toHaveAttribute("role", "alert");
+    await expect(page.getByText(/backend-only-sentinel/u)).toHaveCount(0);
     expect(requestCount).toBe(3);
 
     const supplyText = await page

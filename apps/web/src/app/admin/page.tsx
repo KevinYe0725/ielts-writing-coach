@@ -192,9 +192,16 @@ export default function AdminPage() {
       retry();
     } catch (error) {
       setQuestionSupplyRetryError(
-        error instanceof Error
-          ? error.message
-          : text("无法重试题库补充。", "Could not retry question supply."),
+        error instanceof LearningClientError &&
+          error.code === "QUESTION_BANK_REFILL_RETRY_NOT_AVAILABLE"
+          ? text(
+              "当前没有失败的题库补充任务可重试，请刷新状态后再试。",
+              "There is no failed question-supply refill to retry. Refresh status and try again.",
+            )
+          : text(
+              "题库补充重试失败，请稍后再试。",
+              "Question-supply retry failed. Try again later.",
+            ),
       );
     } finally {
       setRetryingQuestionSupply(false);

@@ -36,6 +36,24 @@ const databaseUrl =
   process.env.IWC_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 
 describe.skipIf(!databaseUrl)("learner data rights (PostgreSQL)", () => {
+  async function waitForLockWaiters(
+    pool: ReturnType<typeof createDatabase>["pool"],
+    minimum: number,
+  ): Promise<void> {
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      const result = await pool.query<{ waiting: string }>(`
+        select count(*)::text as waiting
+        from pg_locks
+        where not granted
+      `);
+      if (Number(result.rows[0]?.waiting ?? 0) >= minimum) return;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    throw new Error(
+      `Timed out waiting for ${minimum} PostgreSQL lock waiter(s)`,
+    );
+  }
+
   it("exports owned learning data and deletes it without deleting the account", async () => {
     const { db, pool } = createDatabase(databaseUrl!);
     const suffix = newDomainId();
@@ -390,4 +408,180 @@ describe.skipIf(!databaseUrl)("learner data rights (PostgreSQL)", () => {
       }
     },
   );
+
+  it("keeps a concurrently inserted ordinary AI job and its Graphile row together across deletion", async () => {
+    const { db, pool } = createDatabase(databaseUrl!);
+    const suffix = newDomainId();
+    const userId = `delete-race-${suffix}`;
+    const jobId = newDomainId();
+    const graphileJobKey = `ai-job:${jobId}`;
+    const [blockingNotification] = await db
+      .insert(user)
+      .values({
+        id: userId,
+        name: "Deletion race learner",
+        email: `${userId}@example.test`,
+        role: "learner",
+      })
+      .then(async () =>
+        db
+          .insert(notification)
+          .values({
+            userId,
+            channel: "in_app",
+            kind: "deletion_race",
+            dedupeKey: `delete-race-${suffix}`,
+            payload: {},
+            scheduledAt: new Date(),
+          })
+          .returning({ id: notification.id }),
+      );
+    const blocker = await pool.connect();
+    let blockerOpen = false;
+    try {
+      await blocker.query("begin");
+      blockerOpen = true;
+      await blocker.query(
+        "select id from notification where id = $1 for update",
+        [blockingNotification!.id],
+      );
+
+      const deletion = deleteLearningRecord(db, userId, `delete:${suffix}`);
+      await waitForLockWaiters(pool, 1);
+
+      let insertionSettled = false;
+      const insertion = db
+        .transaction(async (transaction) => {
+          await transaction.execute(sql`select graphile_worker.add_job(
+            'run_ai_job',
+            ${JSON.stringify({ jobId })}::json,
+            max_attempts := 5,
+            job_key := ${graphileJobKey},
+            job_key_mode := 'preserve_run_at'
+          )`);
+          await transaction.insert(aiJob).values({
+            id: jobId,
+            ownerId: userId,
+            taskKind: "ielts_assessment",
+            status: "QUEUED",
+            protectedReference: { attemptId: newDomainId() },
+            versionSnapshot: {
+              providerKind: "unconfigured",
+              providerConnectionId: "unconfigured",
+            },
+            idempotencyKey: `delete-race:${jobId}`,
+            graphileJobKey,
+          });
+        })
+        .finally(() => {
+          insertionSettled = true;
+        });
+
+      for (let attempt = 0; attempt < 100; attempt += 1) {
+        if (insertionSettled) break;
+        const waits = await pool.query<{ waiting: string }>(`
+          select count(*)::text as waiting from pg_locks where not granted
+        `);
+        if (Number(waits.rows[0]?.waiting ?? 0) >= 2) break;
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+
+      await blocker.query("commit");
+      blockerOpen = false;
+      await Promise.all([deletion, insertion]);
+
+      await expect(
+        db.query.aiJob.findFirst({ where: eq(aiJob.id, jobId) }),
+      ).resolves.toMatchObject({ id: jobId, graphileJobKey });
+      const queued = await db.execute<{ present: boolean }>(sql`
+        select exists(
+          select 1 from graphile_worker._private_jobs where key = ${graphileJobKey}
+        ) as present
+      `);
+      expect(queued.rows[0]?.present).toBe(true);
+    } finally {
+      if (blockerOpen) await blocker.query("rollback");
+      blocker.release();
+      await db.execute(
+        sql`select graphile_worker.remove_job(${graphileJobKey})`,
+      );
+      await db.delete(aiJob).where(eq(aiJob.id, jobId));
+      await db.delete(auditEvent).where(eq(auditEvent.targetId, userId));
+      await db.delete(user).where(eq(user.id, userId));
+      await pool.end();
+    }
+  });
+
+  it("rolls back the AI-row deletion when Graphile removal fails", async () => {
+    const { db, pool } = createDatabase(databaseUrl!);
+    const suffix = newDomainId();
+    const userId = `delete-rollback-${suffix}`;
+    const jobId = newDomainId();
+    const graphileJobKey = `ai-job:${jobId}`;
+    try {
+      await db.insert(user).values({
+        id: userId,
+        name: "Deletion rollback learner",
+        email: `${userId}@example.test`,
+        role: "learner",
+      });
+      await db.execute(sql`select graphile_worker.add_job(
+        'run_ai_job',
+        ${JSON.stringify({ jobId })}::json,
+        max_attempts := 5,
+        job_key := ${graphileJobKey},
+        job_key_mode := 'preserve_run_at'
+      )`);
+      await db.insert(aiJob).values({
+        id: jobId,
+        ownerId: userId,
+        taskKind: "ielts_assessment",
+        status: "QUEUED",
+        protectedReference: { attemptId: newDomainId() },
+        versionSnapshot: {
+          providerKind: "unconfigured",
+          providerConnectionId: "unconfigured",
+        },
+        idempotencyKey: `delete-rollback:${jobId}`,
+        graphileJobKey,
+      });
+      await pool.query(`
+        create function public.test_fail_learning_delete_graphile()
+        returns trigger language plpgsql as $$
+        begin
+          raise exception 'injected Graphile removal failure';
+        end;
+        $$;
+        create trigger test_fail_learning_delete_graphile
+        before delete or update on graphile_worker._private_jobs
+        for each row execute function public.test_fail_learning_delete_graphile();
+      `);
+
+      await expect(
+        deleteLearningRecord(db, userId, `delete:${suffix}`),
+      ).rejects.toThrow("Failed query: select graphile_worker.remove_job");
+      await expect(
+        db.query.aiJob.findFirst({ where: eq(aiJob.id, jobId) }),
+      ).resolves.toMatchObject({ id: jobId, graphileJobKey });
+      const queued = await db.execute<{ present: boolean }>(sql`
+        select exists(
+          select 1 from graphile_worker._private_jobs where key = ${graphileJobKey}
+        ) as present
+      `);
+      expect(queued.rows[0]?.present).toBe(true);
+    } finally {
+      await pool.query(`
+        drop trigger if exists test_fail_learning_delete_graphile
+          on graphile_worker._private_jobs;
+        drop function if exists public.test_fail_learning_delete_graphile();
+      `);
+      await db.execute(
+        sql`select graphile_worker.remove_job(${graphileJobKey})`,
+      );
+      await db.delete(aiJob).where(eq(aiJob.id, jobId));
+      await db.delete(auditEvent).where(eq(auditEvent.targetId, userId));
+      await db.delete(user).where(eq(user.id, userId));
+      await pool.end();
+    }
+  });
 });

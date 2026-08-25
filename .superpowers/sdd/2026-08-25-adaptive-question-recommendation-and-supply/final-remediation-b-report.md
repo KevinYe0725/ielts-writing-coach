@@ -26,13 +26,13 @@ The early-retry RED then failed the cooldown-bypass decision and the missing
 service contract. Independent route, client, and browser RED runs failed on the
 missing route, missing strict client method, and missing Admin action.
 
-After implementation, the fresh PostgreSQL 17.6 focused suite passed 9 files /
-179 tests. The full relevant suites passed:
+After Fix Round 1, the fresh PostgreSQL 17.6 focused suite passed 9 files /
+184 tests. The full relevant suites passed:
 
 ```text
 @iwc/db: 2 files / 11 tests
 @iwc/worker: 14 files / 191 tests
-@iwc/web: 54 files / 439 tests
+@iwc/web: 54 files / 444 tests
 Admin E2E across Chromium, Firefox, WebKit, and mobile: 56 tests
 ```
 
@@ -65,11 +65,11 @@ Admin E2E across Chromium, Firefox, WebKit, and mobile: 56 tests
 ## Verification gates
 
 ```text
-PostgreSQL: fresh postgres:17.6-bookworm at 127.0.0.1:55437, migrations passed
-Focused modified PG/client/security suite: 9 files / 179 tests passed
+PostgreSQL: fresh postgres:17.6-bookworm at 127.0.0.1:55438, migrations passed
+Focused modified PG/client/security suite: 9 files / 184 tests passed
 Full DB package: 11/11 passed
 Full Worker package: 191/191 passed
-Full Web package: 439/439 passed
+Full Web package: 444/444 passed
 Four-project Admin E2E: 56/56 passed
 DB, Worker, Web typecheck: passed
 DB and Worker lint: passed
@@ -89,3 +89,44 @@ Web production build: passed, 48/48 static pages and the new dynamic route
   ledger are the durable handoff.
 
 Commit: the commit containing this report.
+
+## Fix Round 1/5 — atomic deletion, marginal balance, and locale ownership
+
+### RED evidence
+
+- A real PostgreSQL notification-row barrier paused learning deletion after its
+  old pre-transaction job-key read. A concurrent ordinary AI/Graphile job then
+  committed before deletion resumed: the AI row was deleted while the Graphile
+  row survived. The regression failed on the missing AI row.
+- The fully tied 5×8 bank selected type counts `0/7/8/0/0`. Type-heavy and
+  topic-heavy dynamic-bank fixtures also concentrated targets in the first
+  lexicographic types instead of balancing the underrepresented marginals.
+- Chromium received a 409 whose English detail contained
+  `backend-only-sentinel`; the Chinese Admin UI rendered that server text and
+  could not find the required locale-owned Chinese error.
+
+### Fix
+
+- Learning deletion now locks the owner row, deletes only owner-scoped
+  non-`question_bank_refill` AI rows with `RETURNING graphile_job_key`, and
+  removes exactly those returned Graphile keys inside the same transaction.
+  The owner lock serializes concurrent FK-backed job inserts. An injected
+  Graphile DELETE/UPDATE trigger proves a removal failure rolls the AI deletion
+  back.
+- The one shared target builder now greedily chooses the lowest existing pair
+  count, then the lowest live type marginal, then the lowest live topic
+  marginal, with taxonomy order as the deterministic final tie-break. A tied
+  fifteen-target request yields exactly three targets per type and topic counts
+  differing by at most one. Uneven fixtures preserve lower-pair priority while
+  balancing the remaining type/topic deficits.
+- The Admin action maps `QUESTION_BANK_REFILL_RETRY_NOT_AVAILABLE` to
+  locale-owned Chinese/English copy and uses locale-owned generic copy for all
+  other failures. Backend detail is never rendered directly by this action.
+
+### Focused GREEN
+
+```text
+Learning deletion PostgreSQL: 5/5 passed
+Target-mix PostgreSQL: 3/3 passed
+Admin retry Chromium: 1/1 passed
+```

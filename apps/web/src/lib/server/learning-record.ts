@@ -327,17 +327,22 @@ export async function deleteLearningRecord(
   userId: string,
   preservedIdempotencyKey: string,
 ): Promise<{ cycles: number; evidenceEvents: number; queuedJobs: number }> {
-  const jobs = await db
-    .select({ key: aiJob.graphileJobKey })
-    .from(aiJob)
-    .where(
-      and(
-        eq(aiJob.ownerId, userId),
-        ne(aiJob.taskKind, "question_bank_refill"),
-      ),
-    );
   return db.transaction(async (transaction) => {
-    for (const job of jobs) {
+    await transaction
+      .select({ id: user.id })
+      .from(user)
+      .where(eq(user.id, userId))
+      .for("update");
+    const deletedJobs = await transaction
+      .delete(aiJob)
+      .where(
+        and(
+          eq(aiJob.ownerId, userId),
+          ne(aiJob.taskKind, "question_bank_refill"),
+        ),
+      )
+      .returning({ key: aiJob.graphileJobKey });
+    for (const job of deletedJobs) {
       if (job.key)
         await transaction.execute(
           sql`select graphile_worker.remove_job(${job.key})`,
@@ -359,14 +364,6 @@ export async function deleteLearningRecord(
     await transaction
       .delete(questionRecommendation)
       .where(eq(questionRecommendation.userId, userId));
-    await transaction
-      .delete(aiJob)
-      .where(
-        and(
-          eq(aiJob.ownerId, userId),
-          ne(aiJob.taskKind, "question_bank_refill"),
-        ),
-      );
     const deletedCycles = await transaction
       .delete(trainingCycle)
       .where(eq(trainingCycle.userId, userId))
@@ -395,13 +392,13 @@ export async function deleteLearningRecord(
       metadata: {
         cycles: deletedCycles.length,
         evidenceEvents: deletedEvidence.length,
-        queuedJobs: jobs.length,
+        queuedJobs: deletedJobs.length,
       },
     });
     return {
       cycles: deletedCycles.length,
       evidenceEvents: deletedEvidence.length,
-      queuedJobs: jobs.length,
+      queuedJobs: deletedJobs.length,
     };
   });
 }
