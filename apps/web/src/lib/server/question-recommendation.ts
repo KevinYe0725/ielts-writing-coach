@@ -11,7 +11,6 @@ import {
   isNull,
   lte,
   or,
-  sql,
 } from "drizzle-orm";
 
 import {
@@ -37,6 +36,7 @@ import {
 import {
   automaticQuestionBankRefillDecision,
   enqueueQuestionBankRefill,
+  lockQuestionBankRefillAdmission,
 } from "./jobs";
 import { lockLearnerAndAssertActiveCycleCapacity } from "./active-cycle-limit";
 import { ApiProblem } from "./problem";
@@ -226,6 +226,7 @@ export async function createQuestionRecommendation(
     options.randomIndex ?? ((upperExclusive) => randomInt(upperExclusive));
 
   return database.transaction(async (transaction) => {
+    await lockQuestionBankRefillAdmission(transaction);
     await lockLearnerAndAssertActiveCycleCapacity(transaction, actorId);
     const selection = await selectForLearner(transaction, actorId, {
       now,
@@ -531,9 +532,7 @@ export async function retryQuestionBankRefill(
   options: QuestionSupplyRetryOptions = {},
 ): Promise<QuestionSupplyRetryProjection> {
   return database.transaction(async (transaction) => {
-    await transaction.execute(
-      sql`select pg_advisory_xact_lock(hashtext('question-bank-refill'))`,
-    );
+    await lockQuestionBankRefillAdmission(transaction);
     const [active] = await transaction
       .select({
         id: questionGenerationBatch.id,

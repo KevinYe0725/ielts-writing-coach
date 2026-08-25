@@ -1,12 +1,15 @@
-import { eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   aiJob,
   auditEvent,
   createDatabase,
+  instanceConfiguration,
   mixedReviewTask,
+  modelRoute,
   newDomainId,
+  providerConnection,
   question,
   questionGenerationBatch,
   questionRecommendation,
@@ -26,6 +29,7 @@ import {
   createQuestionRecommendation,
   getQuestionRecommendation,
   listPublicQuestionCatalog,
+  retryQuestionBankRefill,
 } from "./question-recommendation";
 import { lockLearnerAndAssertActiveCycleCapacity } from "./active-cycle-limit";
 
@@ -217,6 +221,168 @@ integration("question recommendation service (PostgreSQL)", () => {
           return result;
         }),
     } as unknown as Database;
+  }
+
+  function databaseWithRefillAdmissionBarrier(input: {
+    acquired: () => void;
+    release: () => Promise<void>;
+  }): Database {
+    let intercepted = false;
+    const wrapTransaction = (transaction: object): object =>
+      new Proxy(transaction, {
+        get(target, property) {
+          if (property === "execute") {
+            return async (...args: unknown[]) => {
+              const execute = Reflect.get(target, property, target) as (
+                ...executeArgs: unknown[]
+              ) => Promise<unknown>;
+              const result = await execute.apply(target, args);
+              if (!intercepted) {
+                intercepted = true;
+                input.acquired();
+                await input.release();
+              }
+              return result;
+            };
+          }
+          if (property === "transaction") {
+            return async (
+              callback: (nestedTransaction: unknown) => Promise<unknown>,
+            ) => {
+              const nested = Reflect.get(target, property, target) as (
+                nestedCallback: (nestedTransaction: object) => Promise<unknown>,
+              ) => Promise<unknown>;
+              return nested.call(target, async (nestedTransaction: object) =>
+                callback(wrapTransaction(nestedTransaction)),
+              );
+            };
+          }
+          const value = Reflect.get(target, property, target);
+          return typeof value === "function" ? value.bind(target) : value;
+        },
+      });
+
+    return {
+      transaction: (callback: (transaction: unknown) => Promise<unknown>) =>
+        database.db.transaction((transaction) =>
+          callback(wrapTransaction(transaction)),
+        ),
+    } as unknown as Database;
+  }
+
+  async function within<T>(
+    promise: Promise<T>,
+    label: string,
+    timeoutMs = 8_000,
+  ): Promise<T> {
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    try {
+      return await Promise.race([
+        promise,
+        new Promise<never>((_, reject) => {
+          timeout = setTimeout(
+            () => reject(new Error(`Timed out waiting for ${label}`)),
+            timeoutMs,
+          );
+        }),
+      ]);
+    } finally {
+      if (timeout) clearTimeout(timeout);
+    }
+  }
+
+  async function waitForAdvisoryLockWaiter(): Promise<void> {
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      const result = await database.pool.query<{ waiting: string }>(`
+        select count(*)::text as waiting
+        from pg_locks
+        where locktype = 'advisory' and not granted
+      `);
+      if (Number(result.rows[0]?.waiting ?? 0) > 0) return;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    throw new Error("Timed out waiting for a PostgreSQL advisory-lock waiter");
+  }
+
+  async function installSharedRefillRoute(ownerId: string): Promise<{
+    restoreDeploymentMode: () => Promise<void>;
+  }> {
+    let instance = await database.db.query.instanceConfiguration.findFirst();
+    let createdInstance = false;
+    if (!instance) {
+      const id = newDomainId();
+      [instance] = await database.db
+        .insert(instanceConfiguration)
+        .values({ id, deploymentMode: "personal", defaultLocale: "zh-CN" })
+        .returning();
+      createdInstance = true;
+    }
+    const originalMode = instance!.deploymentMode;
+    const providerId = newDomainId();
+    await database.db.insert(providerConnection).values({
+      id: providerId,
+      ownerId,
+      name: `Refill lock-order provider ${providerId}`,
+      kind: "mock",
+      secretMode: "encrypted",
+    });
+    await database.db.insert(modelRoute).values({
+      id: newDomainId(),
+      ownerId,
+      taskKind: "question_bank_refill",
+      providerConnectionId: providerId,
+      model: "mock-deterministic-v1",
+      updatedAt: new Date(Date.now() + 24 * 60 * 60 * 1_000),
+    });
+    await database.db
+      .update(instanceConfiguration)
+      .set({ deploymentMode: "shared" })
+      .where(eq(instanceConfiguration.id, instance!.id));
+
+    return {
+      restoreDeploymentMode: async () => {
+        if (createdInstance) {
+          await database.db
+            .delete(instanceConfiguration)
+            .where(eq(instanceConfiguration.id, instance!.id));
+          return;
+        }
+        await database.db
+          .update(instanceConfiguration)
+          .set({ deploymentMode: originalMode })
+          .where(eq(instanceConfiguration.id, instance!.id));
+      },
+    };
+  }
+
+  async function expectOneActiveRefillWithoutOrphanJobs(
+    actorIds: readonly string[],
+  ): Promise<typeof questionGenerationBatch.$inferSelect> {
+    const activeBatches =
+      await database.db.query.questionGenerationBatch.findMany({
+        where: and(
+          inArray(questionGenerationBatch.triggeredByUserId, [...actorIds]),
+          inArray(questionGenerationBatch.status, [
+            "QUEUED",
+            "SEARCHING",
+            "GENERATING",
+            "VALIDATING",
+          ]),
+        ),
+      });
+    expect(activeBatches).toHaveLength(1);
+    const jobs = await database.db.query.aiJob.findMany({
+      where: and(
+        inArray(aiJob.ownerId, [...actorIds]),
+        eq(aiJob.taskKind, "question_bank_refill"),
+      ),
+    });
+    expect(jobs).toHaveLength(1);
+    expect(activeBatches[0]?.aiJobId).toBe(jobs[0]?.id);
+    expect(jobs[0]?.protectedReference).toEqual({
+      generationBatchId: activeBatches[0]?.id,
+    });
+    return activeBatches[0]!;
   }
 
   async function waitForLockWaiter(): Promise<void> {
@@ -1056,6 +1222,250 @@ integration("question recommendation service (PostgreSQL)", () => {
           event.targetType === "question_generation_batch",
       ),
     ).toBe(true);
+  });
+
+  it("orders same-owner recommendation and privileged retry as refill admission before the user row", async () => {
+    const ownerId = await createLearner("refill-order-same-owner");
+    await database.db
+      .update(user)
+      .set({ role: "owner" })
+      .where(eq(user.id, ownerId));
+    const shared = await installSharedRefillRoute(ownerId);
+    const onlyCandidate = QUESTION_BANK[0]!;
+    await exposeAllExcept(ownerId, [onlyCandidate.id]);
+    await insertBatch(ownerId, "FAILED", new Date());
+
+    let markAdmissionAcquired!: () => void;
+    const admissionAcquired = new Promise<void>((resolve) => {
+      markAdmissionAcquired = resolve;
+    });
+    let releaseAdmission!: () => void;
+    const admissionReleased = new Promise<void>((resolve) => {
+      releaseAdmission = resolve;
+    });
+    const retryDatabase = databaseWithRefillAdmissionBarrier({
+      acquired: markAdmissionAcquired,
+      release: () => admissionReleased,
+    });
+    const retry = retryQuestionBankRefill(retryDatabase, ownerId);
+    let recommendation: ReturnType<typeof createQuestionRecommendation> | null =
+      null;
+    try {
+      await within(admissionAcquired, "privileged refill admission");
+      recommendation = createQuestionRecommendation(
+        database.db,
+        ownerId,
+        { action: "INITIAL" },
+        options,
+      );
+      await waitForAdvisoryLockWaiter();
+
+      await within(
+        database.db.transaction(async (transaction) => {
+          await transaction
+            .select({ id: user.id })
+            .from(user)
+            .where(eq(user.id, ownerId))
+            .for("update");
+        }),
+        "the still-unlocked recommendation owner row",
+        1_000,
+      );
+      releaseAdmission();
+
+      const [retryResult, recommendationResult] = await within(
+        Promise.all([retry, recommendation]),
+        "same-owner retry and recommendation completion",
+      );
+      expect(retryResult).toEqual({
+        state: "STARTED",
+        batchStatus: "QUEUED",
+      });
+      expect(recommendationResult).toMatchObject({
+        status: "READY",
+        question: { id: onlyCandidate.id },
+      });
+      await expectOneActiveRefillWithoutOrphanJobs([ownerId]);
+    } finally {
+      releaseAdmission();
+      await Promise.allSettled([
+        retry,
+        ...(recommendation ? [recommendation] : []),
+      ]);
+      await shared.restoreDeploymentMode();
+    }
+  });
+
+  it("serializes a learner recommendation with its canonical privileged refill owner retry", async () => {
+    const ownerId = await createLearner("refill-order-route-owner");
+    const learnerId = await createLearner("refill-order-route-learner");
+    await database.db
+      .update(user)
+      .set({ role: "owner" })
+      .where(eq(user.id, ownerId));
+    const shared = await installSharedRefillRoute(ownerId);
+    await exposeAllExcept(learnerId, []);
+    await insertBatch(ownerId, "FAILED", new Date());
+
+    let markAdmissionAcquired!: () => void;
+    const admissionAcquired = new Promise<void>((resolve) => {
+      markAdmissionAcquired = resolve;
+    });
+    let releaseAdmission!: () => void;
+    const admissionReleased = new Promise<void>((resolve) => {
+      releaseAdmission = resolve;
+    });
+    const retryDatabase = databaseWithRefillAdmissionBarrier({
+      acquired: markAdmissionAcquired,
+      release: () => admissionReleased,
+    });
+    const retry = retryQuestionBankRefill(retryDatabase, ownerId);
+    let recommendation: ReturnType<typeof createQuestionRecommendation> | null =
+      null;
+    try {
+      await within(admissionAcquired, "canonical-owner refill admission");
+      recommendation = createQuestionRecommendation(
+        database.db,
+        learnerId,
+        { action: "INITIAL" },
+        options,
+      );
+      await waitForAdvisoryLockWaiter();
+
+      await within(
+        database.db.transaction(async (transaction) => {
+          await transaction
+            .select({ id: user.id })
+            .from(user)
+            .where(eq(user.id, learnerId))
+            .for("update");
+        }),
+        "the still-unlocked learner row",
+        1_000,
+      );
+      releaseAdmission();
+
+      const [retryResult, recommendationResult] = await within(
+        Promise.all([retry, recommendation]),
+        "canonical-owner retry and learner recommendation completion",
+      );
+      expect(retryResult).toEqual({
+        state: "STARTED",
+        batchStatus: "QUEUED",
+      });
+      expect(recommendationResult).toMatchObject({
+        status: "PENDING",
+        question: null,
+      });
+      const active = await expectOneActiveRefillWithoutOrphanJobs([
+        ownerId,
+        learnerId,
+      ]);
+      await expect(
+        database.db.query.questionRecommendation.findFirst({
+          where: eq(questionRecommendation.id, recommendationResult.id),
+        }),
+      ).resolves.toMatchObject({
+        status: "PENDING",
+        generationBatchId: active.id,
+      });
+    } finally {
+      releaseAdmission();
+      await Promise.allSettled([
+        retry,
+        ...(recommendation ? [recommendation] : []),
+      ]);
+      await shared.restoreDeploymentMode();
+    }
+  });
+
+  it("serializes two privileged recommenders before either learner row and keeps one refill job", async () => {
+    const ownerId = await createLearner("refill-order-owner-recommender");
+    const adminId = await createLearner("refill-order-admin-recommender");
+    await database.db
+      .update(user)
+      .set({ role: "owner" })
+      .where(eq(user.id, ownerId));
+    await database.db
+      .update(user)
+      .set({ role: "admin" })
+      .where(eq(user.id, adminId));
+    const shared = await installSharedRefillRoute(ownerId);
+    await exposeAllExcept(ownerId, []);
+    await exposeAllExcept(adminId, []);
+
+    let markAdmissionAcquired!: () => void;
+    const admissionAcquired = new Promise<void>((resolve) => {
+      markAdmissionAcquired = resolve;
+    });
+    let releaseAdmission!: () => void;
+    const admissionReleased = new Promise<void>((resolve) => {
+      releaseAdmission = resolve;
+    });
+    const firstDatabase = databaseWithRefillAdmissionBarrier({
+      acquired: markAdmissionAcquired,
+      release: () => admissionReleased,
+    });
+    const first = createQuestionRecommendation(
+      firstDatabase,
+      adminId,
+      { action: "INITIAL" },
+      options,
+    );
+    let second: ReturnType<typeof createQuestionRecommendation> | null = null;
+    try {
+      await within(admissionAcquired, "first privileged refill admission");
+      second = createQuestionRecommendation(
+        database.db,
+        ownerId,
+        { action: "INITIAL" },
+        options,
+      );
+      await waitForAdvisoryLockWaiter();
+
+      await within(
+        database.db.transaction(async (transaction) => {
+          await transaction
+            .select({ id: user.id })
+            .from(user)
+            .where(inArray(user.id, [ownerId, adminId]))
+            .for("update");
+        }),
+        "both still-unlocked privileged recommender rows",
+        1_000,
+      );
+      releaseAdmission();
+
+      const recommendations = await within(
+        Promise.all([first, second]),
+        "both privileged recommendations",
+      );
+      expect(recommendations).toEqual([
+        expect.objectContaining({ status: "PENDING", question: null }),
+        expect.objectContaining({ status: "PENDING", question: null }),
+      ]);
+      const active = await expectOneActiveRefillWithoutOrphanJobs([
+        ownerId,
+        adminId,
+      ]);
+      const stored = await database.db.query.questionRecommendation.findMany({
+        where: inArray(
+          questionRecommendation.id,
+          recommendations.map((item) => item.id),
+        ),
+      });
+      expect(stored).toHaveLength(2);
+      expect(
+        stored.every(
+          (item) =>
+            item.status === "PENDING" && item.generationBatchId === active.id,
+        ),
+      ).toBe(true);
+    } finally {
+      releaseAdmission();
+      await Promise.allSettled([first, ...(second ? [second] : [])]);
+      await shared.restoreDeploymentMode();
+    }
   });
 
   it("refuses an explicit retry when the latest batch did not fail", async () => {

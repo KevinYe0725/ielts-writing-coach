@@ -196,8 +196,11 @@ later recommendation traffic; both mutexes release after failure; see
 final-remediation-e-report.md)
 Final broad re-review: changes requested at d897490 (2 Important — durable
 fallback abandonment and refill admission lock ordering; 1 stale-scope Minor)
-Final remediation F1: in progress (durable recommendation abandonment)
-Final remediation F2: pending (global refill admission lock order)
+Final remediation F1: complete at 938c248 (cycle-coupled STARTED/ABANDONED,
+status-independent SWAP cooldown, forced race orderings; review clean)
+Final remediation F2: complete (single exported global refill-admission helper,
+global-before-user transaction order, reentrant enqueue, and three deterministic
+PostgreSQL barrier/mutation cases; see final-remediation-f2-report.md)
 Final remediation F1: complete (internal ABANDONED state, protected atomic
 DELETE, GET/DELETE PostgreSQL race barriers, strict client/Demo persistence,
 and manual/private fallback abandonment before custom/cycle creation; see
@@ -210,3 +213,6 @@ Final remediation F1: fix round 2/5 complete (fallback disposition is resolved
 against the cycle question so exact READY use becomes STARTED; every recent
 SWAP row cools excluded_external_id by created_at independent of status; two
 PostgreSQL barriers force both recommended-vs-fallback commit orderings)
+Current final evidence scope: baseline 938c248 plus the focused F2 remediation
+and its report. Earlier broad ranges through d897490 remain historical review
+evidence rather than the current final baseline.

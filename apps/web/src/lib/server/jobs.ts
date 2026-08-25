@@ -164,6 +164,21 @@ export function sourceOwnedFocusedGenerationDecision(
 
 const QUESTION_BANK_REFILL_COOLDOWN_MS = 6 * 60 * 60 * 1_000;
 
+/**
+ * Serializes refill admission across the whole instance for this transaction.
+ * PostgreSQL transaction advisory locks are reentrant, so a caller can acquire
+ * this before any user-row lock and safely call enqueueQuestionBankRefill.
+ * The intentional tradeoff is that recommendation admission is instance-wide,
+ * even when a recommendation ultimately does not need a refill.
+ */
+export async function lockQuestionBankRefillAdmission(
+  transaction: DatabaseTransaction,
+): Promise<void> {
+  await transaction.execute(
+    sql`select pg_advisory_xact_lock(hashtext('question-bank-refill'))`,
+  );
+}
+
 export function automaticQuestionBankRefillDecision(input: {
   hasOtherNonTerminalBatch: boolean;
   latestFailedAt: Date | null;
@@ -445,9 +460,7 @@ export async function enqueueQuestionBankRefill(
   batchId: string,
   options: { bypassFailedCooldown?: boolean } = {},
 ): Promise<EnqueuedAIJob> {
-  await transaction.execute(
-    sql`select pg_advisory_xact_lock(hashtext('question-bank-refill'))`,
-  );
+  await lockQuestionBankRefillAdmission(transaction);
   const [batch] = await transaction
     .select()
     .from(questionGenerationBatch)
