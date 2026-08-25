@@ -1205,6 +1205,8 @@ test.describe("Today query states at the HTTP boundary", () => {
     await expect.poll(() => accountAKeys.length).toBe(1);
 
     await accountB.goto("/today?mixed-review=1");
+    const accountBMobileMenu = accountB.locator(".mobile-menu > summary");
+    if (await accountBMobileMenu.isVisible()) await accountBMobileMenu.click();
     await accountB
       .getByRole("button", { name: /learner@example\.com/i })
       .first()

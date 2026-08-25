@@ -187,9 +187,9 @@ changing the earlier independent-review verdict boundary. Repository-controlled
 evidence is recorded in the 2026-08-25 addendum to
 `annotation-desk-v1-evidence.md`:
 
-- isolated PostgreSQL 17.6: 91 files / 850 tests passed, no skips or failures;
-- Demo four-project browser matrix: 658 passed / 250 intentional skips;
-- non-Demo four-project HTTP matrix: 135 passed / 73 intentional skips;
+- isolated PostgreSQL 17.6: 95 files / 930 tests passed, no skips or failures;
+- Demo four-project browser matrix: 658 passed / 314 intentional skips;
+- non-Demo four-project HTTP matrix: 199 passed / 73 intentional skips;
 - format, lint, typecheck, Web/Worker build, and whitespace gates passed;
 - learner exports omit question-supply internals, the encrypted full backup
   preserves the encrypted search connection only after archive authentication,

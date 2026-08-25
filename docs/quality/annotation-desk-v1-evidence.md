@@ -254,9 +254,10 @@ Fix Round 1 closed the four review findings against the Task 10 candidate:
   target IDs while retaining event, resource class, result, and time context.
 
 This addendum verifies the adaptive recommendation and shared question-supply
-work based on `a9c2fbada3a9a8e735dd513a42c73aa3cb933b87` plus the Task 10
-release-gate diff. It does not replace the external real-account and rendered
-zoom boundaries above.
+work through `87fb60599d98783fc6117f3b7975319f9e0f2af6`, including the final
+cross-tab deletion regression after the production fixes through `00088f9`.
+It does not replace the external real-account, real-provider, or rendered zoom
+boundaries above.
 
 ### Privacy, backup, and administration
 
@@ -286,20 +287,20 @@ zoom boundaries above.
 | Gate                               | Result                                                                                 |
 | ---------------------------------- | -------------------------------------------------------------------------------------- |
 | Isolated PostgreSQL 17.6 migration | VERIFIED, exit 0 on tmpfs `iwc-question-supply-final-pg17`                             |
-| Exact DB-backed `pnpm test`        | VERIFIED, 91 files / 850 passed / 0 skipped / 0 failed                                 |
+| Exact DB-backed `pnpm test`        | VERIFIED, 95 files / 930 passed / 0 skipped / 0 failed                                 |
 | Format                             | VERIFIED, all matched files use Prettier style                                         |
 | Lint                               | VERIFIED, 0 errors / 4 existing Fast Refresh warnings                                  |
 | Typecheck                          | VERIFIED, all packages and scripts                                                     |
 | Web production build               | VERIFIED, compiled and generated 48/48 pages                                           |
 | Worker production build            | VERIFIED, two ESM entry points and source maps                                         |
 | Compose operation regressions      | VERIFIED, 2 files / 13 passed / 0 skipped / 0 failed                                   |
-| Demo browser matrix                | VERIFIED, 908 enumerated / 658 passed / 250 intentional skips / 0 failed               |
-| Non-Demo HTTP matrix               | VERIFIED, 208 enumerated / 135 passed / 73 intentional skips / 0 failed                |
+| Demo browser matrix                | VERIFIED, 972 enumerated / 658 passed / 314 intentional skips / 0 failed               |
+| Non-Demo HTTP matrix               | VERIFIED, 272 enumerated / 199 passed / 73 intentional skips / 0 failed                |
 | Fix Round 1 Admin matrix           | VERIFIED, 52/52 passed across Chromium, Firefox, WebKit, and mobile                    |
 | Whitespace                         | VERIFIED, `git diff --check` exit 0                                                    |
 | Real Brave connection and refill   | `EXTERNAL_PENDING`; no credential requested, read, stored, synthesized, or transmitted |
 
-The 250 Demo skips belong to non-Demo HTTP/Admin contracts and
+The 314 Demo skips belong to non-Demo HTTP/Admin contracts and
 hardware-keyboard or mode-specific coverage. The 73 non-Demo skips include the
 inverse Demo-only recommendation/setup flows and 24 browser-only Demo
 presentation checks; the latter passed in the complete Demo matrix, while the
@@ -312,3 +313,9 @@ complete two-worker rerun. The first final-remediation non-Demo run had four
 expected stale write-only-key assertions; the exact matrix passed after the
 oracle required immediate Save from ephemeral component state. No failing
 assertion was converted to a general skip.
+
+The controller's first final non-Demo run exposed one mobile-only test setup
+error: the cross-tab sign-out fixture tried to use the account control before
+opening the mobile navigation. The focused mobile regression passed after the
+fixture used the existing mobile-menu flow, and the complete 272-test matrix
+was rerun to the green totals above. No product code changed for that fix.
