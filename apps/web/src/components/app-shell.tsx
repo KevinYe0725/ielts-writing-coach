@@ -449,7 +449,6 @@ function Topbar({
         </div>
       </div>
       <div className="topbar-actions">
-        <NotificationCenter />
         <LocaleSwitch />
       </div>
     </header>
@@ -536,6 +535,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <Sidebar destinations={destinations} hidden={sidebarCollapsed} />
       <div className={cn("app-column", styles.appColumn)}>
         <MobileHeader destinations={destinations} />
+        <NotificationCenter />
         <Suspense fallback={null}>
           <CurrentRouteObserver
             onChange={setCurrentRoute}

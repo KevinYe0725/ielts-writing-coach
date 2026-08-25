@@ -174,6 +174,177 @@ test.describe("account controls", () => {
     await expect(page).toHaveURL(/\/today$/);
   });
 
+  test("uses a login-specific composition without an empty viewport scroll", async ({
+    page,
+  }) => {
+    for (const viewport of [
+      { width: 1440, height: 900 },
+      { width: 1024, height: 768 },
+      { width: 390, height: 844 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.goto("/signin");
+
+      await expect(page.locator("[data-signin-layout]")).toBeVisible();
+      await expect(page.locator("[data-signin-form]")).toBeVisible();
+      await expect(page.locator("[data-signin-story]")).toBeVisible();
+      await expect(page.getByText("自托管实例")).toHaveCount(0);
+      await expect(page.getByText("欢迎回来", { exact: true })).toBeVisible();
+
+      const overflow = await page.evaluate(() => ({
+        horizontal:
+          document.documentElement.scrollWidth -
+          document.documentElement.clientWidth,
+        vertical:
+          document.documentElement.scrollHeight -
+          document.documentElement.clientHeight,
+      }));
+      expect(overflow.horizontal).toBeLessThanOrEqual(1);
+      expect(overflow.vertical).toBeLessThanOrEqual(1);
+    }
+  });
+
+  test("fills the wide entry canvas while keeping the form readable", async ({
+    page,
+  }) => {
+    for (const viewport of [
+      { width: 1440, height: 900 },
+      { width: 1920, height: 1080 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.goto("/signin");
+      await expect(page.locator("[data-signin-layout]")).toBeVisible();
+
+      const geometry = await page.evaluate(() => {
+        const topbar = document
+          .querySelector(".setup-topbar")
+          ?.getBoundingClientRect();
+        const layout = document
+          .querySelector("[data-signin-layout]")
+          ?.getBoundingClientRect();
+        const form = document
+          .querySelector("[data-signin-form] form")
+          ?.getBoundingClientRect();
+        return {
+          formWidth: form?.width ?? 0,
+          layoutWidth: layout?.width ?? 0,
+          topbarLeft: topbar?.left ?? -1,
+          topbarRight: topbar?.right ?? -1,
+        };
+      });
+
+      expect(geometry.topbarLeft).toBeLessThanOrEqual(1);
+      expect(viewport.width - geometry.topbarRight).toBeLessThanOrEqual(1);
+      expect(geometry.layoutWidth).toBeGreaterThanOrEqual(viewport.width - 100);
+      expect(geometry.formWidth).toBeGreaterThanOrEqual(360);
+      expect(geometry.formWidth).toBeLessThanOrEqual(540);
+    }
+  });
+
+  test("keeps a short password local and submits a normalized new-account email", async ({
+    page,
+  }) => {
+    await signedInSession(page);
+    let submittedBody: unknown = null;
+    await page.route("**/api/v1/account-entry", async (route) => {
+      submittedBody = route.request().postDataJSON();
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          outcome: "REGISTERED",
+          redirect_to: "/today",
+        }),
+      });
+    });
+
+    await page.goto("/signin");
+    await page.locator("#signin-email").fill("  new@example.test  ");
+    await page.locator("#signin-password").fill("12345678901");
+    await expect(page.getByText(/至少 12 个字符/)).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /登录并继续|sign in and continue/i }),
+    ).toBeDisabled();
+
+    await page.locator("#signin-password").fill("123456789012");
+    await page
+      .getByRole("button", { name: /登录并继续|sign in and continue/i })
+      .click();
+
+    await expect(page).toHaveURL(/\/today$/);
+    expect(submittedBody).toMatchObject({
+      email: "new@example.test",
+      password: "123456789012",
+    });
+  });
+
+  test("shows localized credential errors instead of server prose", async ({
+    page,
+  }) => {
+    await page.route("**/api/v1/account-entry", async (route) => {
+      await route.fulfill({
+        status: 401,
+        contentType: "application/problem+json",
+        body: JSON.stringify({
+          code: "INVALID_CREDENTIALS",
+          detail: "The email or password is incorrect.",
+        }),
+      });
+    });
+
+    await page.goto("/signin");
+    await enterSignInCredentials(page, "learner@example.test");
+    await page
+      .getByRole("button", {
+        name: /继续|continue|登录并继续|sign in and continue/i,
+      })
+      .click();
+
+    await expect(
+      page.locator("[data-entry-surface='signin'] [role='alert']"),
+    ).toHaveText("邮箱或密码不正确。");
+    await expect(
+      page.getByText("The email or password is incorrect."),
+    ).toHaveCount(0);
+  });
+
+  test("allows only one account-entry request while the form is busy", async ({
+    page,
+  }) => {
+    let requestCount = 0;
+    let releaseRequest!: () => void;
+    const requestGate = new Promise<void>((resolve) => {
+      releaseRequest = resolve;
+    });
+    await page.route("**/api/v1/account-entry", async (route) => {
+      requestCount += 1;
+      await requestGate;
+      await route.fulfill({
+        status: 401,
+        contentType: "application/problem+json",
+        body: JSON.stringify({ code: "INVALID_CREDENTIALS" }),
+      });
+    });
+
+    await page.goto("/signin");
+    await enterSignInCredentials(page, "learner@example.test");
+    const form = page.locator("[data-entry-surface='signin'] form");
+    await form.evaluate((element) => {
+      const signInForm = element as HTMLFormElement;
+      signInForm.requestSubmit();
+      signInForm.requestSubmit();
+    });
+
+    try {
+      await expect.poll(() => requestCount).toBeGreaterThan(0);
+      expect(requestCount).toBe(1);
+      await expect(form).toHaveAttribute("aria-busy", "true");
+      await expect(page.locator("#signin-email")).toBeDisabled();
+      await expect(page.locator("#signin-password")).toBeDisabled();
+    } finally {
+      releaseRequest();
+    }
+  });
+
   test("shows the signed-in account and updates a confirmed password", async ({
     page,
   }) => {
@@ -761,7 +932,7 @@ test.describe("account controls", () => {
         14.5,
       );
       await expectAllVisibleFontsAtLeast(
-        page.getByRole("button", { name: "继续", exact: true }),
+        page.getByRole("button", { name: "登录并继续", exact: true }),
         "/signin primary button",
         14.5,
       );

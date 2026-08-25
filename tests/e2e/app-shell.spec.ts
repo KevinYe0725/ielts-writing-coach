@@ -455,6 +455,62 @@ test.describe("notification center against the HTTP boundary", () => {
     "The deterministic browser demo intentionally does not call notification APIs.",
   );
 
+  test("opens as an anchored popover without resizing the workspace", async ({
+    page,
+  }) => {
+    await signedInSession(page);
+    await page.route("**/api/v1/notifications", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ notifications: [] }),
+      });
+    });
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto("/today");
+
+    const center = page.locator(".notification-center");
+    const topbar = page.locator("header.topbar");
+    const main = page.locator("#main-content");
+    const summary = center.locator("summary");
+    const panel = center.locator(".notification-panel");
+    await expect(center).toBeVisible();
+    const topbarBefore = await topbar.boundingBox();
+    const mainBefore = await main.evaluate(
+      (element) => element.getBoundingClientRect().top + window.scrollY,
+    );
+
+    await summary.click();
+    await expect(panel).toBeVisible();
+
+    const topbarAfter = await topbar.boundingBox();
+    const mainAfter = await main.evaluate(
+      (element) => element.getBoundingClientRect().top + window.scrollY,
+    );
+    const summaryBox = await summary.boundingBox();
+    const panelBox = await panel.boundingBox();
+    const panelStyles = await panel.evaluate((element) => {
+      const style = window.getComputedStyle(element);
+      return {
+        overflowY: style.overflowY,
+        position: style.position,
+      };
+    });
+
+    expect(Math.abs(topbarAfter!.height - topbarBefore!.height)).toBeLessThan(
+      1,
+    );
+    expect(Math.abs(mainAfter - mainBefore)).toBeLessThan(1);
+    expect(panelBox!.width).toBeGreaterThanOrEqual(300);
+    expect(panelBox!.x + panelBox!.width).toBeLessThanOrEqual(1264);
+    expect(panelBox!.y).toBeGreaterThanOrEqual(
+      summaryBox!.y + summaryBox!.height,
+    );
+    expect(panelStyles).toEqual({
+      overflowY: "auto",
+      position: "absolute",
+    });
+  });
+
   test("shows unread notifications and marks one as read", async ({ page }) => {
     await signedInSession(page);
     await page.route("**/api/v1/notifications", async (route) => {

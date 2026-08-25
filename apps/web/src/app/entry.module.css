@@ -541,8 +541,278 @@
 }
 
 .signinSurface {
+  width: 100%;
+  padding: clamp(var(--desk-space-3), 2vw, var(--desk-space-6))
+    clamp(var(--desk-space-3), 3vw, var(--desk-space-8));
+  margin: 0 auto;
+}
+
+.signinLayout {
   display: grid;
+  min-height: 520px;
+  overflow: hidden;
+  background: var(--desk-paper);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--desk-radius-md);
+  box-shadow: var(--desk-shadow-floating);
+  grid-template-areas: "story form";
+  grid-template-columns: minmax(0, 1.04fr) minmax(390px, 0.96fr);
+}
+
+.signinFormPane {
+  display: flex;
+  padding: clamp(var(--desk-space-8), 5vw, var(--desk-space-12));
   align-items: center;
+  flex-direction: column;
+  grid-area: form;
+  justify-content: center;
+}
+
+.signinFormPane > * {
+  width: min(100%, 520px);
+}
+
+.signinHeading {
+  margin-bottom: var(--desk-space-6);
+}
+
+.signinHeading h1 {
+  margin: var(--desk-space-3) 0 var(--desk-space-2);
+  font-size: var(--desk-type-page-title);
+  letter-spacing: -0.035em;
+}
+
+.signinHeading p {
+  max-width: 440px;
+  margin: 0;
+  color: var(--desk-ink-muted);
+}
+
+.formCard {
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.signinForm {
+  display: grid;
+  gap: var(--desk-space-4);
+}
+
+.signinForm :global(.form-field) {
+  gap: var(--desk-space-2);
+}
+
+.signinForm :global(.text-input:focus-visible) {
+  border-color: var(--desk-blue);
+  outline: 3px solid var(--desk-blue);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+.inputHint,
+.fieldError,
+.formError {
+  margin: 0;
+  font-size: var(--desk-type-meta);
+}
+
+.inputHint {
+  color: var(--desk-ink-muted);
+}
+
+.fieldError {
+  color: var(--desk-error);
+}
+
+.formError {
+  padding: var(--desk-space-3) var(--desk-space-4);
+}
+
+.signinSubmit {
+  width: 100%;
+  margin-top: var(--desk-space-2);
+  justify-content: center;
+}
+
+.signinMeta {
+  display: grid;
+  margin-top: var(--desk-space-6);
+  color: var(--desk-ink-muted);
+  font-size: var(--desk-type-meta);
+  gap: var(--desk-space-2);
+}
+
+.signinMeta p {
+  margin: 0;
+}
+
+.signinMeta a {
+  width: fit-content;
+  color: var(--desk-blue);
+  font-weight: var(--desk-body-weight-semibold);
+  text-underline-offset: 3px;
+}
+
+.signinStory {
+  display: flex;
+  min-width: 0;
+  padding: clamp(var(--desk-space-8), 5vw, var(--desk-space-12));
+  color: var(--desk-ink);
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--desk-blue) 12%, var(--desk-canvas)),
+    var(--desk-canvas) 72%
+  );
+  border-right: 1px solid var(--line);
+  align-items: center;
+  flex-direction: column;
+  grid-area: story;
+  justify-content: center;
+}
+
+.signinStory > * {
+  width: min(100%, 560px);
+}
+
+.storyKicker {
+  margin: 0 0 var(--desk-space-3);
+  color: var(--desk-blue);
+  font-size: var(--desk-type-meta);
+  font-weight: var(--desk-body-weight-bold);
+  letter-spacing: 0.08em;
+}
+
+.signinStory h2 {
+  max-width: 430px;
+  margin: 0;
+  font-size: var(--desk-type-section-title);
+  letter-spacing: -0.035em;
+}
+
+.storyLead {
+  max-width: 440px;
+  margin: var(--desk-space-4) 0 var(--desk-space-6);
+  color: var(--desk-ink-muted);
+}
+
+.storySteps {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.storySteps li {
+  display: grid;
+  padding: var(--desk-space-3) 0;
+  border-top: 1px solid var(--line);
+  gap: var(--desk-space-3);
+  grid-template-columns: 34px minmax(0, 1fr);
+}
+
+.storySteps li > span {
+  color: var(--desk-blue);
+  font-family: var(--desk-font-utility);
+  font-size: var(--desk-type-meta);
+  font-weight: var(--desk-utility-weight-semibold);
+}
+
+.storySteps strong {
+  display: block;
+  margin-bottom: var(--desk-space-1);
+}
+
+.storySteps p,
+.storyFoot {
+  margin: 0;
+  color: var(--desk-ink-muted);
+  font-size: var(--desk-type-meta);
+}
+
+.storyFoot {
+  margin-top: var(--desk-space-6);
+  font-weight: var(--desk-body-weight-semibold);
+}
+
+@media (max-width: 1100px) {
+  .signinFormPane,
+  .signinStory {
+    padding: var(--desk-space-6);
+  }
+
+  .signinHeading {
+    margin-bottom: var(--desk-space-4);
+  }
+
+  .signinMeta {
+    margin-top: var(--desk-space-4);
+  }
+}
+
+@media (max-width: 900px) {
+  .signinLayout {
+    min-height: 0;
+    grid-template-areas:
+      "form"
+      "story";
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .signinFormPane,
+  .signinStory {
+    padding: var(--desk-space-6);
+  }
+
+  .signinStory {
+    border-top: 1px solid var(--line);
+    border-right: 0;
+  }
+
+  .storySteps {
+    display: none;
+  }
+
+  .storyLead {
+    margin-bottom: 0;
+  }
+
+  .storyFoot {
+    margin-top: var(--desk-space-3);
+  }
+}
+
+@media (max-width: 600px) {
+  .signinSurface {
+    padding: var(--desk-space-3) 0;
+  }
+
+  .signinLayout {
+    border-radius: var(--desk-radius-sm);
+    box-shadow: none;
+  }
+
+  .signinFormPane {
+    padding: var(--desk-space-6);
+  }
+
+  .signinHeading h1 {
+    font-size: var(--desk-type-page-title);
+  }
+
+  .signinStory {
+    padding: var(--desk-space-6);
+  }
+
+  .signinStory h2 {
+    font-size: var(--desk-type-section-title);
+  }
+
+  .storyLead,
+  .storySteps,
+  .storyFoot {
+    display: none;
+  }
 }
 
 .setupSurface {

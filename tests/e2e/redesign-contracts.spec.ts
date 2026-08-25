@@ -519,10 +519,11 @@ test.describe("annotation desk redesign contracts", () => {
   }) => {
     await page.goto("/signin");
     await expect(page.locator("[data-entry-surface='signin']")).toBeVisible();
+    await expect(page.getByText(/新邮箱会自动创建账号/)).toBeVisible();
+    await expect(page.getByText(/学校或团队.*邀请链接/)).toBeVisible();
     await expect(
-      page.getByText(/个人学习空间会为新邮箱创建账号/),
-    ).toBeVisible();
-    await expect(page.getByText(/共享空间需要邀请链接/)).toBeVisible();
+      page.getByText(/自托管实例|个人学习空间|共享空间/),
+    ).toHaveCount(0);
 
     await page.goto("/join?token=opaque-entry-token");
     await expect(page.locator("[data-entry-surface='join']")).toBeVisible();

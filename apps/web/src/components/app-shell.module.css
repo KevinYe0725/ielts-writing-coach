@@ -711,9 +711,10 @@
 
 .entryTopbar {
   display: flex;
-  width: min(1180px, calc(100% - 40px));
+  width: 100%;
   min-height: 76px;
-  margin: 0 auto;
+  padding-inline: clamp(var(--desk-space-4), 3vw, var(--desk-space-12));
+  margin: 0;
   background: color-mix(in srgb, var(--desk-paper) 94%, transparent);
   border-color: color-mix(in srgb, var(--desk-ink) 13%, transparent);
   align-items: center;
@@ -742,20 +743,153 @@
 }
 
 .notificationCenter {
+  position: fixed;
+  z-index: 60;
+  top: 15px;
+  right: calc(clamp(var(--desk-space-4), 3vw, var(--desk-space-8)) + 70px);
+  display: block;
+  flex: none;
   font-family: var(--desk-font-body);
 }
 
 .notificationSummary {
+  position: relative;
+  display: grid;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  list-style: none;
+  cursor: pointer;
   background: var(--desk-paper);
+  border: 1px solid color-mix(in srgb, var(--desk-ink) 16%, transparent);
   border-color: color-mix(in srgb, var(--desk-ink) 16%, transparent);
   border-radius: var(--desk-radius-sm);
+  place-items: center;
+}
+
+.notificationSummary::-webkit-details-marker {
+  display: none;
+}
+
+.notificationSummary::marker {
+  content: "";
+}
+
+.notificationSummary:focus-visible {
+  outline: 3px solid var(--desk-blue);
+  outline-offset: 3px;
+}
+
+.notificationCenter[open] .notificationSummary {
+  color: var(--desk-blue);
+  background: var(--desk-blue-soft);
+  border-color: color-mix(in srgb, var(--desk-blue) 42%, transparent);
+}
+
+.notificationSummary > span {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  display: grid;
+  min-width: 17px;
+  height: 17px;
+  padding-inline: var(--desk-space-1);
+  color: var(--desk-paper);
+  background: var(--desk-blue);
+  border-radius: var(--desk-radius-pill);
+  font-family: var(--desk-font-utility);
+  font-size: var(--desk-type-auxiliary);
+  font-weight: var(--desk-utility-weight-semibold);
+  line-height: 1;
+  place-items: center;
 }
 
 .notificationPanel {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + var(--desk-space-2));
+  right: 0;
+  width: min(360px, calc(100vw - var(--desk-space-8)));
+  max-height: min(420px, calc(100vh - 96px));
+  padding: var(--desk-space-4);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   background: var(--desk-paper);
+  border: 1px solid color-mix(in srgb, var(--desk-ink) 16%, transparent);
   border-color: color-mix(in srgb, var(--desk-ink) 16%, transparent);
   border-radius: var(--desk-radius-md);
   box-shadow: var(--desk-shadow-floating);
+}
+
+.notificationPanel > strong {
+  display: block;
+  margin-bottom: var(--desk-space-3);
+  font-size: var(--desk-type-body);
+}
+
+.notificationPanel > p {
+  margin: 0;
+  color: var(--desk-ink-muted);
+  font-size: var(--desk-type-meta);
+}
+
+.notificationPanel ul {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.notificationPanel li {
+  display: grid;
+  min-height: 48px;
+  padding: var(--desk-space-3) 0;
+  border-top: 1px solid var(--line);
+  align-items: center;
+  gap: var(--desk-space-3);
+  grid-template-columns: minmax(0, 1fr) 36px;
+}
+
+.notificationPanel li:first-child {
+  border-top: 0;
+}
+
+.notificationPanel li a {
+  color: var(--desk-ink);
+  font-size: var(--desk-type-label);
+  line-height: var(--desk-leading-body);
+}
+
+.notificationPanel li a:hover {
+  color: var(--desk-blue);
+}
+
+.notificationPanel li button {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  color: var(--desk-blue);
+  background: var(--desk-blue-soft);
+  border: 1px solid color-mix(in srgb, var(--desk-blue) 24%, transparent);
+  border-radius: var(--desk-radius-sm);
+  cursor: pointer;
+  place-items: center;
+}
+
+@media (max-width: 960px) {
+  .notificationCenter {
+    top: var(--desk-space-3);
+    right: 124px;
+  }
+
+  .notificationPanel {
+    position: fixed;
+    top: 66px;
+    right: var(--desk-space-4);
+    left: var(--desk-space-4);
+    width: auto;
+    max-height: calc(100svh - 82px);
+  }
 }
 
 @media (max-width: 1100px) {
