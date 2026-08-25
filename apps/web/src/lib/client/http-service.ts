@@ -1634,41 +1634,57 @@ const QUESTION_TOPICS = new Set<QuestionTopic>([
 function projectRecommendationQuestion(
   question: WireQuestion | undefined,
 ): QuestionOption | null {
-  const id = question?.id ?? question?.externalId;
-  const type = question?.type ?? question?.questionType;
-  const topic = question?.topic;
+  if (!question || Array.isArray(question)) return null;
+  const id = question.id;
+  const prompt = question.prompt;
+  const type = question.type;
+  const topic = question.topic;
+  const ieltsTrack = question.ielts_track;
+  const visibility = question.visibility;
   if (
-    !id ||
-    !question?.prompt ||
-    !type ||
-    !topic ||
+    typeof id !== "string" ||
+    typeof prompt !== "string" ||
+    typeof type !== "string" ||
+    typeof topic !== "string" ||
+    typeof ieltsTrack !== "string" ||
+    typeof visibility !== "string" ||
+    !id.trim() ||
+    !prompt.trim() ||
     !QUESTION_TYPES.has(type as QuestionType) ||
-    !QUESTION_TOPICS.has(topic as QuestionTopic)
+    !QUESTION_TOPICS.has(topic as QuestionTopic) ||
+    !["academic", "general_training"].includes(ieltsTrack) ||
+    !["public", "private"].includes(visibility)
   )
     return null;
   return {
     id,
-    prompt: question.prompt,
+    prompt,
     type: type as QuestionType,
     topic: topic as QuestionTopic,
-    ieltsTrack:
-      (question.ielts_track ?? question.ieltsTrack) === "general_training"
-        ? "general_training"
-        : "academic",
-    visibility: question.visibility === "private" ? "private" : "public",
+    ieltsTrack: ieltsTrack as QuestionOption["ieltsTrack"],
+    visibility: visibility as QuestionOption["visibility"],
   };
 }
 
 function projectQuestionRecommendation(
   payload: unknown,
 ): QuestionRecommendation {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload))
+    throw new LearningClientError(
+      "The server did not return a usable question recommendation.",
+      { code: "INVALID_RESPONSE" },
+    );
   const record = payload as {
     detail?: unknown;
     recommendation?: WireQuestionRecommendation;
     recommendation_id?: unknown;
   };
   const recommendation = record.recommendation;
-  if (recommendation?.status === "READY" && recommendation.id) {
+  if (
+    recommendation?.status === "READY" &&
+    typeof recommendation.id === "string" &&
+    recommendation.id.trim()
+  ) {
     const question = projectRecommendationQuestion(recommendation.question);
     if (question) return { state: "READY", id: recommendation.id, question };
   }

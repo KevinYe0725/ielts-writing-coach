@@ -101,9 +101,6 @@ function feedbackWaitingNoticeSnapshot() {
 
 const MAX_RECOMMENDATION_POLLS = 5;
 
-const waitForRecommendation = (milliseconds: number) =>
-  new Promise<void>((resolve) => window.setTimeout(resolve, milliseconds));
-
 export default function TodayPage() {
   const router = useRouter();
   const startingNewEssay = useSyncExternalStore(
@@ -127,9 +124,15 @@ export default function TodayPage() {
   const [selectedQuestionId, setSelectedQuestionId] = useState("");
   const [recommendation, setRecommendation] =
     useState<QuestionRecommendation | null>(null);
-  const [recommendationLoading, setRecommendationLoading] = useState(false);
+  const [recommendationBusy, setRecommendationBusy] = useState(false);
+  const [recommendationRetryId, setRecommendationRetryId] = useState<
+    string | null
+  >(null);
+  const recommendationCurrent = useRef<QuestionRecommendation | null>(null);
   const focusRecommendationStart = useRef(false);
   const recommendationStartRef = useRef<HTMLButtonElement>(null);
+  const recommendationOperation = useRef(0);
+  const recommendationTimers = useRef(new Map<number, () => void>());
   const [customOpen, setCustomOpen] = useState(false);
   const [customPrompt, setCustomPrompt] = useState("");
   const [customType, setCustomType] = useState<QuestionType>("opinion");
@@ -145,6 +148,124 @@ export default function TodayPage() {
     startingNewEssay ||
     data?.nextTask.id === "question-bank" ||
     data?.nextTask.href.startsWith("/today?mixed-review=1");
+  const mixedReview = data?.nextTask.href.startsWith("/today?mixed-review=1");
+
+  const setCurrentRecommendation = useCallback(
+    (next: QuestionRecommendation | null) => {
+      recommendationCurrent.current = next;
+      setRecommendation(next);
+    },
+    [],
+  );
+
+  const cancelRecommendationOperation = useCallback(() => {
+    recommendationOperation.current += 1;
+    for (const [timeout, resolve] of recommendationTimers.current) {
+      window.clearTimeout(timeout);
+      resolve();
+    }
+    recommendationTimers.current.clear();
+  }, []);
+
+  const waitForRecommendation = useCallback((milliseconds: number) => {
+    return new Promise<void>((resolve) => {
+      const timeout = window.setTimeout(() => {
+        recommendationTimers.current.delete(timeout);
+        resolve();
+      }, milliseconds);
+      recommendationTimers.current.set(timeout, resolve);
+    });
+  }, []);
+
+  const pollRecommendation = useCallback(
+    async (
+      id: string,
+      operation: number,
+      initial: QuestionRecommendation | null = recommendationCurrent.current,
+    ) => {
+      let next = initial;
+      for (let attempt = 0; attempt < MAX_RECOMMENDATION_POLLS; attempt += 1) {
+        if (recommendationOperation.current !== operation) return;
+        const retryAfterSeconds =
+          next?.state === "PREPARING" ? next.retryAfterSeconds : 1;
+        await waitForRecommendation(retryAfterSeconds * 1_000);
+        if (recommendationOperation.current !== operation) return;
+        next = await learningClient.getQuestionRecommendation(id);
+        if (recommendationOperation.current !== operation) return;
+        setCurrentRecommendation(next);
+        if (next.state !== "PREPARING") {
+          setRecommendationRetryId(null);
+          return;
+        }
+      }
+      if (recommendationOperation.current !== operation) return;
+      setRecommendationRetryId(id);
+    },
+    [setCurrentRecommendation, waitForRecommendation],
+  );
+
+  const requestRecommendation = useCallback(
+    async (
+      input: { action: "INITIAL" | "SWAP"; excludedQuestionId?: string },
+      focusStart = false,
+    ) => {
+      cancelRecommendationOperation();
+      const operation = recommendationOperation.current;
+      setRecommendationBusy(true);
+      setRecommendationRetryId(null);
+      setQuestionError(null);
+      if (focusStart) focusRecommendationStart.current = true;
+      try {
+        const next = await learningClient.requestQuestionRecommendation(input);
+        if (recommendationOperation.current !== operation) return;
+        setCurrentRecommendation(next);
+        if (next.state === "PREPARING")
+          await pollRecommendation(next.id, operation, next);
+      } catch (error) {
+        if (recommendationOperation.current !== operation) return;
+        setQuestionError(
+          error instanceof Error
+            ? error.message
+            : "A question could not be prepared.",
+        );
+      } finally {
+        if (recommendationOperation.current === operation)
+          setRecommendationBusy(false);
+      }
+    },
+    [
+      cancelRecommendationOperation,
+      pollRecommendation,
+      setCurrentRecommendation,
+    ],
+  );
+
+  const retryRecommendation = useCallback(async () => {
+    if (!recommendationRetryId || recommendationBusy) return;
+    cancelRecommendationOperation();
+    const operation = recommendationOperation.current;
+    setRecommendationBusy(true);
+    setRecommendationRetryId(null);
+    try {
+      await pollRecommendation(recommendationRetryId, operation);
+    } catch (error) {
+      if (recommendationOperation.current !== operation) return;
+      setQuestionError(
+        error instanceof Error
+          ? error.message
+          : "A question could not be prepared.",
+      );
+    } finally {
+      if (recommendationOperation.current === operation)
+        setRecommendationBusy(false);
+    }
+  }, [
+    cancelRecommendationOperation,
+    pollRecommendation,
+    recommendationBusy,
+    recommendationRetryId,
+  ]);
+
   useEffect(() => {
     if (!needsQuestion) return;
     let cancelled = false;
@@ -161,40 +282,14 @@ export default function TodayPage() {
           );
       },
     );
-    const loadRecommendation = async () => {
-      setRecommendationLoading(true);
-      setQuestionError(null);
-      try {
-        let next = await learningClient.requestQuestionRecommendation({
-          action: "INITIAL",
-        });
-        if (!cancelled) setRecommendation(next);
-        for (
-          let attempt = 0;
-          next.state === "PREPARING" && attempt < MAX_RECOMMENDATION_POLLS;
-          attempt += 1
-        ) {
-          await waitForRecommendation(next.retryAfterSeconds * 1_000);
-          if (cancelled) return;
-          next = await learningClient.getQuestionRecommendation(next.id);
-          if (!cancelled) setRecommendation(next);
-        }
-      } catch (error) {
-        if (!cancelled)
-          setQuestionError(
-            error instanceof Error
-              ? error.message
-              : "A question could not be prepared.",
-          );
-      } finally {
-        if (!cancelled) setRecommendationLoading(false);
-      }
-    };
-    void loadRecommendation();
+    void Promise.resolve().then(() => {
+      if (!cancelled) return requestRecommendation({ action: "INITIAL" });
+    });
     return () => {
       cancelled = true;
+      cancelRecommendationOperation();
     };
-  }, [needsQuestion]);
+  }, [cancelRecommendationOperation, needsQuestion, requestRecommendation]);
 
   const selectedQuestion = questions.find(
     (question) => question.id === selectedQuestionId,
@@ -211,7 +306,7 @@ export default function TodayPage() {
     question: QuestionOption | undefined,
     recommendationId?: string,
   ) => {
-    if (!question) return;
+    if (!question || recommendationBusy) return;
     setQuestionLoading(true);
     setQuestionError(null);
     try {
@@ -230,34 +325,19 @@ export default function TodayPage() {
   };
 
   const swapRecommendation = async () => {
-    if (recommendation?.state !== "READY") return;
-    setRecommendationLoading(true);
-    setQuestionError(null);
-    focusRecommendationStart.current = true;
-    try {
-      let next = await learningClient.requestQuestionRecommendation({
+    if (
+      recommendation?.state !== "READY" ||
+      recommendationBusy ||
+      questionLoading
+    )
+      return;
+    await requestRecommendation(
+      {
         action: "SWAP",
         excludedQuestionId: recommendation.question.id,
-      });
-      setRecommendation(next);
-      for (
-        let attempt = 0;
-        next.state === "PREPARING" && attempt < MAX_RECOMMENDATION_POLLS;
-        attempt += 1
-      ) {
-        await waitForRecommendation(next.retryAfterSeconds * 1_000);
-        next = await learningClient.getQuestionRecommendation(next.id);
-        setRecommendation(next);
-      }
-    } catch (error) {
-      setQuestionError(
-        error instanceof Error
-          ? error.message
-          : "A new question could not be prepared.",
-      );
-    } finally {
-      setRecommendationLoading(false);
-    }
+      },
+      true,
+    );
   };
 
   const retryPendingJob = async () => {
@@ -448,6 +528,23 @@ export default function TodayPage() {
           </p>
         ) : null}
 
+        {mixedReview ? (
+          <section className={cn("next-task-card", styles.mixedReviewFrame)}>
+            <div className="next-task-topline">
+              <Badge tone="blue">
+                <Sparkles aria-hidden="true" size={13} />
+                {text(task.eyebrowZh, task.eyebrowEn)}
+              </Badge>
+              <span className="due-label">
+                <CalendarClock aria-hidden="true" size={15} />
+                {text(task.dueLabelZh, task.dueLabelEn)}
+              </span>
+            </div>
+            <h2>{text(task.titleZh, task.titleEn)}</h2>
+            <p>{text(task.descriptionZh, task.descriptionEn)}</p>
+          </section>
+        ) : null}
+
         {needsQuestion ? (
           <section
             aria-labelledby="recommendation-title"
@@ -470,7 +567,7 @@ export default function TodayPage() {
                 )}
               </p>
             </div>
-            {recommendationLoading && !recommendation ? (
+            {recommendationBusy && !recommendation ? (
               <p className={styles.preparing} role="status">
                 <LoaderCircle aria-hidden="true" className="spin" size={18} />
                 {text("正在为你准备一题…", "Preparing a question for you…")}
@@ -519,9 +616,9 @@ export default function TodayPage() {
                     </div>
                   </dl>
                 </div>
-                <div className={styles.recommendationActions}>
+                <div className={styles.recommendationDock}>
                   <Button
-                    disabled={questionLoading}
+                    disabled={questionLoading || recommendationBusy}
                     onClick={() =>
                       void beginSelectedQuestion(
                         recommendation.question,
@@ -545,8 +642,10 @@ export default function TodayPage() {
                       "Start writing with this question",
                     )}
                   </Button>
+                </div>
+                <div className={styles.recommendationActions}>
                   <Button
-                    disabled={recommendationLoading}
+                    disabled={recommendationBusy || questionLoading}
                     onClick={() => void swapRecommendation()}
                     type="button"
                     variant="secondary"
@@ -556,20 +655,38 @@ export default function TodayPage() {
                 </div>
               </>
             ) : recommendation?.state === "PREPARING" ? (
-              <p className={styles.preparing} role="status">
-                <LoaderCircle aria-hidden="true" className="spin" size={18} />
-                {text(
-                  "正在为你准备一题；你也可以先使用自己的题目。",
-                  "We are preparing a question; you can also use your own task.",
-                )}
-              </p>
+              recommendationRetryId ? (
+                <div className={styles.preparing} role="status">
+                  <p>
+                    {text(
+                      "这一题还没有准备好。你可以再试一次，或使用自己的题目。",
+                      "This question is not ready yet. Try again or use your own task.",
+                    )}
+                  </p>
+                  <Button
+                    disabled={recommendationBusy}
+                    onClick={() => void retryRecommendation()}
+                    type="button"
+                    variant="secondary"
+                  >
+                    {text("再试一次", "Try again")}
+                  </Button>
+                </div>
+              ) : (
+                <p className={styles.preparing} role="status">
+                  <LoaderCircle aria-hidden="true" className="spin" size={18} />
+                  {text(
+                    "正在为你准备一题；你也可以先使用自己的题目。",
+                    "We are preparing a question; you can also use your own task.",
+                  )}
+                </p>
+              )
             ) : (
               <p className={styles.unavailable} role="alert">
-                {recommendation?.message ??
-                  text(
-                    "暂时无法准备新题。你可以浏览题库，或粘贴自己的题目。",
-                    "A new question is unavailable. Browse the bank or paste your own task.",
-                  )}
+                {text(
+                  "暂时无法准备新题。你可以浏览题库，或粘贴自己的题目。",
+                  "A new question is unavailable. Browse the bank or paste your own task.",
+                )}
               </p>
             )}
           </section>

@@ -156,6 +156,11 @@ test.describe("deterministic setup and Today experience", () => {
 
     await page.getByRole("button", { name: "换一题" }).click();
 
+    await expect(
+      page.getByRole("button", { name: "用这道题开始写作" }),
+    ).toBeDisabled();
+    await expect(page.getByRole("button", { name: "换一题" })).toBeDisabled();
+
     await expect(prompt).not.toHaveText(before ?? "");
     await expect(
       page.getByRole("button", { name: "用这道题开始写作" }),
@@ -191,6 +196,56 @@ test.describe("deterministic setup and Today experience", () => {
       page.getByRole("button", { name: "用这道题开始写作" }),
     ).toHaveCount(0);
     await expect(page.getByText("粘贴我自己的题目")).toBeVisible();
+  });
+
+  test("a bounded preparing window becomes a local retry without leaking its detail", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        "iwc.demo.question-recommendation-state",
+        "PREPARING_TIMEOUT",
+      );
+    });
+    await page.goto("/today?new-essay=1");
+
+    await expect(page.getByRole("button", { name: "再试一次" })).toBeVisible({
+      timeout: 5_000,
+    });
+    await expect(page.locator("[data-today-primary]")).not.toContainText(
+      "server-supplied detail must never render",
+    );
+    await page.evaluate(() => {
+      localStorage.setItem("iwc.demo.question-recommendation-state", "READY");
+    });
+    await page.getByRole("button", { name: "再试一次" }).click();
+    await expect(page.locator("[data-recommendation-prompt]")).toBeVisible();
+  });
+
+  test("the safe action dock keeps the complete prompt and start action visible", async ({
+    page,
+  }) => {
+    for (const viewport of [
+      { width: 1024, height: 768 },
+      { width: 390, height: 844 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.goto("/today?new-essay=1");
+      const prompt = page.locator("[data-recommendation-prompt]");
+      const start = page.getByRole("button", { name: "用这道题开始写作" });
+      await expect(prompt).toBeVisible();
+      await expect(start).toBeVisible();
+      const [promptBox, startBox] = await Promise.all([
+        prompt.boundingBox(),
+        start.boundingBox(),
+      ]);
+      expect(promptBox).not.toBeNull();
+      expect(startBox).not.toBeNull();
+      expect(promptBox!.y + promptBox!.height).toBeLessThan(startBox!.y - 8);
+      expect(startBox!.y + startBox!.height).toBeLessThanOrEqual(
+        viewport.height - 8,
+      );
+    }
   });
 
   test("starting a recommendation records its recommendation id and avoids backend vocabulary", async ({
@@ -267,7 +322,9 @@ test.describe("deterministic setup and Today experience", () => {
       .boundingBox();
     expect(promptBox).not.toBeNull();
     expect(startBox).not.toBeNull();
-    expect(startBox!.y).toBeGreaterThan(promptBox!.y + promptBox!.height);
+    expect(startBox!.y + startBox!.height).toBeLessThanOrEqual(
+      page.viewportSize()!.height - 8,
+    );
   });
 });
 
@@ -336,6 +393,50 @@ async function routeTodayHttpFixture(page: Page, state: TodayHttpState) {
       }),
     });
   });
+  await page.route("**/api/v1/question-recommendations", async (route) => {
+    if (route.request().method() !== "POST") return route.fallback();
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        recommendation: {
+          id: "recommendation-http",
+          status: "READY",
+          question: {
+            id: "http-question-education",
+            prompt:
+              "Some people believe schools should teach financial literacy. To what extent do you agree or disagree?",
+            type: "opinion",
+            topic: "education",
+            ielts_track: "academic",
+            visibility: "public",
+          },
+        },
+      }),
+    });
+  });
+  await page.route(
+    "**/api/v1/question-recommendations/recommendation-http",
+    async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          recommendation: {
+            id: "recommendation-http",
+            status: "READY",
+            question: {
+              id: "http-question-education",
+              prompt:
+                "Some people believe schools should teach financial literacy. To what extent do you agree or disagree?",
+              type: "opinion",
+              topic: "education",
+              ielts_track: "academic",
+              visibility: "public",
+            },
+          },
+        }),
+      });
+    },
+  );
   await page.route("**/api/v1/today", async (route) => {
     const cycle = {
       id: "cycle-http-fixture",
@@ -392,7 +493,7 @@ test.describe("Today query states at the HTTP boundary", () => {
     "Run with NEXT_PUBLIC_DEMO_MODE=false and an isolated HTTP-mode server.",
   );
 
-  test("mixed-review opens hidden-review question selection and its start action", async ({
+  test("mixed-review keeps D14 framing while showing the recommended question", async ({
     page,
   }) => {
     await routeTodayHttpFixture(page, "mixed-review");
@@ -405,12 +506,12 @@ test.describe("Today query states at the HTTP boundary", () => {
       }),
     ).toBeVisible();
     await expect(
-      page.getByRole("heading", { name: "先选一道题" }),
+      page.getByText(
+        "旧目标保持隐藏；系统只根据这篇新作文中自然出现的证据判断保持情况。",
+      ),
     ).toBeVisible();
     await expect(
-      page.locator(".next-task-card").getByRole("button", {
-        name: "用这道题开始",
-      }),
+      page.getByRole("button", { name: "用这道题开始写作" }),
     ).toBeVisible();
   });
 

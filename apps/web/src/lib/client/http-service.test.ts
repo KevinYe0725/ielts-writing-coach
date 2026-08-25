@@ -356,6 +356,77 @@ describe("HttpLearningClient protocol", () => {
     ).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
   });
 
+  it("requires exact runtime strings and enums for a READY recommendation", async () => {
+    const readyQuestion = {
+      id: "question-runtime",
+      prompt:
+        "Some people believe city centres should be car free. Discuss both views and give your opinion.",
+      type: "discussion",
+      topic: "urban_transport",
+      ielts_track: "academic",
+      visibility: "public",
+    };
+    const malformed = [
+      { id: 7, question: readyQuestion },
+      {
+        id: "recommendation-runtime",
+        question: { ...readyQuestion, prompt: 7 },
+      },
+      {
+        id: "recommendation-runtime",
+        question: { ...readyQuestion, ielts_track: undefined },
+      },
+      {
+        id: "recommendation-runtime",
+        question: { ...readyQuestion, visibility: "shared" },
+      },
+    ];
+
+    for (const recommendation of malformed) {
+      const client = new HttpLearningClient({
+        baseUrl: "https://coach.test/api/v1",
+        fetch: async () =>
+          jsonResponse({
+            recommendation: { status: "READY", ...recommendation },
+          }),
+        origin: "https://coach.test",
+      });
+      await expect(
+        client.requestQuestionRecommendation({ action: "INITIAL" }),
+      ).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
+    }
+  });
+
+  it("rejects a non-object envelope and empty READY identifiers", async () => {
+    for (const payload of [
+      null,
+      {
+        recommendation: {
+          id: "",
+          status: "READY",
+          question: {
+            id: "",
+            prompt:
+              "Some people believe public spaces should be free for everyone. Discuss both views and give your opinion.",
+            type: "discussion",
+            topic: "society_culture",
+            ielts_track: "academic",
+            visibility: "public",
+          },
+        },
+      },
+    ]) {
+      const client = new HttpLearningClient({
+        baseUrl: "https://coach.test/api/v1",
+        fetch: async () => jsonResponse(payload),
+        origin: "https://coach.test",
+      });
+      await expect(
+        client.requestQuestionRecommendation({ action: "INITIAL" }),
+      ).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
+    }
+  });
+
   it("returns a saved tutorial answer immediately without reading an AI job", async () => {
     const safeResponse = {
       id: "019teaching-response",

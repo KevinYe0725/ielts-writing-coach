@@ -379,6 +379,36 @@
   gap: var(--desk-space-3);
 }
 
+.recommendationDock {
+  position: relative;
+  margin-left: var(--desk-space-3);
+}
+
+.mixedReviewFrame {
+  display: grid;
+  padding: var(--desk-space-6) var(--desk-space-8);
+  background: color-mix(in srgb, var(--desk-blue-soft) 48%, var(--desk-paper));
+  border-color: color-mix(in srgb, var(--desk-blue) 24%, transparent);
+  box-shadow: none;
+  gap: var(--desk-space-2);
+}
+
+.mixedReviewFrame h2,
+.mixedReviewFrame p {
+  max-width: 62ch;
+  margin: 0;
+}
+
+.mixedReviewFrame h2 {
+  font-size: var(--desk-type-subheading);
+}
+
+.mixedReviewFrame p {
+  color: var(--desk-ink-muted);
+  font-size: var(--desk-type-label);
+  line-height: var(--desk-leading-body);
+}
+
 .preparing,
 .unavailable {
   display: flex;
@@ -395,6 +425,38 @@
 
 .unavailable {
   color: var(--desk-amber);
+}
+
+@media (max-width: 1120px) {
+  .recommendationSheet {
+    padding-bottom: calc(var(--desk-space-20) + var(--desk-space-6));
+  }
+
+  .promptBody {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--desk-space-4);
+  }
+
+  .rationaleRail {
+    padding: var(--desk-space-3) 0 0;
+    border-top: 1px solid color-mix(in srgb, var(--desk-blue) 28%, transparent);
+    border-left: 0;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--desk-space-3);
+  }
+
+  .recommendationDock {
+    position: fixed;
+    right: var(--desk-space-6);
+    bottom: max(var(--desk-space-4), env(safe-area-inset-bottom));
+    z-index: 10;
+    margin: 0;
+    padding: var(--desk-space-2);
+    background: color-mix(in srgb, var(--desk-paper) 94%, transparent);
+    border: 1px solid color-mix(in srgb, var(--desk-blue) 25%, transparent);
+    border-radius: var(--desk-radius-md);
+    box-shadow: var(--desk-shadow-floating);
+  }
 }
 
 .manualRoutes {
@@ -604,6 +666,17 @@
     margin-left: var(--desk-space-2);
   }
 
+  .recommendationDock {
+    right: var(--desk-space-3);
+    bottom: max(var(--desk-space-3), env(safe-area-inset-bottom));
+    left: var(--desk-space-3);
+    display: grid;
+  }
+
+  .recommendationDock :global(.button) {
+    width: 100%;
+  }
+
   .sheetHeading {
     align-items: start;
     flex-direction: column;
@@ -655,10 +728,8 @@
 @keyframes recommendation-settle {
   from {
     opacity: 0.82;
-    transform: translateY(4px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
   }
 }

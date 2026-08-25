@@ -1455,11 +1455,17 @@ export class MockLearningClient implements LearningClient {
         id: "demo-recommendation-preparing",
         retryAfterSeconds: 1,
       };
+    if (forcedState === "PREPARING_TIMEOUT")
+      return {
+        state: "PREPARING",
+        id: "demo-recommendation-preparing-timeout",
+        retryAfterSeconds: 0.01,
+      };
     if (forcedState === "UNAVAILABLE")
       return {
         state: "UNAVAILABLE",
         id: "demo-recommendation-unavailable",
-        message: "暂时无法准备新题。你可以浏览题库，或粘贴自己的题目。",
+        message: "server-supplied detail must never render",
       };
     const question = chooseDemoRecommendation();
     if (!question)
@@ -1476,11 +1482,19 @@ export class MockLearningClient implements LearningClient {
     const forcedState = readStorage(STORAGE_KEYS.questionRecommendationState);
     if (forcedState === "PREPARING")
       return { state: "PREPARING", id, retryAfterSeconds: 1 };
+    if (forcedState === "PREPARING_TIMEOUT")
+      return { state: "PREPARING", id, retryAfterSeconds: 0.01 };
+    if (forcedState === "READY")
+      return {
+        state: "READY",
+        id,
+        question: demoRecommendationQuestions[0]!,
+      };
     if (forcedState === "UNAVAILABLE")
       return {
         state: "UNAVAILABLE",
         id,
-        message: "暂时无法准备新题。你可以浏览题库，或粘贴自己的题目。",
+        message: "server-supplied detail must never render",
       };
     try {
       const stored = JSON.parse(
@@ -1494,7 +1508,7 @@ export class MockLearningClient implements LearningClient {
     return {
       state: "UNAVAILABLE",
       id,
-      message: "暂时无法准备新题。你可以浏览题库，或粘贴自己的题目。",
+      message: "server-supplied detail must never render",
     };
   }
 
