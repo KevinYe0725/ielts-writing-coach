@@ -7,7 +7,7 @@ import { KeyRound, LogIn } from "lucide-react";
 
 import { useLocale } from "@/components/locale-provider";
 import { Badge, Button, Card, LoadingButtonContent } from "@/components/ui";
-import { markAccountBoundary } from "@/lib/client/account-boundary";
+import { markAccountBoundaryAfterSuccessfulResponse } from "@/lib/client/account-boundary";
 
 import styles from "../entry.module.css";
 
@@ -56,6 +56,7 @@ function SignInForm() {
             : {}),
         }),
       });
+      markAccountBoundaryAfterSuccessfulResponse(response);
       if (!response.ok) {
         const problem = (await response
           .json()
@@ -75,7 +76,6 @@ function SignInForm() {
         );
       }
       const result = (await response.json()) as AccountEntryPayload;
-      markAccountBoundary();
       router.replace(safeLocalRedirect(result.redirect_to));
       router.refresh();
     } catch (caught) {

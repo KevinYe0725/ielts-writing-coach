@@ -988,6 +988,131 @@ describe("HttpLearningClient protocol", () => {
     ).toEqual(new Set(["logical-recommendation-initial"]));
   });
 
+  it("retains the recommendation key through six cleanly closed invalid success DTOs", async () => {
+    const issuedKey = vi
+      .fn<() => string>()
+      .mockReturnValueOnce("invalid-success-recommendation-key")
+      .mockReturnValueOnce("duplicate-recommendation-key");
+    const fetcher = vi.fn<typeof fetch>(async () => {
+      const attempt = fetcher.mock.calls.length;
+      if (attempt <= 6) {
+        if (attempt % 2 === 1)
+          return new Response('{"recommendation":', {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          });
+        return jsonResponse({
+          recommendation: {
+            id: "recommendation-committed-invalid-body",
+            status: "READY",
+            question: { id: "truncated-question" },
+          },
+        });
+      }
+      return jsonResponse({
+        recommendation: {
+          id: "recommendation-committed-invalid-body",
+          status: "READY",
+          question: {
+            id: "question-committed-invalid-body",
+            prompt:
+              "Some people believe financial education belongs in every school. To what extent do you agree or disagree?",
+            type: "opinion",
+            topic: "education",
+            ielts_track: "academic",
+            visibility: "public",
+          },
+        },
+      });
+    });
+    const client = new HttpLearningClient({
+      baseUrl: "https://coach.test/api/v1",
+      fetch: fetcher,
+      idempotencyKey: issuedKey,
+      origin: "https://coach.test",
+      sleep: async () => undefined,
+    });
+
+    await expect(
+      client.requestQuestionRecommendation({ action: "INITIAL" }),
+    ).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
+    expect(fetcher).toHaveBeenCalledTimes(6);
+    await expect(
+      client.requestQuestionRecommendation({ action: "INITIAL" }),
+    ).resolves.toMatchObject({
+      state: "READY",
+      id: "recommendation-committed-invalid-body",
+    });
+
+    expect(issuedKey).toHaveBeenCalledTimes(1);
+    expect(
+      new Set(
+        fetcher.mock.calls.map((call) =>
+          requestHeaders(call).get("idempotency-key"),
+        ),
+      ),
+    ).toEqual(new Set(["invalid-success-recommendation-key"]));
+  });
+
+  it.each([
+    {
+      label: "recommended STARTED",
+      questionId: "question-invalid-started",
+      link: { recommendationId: "recommendation-invalid-started" },
+      cycleId: "cycle-committed-invalid-started",
+    },
+    {
+      label: "fallback ABANDONED",
+      questionId: "question-invalid-abandoned",
+      link: { abandonRecommendationId: "recommendation-invalid-abandoned" },
+      cycleId: "cycle-committed-invalid-abandoned",
+    },
+  ])(
+    "retains one cycle key through six invalid success bodies for $label",
+    async ({ questionId, link, cycleId }) => {
+      const issuedKey = vi
+        .fn<() => string>()
+        .mockReturnValueOnce(`invalid-success-${cycleId}`)
+        .mockReturnValueOnce(`duplicate-${cycleId}`);
+      const fetcher = vi.fn<typeof fetch>(async () => {
+        const attempt = fetcher.mock.calls.length;
+        if (attempt <= 6) {
+          if (attempt % 2 === 1)
+            return new Response('{"cycle":', {
+              status: 201,
+              headers: { "content-type": "application/json" },
+            });
+          return jsonResponse({ cycle: {} }, { status: 201 });
+        }
+        return jsonResponse({ cycle: { id: cycleId } }, { status: 201 });
+      });
+      const client = new HttpLearningClient({
+        baseUrl: "https://coach.test/api/v1",
+        fetch: fetcher,
+        idempotencyKey: issuedKey,
+        origin: "https://coach.test",
+        sleep: async () => undefined,
+      });
+
+      await expect(
+        client.startTrainingCycle(questionId, link),
+      ).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
+      expect(fetcher).toHaveBeenCalledTimes(6);
+      await expect(client.startTrainingCycle(questionId, link)).resolves.toBe(
+        cycleId,
+      );
+
+      expect(issuedKey).toHaveBeenCalledTimes(1);
+      expect(
+        new Set(
+          fetcher.mock.calls.map((call) =>
+            requestHeaders(call).get("idempotency-key"),
+          ),
+        ),
+      ).toEqual(new Set([`invalid-success-${cycleId}`]));
+    },
+  );
+
   it("retains the logical key when IN_PROGRESS is followed by exhausted transport loss", async () => {
     const issuedKey = vi
       .fn<() => string>()
@@ -1809,6 +1934,7 @@ describe("HttpLearningClient protocol", () => {
             },
           }),
         origin: "https://coach.test",
+        sleep: async () => undefined,
       });
 
       await expect(
@@ -1829,6 +1955,7 @@ describe("HttpLearningClient protocol", () => {
           },
         }),
       origin: "https://coach.test",
+      sleep: async () => undefined,
     });
 
     await expect(
@@ -1870,6 +1997,7 @@ describe("HttpLearningClient protocol", () => {
             recommendation: { status: "READY", ...recommendation },
           }),
         origin: "https://coach.test",
+        sleep: async () => undefined,
       });
       await expect(
         client.requestQuestionRecommendation({ action: "INITIAL" }),
@@ -1900,6 +2028,7 @@ describe("HttpLearningClient protocol", () => {
         baseUrl: "https://coach.test/api/v1",
         fetch: async () => jsonResponse(payload),
         origin: "https://coach.test",
+        sleep: async () => undefined,
       });
       await expect(
         client.requestQuestionRecommendation({ action: "INITIAL" }),

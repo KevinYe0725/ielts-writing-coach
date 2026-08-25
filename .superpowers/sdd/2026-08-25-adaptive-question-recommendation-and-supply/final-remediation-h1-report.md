@@ -111,8 +111,8 @@ All final gates used Node 24.19.0 and a newly migrated tmpfs
 
 ```text
 PostgreSQL migration chain: pass
-Full repository tests: 94 files / 924 passed / 0 failed / 0 skipped
-Web tests: 54 files / 513 passed
+Full repository tests: 95 files / 930 passed / 0 failed / 0 skipped
+Web tests: 55 files / 519 passed
 format: pass
 typecheck: pass
 lint: pass, 0 errors / 4 existing Fast Refresh warnings
@@ -120,7 +120,7 @@ Worker production build: pass, 2 ESM entries plus source maps
 Web production build: pass, 48/48 static pages
 ```
 
-The current evidence range is `d6ba3b3..H1 Fix Round 2 commit`, superseding the
+The current evidence range is `ef04c7f..H1 Fix Round 3 commit`, superseding the
 earlier fourth-review snapshot and its 94-file / 905-test total.
 
 ## Remaining boundary
@@ -191,5 +191,52 @@ boundary must not advance or abort. GREEN after the change:
 - STARTED, ABANDONED, and initial recommendation Today fidelity: 3/3 passed;
 - full Web on fresh PostgreSQL 17.6: 54 files / 513 passed;
 - full repository on the same fresh database: 94 files / 924 passed.
+
+## Fix Round 3/5 — validated success and cross-tab boundary
+
+The third H1 review found two remaining unknown-outcome windows. First, the
+generic request boundary cleared a logical key for any complete 2xx before the
+recommendation or cycle method validated its DTO. A committed response with a
+cleanly closed malformed/truncated body therefore lost its recovery key.
+Second, the account generation was tab-local, and sign-in advanced it only
+after reading the success body.
+
+Opted-in requests now provide a method projector at the request boundary. A
+2xx body is projected before logical clear. Invalid recommendation, STARTED,
+or ABANDONED success remains an unknown outcome: it retries six times under the
+same key and retains that key after exhaustion. The next user call can receive
+the server's valid replay/original identity; only a valid projected success
+clears the registry. Permitted non-2xx recommendation responses are also
+projected, while a malformed definitive non-2xx still clears before surfacing
+its error.
+
+Sign-in now marks a successful account response immediately after
+`response.ok`, before `response.json()`. A malformed or disconnected success
+body therefore still cancels the old account generation; a non-ok sign-in does
+not.
+
+The account boundary lazily feature-detects a nonpersistent BroadcastChannel at
+the fixed `iwc:account-boundary:v1` namespace. Local boundaries broadcast only
+the exact identity-free `{ kind: "ACCOUNT_BOUNDARY", version: 1 }` message.
+Remote messages advance generation and abort active logical work without
+rebroadcasting, so no loop or account identifier/token is possible. A dispose
+hook closes the channel for controlled lifecycle and tests; no boundary state
+is written to browser storage.
+
+Strict RED on `ef04c7f`:
+
+- recommendation, recommended STARTED, and fallback ABANDONED each stopped
+  after the first malformed 2xx instead of making six same-key attempts;
+- no response-ok boundary helper existed;
+- no fixed BroadcastChannel namespace, remote advance, or cleanup existed.
+
+GREEN after the change:
+
+- focused DTO/account-boundary matrix: 6/6 passed;
+- full HTTP client/account boundary/account session: 3 files / 149 passed;
+- STARTED, ABANDONED, initial recommendation, and two-page cross-tab Today
+  fidelity: 4/4 passed;
+- full Web on fresh PostgreSQL 17.6: 55 files / 519 passed;
+- full repository on the same fresh database: 95 files / 930 passed.
 
 Commit: the commit containing this report.

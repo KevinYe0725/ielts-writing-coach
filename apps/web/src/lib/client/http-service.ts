@@ -114,6 +114,7 @@ interface RequestOptions {
   idempotencyKey?: string;
   method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
   permitStatuses?: readonly number[];
+  projectResponse?: (payload: unknown, response: Response) => unknown;
   retainLogicalOperation?: true;
 }
 
@@ -1747,6 +1748,26 @@ function projectQuestionRecommendation(
   );
 }
 
+function projectTrainingCycleStart(payload: unknown): string {
+  if (!isRecord(payload) || !isRecord(payload.cycle))
+    throw new LearningClientError(
+      "The server did not return the new training cycle.",
+      { code: "INVALID_RESPONSE" },
+    );
+  const id = payload.cycle.id;
+  if (typeof id !== "string" || !id.trim())
+    throw new LearningClientError(
+      "The server did not return the new training cycle.",
+      { code: "INVALID_RESPONSE" },
+    );
+  if ("next_action" in payload && payload.next_action !== "start_version_1")
+    throw new LearningClientError(
+      "The server did not return the new training cycle.",
+      { code: "INVALID_RESPONSE" },
+    );
+  return id;
+}
+
 function projectSearchConnectionSetting(
   payload: unknown,
   options: { allowMissing: boolean; requireActive: boolean },
@@ -2127,14 +2148,37 @@ export class HttpLearningClient implements LearningClient {
             );
           }
         } else {
-          if (logicalOperation) this.assertLogicalGeneration(logicalContext);
-          if (logicalOperation)
+          let projected = payload as T;
+          let projectionFailed = false;
+          if (options.projectResponse) {
+            try {
+              projected = options.projectResponse(payload, response) as T;
+            } catch (cause) {
+              const retryUnknownSuccess =
+                response.ok && logicalOperation && requestAttempt < 5;
+              if (!retryUnknownSuccess) {
+                if (logicalOperation && !response.ok) {
+                  this.assertLogicalGeneration(logicalContext);
+                  this.logicalOperations.clear(
+                    logicalOperation.fingerprint,
+                    logicalOperation.key,
+                    logicalOperation.generation,
+                  );
+                }
+                throw cause;
+              }
+              projectionFailed = true;
+            }
+          }
+          if (!projectionFailed && logicalOperation)
+            this.assertLogicalGeneration(logicalContext);
+          if (!projectionFailed && logicalOperation)
             this.logicalOperations.clear(
               logicalOperation.fingerprint,
               logicalOperation.key,
               logicalOperation.generation,
             );
-          return { data: payload as T, response };
+          if (!projectionFailed) return { data: projected, response };
         }
       } catch (cause) {
         this.assertLogicalGeneration(logicalContext);
@@ -2534,19 +2578,23 @@ export class HttpLearningClient implements LearningClient {
   async requestQuestionRecommendation(
     input: QuestionRecommendationRequest,
   ): Promise<QuestionRecommendation> {
-    const { data } = await this.request<unknown>("/question-recommendations", {
-      body: {
-        action: input.action,
-        ...(input.excludedQuestionId
-          ? { excluded_question_id: input.excludedQuestionId }
-          : {}),
+    const { data } = await this.request<QuestionRecommendation>(
+      "/question-recommendations",
+      {
+        body: {
+          action: input.action,
+          ...(input.excludedQuestionId
+            ? { excluded_question_id: input.excludedQuestionId }
+            : {}),
+        },
+        idempotent: true,
+        method: "POST",
+        permitStatuses: [202, 503],
+        projectResponse: projectQuestionRecommendation,
+        retainLogicalOperation: true,
       },
-      idempotent: true,
-      method: "POST",
-      permitStatuses: [202, 503],
-      retainLogicalOperation: true,
-    });
-    return projectQuestionRecommendation(data);
+    );
+    return data;
   }
 
   async getQuestionRecommendation(id: string): Promise<QuestionRecommendation> {
@@ -2599,33 +2647,25 @@ export class HttpLearningClient implements LearningClient {
     questionId: string,
     recommendation: TrainingCycleRecommendationLink = {},
   ): Promise<string> {
-    const { data } = await this.request<{ cycle?: { id?: string } }>(
-      "/training-cycles",
-      {
-        body: {
-          question_id: questionId,
-          ...(recommendation.recommendationId
-            ? { recommendation_id: recommendation.recommendationId }
-            : {}),
-          ...(recommendation.abandonRecommendationId
-            ? {
-                abandon_recommendation_id:
-                  recommendation.abandonRecommendationId,
-              }
-            : {}),
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        },
-        idempotent: true,
-        method: "POST",
-        retainLogicalOperation: true,
+    const { data } = await this.request<string>("/training-cycles", {
+      body: {
+        question_id: questionId,
+        ...(recommendation.recommendationId
+          ? { recommendation_id: recommendation.recommendationId }
+          : {}),
+        ...(recommendation.abandonRecommendationId
+          ? {
+              abandon_recommendation_id: recommendation.abandonRecommendationId,
+            }
+          : {}),
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       },
-    );
-    if (!data.cycle?.id)
-      throw new LearningClientError(
-        "The server did not return the new training cycle.",
-        { code: "INVALID_RESPONSE" },
-      );
-    return data.cycle.id;
+      idempotent: true,
+      method: "POST",
+      projectResponse: projectTrainingCycleStart,
+      retainLogicalOperation: true,
+    });
+    return data;
   }
 
   async getAttempt(version: 1 | 2, cycleId: string): Promise<AttemptData> {

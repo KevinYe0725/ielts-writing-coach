@@ -261,3 +261,11 @@ and promises with fixed ACCOUNT_CONTEXT_CHANGED; generation/identity guards
 prevent A cleanup from touching B; data deletion advances the boundary; 94
 files / 924 tests green on Node 24.19.0 with fresh PostgreSQL 17.6; live-client
 reload boundary remains deliberate and documented; see report)
+Final remediation H1: fix round 3/5 complete (recommendation/cycle projectors
+validate 2xx inside the attempt before logical clear; six cleanly closed
+malformed successes retain and reuse one key; sign-in advances immediately
+after response.ok; fixed identity-free BroadcastChannel propagates boundary
+abort across tabs without persistence or rebroadcast; two-page signout/signin
+fidelity proves A cancellation and B new key; 95 files / 930 tests green on
+Node 24.19.0 with fresh PostgreSQL 17.6; reload boundary remains documented)
+Fifth final broad review: in progress at ef04c7f

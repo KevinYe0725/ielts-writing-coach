@@ -1135,6 +1135,124 @@ test.describe("Today query states at the HTTP boundary", () => {
     );
   });
 
+  test("cross-tab sign-out and sign-in abort an old mutation with an identity-free boundary message", async ({
+    page: accountA,
+  }) => {
+    const accountB = await accountA.context().newPage();
+    const accountAKeys: string[] = [];
+    const accountBKeys: string[] = [];
+    const pageErrors: Error[] = [];
+    let releaseAccountA!: () => void;
+    const accountAHold = new Promise<void>((resolve) => {
+      releaseAccountA = resolve;
+    });
+    accountA.on("pageerror", (error) => pageErrors.push(error));
+    await accountA.addInitScript(() => {
+      const messages: unknown[] = [];
+      const channel = new BroadcastChannel("iwc:account-boundary:v1");
+      channel.addEventListener("message", (event) => messages.push(event.data));
+      Object.assign(window, {
+        __iwcAccountBoundaryMessages: messages,
+        __iwcAccountBoundaryObserver: channel,
+      });
+    });
+    await routeTodayHttpFixture(accountA, "mixed-review");
+    await routeTodayHttpFixture(accountB, "mixed-review");
+    await accountA.route("**/api/v1/training-cycles", async (route) => {
+      accountAKeys.push(
+        route.request().headers()["idempotency-key"] ?? "missing",
+      );
+      await accountAHold;
+      await route
+        .fulfill({
+          contentType: "application/json",
+          status: 201,
+          body: JSON.stringify({ cycle: { id: "stale-account-a-cycle" } }),
+        })
+        .catch(() => undefined);
+    });
+    await accountB.route("**/api/v1/training-cycles", async (route) => {
+      accountBKeys.push(
+        route.request().headers()["idempotency-key"] ?? "missing",
+      );
+      await route.fulfill({
+        contentType: "application/json",
+        status: 201,
+        body: JSON.stringify({ cycle: { id: "account-b-cycle" } }),
+      });
+    });
+    await accountB.route("**/api/v1/auth/sign-out", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ success: true }),
+      });
+    });
+    await accountB.route("**/api/v1/account-entry", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          outcome: "SIGNED_IN",
+          redirect_to: "/today?mixed-review=1",
+        }),
+      });
+    });
+
+    await accountA.goto("/today?mixed-review=1");
+    const accountAStart = accountA.getByRole("button", {
+      name: "用这道题开始写作",
+    });
+    await accountAStart.click();
+    await expect.poll(() => accountAKeys.length).toBe(1);
+
+    await accountB.goto("/today?mixed-review=1");
+    await accountB
+      .getByRole("button", { name: /learner@example\.com/i })
+      .first()
+      .click();
+    await accountB
+      .getByRole("menuitem", { name: /退出登录|sign out/i })
+      .click();
+    await expect(accountB).toHaveURL(/\/signin$/);
+    await expect(
+      accountA.getByText(
+        "The account changed before this operation finished. Retry in the current account.",
+        { exact: true },
+      ),
+    ).toBeVisible();
+    releaseAccountA();
+
+    await accountB.locator("#signin-email").fill("account-b@example.test");
+    await accountB.locator("#signin-password").fill("secure-password");
+    await accountB.getByRole("button", { name: /继续|continue/i }).click();
+    await expect(accountB).toHaveURL(/\/today\?mixed-review=1$/);
+    await accountB.getByRole("button", { name: "用这道题开始写作" }).click();
+    await expect(accountB).toHaveURL(/\/write\?cycle=account-b-cycle$/);
+
+    await expect.poll(() => accountBKeys.length).toBe(1);
+    expect(accountAKeys[0]).not.toBe("missing");
+    expect(accountBKeys[0]).not.toBe("missing");
+    expect(accountBKeys[0]).not.toBe(accountAKeys[0]);
+    await accountA.waitForTimeout(100);
+    expect(accountAKeys).toHaveLength(1);
+    const boundaryMessages = await accountA.evaluate(
+      () =>
+        (
+          window as typeof window & {
+            __iwcAccountBoundaryMessages?: unknown[];
+          }
+        ).__iwcAccountBoundaryMessages ?? [],
+    );
+    expect(boundaryMessages.length).toBeGreaterThanOrEqual(2);
+    for (const message of boundaryMessages) {
+      expect(message).toEqual({ kind: "ACCOUNT_BOUNDARY", version: 1 });
+      expect(JSON.stringify(message)).not.toMatch(
+        /account-b@example|email|identity|token|user[_-]?id/iu,
+      );
+    }
+    expect(pageErrors).toEqual([]);
+    await accountB.close();
+  });
+
   test("synchronously dispatched swap events create one recommendation request", async ({
     page,
   }) => {
