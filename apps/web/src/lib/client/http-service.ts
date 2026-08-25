@@ -1718,10 +1718,15 @@ function projectQuestionRecommendation(
 
 function projectSearchConnectionSetting(
   payload: unknown,
+  options: { allowMissing: boolean; requireActive: boolean },
 ): import("./types").SearchConnectionSetting {
-  if (payload === null)
+  if (payload === null && options.allowMissing)
     return { kind: "brave", status: "MISSING", testedAt: null };
-  if (!isRecord(payload))
+  if (
+    !isRecord(payload) ||
+    Object.keys(payload).length !== 3 ||
+    !["kind", "status", "tested_at"].every((key) => key in payload)
+  )
     throw new LearningClientError(
       "The server did not return a usable search connection setting.",
       { code: "INVALID_RESPONSE" },
@@ -1735,11 +1740,32 @@ function projectSearchConnectionSetting(
       "The server did not return a usable search connection setting.",
       { code: "INVALID_RESPONSE" },
     );
+  if (options.requireActive && payload.status !== "ACTIVE")
+    throw new LearningClientError(
+      "The server did not confirm the saved search connection.",
+      { code: "INVALID_RESPONSE" },
+    );
   return {
     kind: "brave",
     status: payload.status,
     testedAt: payload.tested_at,
   };
+}
+
+function assertExactSearchConnectionTest(payload: unknown): void {
+  if (
+    !isRecord(payload) ||
+    Object.keys(payload).length !== 3 ||
+    !["ok", "latency_ms", "safe_message"].every((key) => key in payload) ||
+    payload.ok !== true ||
+    typeof payload.latency_ms !== "number" ||
+    !Number.isFinite(payload.latency_ms) ||
+    typeof payload.safe_message !== "string"
+  )
+    throw new LearningClientError(
+      "The server did not return a usable search connection test.",
+      { code: "INVALID_RESPONSE" },
+    );
 }
 
 async function readBoundedResponseText(
@@ -4035,22 +4061,18 @@ export class HttpLearningClient implements LearningClient {
     import("./types").SearchConnectionSetting
   > {
     const { data } = await this.request<unknown>("/search-connection");
-    return projectSearchConnectionSetting(data);
+    return projectSearchConnectionSetting(data, {
+      allowMissing: true,
+      requireActive: false,
+    });
   }
 
   async testSearchConnection(apiKey: string): Promise<void> {
-    const { data } = await this.request<{ ok?: unknown }>(
-      "/search-connection/test",
-      {
-        body: { api_key: apiKey },
-        method: "POST",
-      },
-    );
-    if (data.ok !== true)
-      throw new LearningClientError(
-        "The search connection test was not confirmed.",
-        { status: 502, code: "SEARCH_CONNECTION_TEST_UNCONFIRMED" },
-      );
+    const { data } = await this.request<unknown>("/search-connection/test", {
+      body: { api_key: apiKey },
+      method: "POST",
+    });
+    assertExactSearchConnectionTest(data);
   }
 
   async saveSearchConnection(
@@ -4061,7 +4083,10 @@ export class HttpLearningClient implements LearningClient {
       idempotent: true,
       method: "PUT",
     });
-    return projectSearchConnectionSetting(data);
+    return projectSearchConnectionSetting(data, {
+      allowMissing: false,
+      requireActive: true,
+    });
   }
 
   async deleteSearchConnection(): Promise<void> {

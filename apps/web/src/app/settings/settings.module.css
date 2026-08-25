@@ -504,7 +504,7 @@
 :global(.ai-danger-zone) {
   display: flex;
   padding: var(--desk-space-3) var(--desk-space-4);
-  color: var(--desk-error);
+  color: #9f3840;
   background: var(--red-soft);
   border: 1px solid var(--desk-line-strong);
   border-radius: var(--desk-radius-md);
@@ -708,6 +708,10 @@
 
 .page :global(.day-picker button) {
   font-size: var(--desk-type-meta);
+}
+
+.page :global(.badge-red) {
+  color: #9f3840;
 }
 
 .advancedSettings {

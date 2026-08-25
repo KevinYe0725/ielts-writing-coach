@@ -222,7 +222,6 @@ describe("HttpLearningClient protocol", () => {
           ok: true,
           latency_ms: 21,
           safe_message: "Brave Search connection validated.",
-          provider_trace: "must-not-reach-settings",
         }),
       )
       .mockResolvedValueOnce(
@@ -230,7 +229,6 @@ describe("HttpLearningClient protocol", () => {
           kind: "brave",
           status: "ACTIVE",
           tested_at: "2026-08-25T09:30:00.000Z",
-          encrypted_api_key: "must-not-reach-settings",
         }),
       )
       .mockResolvedValueOnce(new Response(null, { status: 204 }));
@@ -292,6 +290,75 @@ describe("HttpLearningClient protocol", () => {
       });
 
       await expect(client.getSearchConnection()).rejects.toMatchObject({
+        code: "INVALID_RESPONSE",
+      });
+    }
+  });
+
+  it("rejects unknown keys from every public search-connection response", async () => {
+    const cases: Array<{
+      label: string;
+      payload: unknown;
+      invoke: (client: HttpLearningClient) => Promise<unknown>;
+    }> = [
+      {
+        label: "GET projection",
+        payload: {
+          kind: "brave",
+          status: "ACTIVE",
+          tested_at: "2026-08-25T09:30:00.000Z",
+          encrypted_api_key: "must-not-reach-settings",
+        },
+        invoke: (client) => client.getSearchConnection(),
+      },
+      {
+        label: "PUT projection",
+        payload: {
+          kind: "brave",
+          status: "ACTIVE",
+          tested_at: "2026-08-25T09:30:00.000Z",
+          provider_trace: "must-not-reach-settings",
+        },
+        invoke: (client) => client.saveSearchConnection("saved-key"),
+      },
+      {
+        label: "test result",
+        payload: {
+          ok: true,
+          latency_ms: 21,
+          safe_message: "Brave Search connection validated.",
+          provider_trace: "must-not-reach-settings",
+        },
+        invoke: (client) => client.testSearchConnection("temporary-key"),
+      },
+    ];
+
+    for (const { label, payload, invoke } of cases) {
+      const client = new HttpLearningClient({
+        baseUrl: "https://coach.test/api/v1",
+        fetch: async () => jsonResponse(payload),
+        origin: "https://coach.test",
+      });
+      await expect(invoke(client), label).rejects.toMatchObject({
+        code: "INVALID_RESPONSE",
+      });
+    }
+  });
+
+  it("accepts only an exact ACTIVE projection as a saved search connection", async () => {
+    for (const payload of [
+      null,
+      { kind: "brave", status: "INVALID", tested_at: null },
+      { kind: "brave", status: "MISSING", tested_at: null },
+    ]) {
+      const client = new HttpLearningClient({
+        baseUrl: "https://coach.test/api/v1",
+        fetch: async () => jsonResponse(payload),
+        origin: "https://coach.test",
+      });
+      await expect(
+        client.saveSearchConnection("saved-key"),
+      ).rejects.toMatchObject({
         code: "INVALID_RESPONSE",
       });
     }

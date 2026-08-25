@@ -296,6 +296,265 @@ test.describe("account controls", () => {
     expect(overflow).toBeLessThanOrEqual(1);
   });
 
+  test("uses only the owner-safe HTTP search-connection contract", async ({
+    page,
+  }) => {
+    test.skip(
+      process.env.NEXT_PUBLIC_DEMO_MODE === "true",
+      "This contract test exercises the non-demo HttpLearningClient.",
+    );
+
+    type SearchMode = "MISSING" | "ACTIVE" | "INVALID" | "FORBIDDEN" | "ERROR";
+    let searchMode: SearchMode = "MISSING";
+    let testAttempts = 0;
+    const mutations: Array<{
+      body: string | null;
+      headers: Record<string, string>;
+      method: string;
+      path: string;
+    }> = [];
+    const json = (
+      route: import("@playwright/test").Route,
+      body: unknown,
+      status = 200,
+    ) =>
+      route.fulfill({
+        body: JSON.stringify(body),
+        contentType: "application/json",
+        status,
+      });
+
+    await page.route("**/api/v1/**", async (route) => {
+      const request = route.request();
+      const url = new URL(request.url());
+      const path = url.pathname;
+      if (path.endsWith("/auth/get-session")) {
+        await json(route, {
+          session: { token: "never-rendered" },
+          user: {
+            id: "owner-http-fixture",
+            email: "owner@example.test",
+            name: "Owner",
+            role: "owner",
+          },
+        });
+        return;
+      }
+      if (path.endsWith("/providers")) {
+        await json(route, { providers: [] });
+        return;
+      }
+      if (path.endsWith("/preferences")) {
+        await json(route, {
+          email: "owner@example.test",
+          preferences: {},
+          slots: [],
+          smtp_configured: true,
+          timezone: "Asia/Shanghai",
+        });
+        return;
+      }
+      if (path.endsWith("/search-connection/test")) {
+        mutations.push({
+          body: request.postData(),
+          headers: request.headers(),
+          method: request.method(),
+          path,
+        });
+        testAttempts += 1;
+        if (testAttempts === 1) {
+          await json(
+            route,
+            {
+              code: "SEARCH_CONNECTION_TEST_FAILED",
+              detail: "This temporary key could not be tested.",
+              status: 422,
+              title: "Search connection test failed",
+            },
+            422,
+          );
+          return;
+        }
+        await json(route, {
+          latency_ms: 12,
+          ok: true,
+          safe_message: "Brave Search connection validated.",
+        });
+        return;
+      }
+      if (path.endsWith("/search-connection")) {
+        if (request.method() !== "GET") {
+          mutations.push({
+            body: request.postData(),
+            headers: request.headers(),
+            method: request.method(),
+            path,
+          });
+        }
+        if (request.method() === "GET") {
+          if (searchMode === "FORBIDDEN") {
+            await json(
+              route,
+              { code: "FORBIDDEN", detail: "Forbidden", status: 403 },
+              403,
+            );
+            return;
+          }
+          if (searchMode === "ERROR") {
+            await json(
+              route,
+              {
+                code: "SEARCH_CONNECTION_UNAVAILABLE",
+                detail: "Question-search status is temporarily unavailable.",
+                status: 503,
+                title: "Question-search status unavailable",
+              },
+              503,
+            );
+            return;
+          }
+          if (searchMode === "MISSING") {
+            await json(route, null);
+            return;
+          }
+          await json(route, {
+            kind: "brave",
+            status: searchMode,
+            tested_at: "2026-08-25T09:30:00.000Z",
+          });
+          return;
+        }
+        if (request.method() === "PUT") {
+          searchMode = "ACTIVE";
+          await json(route, {
+            kind: "brave",
+            status: "ACTIVE",
+            tested_at: "2026-08-25T09:31:00.000Z",
+          });
+          return;
+        }
+        if (request.method() === "DELETE") {
+          searchMode = "MISSING";
+          await route.fulfill({ status: 204 });
+          return;
+        }
+      }
+      await json(route, {});
+    });
+
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/settings");
+    await page.getByRole("button", { name: "AI 服务" }).click();
+    const search = page.getByRole("region", { name: "联网题目检索" });
+    const key = search.getByLabel("Brave Search API Key");
+    await expect(search.getByText("未连接", { exact: true })).toBeVisible();
+
+    await key.fill("temporary-invalid-key");
+    await search.getByRole("button", { name: "测试连接" }).click();
+    await expect(search.getByRole("status")).toContainText("temporary key");
+    await expect(key).toHaveValue("temporary-invalid-key");
+
+    await key.fill("temporary-valid-key");
+    await search.getByRole("button", { name: "测试连接" }).click();
+    await expect(search.getByRole("status")).toContainText("已通过测试");
+    await expect(key).toHaveValue("");
+
+    await key.fill("first-saved-key");
+    await search.getByRole("button", { name: "保存并启用" }).click();
+    await expect(search.getByText("可正常使用", { exact: true })).toBeVisible();
+    await expect(key).toHaveValue("");
+
+    await key.fill("replacement-key");
+    await search.getByRole("button", { name: "保存并替换" }).click();
+    await expect(search.getByRole("status")).toContainText("最近验证");
+    await expect(key).toHaveValue("");
+
+    const activeAxe = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
+      .analyze();
+    expect(activeAxe.violations).toEqual([]);
+
+    page.once("dialog", (dialog) => dialog.dismiss());
+    await search.getByRole("button", { name: "撤销连接…" }).click();
+    await expect(search.getByText("可正常使用", { exact: true })).toBeVisible();
+    expect(
+      mutations.filter((mutation) => mutation.method === "DELETE"),
+    ).toHaveLength(0);
+
+    page.once("dialog", (dialog) => dialog.accept());
+    await search.getByRole("button", { name: "撤销连接…" }).click();
+    await expect(search.getByText("未连接", { exact: true })).toBeVisible();
+
+    searchMode = "INVALID";
+    await page.reload();
+    await page.getByRole("button", { name: "AI 服务" }).click();
+    const invalidSearch = page.getByRole("region", { name: "联网题目检索" });
+    await expect(
+      invalidSearch.getByText("需要检查", { exact: true }),
+    ).toBeVisible();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expectVisibleTextFloor(invalidSearch, "HTTP invalid search setting");
+    const invalidAxe = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
+      .analyze();
+    expect(invalidAxe.violations).toEqual([]);
+    const overflow = await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth -
+        document.documentElement.clientWidth,
+    );
+    expect(overflow).toBeLessThanOrEqual(1);
+
+    searchMode = "FORBIDDEN";
+    await page.reload();
+    await page.getByRole("button", { name: "AI 服务" }).click();
+    await expect(
+      page.getByRole("heading", { name: "联网题目检索" }),
+    ).toHaveCount(0);
+
+    searchMode = "ERROR";
+    await page.reload();
+    await page.getByRole("button", { name: "AI 服务" }).click();
+    await expect(
+      page.getByRole("region", { name: "联网题目检索" }),
+    ).toContainText("temporarily unavailable");
+
+    const stored = await page.evaluate(() => [
+      ...Object.values(localStorage),
+      ...Object.values(sessionStorage),
+    ]);
+    for (const secret of [
+      "temporary-invalid-key",
+      "temporary-valid-key",
+      "first-saved-key",
+      "replacement-key",
+    ])
+      expect(stored.join("\n")).not.toContain(secret);
+
+    const testCalls = mutations.filter((mutation) =>
+      mutation.path.endsWith("/test"),
+    );
+    expect(testCalls).toHaveLength(2);
+    for (const mutation of mutations) {
+      if (mutation.method === "GET") continue;
+      expect(mutation.headers.origin).toBe("http://127.0.0.1:3295");
+    }
+    const saves = mutations.filter((mutation) => mutation.method === "PUT");
+    expect(saves).toHaveLength(2);
+    expect(saves.map((mutation) => JSON.parse(mutation.body ?? "{}"))).toEqual([
+      { api_key: "first-saved-key" },
+      { api_key: "replacement-key" },
+    ]);
+    expect(
+      saves.every((mutation) => Boolean(mutation.headers["idempotency-key"])),
+    ).toBe(true);
+    const deletes = mutations.filter(
+      (mutation) => mutation.method === "DELETE",
+    );
+    expect(deletes).toHaveLength(1);
+    expect(deletes[0]?.headers["idempotency-key"]).toBeTruthy();
+  });
+
   for (const viewport of [
     { label: "desktop", width: 1440, height: 960 },
     { label: "390px mobile", width: 390, height: 844 },
