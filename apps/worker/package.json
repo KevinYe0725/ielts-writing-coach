@@ -26,10 +26,10 @@
     "ajv": "catalog:",
     "drizzle-orm": "catalog:",
     "graphile-worker": "0.17.3",
-    "nodemailer": "9.0.5"
+    "nodemailer": "10.0.0"
   },
   "devDependencies": {
-    "tsup": "8.5.0",
+    "tsup": "8.5.1",
     "typescript": "catalog:"
   }
 }
