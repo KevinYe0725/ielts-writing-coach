@@ -28,6 +28,7 @@ export type {
 } from "./learning";
 
 const ajv = new Ajv2020({ allErrors: true, strict: true });
+export { learnerFacingTeachingGoal } from "./learning";
 const validateFocusedLearningShape = ajv.compile<FocusedLearningPackage>(
   focusedLearningPackageSchema as AnySchemaObject,
 ) as ValidateFunction<FocusedLearningPackage>;

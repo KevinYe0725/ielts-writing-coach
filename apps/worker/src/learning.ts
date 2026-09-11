@@ -186,13 +186,30 @@ function hasClearOutputAction(instruction: string): boolean {
 function criteriaAreVisibleInInstruction(
   item: PracticePaperItemContent,
 ): boolean {
-  // The learner-facing instruction must state its own requirements, but the
-  // criterion description is evaluator metadata and does not need to repeat
-  // the instruction word-for-word. A non-empty instruction with a clear
-  // output action (checked separately) is sufficient for the learner.
+  // Preserve readability of older papers whose metadata paraphrased the task.
+  // These descriptions are never authoritative: withVisiblePracticeCriteria
+  // replaces them from the visible instruction before persistence and grading.
   return item.publicCriteria.every(
     (criterion) => criterion.descriptionZh.trim().length > 0,
   );
+}
+
+/** Build evaluator requirements from what the learner actually saw, including for historical papers. */
+export function withVisiblePracticeCriteria<
+  T extends { readonly instructionZh: string },
+>(items: readonly T[]) {
+  return items.map((item) => ({
+    ...item,
+    publicCriteria: [
+      {
+        labelZh: "题目要求",
+        labelEn: "Visible task requirements",
+        descriptionZh: item.instructionZh,
+        descriptionEn: item.instructionZh,
+        weight: 100,
+      },
+    ],
+  }));
 }
 
 /** Product-level guardrails that reject confusing or internally inconsistent AI papers. */
@@ -618,6 +635,22 @@ export function validateFocusedLearningPackage(
     return false;
 
   return true;
+}
+
+/** New public copy is checked separately so an old private goal cannot hide an otherwise usable course. */
+export function learnerFacingTeachingGoal(
+  value: FocusedLearningPackage,
+): { zh: string; en: string } | null {
+  const fields = [
+    value.teachingModule.coreAbilityZh,
+    value.teachingModule.coreAbilityEn,
+  ];
+  if (
+    hasInternalVocabulary(fields) ||
+    leaksFuturePaperAnswer(fields, value.paper)
+  )
+    return null;
+  return { zh: fields[0]!, en: fields[1]! };
 }
 
 export function sanitizePracticePaperJudgment(input: {
@@ -1553,6 +1586,14 @@ export interface PersistedIssueClassification {
 export function classifyIssueForPersistence(
   issue: AiIssueJudgment,
 ): PersistedIssueClassification {
+  if (issue.issueType === "OPTIONAL_POLISH") {
+    return {
+      skillId: issue.skillId,
+      categories: ["OPTIONAL_OPTIMIZATION"],
+      hardGrammarError: false,
+      diagnosis: issue.diagnosis,
+    };
+  }
   if (
     /much\s+(?:\+\s*)?slighter|much\s*\+\s*comparative/i.test(
       `${issue.excerpt} ${issue.diagnosis}`,

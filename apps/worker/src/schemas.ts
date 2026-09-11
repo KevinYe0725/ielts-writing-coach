@@ -210,7 +210,7 @@ export const issueBatchSchema = {
   additionalProperties: false,
   required: ["issues"],
   properties: {
-    issues: { type: "array", minItems: 1, maxItems: 40, items: issue },
+    issues: { type: "array", minItems: 0, maxItems: 40, items: issue },
   },
 } as const;
 

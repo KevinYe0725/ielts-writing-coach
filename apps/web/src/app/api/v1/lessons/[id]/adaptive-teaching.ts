@@ -1,5 +1,6 @@
 import {
   validateFocusedLearningPackage,
+  learnerFacingTeachingGoal,
   type AdaptiveTeachingModule,
   type FocusedLearningPackage,
   type PracticePaperContent,
@@ -276,12 +277,14 @@ export function learnerFacingTeachingArticle(
   const focusedPackage = validatedFocusedLearningPackage(value);
   if (!focusedPackage) return null;
   const module = focusedPackage.teachingModule;
+  const learningGoal = learnerFacingTeachingGoal(focusedPackage);
   return {
     format: module.format,
     titleZh: module.titleZh,
     titleEn: module.titleEn,
     introductionMarkdown: module.introductionMarkdown,
     estimatedMinutes: module.estimatedMinutes,
+    ...(learningGoal ? { learningGoal } : {}),
     sections: module.sections,
     practicePrompts: module.practicePrompts,
   };

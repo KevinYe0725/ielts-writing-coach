@@ -236,6 +236,57 @@ describe("adaptive lesson generation evidence", () => {
     lessonState.updated = [];
   });
 
+  it("persists only visible instructions as grading requirements, even if a model adds a hidden criterion", async () => {
+    const original = lessonState.package!;
+    const hidden = "必须额外比较三个国家的金融法规。";
+    lessonState.package = {
+      ...original,
+      paper: {
+        ...original.paper,
+        items: original.paper.items.map((item, index) =>
+          index === 0
+            ? {
+                ...item,
+                publicCriteria: [
+                  {
+                    labelZh: hidden,
+                    labelEn: "Hidden comparison",
+                    descriptionZh: hidden,
+                    descriptionEn:
+                      "Compare three national financial regulations",
+                    weight: 100,
+                  },
+                ],
+              }
+            : item,
+        ),
+      },
+    };
+    await generateLesson();
+    expect(lessonState.failure).toBeUndefined();
+    const saved = lessonState.inserted.find(
+      (entry) => entry.table === lessonPlan,
+    )?.values;
+    expect(JSON.stringify(saved)).not.toContain(hidden);
+    expect(saved).toMatchObject({
+      paperContent: {
+        paper: {
+          items: expect.arrayContaining([
+            expect.objectContaining({
+              instructionZh: original.paper.items[0]!.instructionZh,
+              publicCriteria: [
+                expect.objectContaining({
+                  descriptionZh: original.paper.items[0]!.instructionZh,
+                  weight: 100,
+                }),
+              ],
+            }),
+          ]),
+        },
+      },
+    });
+  });
+
   it("passes only the selected skill's top four issues in stable priority and position order", async () => {
     lessonState.issues = [
       issue({

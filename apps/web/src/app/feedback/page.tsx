@@ -49,6 +49,11 @@ import {
 } from "@/lib/client";
 import { buildFeedbackSegments } from "@/lib/client/feedback-annotations";
 import {
+  feedbackGroup,
+  priorityFeedback,
+  type FeedbackGroup,
+} from "@/lib/client/feedback-priorities";
+import {
   learningRouteHref,
   singleRouteParam,
   type LearningSearchParams,
@@ -119,6 +124,7 @@ export default function FeedbackPage({
   );
   const { data, error, loading, retry } = useDemoResource(loader);
   const [activeIssueId, setActiveIssueId] = useState<string | null>(null);
+  const [issueFilter, setIssueFilter] = useState<FeedbackGroup | "all">("all");
   const [mobilePane, setMobilePane] = useState<MobilePane>("suggestions");
   const [locationMessage, setLocationMessage] = useState("");
   const [retryingGeneration, setRetryingGeneration] = useState(false);
@@ -129,10 +135,22 @@ export default function FeedbackPage({
   const cardRefs = useRef<Record<string, HTMLElement | null>>({});
 
   const issues = useMemo(() => data?.issues ?? [], [data?.issues]);
+  const visibleIssues = useMemo(
+    () =>
+      issues.filter(
+        (issue) =>
+          issueFilter === "all" || feedbackGroup(issue) === issueFilter,
+      ),
+    [issues, issueFilter],
+  );
+  const priorities = useMemo(
+    () => priorityFeedback(issues, data?.targetIssueId),
+    [issues, data?.targetIssueId],
+  );
   const selectedIssueId =
-    activeIssueId && issues.some((issue) => issue.id === activeIssueId)
+    activeIssueId && visibleIssues.some((issue) => issue.id === activeIssueId)
       ? activeIssueId
-      : (issues[0]?.id ?? null);
+      : (visibleIssues[0]?.id ?? null);
   const segments = useMemo(
     () => buildFeedbackSegments(data?.originalEssay ?? "", issues),
     [data?.originalEssay, issues],
@@ -273,6 +291,7 @@ export default function FeedbackPage({
 
   const activateFromHighlight = useCallback(
     (issueId: string) => {
+      setIssueFilter("all");
       setActiveIssueId(issueId);
       if (isSmallScreen()) setMobilePane("suggestions");
       scrollToRef(cardRefs, issueId);
@@ -391,8 +410,8 @@ export default function FeedbackPage({
         }
         eyebrow={text("第1步 · 详细批改与改正", "Step 1 · Detailed correction")}
         title={text(
-          "对照原文，把每一处问题改明白",
-          "Correct each issue against your original essay",
+          "看懂问题，学会修改",
+          "Understand the issue. Learn the revision.",
         )}
       />
 
@@ -402,14 +421,14 @@ export default function FeedbackPage({
           <div>
             <strong>
               {text(
-                "批改已完成，但问题归类没有生成，报告细节不完整",
-                "Feedback is complete, but issue classification did not finish",
+                "总体批改已完成，逐句建议还未准备好",
+                "The overall review is ready; sentence suggestions are still unavailable",
               )}
             </strong>
             <p>
               {text(
-                "分数与总体结论可用；逐句问题清单需要重新运行问题归类后才会出现。",
-                "The score and overall summary are available; the sentence-level issue list appears after issue classification is rerun.",
+                "可以先阅读总体反馈。点击下方按钮补全逐句建议，已保存的作文和批改会保留。",
+                "Read the overall feedback first, then request the remaining suggestions. Your essay and existing feedback are saved.",
               )}
             </p>
             {issueRetryError ? <p role="alert">{issueRetryError}</p> : null}
@@ -439,7 +458,7 @@ export default function FeedbackPage({
             {retryingIssues ? (
               <LoadingButtonContent label={text("正在重试…", "Retrying…")} />
             ) : (
-              text("重试问题归类", "Retry issue classification")
+              text("补全逐句建议", "Complete sentence suggestions")
             )}
           </Button>
         </div>
@@ -502,6 +521,54 @@ export default function FeedbackPage({
           ))}
         </div>
       </section>
+
+      {priorities.length > 0 ? (
+        <section
+          className={styles.priorityPlan}
+          aria-labelledby="feedback-priorities-title"
+        >
+          <div className={styles.priorityHeading}>
+            <div>
+              <p className="eyebrow">
+                {text("先抓住重点", "Start with what matters")}
+              </p>
+              <h2 id="feedback-priorities-title">
+                {text("这篇作文，先看这几处", "Start with these changes")}
+              </h2>
+            </div>
+            <p>
+              {text(
+                "相同问题先看一个代表，再到原文中举一反三。",
+                "Start with one example of each issue, then apply the lesson elsewhere.",
+              )}
+            </p>
+          </div>
+          <ol className={styles.priorityList}>
+            {priorities.map((issue) => (
+              <li key={issue.id}>
+                <button
+                  type="button"
+                  onClick={() => activateFromHighlight(issue.id)}
+                >
+                  <span className={styles.priorityLabel}>
+                    {feedbackGroup(issue) === "must_fix"
+                      ? text("需要改正", "Correction")
+                      : text("表达提升", "Expression")}
+                  </span>
+                  <strong>{text(issue.titleZh, issue.titleEn)}</strong>
+                  <span className={styles.priorityAction}>
+                    {text(issue.transferRuleZh, issue.transferRuleEn)}
+                  </span>
+                  <span className={styles.priorityLink}>
+                    {text("看原文与改法", "See the example and revision")}{" "}
+                    <ArrowRight size={14} aria-hidden="true" />
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ol>
+        </section>
+      ) : null}
 
       <div
         aria-label={text("报告视图", "Report view")}
@@ -676,6 +743,46 @@ export default function FeedbackPage({
             <span>{data.issues.length}</span>
           </div>
 
+          <div
+            className={styles.issueFilters}
+            role="group"
+            aria-label={text("筛选修改建议", "Filter suggestions")}
+          >
+            {(["all", "must_fix", "naturalness", "polish"] as const).map(
+              (filter) => {
+                const labels = {
+                  all: text("全部", "All"),
+                  must_fix: text("需要改正", "Corrections"),
+                  naturalness: text("表达提升", "Expression"),
+                  polish: text("可选润色", "Optional polish"),
+                };
+                const count =
+                  filter === "all"
+                    ? issues.length
+                    : issues.filter((issue) => feedbackGroup(issue) === filter)
+                        .length;
+                return (
+                  <button
+                    key={filter}
+                    type="button"
+                    aria-pressed={issueFilter === filter}
+                    onClick={() => setIssueFilter(filter)}
+                  >
+                    {labels[filter]} <span>{count}</span>
+                  </button>
+                );
+              },
+            )}
+          </div>
+          {issueFilter === "polish" ? (
+            <p className={styles.filterHelp}>
+              {text(
+                "这里是可选的表达建议，不代表原句有错。",
+                "These are optional choices; the original wording is not necessarily wrong.",
+              )}
+            </p>
+          ) : null}
+
           {targetDiffersFromFirst ? (
             <div className={styles.targetNote}>
               <Target aria-hidden="true" size={16} />
@@ -689,8 +796,8 @@ export default function FeedbackPage({
           ) : null}
 
           <div className={styles.issueList}>
-            {data.issues.length > 0 ? (
-              data.issues.map((issue) => {
+            {visibleIssues.length > 0 ? (
+              visibleIssues.map((issue) => {
                 const active = selectedIssueId === issue.id;
                 const isTarget = data.targetIssueId === issue.id;
                 const canLocate = highlightableIds.has(issue.id);
@@ -721,12 +828,12 @@ export default function FeedbackPage({
                       </span>
                       <span className={styles.issueSummary}>
                         <span className={styles.issueLabels}>
-                          <span data-tone={issue.severity}>
-                            {issue.severity === "must_fix"
+                          <span data-tone={feedbackGroup(issue)}>
+                            {feedbackGroup(issue) === "must_fix"
                               ? text("需要改正", "Fix this")
-                              : issue.severity === "naturalness"
+                              : feedbackGroup(issue) === "naturalness"
                                 ? text("表达更自然", "More natural")
-                                : text("可以更好", "Could improve")}
+                                : text("可选润色", "Optional polish")}
                           </span>
                           {isTarget ? (
                             <span className={styles.focusTarget}>
@@ -763,7 +870,12 @@ export default function FeedbackPage({
                       <div className={styles.detailBlock}>
                         <span>
                           <Languages aria-hidden="true" size={15} />
-                          {text("为什么要改", "Why it needs revision")}
+                          {feedbackGroup(issue) === "polish"
+                            ? text(
+                                "这项建议的作用",
+                                "What this suggestion offers",
+                              )
+                            : text("为什么要改", "Why it needs revision")}
                         </span>
                         <p>{text(issue.explanationZh, issue.explanationEn)}</p>
                       </div>
@@ -813,8 +925,8 @@ export default function FeedbackPage({
                 <CheckCircle2 aria-hidden="true" size={22} />
                 <p>
                   {text(
-                    "本轮没有逐句修改建议。",
-                    "No sentence-level suggestions for this attempt.",
+                    "这里没有需要查看的建议，可以切换分类或继续阅读。",
+                    "There are no suggestions in this view. Choose another category or keep reading.",
                   )}
                 </p>
               </div>

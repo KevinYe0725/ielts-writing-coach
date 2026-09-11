@@ -297,6 +297,18 @@ describe("issue persistence categories", () => {
     };
   }
 
+  it("never persists optional polish as hard grammar even when its skill is grammatical", () => {
+    expect(
+      classifyIssueForPersistence({
+        ...issue("subject_verb_agreement"),
+        issueType: "OPTIONAL_POLISH",
+      }),
+    ).toMatchObject({
+      categories: ["OPTIONAL_OPTIMIZATION"],
+      hardGrammarError: false,
+    });
+  });
+
   it.each([
     ["word_form_precision", "LEXICAL_PRECISION"],
     ["task_instruction_coverage", "TASK_COVERAGE"],

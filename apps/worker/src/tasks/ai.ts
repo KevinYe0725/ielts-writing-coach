@@ -103,6 +103,7 @@ import {
   buildVersionComparisonMetrics,
   canonicalEvidenceFromPayload,
   classifyIssueForPersistence,
+  withVisiblePracticeCriteria,
   countComparisonWords,
   followUpSchedule,
   verifyComparisonIssueSpans,
@@ -970,7 +971,11 @@ async function classifyIssues(
     },
   );
   if (persistedIssues.length > 0) {
-    const persistedPrimary = [...persistedIssues].sort(
+    const actionablePersisted = persistedIssues.filter(
+      (issue) =>
+        tutorialRecord(issue.diagnosis)?.issueType !== "OPTIONAL_POLISH",
+    );
+    const persistedPrimary = [...actionablePersisted].sort(
       (left, right) =>
         right.severity - left.severity || right.confidence - left.confidence,
     )[0]?.skillId;
@@ -983,12 +988,15 @@ async function classifyIssues(
       .update(trainingCycle)
       .set({ coreSkillId: primarySkillId })
       .where(eq(trainingCycle.id, attempt.cycleId));
-    await completeDueMixedReview(job, attempt, persistedIssues);
+    await completeDueMixedReview(job, attempt, actionablePersisted);
     await enqueueChild(job, helpers, "exercise_generation", {
       attemptId,
       cycleId: attempt.cycleId,
       assessmentId,
       skillId: primarySkillId,
+      ...(actionablePersisted.length === 0
+        ? { diagnosisMode: "CONSOLIDATION" }
+        : {}),
     });
     return {};
   }
@@ -999,21 +1007,22 @@ async function classifyIssues(
     model: model(job),
     idempotencyKey: job.id,
     system: PROMPT_REGISTRY.issue_classification.system,
-    input: `Flag every sentence that is not yet excellent; do not skip minor polish, naturalness, or small grammar problems, and skip only sentences where nothing needs changing. Return non-overlapping issues. Character offsets use this exact immutable essay, starting at zero. Use the minimum exact span a learner can act on: for grammar, spelling, word form, collocation, and naturalness, do not include unaffected surrounding words; for missing logic, cohesion, or task development, use only enough context to locate where an addition belongs and explain that the learner needs to add content rather than replace the entire span. A phrase can be grammatical but unnatural; in particular, do not claim that "much + comparative" is ungrammatical.\n\n${attempt.content}`,
+    input: `Identify supported, useful corrections, not every possible stylistic variation. Return an empty issues array when no defensible issue is found. Optional polish must be labelled OPTIONAL_POLISH with LOW severity and must not be described as a language error. Return non-overlapping issues. Character offsets use this exact immutable essay, starting at zero. Use the minimum exact span a learner can act on: for grammar, spelling, word form, collocation, and naturalness, do not include unaffected surrounding words; for missing logic, cohesion, or task development, use only enough context to locate where an addition belongs and explain that the learner needs to add content rather than replace the entire span. A phrase can be grammatical but unnatural; in particular, do not claim that "much + comparative" is ungrammatical.\n\n${attempt.content}`,
     schemaName: "iwc_ai_issue_batch_v1",
     schema: issueBatchSchema as unknown as Record<string, unknown>,
     validate: (value): value is { issues: AiIssueJudgment[] } =>
       typeof value === "object" &&
       value !== null &&
       Array.isArray((value as { issues?: unknown }).issues) &&
-      (value as { issues: unknown[] }).issues.some((issue) => {
-        try {
-          assertContract("aiIssueJudgment", issue);
-          return true;
-        } catch {
-          return false;
-        }
-      }),
+      ((value as { issues: unknown[] }).issues.length === 0 ||
+        (value as { issues: unknown[] }).issues.some((issue) => {
+          try {
+            assertContract("aiIssueJudgment", issue);
+            return true;
+          } catch {
+            return false;
+          }
+        })),
     maxOutputTokens: 40_000,
     timeoutMs: STANDARD_GENERATION_TIMEOUT_MS,
   });
@@ -1027,36 +1036,18 @@ async function classifyIssues(
       return false;
     }
   });
-  if (validIssues.length === 0) {
+  if (validIssues.length === 0 && result.value.issues.length > 0) {
     throw new Error("The provider returned no valid issue classifications.");
   }
-  let issues = anchorIssueSpans(attempt.content, validIssues);
-  let usedSyntheticFallback = false;
-  if (issues.length === 0 && attempt.content.length > 0) {
-    usedSyntheticFallback = true;
-    const endOffset = Math.min(
-      attempt.content.length,
-      Math.max(1, attempt.content.search(/[.!?](?:\s|$)/) + 1 || 1),
+  const issues = anchorIssueSpans(attempt.content, validIssues).map((issue) =>
+    issue.issueType === "OPTIONAL_POLISH"
+      ? { ...issue, severity: "LOW" as const }
+      : issue,
+  );
+  if (issues.length === 0 && validIssues.length > 0) {
+    throw new Error(
+      "The issue evidence could not be located in the submitted essay.",
     );
-    issues = [
-      {
-        skillId: "mechanism_chain",
-        startOffset: 0,
-        endOffset,
-        excerpt: attempt.content.slice(0, endOffset),
-        diagnosis:
-          "Use this exact span as the starting point for evidence-based development practice.",
-        issueType: "LOGIC",
-        correctedVersion: attempt.content.slice(0, endOffset),
-        explanationZh:
-          "当前证据不足以形成更具体的自动诊断，请在报告中人工确认这一处的论证展开。",
-        knowledgePointZh: "观点需要用原因、机制或例证充分展开。",
-        transferRuleZh:
-          "下一篇写完主体观点后，检查是否回答了为什么、如何发生和产生什么结果。",
-        severity: "MEDIUM",
-        confidence: 0.6,
-      },
-    ];
   }
   const severity = { HIGH: 3, MEDIUM: 2, LOW: 1 } as const;
   issues.sort(
@@ -1068,8 +1059,11 @@ async function classifyIssues(
     issue,
     classification: classifyIssueForPersistence(issue),
   }));
+  const actionableIssues = classifiedIssues.filter(
+    ({ issue }) => issue.issueType !== "OPTIONAL_POLISH",
+  );
   const primarySkillId =
-    classifiedIssues[0]?.classification.skillId ?? "mechanism_chain";
+    actionableIssues[0]?.classification.skillId ?? "mechanism_chain";
   await databaseContext.db.transaction(async (transaction) => {
     if (classifiedIssues.length > 0) {
       await transaction.insert(issueEvidence).values(
@@ -1090,9 +1084,7 @@ async function classifyIssues(
             transferRuleZh: issue.transferRuleZh,
             transferRuleEn: issue.transferRuleZh,
             issueType: issue.issueType,
-            source: usedSyntheticFallback
-              ? "SYNTHETIC_FALLBACK"
-              : "AI_CLASSIFICATION",
+            source: "AI_CLASSIFICATION",
           },
           categories: [...classification.categories],
           hardGrammarError: classification.hardGrammarError,
@@ -1109,12 +1101,22 @@ async function classifyIssues(
   const storedIssues = await databaseContext.db.query.issueEvidence.findMany({
     where: eq(issueEvidence.assessmentId, assessmentId),
   });
-  await completeDueMixedReview(job, attempt, storedIssues);
+  await completeDueMixedReview(
+    job,
+    attempt,
+    storedIssues.filter(
+      (issue) =>
+        tutorialRecord(issue.diagnosis)?.issueType !== "OPTIONAL_POLISH",
+    ),
+  );
   await enqueueChild(job, helpers, "exercise_generation", {
     attemptId,
     cycleId: attempt.cycleId,
     assessmentId,
     skillId: primarySkillId,
+    ...(actionableIssues.length === 0
+      ? { diagnosisMode: "CONSOLIDATION" }
+      : {}),
   });
   return usageRecord(result.usage);
 }
@@ -1178,25 +1180,32 @@ async function generateLesson(
           })
         )?.summary;
   const diagnosisContext =
-    selectedIssueRows.length > 0
+    job.protectedReference.diagnosisMode === "CONSOLIDATION"
       ? {
-          source: "SELECTED_SKILL_ISSUES",
+          source: "NO_ACTIONABLE_ISSUES",
           skillId: canonicalSkillId,
-          issues: selectedIssueRows.map((issue) => ({
-            excerpt: issue.excerpt,
-            diagnosis: issue.diagnosis,
-          })),
+          instruction:
+            "No actionable weakness was identified. Present this as optional consolidation or a new-context challenge, never as correction of a diagnosed deficit. Do not claim the learner failed this skill.",
         }
-      : assessmentId
+      : selectedIssueRows.length > 0
         ? {
-            source: "ASSESSMENT_SUMMARY_FALLBACK",
+            source: "SELECTED_SKILL_ISSUES",
             skillId: canonicalSkillId,
-            assessmentSummary: assessmentSummary ?? {},
+            issues: selectedIssueRows.map((issue) => ({
+              excerpt: issue.excerpt,
+              diagnosis: issue.diagnosis,
+            })),
           }
-        : {
-            source: "MIGRATED_LEGACY_FALLBACK",
-            skillId: canonicalSkillId,
-          };
+        : assessmentId
+          ? {
+              source: "ASSESSMENT_SUMMARY_FALLBACK",
+              skillId: canonicalSkillId,
+              assessmentSummary: assessmentSummary ?? {},
+            }
+          : {
+              source: "MIGRATED_LEGACY_FALLBACK",
+              skillId: canonicalSkillId,
+            };
   const version1 = cycle.writingAttempts.find(
     (attempt) => attempt.kind === "version_1",
   );
@@ -1526,11 +1535,13 @@ Learner Version 1 for context only: ${(version1?.content ?? "").slice(0, 4_000)}
       ...result.value.paper,
       format: "TIMED_PAPER_V3",
       durationMinutes: 60,
-      items: result.value.paper.items.map((item, index) => ({
-        ...item,
-        id: newDomainId(),
-        number: index + 1,
-      })),
+      items: withVisiblePracticeCriteria(result.value.paper.items).map(
+        (item, index) => ({
+          ...item,
+          id: newDomainId(),
+          number: index + 1,
+        }),
+      ),
     },
     format: "TIMED_PAPER_V2",
   };
@@ -2027,16 +2038,20 @@ async function evaluatePracticePaper(
   if (plan.paperResult) return {};
   if (!plan.paperSubmittedAt)
     throw new Error("The practice paper has not been submitted.");
-  const paper = publicPaper(plan.paperContent);
-  if (!paper || paper.items.length !== 8)
+  const storedPaper = publicPaper(plan.paperContent);
+  if (!storedPaper || storedPaper.items.length !== 8)
     throw new Error("The practice paper content is invalid.");
+  const paper = {
+    ...storedPaper,
+    items: withVisiblePracticeCriteria(storedPaper.items),
+  };
   const answers = plan.paperAnswers;
   const adapter = await adapterForJob(job);
   const result = await adapter.generateStructured<PracticePaperJudgment>({
     model: model(job),
     idempotencyKey: job.id,
     system: PROMPT_REGISTRY.paragraph_evaluation.system,
-    input: `Mark this complete focused-practice paper. Judge only the publicCriteria attached to each question. Do not infer an unstated requirement. Preserve every question's itemId exactly. For a choice question, compare the answer with acceptedAnswers deterministically. For open English, quote only exact learner wording in evidence. A blank or impossible-to-judge answer is NOT_SCORABLE. Detailed problems and the improved answer are required only for NEEDS_WORK; keep them empty for MEETS_STANDARD. Use supportive, concrete Chinese and never mention software internals.
+    input: `Mark this complete focused-practice paper. The publicCriteria are copied from the learner-visible instruction for each question. Judge only those stated requirements. Reference explanations illustrate a possible approach and must not add requirements or prohibit a valid alternative. Preserve every question's itemId exactly. For a choice question, compare the answer with acceptedAnswers deterministically. For open English, quote only exact learner wording in evidence. A blank or impossible-to-judge answer is NOT_SCORABLE. Detailed problems and the improved answer are required only for NEEDS_WORK; keep them empty for MEETS_STANDARD. Use supportive, concrete Chinese and never mention software internals.
 
 Paper: ${JSON.stringify(paper)}
 Learner answers submitted together: ${JSON.stringify(answers)}`,

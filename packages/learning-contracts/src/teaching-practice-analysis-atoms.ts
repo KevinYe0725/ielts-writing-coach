@@ -1,3 +1,5 @@
+import { SKILL_IMPROVEMENT_COPY } from "./teaching-practice-skill-feedback";
+
 export const TEACHING_PRACTICE_STRENGTH_CODES = [
   "DIRECT_RESPONSE",
   "EXPLICIT_CAUSAL_LINK",
@@ -19,6 +21,19 @@ export const TEACHING_PRACTICE_IMPROVEMENT_CODES = [
   "MAKE_OUTCOME_SPECIFIC",
   "CLARIFY_POSITION",
   "USE_MORE_NATURAL_WORDING",
+  "CHECK_SUBJECT_VERB_AGREEMENT",
+  "CHECK_VERB_FORM",
+  "REPAIR_SENTENCE_BOUNDARY",
+  "CHECK_ARTICLE_REFERENCE",
+  "CHECK_WORD_FORM",
+  "CHECK_SPELLING",
+  "MATCH_COLLOCATION",
+  "COMPLETE_COMPARISON",
+  "COVER_TASK_REQUIREMENTS",
+  "KEEP_SUPPORT_RELEVANT",
+  "QUALIFY_CLAIM",
+  "ORDER_PARAGRAPH_IDEAS",
+  "CLARIFY_REFERENCE",
 ] as const;
 
 export type TeachingPracticeStrengthCode =
@@ -51,6 +66,11 @@ export interface RenderedTeachingPracticeAnalysis {
     readonly explanation: LocalizedText;
     readonly whyItMatters: LocalizedText;
     readonly userAnswerEvidence: readonly string[];
+    readonly example?: {
+      readonly before: string;
+      readonly after: string;
+      readonly explanation: LocalizedText;
+    };
   };
   readonly nextCheck: LocalizedText;
   readonly uncertainty?: LocalizedText;
@@ -240,8 +260,14 @@ const IMPROVEMENT_COPY: Record<
     readonly explanation: LocalizedText;
     readonly whyItMatters: LocalizedText;
     readonly nextCheck: LocalizedText;
+    readonly example?: {
+      readonly before: string;
+      readonly after: string;
+      readonly explanation: LocalizedText;
+    };
   }
 > = {
+  ...SKILL_IMPROVEMENT_COPY,
   MAKE_CAUSAL_LINK_EXPLICIT: {
     title: { zh: "把因果联系写明", en: "Make the causal link explicit" },
     explanation: {
@@ -361,6 +387,9 @@ export function renderTeachingPracticeAnalysisAtoms(
             explanation: improvementCopy.explanation,
             whyItMatters: improvementCopy.whyItMatters,
             userAnswerEvidence: [improvement.evidence],
+            ...(improvementCopy.example
+              ? { example: improvementCopy.example }
+              : {}),
           },
         }
       : {}),

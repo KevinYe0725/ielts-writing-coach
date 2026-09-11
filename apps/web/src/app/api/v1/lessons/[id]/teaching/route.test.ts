@@ -203,6 +203,7 @@ describe("focused teaching adaptive article routes", () => {
       titleEn: teaching.titleEn,
       introductionMarkdown: teaching.introductionMarkdown,
       estimatedMinutes: teaching.estimatedMinutes,
+      learningGoal: { zh: teaching.coreAbilityZh, en: teaching.coreAbilityEn },
       sections: teaching.sections,
       practicePrompts: teaching.practicePrompts,
     });
@@ -210,6 +211,38 @@ describe("focused teaching adaptive article routes", () => {
     expect(body.teaching).not.toHaveProperty("coreAbilityZh");
     expect(body.teaching).not.toHaveProperty("coreAbilityEn");
   });
+
+  it.each(["internal", "future-answer"])(
+    "omits an unsafe %s learning goal while preserving the existing article",
+    async (kind) => {
+      const focusedPackage = await adaptivePackage();
+      const goal =
+        kind === "internal"
+          ? "AI model output schema internal pipeline"
+          : (
+              focusedPackage.paper.items as Array<{
+                options: Array<{ labelEn: string }>;
+              }>
+            )[0]!.options[0]!.labelEn;
+      focusedPackage.teachingModule.coreAbilityEn = goal;
+      focusedPackage.paper.objectiveEn = goal;
+      routeState.lesson = {
+        id: lessonId,
+        cycle: { userId: routeState.actor.id },
+        paperContent: focusedPackage,
+      };
+      const response = await getTeaching(
+        new Request(`https://coach.test/api/v1/lessons/${lessonId}/teaching`),
+        { params: Promise.resolve({ id: lessonId }) },
+      );
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.teaching).not.toHaveProperty("learningGoal");
+      expect(body.teaching.sections).toEqual(
+        focusedPackage.teachingModule.sections,
+      );
+    },
+  );
 
   it("requires replacement when a block is missing its kind-specific teaching content", async () => {
     const focusedPackage = await adaptivePackage();

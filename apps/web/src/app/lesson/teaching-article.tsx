@@ -133,6 +133,39 @@ function AnalysisDetails({ analysis }: { analysis: TeachingPracticeAnalysis }) {
               {evidence}
             </q>
           ))}
+          {analysis.keyImprovement.example ? (
+            <aside
+              className={styles.analysisExample}
+              aria-label={text("同类例句", "A separate worked example")}
+            >
+              <strong>
+                {text(
+                  "用一组同类例句看清规则",
+                  "See the rule in a separate example",
+                )}
+              </strong>
+              <p>
+                <span>{text("原句", "Before")}</span>
+                <q lang="en">{analysis.keyImprovement.example.before}</q>
+              </p>
+              <p>
+                <span>{text("一种改法", "One revision")}</span>
+                <q lang="en">{analysis.keyImprovement.example.after}</q>
+              </p>
+              <p>
+                {text(
+                  analysis.keyImprovement.example.explanation.zh,
+                  analysis.keyImprovement.example.explanation.en,
+                )}
+              </p>
+              <small>
+                {text(
+                  "这是教学例句，不是你的答案，也不是唯一可行的表达。",
+                  "This is a teaching example, not your answer or the only valid wording.",
+                )}
+              </small>
+            </aside>
+          ) : null}
         </section>
       ) : null}
 
@@ -506,7 +539,9 @@ function MarkdownSection({ section }: { section: TeachingSectionMarkdown }) {
 function sectionAnchors(
   sections: readonly TeachingSectionMarkdown[],
 ): readonly string[] {
-  const occurrences = new Map<string, number>();
+  const occurrences = new Map<string, number>([
+    ["teaching-practice-prompts", 1],
+  ]);
 
   return sections.map((section, index) => {
     const normalized = section.titleEn
@@ -542,7 +577,15 @@ function PracticePrompts({
 }) {
   const { text } = useLocale();
   return (
-    <div className={styles.practiceBlock} data-teaching-block="PRACTICE">
+    <section
+      className={styles.practiceBlock}
+      data-teaching-block="PRACTICE"
+      id="teaching-practice-prompts"
+      aria-labelledby="teaching-practice-heading"
+    >
+      <h2 id="teaching-practice-heading" tabIndex={-1}>
+        {text("现在，换你试一试", "Now try it yourself")}
+      </h2>
       <p className={styles.practiceLead}>
         {text(
           "先独立作答。提交后，你会立即看到自己的首次答案、另一种可行路径，以及针对这次表达的进一步讲解。",
@@ -563,7 +606,7 @@ function PracticePrompts({
           />
         ))}
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -951,8 +994,8 @@ function TeachingArticleContent({
   };
 
   useEffect(() => {
-    const sections = data.sections
-      .map((_, index) => document.getElementById(anchors[index] ?? ""))
+    const sections = [...anchors, "teaching-practice-prompts"]
+      .map((anchor) => document.getElementById(anchor))
       .filter((section): section is HTMLElement => Boolean(section));
     if (sections.length === 0 || !("IntersectionObserver" in window)) return;
 
@@ -990,9 +1033,24 @@ function TeachingArticleContent({
           </span>
         </div>
         <h1>{text(data.titleZh, data.titleEn)}</h1>
+        {data.learningGoal ? (
+          <div className={styles.learningGoal}>
+            <span>
+              {text("学完这节，你能够", "After this tutorial, you can")}
+            </span>
+            <p>{text(data.learningGoal.zh, data.learningGoal.en)}</p>
+          </div>
+        ) : null}
         <div className={styles.prose} data-teaching-prose>
           <Markdown>{data.introductionMarkdown}</Markdown>
         </div>
+        <a className={styles.practiceJump} href="#teaching-practice-prompts">
+          {text(
+            `读懂方法后，试做 ${practicePrompts.length} 道随堂练习`,
+            `After reading, try ${practicePrompts.length} short exercises`,
+          )}{" "}
+          <ArrowRight size={15} aria-hidden="true" />
+        </a>
       </header>
 
       <div className={styles.readingLayout} data-teaching-layout>
@@ -1138,6 +1196,36 @@ function TeachingArticleContent({
                 );
               })}
             </ol>
+            <a
+              className={styles.contentsPractice}
+              href="#teaching-practice-prompts"
+              aria-current={
+                activeAnchor === "teaching-practice-prompts"
+                  ? "location"
+                  : undefined
+              }
+              onClick={(event) => {
+                event.preventDefault();
+                setContentsOpen(false);
+                setActiveAnchor("teaching-practice-prompts");
+                window.history.replaceState(
+                  window.history.state,
+                  "",
+                  "#teaching-practice-prompts",
+                );
+                window.requestAnimationFrame(() => {
+                  document
+                    .getElementById("teaching-practice-prompts")
+                    ?.scrollIntoView({ block: "start", behavior: "instant" });
+                  document
+                    .getElementById("teaching-practice-heading")
+                    ?.focus({ preventScroll: true });
+                });
+              }}
+            >
+              {text("随堂练习", "Try it yourself")}{" "}
+              <span>{practicePrompts.length}</span>
+            </a>
           </nav>
         </div>
       </div>

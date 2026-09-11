@@ -51,10 +51,10 @@ describe("runtime pedagogy knowledge", () => {
   it("allows a bounded flexible article instead of prescribing the legacy lesson template", () => {
     const guidance = pedagogyGuidanceFor("exercise_generation");
 
-    expect(guidance).toContain("3–6 dynamically named sections");
-    expect(guidance).toContain("7–12 blocks");
+    expect(guidance).toContain("2–6 dynamically named sections");
+    expect(guidance).toContain("one Markdown body");
     expect(guidance).toContain("rather than a fixed course template");
-    expect(guidance).toContain("selected block kinds");
+    expect(guidance).toContain("separate practicePrompts list");
     expect(guidance).not.toContain("three to five knowledge points");
     expect(guidance).not.toContain("two quick checks");
     expect(guidance).not.toContain("readiness checklist");

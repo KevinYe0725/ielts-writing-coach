@@ -332,6 +332,11 @@ export interface TeachingPracticeAnalysis {
     readonly explanation: TeachingPracticeLocalizedText;
     readonly whyItMatters: TeachingPracticeLocalizedText;
     readonly userAnswerEvidence: readonly string[];
+    readonly example?: {
+      readonly before: string;
+      readonly after: string;
+      readonly explanation: TeachingPracticeLocalizedText;
+    };
   };
   readonly comparisonPoints: readonly {
     readonly aspect: TeachingPracticeLocalizedText;
@@ -373,6 +378,7 @@ export interface FocusedTeachingData {
   readonly titleEn: string;
   readonly introductionMarkdown: string;
   readonly estimatedMinutes: number;
+  readonly learningGoal?: TeachingPracticeLocalizedText;
   readonly sections: readonly TeachingSectionMarkdown[];
   readonly practicePrompts: readonly TeachingPracticePrompt[];
 }

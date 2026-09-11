@@ -637,6 +637,10 @@ const feedback: FeedbackData = {
 };
 
 export const mechanismChainTeachingFixture: FocusedTeachingData = {
+  learningGoal: {
+    zh: "说清原因怎样导致结果，让一个观点有完整的解释。",
+    en: "Explain how a cause produces its result to develop one supported claim.",
+  },
   id: "lesson-demo",
   cycleId: "cycle-demo",
   format: "ADAPTIVE_ARTICLE_V1",
@@ -723,6 +727,10 @@ export const mechanismChainTeachingFixture: FocusedTeachingData = {
 };
 
 export const collocationControlTeachingFixture: FocusedTeachingData = {
+  learningGoal: {
+    zh: "根据语境中的关系，选择自然准确的动词与名词搭配。",
+    en: "Choose natural verb–noun collocations for the relationship you mean.",
+  },
   id: "lesson-collocation-control",
   cycleId: "cycle-collocation-control",
   format: "ADAPTIVE_ARTICLE_V1",

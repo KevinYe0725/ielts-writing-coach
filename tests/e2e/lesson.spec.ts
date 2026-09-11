@@ -507,6 +507,58 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
     ).toHaveAttribute("href", /lesson=lesson-collocation-perspective/);
   });
 
+  test("opens a priority and recovers an original-text link after filtering suggestions", async ({
+    page,
+  }) => {
+    await page.goto(feedbackUrl);
+    const priorities = page.getByRole("region", {
+      name: "这篇作文，先看这几处",
+    });
+    await expect(priorities).toBeVisible();
+    await priorities.getByRole("button").first().click();
+    await expect(
+      page.locator("[data-feedback-issue][aria-expanded='true']"),
+    ).toBeVisible();
+    const filters = page.getByRole("group", { name: "筛选修改建议" });
+    await filters.getByRole("button", { name: /可选润色/ }).click();
+    await expect(
+      page.getByText("这里是可选的表达建议，不代表原句有错。", { exact: true }),
+    ).toBeVisible();
+    const sourceTab = page.getByRole("tab", { name: "原文", exact: true });
+    if (await sourceTab.isVisible()) await sourceTab.click();
+    const highlight = page.locator("[data-feedback-highlight]").first();
+    const issueId = await highlight.getAttribute("data-feedback-highlight");
+    await highlight.click();
+    await expect(filters.getByRole("button", { name: /全部/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await expect(
+      page.locator(`[data-feedback-issue="${issueId}"]`),
+    ).toHaveAttribute("aria-expanded", "true");
+  });
+
+  test("makes the tutorial goal readable and opens active practice from the contents", async ({
+    page,
+  }) => {
+    await page.goto(lessonUrl);
+    await expect(
+      page.getByText("学完这节，你能够", { exact: true }),
+    ).toBeVisible();
+    const toggle = page.locator("[data-teaching-toc-toggle]");
+    if (await toggle.isVisible()) await toggle.click();
+    await page
+      .locator("[data-teaching-toc]")
+      .getByRole("link", { name: /随堂练习/ })
+      .click();
+    await expect(
+      page.getByRole("heading", { name: "现在，换你试一试" }),
+    ).toBeFocused();
+    await expect(
+      page.locator("[data-teaching-block='PRACTICE']"),
+    ).toBeInViewport();
+  });
+
   test("uses feedback columns only when the report has enough content space", async ({
     page,
   }) => {
@@ -745,7 +797,10 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
       "build-the-mechanism-one-step-at-a-time",
       "transfer-the-method-to-a-new-topic",
     ]);
-    await expect(contents.locator("a")).toHaveCount(sectionAnchors.length);
+    await expect(contents.locator("ol a")).toHaveCount(sectionAnchors.length);
+    await expect(
+      contents.getByRole("link", { name: /随堂练习/ }),
+    ).toHaveAttribute("href", "#teaching-practice-prompts");
 
     const proseMetrics = await page
       .locator("[data-teaching-prose]")
@@ -1249,7 +1304,7 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
       /\/feedback\?cycle=cycle-demo&lesson=lesson-collocation-perspective$/,
     );
     await expect(
-      page.getByRole("heading", { name: "对照原文，把每一处问题改明白" }),
+      page.getByRole("heading", { name: "看懂问题，学会修改" }),
     ).toBeVisible();
     await page.getByRole("link", { name: "进入专项教学" }).click();
     await page.getByRole("link", { name: "开始60分钟训练卷" }).click();
