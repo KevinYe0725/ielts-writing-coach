@@ -6,8 +6,7 @@ import { Group, Panel, Separator } from "react-resizable-panels";
 import { useLocale } from "@/components/locale-provider";
 
 import styles from "./feedback.module.css";
-
-const RESIZABLE_REPORT_QUERY = "(min-width: 940px)";
+import { RESIZABLE_REPORT_QUERY } from "./report-layout";
 
 function subscribeToReportWidth(onStoreChange: () => void) {
   const query = window.matchMedia(RESIZABLE_REPORT_QUERY);

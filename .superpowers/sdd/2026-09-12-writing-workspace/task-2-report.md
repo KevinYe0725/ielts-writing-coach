@@ -132,3 +132,17 @@ These are ignored local DEMO artifacts. They prove layout behavior only, not rea
 - Visual review completed at feedback 900px fallback, feedback 1024px resizable, and sign-in 390×844.
 
 No package, server, backend, build, deployment, push or merge operation was performed in round 1. Controller owns the final combined full-suite and production-build gates.
+
+## Review round 2 — breakpoint interaction alignment
+
+Re-review confirmed the round 1 findings were fixed, then identified one interaction mismatch: the wrapper and CSS entered single-pane mode below 940px, but `activateFromHighlight` changed to the suggestions pane only below 760px.
+
+TDD evidence:
+
+- Added an explicit 768px/900px flow that first selects the source tab, then activates a source mark, and requires the source to hide while the matching expanded suggestion becomes visible.
+- RED reproduced at 768px: the suggestion remained hidden after source activation.
+- Added `report-layout.ts` as the single JavaScript contract for `RESIZABLE_REPORT_MIN_WIDTH_PX`, the resizable query and its complementary single-pane query.
+- `ResponsiveReport` and `FeedbackPage` now consume those shared queries; no copied JavaScript threshold remains.
+- GREEN: the new regression passed 2/2 across Chromium + mobile; the complete document-workspace suite passed 14/14 across both projects.
+
+No other implementation or polish was added in round 2. No full suite, build, push, merge or deployment was run.

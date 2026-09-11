@@ -69,3 +69,10 @@ Reviewed against the baseline for content visibility, resolved spacing tokens, 1
 - The full-load switcher failure showed the trigger click landing before client event handlers existed. The server-rendered trigger is now disabled until a `useSyncExternalStore` hydration snapshot marks it interactive; the browser test waits for enabled readiness before opening. The complete open/search/focus/Escape/select flow passed 20/20 repeated runs across Chromium + mobile, and the broader feedback/navigation interaction slice passed 46/46.
 - Review screenshots: `output/playwright/v4-fix-feedback-900.png`, `v4-fix-feedback-1024.png`, `v4-fix-signin-mobile.png`.
 - Controller separately verified production HTTP mode on `e294a52`: 65 passed / 71 DEMO skips. Round 1 did not rerun the full suite or build; those remain controller-owned final gates.
+
+## Task 2 review round 2
+
+- Re-review found that the responsive wrapper used a 940px breakpoint while source-highlight activation still treated only ≤760px as single-pane. The dedicated RED at 768px switched to the source, activated its mark and observed the corresponding suggestion remain hidden.
+- `report-layout.ts` now exports the 940px resizable threshold and both matching media queries. `ResponsiveReport` consumes the wide query; source-highlight activation consumes the complementary single-pane query. CSS behavior remains covered by the existing geometry suite.
+- The actual source-tab → source-mark → visible expanded suggestion flow passes at both 768px and 900px in Chromium and mobile projects. Full document-workspace verification: 14 passed across both projects.
+- No other source, visual or infrastructure work was included. Full suite and build remain controller-owned.

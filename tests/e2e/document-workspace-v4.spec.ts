@@ -142,6 +142,30 @@ test.describe("document-first workspace", () => {
     await expect(highlight).toHaveAttribute("aria-pressed", "true");
   });
 
+  test("opens the selected suggestion from source-only intermediate widths", async ({
+    page,
+  }) => {
+    for (const width of [768, 900]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto("/feedback?cycle=cycle-demo");
+      await page.getByRole("tab", { name: "原文", exact: true }).click();
+      const source = page.locator("[data-essay-pane]");
+      const suggestions = page.locator("[data-suggestion-panel]");
+      await expect(source).toBeVisible();
+      await expect(suggestions).toBeHidden();
+
+      const highlight = page.locator("[data-feedback-highlight]").first();
+      const issue = await highlight.getAttribute("data-feedback-highlight");
+      await highlight.click();
+
+      await expect(suggestions).toBeVisible();
+      await expect(source).toBeHidden();
+      await expect(
+        page.locator(`[data-feedback-issue="${issue}"]`),
+      ).toHaveAttribute("aria-expanded", "true");
+    }
+  });
+
   test("keeps the tutorial title on the same reading axis as its prose", async ({
     page,
   }) => {

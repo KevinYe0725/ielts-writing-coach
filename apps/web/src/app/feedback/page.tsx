@@ -60,6 +60,7 @@ import {
 } from "@/lib/client/learning-route";
 
 import styles from "./feedback.module.css";
+import { SINGLE_PANE_REPORT_QUERY } from "./report-layout";
 import { ResponsiveReport } from "./responsive-report";
 
 type MobilePane = "source" | "suggestions";
@@ -70,8 +71,8 @@ function scrollBehavior(): ScrollBehavior {
     : "smooth";
 }
 
-function isSmallScreen() {
-  return window.matchMedia("(max-width: 760px)").matches;
+function usesSinglePaneReport() {
+  return window.matchMedia(SINGLE_PANE_REPORT_QUERY).matches;
 }
 
 function panesAreSideBySide() {
@@ -294,7 +295,7 @@ export default function FeedbackPage({
     (issueId: string) => {
       setIssueFilter("all");
       setActiveIssueId(issueId);
-      if (isSmallScreen()) setMobilePane("suggestions");
+      if (usesSinglePaneReport()) setMobilePane("suggestions");
       scrollToRef(cardRefs, issueId);
       announceIssue(issueId, "suggestions");
     },
