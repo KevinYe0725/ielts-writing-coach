@@ -46,7 +46,27 @@ test.describe("document-first workspace", () => {
       .toBeLessThan(before - 1);
     expect(await essay.textContent()).toBe(original);
     await expect(selected).toHaveAttribute("aria-expanded", "true");
+    await expect(highlight).toHaveAttribute("aria-pressed", "true");
     await expect(separator).toBeFocused();
+  });
+
+  test("uses one report document on mobile with a readable diagnosis", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/feedback?cycle=cycle-demo");
+
+    await expect(page.locator("[data-essay-pane]")).toHaveCount(1);
+    await expect(page.locator("[data-suggestion-panel]")).toHaveCount(1);
+    await expect(page.getByRole("separator")).toBeHidden();
+    await expect(page.locator("[data-suggestion-panel]")).toBeVisible();
+    await page.getByRole("tab", { name: "原文", exact: true }).click();
+    await expect(page.locator("[data-essay-pane]")).toBeVisible();
+    await expect(page.locator("[data-suggestion-panel]")).toBeHidden();
+    const summarySize = await page
+      .locator("#feedback-assessment-heading")
+      .evaluate((element) => parseFloat(getComputedStyle(element).fontSize));
+    expect(summarySize).toBeGreaterThanOrEqual(16);
   });
 
   test("keeps the tutorial title on the same reading axis as its prose", async ({

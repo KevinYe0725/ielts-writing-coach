@@ -557,7 +557,7 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
     ).toBeInViewport();
   });
 
-  test("uses feedback columns only when the report has enough content space", async ({
+  test("offers resizable feedback columns only when the report has enough content space", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
@@ -569,13 +569,19 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
     await expect(workbench).toBeVisible();
     await expect(essay).toBeVisible();
     await expect(suggestions).toBeVisible();
-    expect(await gridColumnCount(workbench)).toBe(2);
     await expectLeftOf(essay, suggestions);
     await expect(essay).toHaveCSS("position", "sticky");
+    await expect(
+      page.getByRole("separator", { name: /调整.*宽度|resize/i }),
+    ).toBeVisible();
 
-    await page.setViewportSize({ width: 1279, height: 900 });
-    expect(await gridColumnCount(workbench)).toBe(1);
-    await expectAbove(essay, suggestions);
+    await page.setViewportSize({ width: 760, height: 900 });
+    await expect(page.getByRole("separator")).toBeHidden();
+    await expect(suggestions).toBeVisible();
+    await expect(essay).toBeHidden();
+    await page.getByRole("tab", { name: "原文", exact: true }).click();
+    await expect(essay).toBeVisible();
+    await expect(suggestions).toBeHidden();
   });
 
   test("maps every issue card to one source mark and synchronizes both directions", async ({
@@ -891,7 +897,7 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
       .toBeGreaterThanOrEqual(64);
   });
 
-  test("uses the space recovered when the product sidebar is hidden", async ({
+  test("uses the full reading width under the workspace header", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
@@ -899,16 +905,15 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
 
     const shell = page.locator("[data-app-shell]");
     const layout = page.locator("[data-teaching-layout]");
-    const toggle = page.locator("[data-teaching-toc-toggle]");
-    await expect(shell).toHaveAttribute("data-sidebar-state", "expanded");
-    await expect(layout).toHaveCSS("display", "flex");
-    await expect(toggle).toBeVisible();
-
-    await page.locator("[data-sidebar-toggle]").click();
     await expect(shell).toHaveAttribute("data-sidebar-state", "collapsed");
     await expect(layout).toHaveCSS("display", "grid");
-    await expect(toggle).toBeHidden();
+    await expect(page.locator("[data-sidebar-toggle]")).toHaveCount(0);
+    await expect(page.locator("[data-teaching-toc-toggle]")).toBeHidden();
     await expect(page.locator("[data-teaching-toc]")).toBeVisible();
+    const articleBox = (await page
+      .locator("[data-teaching-article]")
+      .boundingBox())!;
+    expect(articleBox.width).toBeGreaterThanOrEqual(1000);
   });
 
   test("does not expose backend vocabulary in feedback or focused teaching", async ({

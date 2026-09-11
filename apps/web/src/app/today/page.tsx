@@ -567,14 +567,7 @@ export default function TodayPage() {
   return (
     <PageLayout variant="focus">
       <div className={styles.desk} data-today-desk="focus">
-        <PageHeader
-          eyebrow={text("今日计划", "Today’s plan")}
-          title={text(data.greetingZh, data.greetingEn)}
-          description={text(
-            "这里推荐当前最值得完成的一步。你也可以到“我的作文”切换文章，继续各自的进度。",
-            "Start with the suggested next step, or switch essays in My essays and pick up their separate progress.",
-          )}
-        />
+        <PageHeader title={text(data.greetingZh, data.greetingEn)} />
 
         {aiService.state === "needs_setup" ? (
           <div className="status-banner status-banner-warning" role="status">
@@ -895,7 +888,6 @@ export default function TodayPage() {
             className={cn("next-task-card", styles.primaryAction)}
             data-today-primary
           >
-            <div className="next-task-accent" aria-hidden="true" />
             <div className="next-task-topline">
               <Badge tone="blue">
                 <Sparkles aria-hidden="true" size={13} />
@@ -909,7 +901,6 @@ export default function TodayPage() {
             <div className="next-task-body">
               <div className="next-task-copy">
                 <div className={styles.currentEssay}>
-                  <span>{text("这一步对应的作文", "For this essay")}</span>
                   <p
                     lang={
                       /\p{Script=Han}/u.test(data.cycleTitle) ? "zh-CN" : "en"
@@ -1159,7 +1150,7 @@ export default function TodayPage() {
 
         <section className={styles.learningThread} data-today-learning-thread>
           <SectionHeader
-            title={text("本篇训练闭环", "This learning loop")}
+            title={text("本篇进度", "Essay progress")}
             description={data.cycleTitle}
           />
           <Card className={cn("cycle-timeline-card", styles.timelineCard)}>

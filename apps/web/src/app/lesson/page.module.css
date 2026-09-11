@@ -97,14 +97,10 @@
 }
 
 .readingPage {
-  width: min(1040px, calc(100vw - 296px));
+  width: min(1040px, 100%);
   max-width: none;
   padding: 0;
   font-family: var(--desk-font-body);
-}
-
-:global([data-sidebar-state="collapsed"]) .readingPage {
-  width: min(1040px, calc(100vw - 128px));
 }
 
 .article {
@@ -149,7 +145,7 @@
   border-top: 1px solid var(--line);
 }
 .practiceBlock {
-  scroll-margin-top: 100px;
+  scroll-margin-top: calc(var(--workspace-header-height) + var(--desk-space-4));
 }
 .practiceBlock > h2 {
   margin: 0 0 var(--desk-space-3);
@@ -189,9 +185,10 @@
 }
 
 .articleHeader {
-  max-width: var(--desk-layout-reading-copy);
-  padding: var(--desk-space-8) 0 var(--desk-space-8);
-  margin: 0 auto;
+  width: var(--desk-layout-reading-copy);
+  max-width: 100%;
+  padding: var(--desk-space-6) 0 var(--desk-space-6);
+  margin: 0;
   border-bottom: 1px solid var(--line);
 }
 
@@ -252,8 +249,8 @@
 
 .articleSection {
   min-width: 0;
-  padding: var(--desk-space-16) 0 var(--desk-space-2);
-  scroll-margin-top: var(--desk-space-20);
+  padding: var(--desk-space-12) 0 var(--desk-space-2);
+  scroll-margin-top: calc(var(--workspace-header-height) + var(--desk-space-4));
 }
 
 .articleSection + .articleSection {
@@ -263,22 +260,15 @@
 
 .sectionHeading {
   display: flex;
-  margin-bottom: var(--desk-space-8);
+  margin-bottom: var(--desk-space-6);
   align-items: baseline;
   gap: var(--desk-space-3);
 }
 
-.sectionHeading > span {
-  color: var(--blue);
-  font-size: var(--desk-type-meta);
-  font-weight: var(--desk-body-weight-bold);
-  letter-spacing: 0.08em;
-}
-
 .sectionHeading h2 {
   margin: 0;
-  font-size: var(--desk-type-page-title);
-  line-height: 1.28;
+  font-size: var(--desk-type-section-title);
+  line-height: 1.35;
   letter-spacing: -0.025em;
 }
 
@@ -997,9 +987,11 @@
 
 .contentsColumn {
   position: sticky;
-  top: 88px;
+  top: calc(var(--workspace-header-height) + var(--desk-space-4));
   min-width: 0;
-  max-height: calc(100dvh - 104px);
+  max-height: calc(
+    100dvh - var(--workspace-header-height) - (2 * var(--desk-space-4))
+  );
   overflow-y: auto;
 }
 
@@ -1065,6 +1057,7 @@
 
 @container teaching-article (max-width: 999px) {
   .articleHeader {
+    width: 100%;
     max-width: var(--desk-layout-reading-copy);
   }
 

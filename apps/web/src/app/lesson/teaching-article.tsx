@@ -1066,9 +1066,6 @@ function TeachingArticleContent({
                 key={slug}
               >
                 <header className={styles.sectionHeading}>
-                  <span aria-hidden="true">
-                    {String(sectionIndex + 1).padStart(2, "0")}
-                  </span>
                   <h2 id={`${slug}-heading`} tabIndex={-1}>
                     {text(section.titleZh, section.titleEn)}
                   </h2>
