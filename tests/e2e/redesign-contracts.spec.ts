@@ -253,11 +253,7 @@ async function expectNoErrorToken(locator: Locator): Promise<void> {
 
 async function switchToEnglish(page: Page): Promise<void> {
   if ((await page.locator("html").getAttribute("lang")) !== "en") {
-    const switcher = page.locator(
-      (page.viewportSize()?.width ?? 1280) <= 960
-        ? ".mobile-header .locale-switch"
-        : ".topbar .locale-switch",
-    );
+    const switcher = page.locator("[data-workspace-header] .locale-switch");
     await expect(switcher).toBeVisible();
     await expect(switcher).toHaveAccessibleName("切换到英文界面");
     await switcher.click();
@@ -470,15 +466,17 @@ test.describe("annotation desk redesign contracts", () => {
   }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/today");
-    const mobileHeader = page.locator(".mobile-header");
-    const mobileMenu = page.locator(".mobile-menu");
+    const mobileHeader = page.locator("[data-workspace-header]");
+    const mobileMenu = page.locator("[data-workspace-more]");
     const nextTask = page.locator(".next-task-card");
-    await expect(mobileHeader).toHaveClass(/mobile-header/);
+    await expect(mobileHeader).toHaveClass(/topbar/);
     await expectComputedStyles(mobileHeader, {
-      display: "flex",
+      display: "grid",
       position: "sticky",
     });
-    await expect(mobileMenu).toHaveClass(/mobile-menu/);
+    await expect(mobileMenu.locator("summary")).toHaveAccessibleName(
+      "更多导航",
+    );
     await expectComputedStyles(mobileMenu, { position: "relative" });
     await expect(nextTask).toHaveClass(/next-task-card/);
     await expectComputedStyles(nextTask, { position: "relative" });
@@ -894,7 +892,7 @@ test.describe("annotation desk redesign contracts", () => {
       "/lesson/paper?cycle=cycle-demo&lesson=lesson-collocation-perspective",
     );
 
-    const mobileHeader = page.locator(".mobile-header");
+    const mobileHeader = page.locator("[data-workspace-header]");
     const navigation = page.locator("[data-paper-question-nav]");
     const questionEight = page.locator("#paper-question-demo-paper-question-8");
     const links = navigation.getByRole("link");

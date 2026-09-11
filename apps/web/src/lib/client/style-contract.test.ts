@@ -243,13 +243,8 @@ const pageFamilyModules = [
 
 const frozenHookSources = [
   {
-    hook: "mobile-header",
-    moduleClass: "mobileHeader",
-    source: new URL("../../components/app-shell.tsx", import.meta.url),
-  },
-  {
-    hook: "mobile-menu",
-    moduleClass: "mobileMenu",
+    hook: "topbar",
+    moduleClass: "topbar",
     source: new URL("../../components/app-shell.tsx", import.meta.url),
   },
   {
@@ -383,8 +378,8 @@ describe("annotation desk token contract", () => {
     const defined = customProperties(tokensRoot);
     const expected = {
       "--desk-ink": "#172033",
-      "--desk-paper": "#fcfbf8",
-      "--desk-canvas": "#eef1f5",
+      "--desk-paper": "#ffffff",
+      "--desk-canvas": "#f6f8fb",
       "--desk-blue": "#1d56a0",
       "--desk-green": "#2f6d5a",
       "--desk-amber": "#7c531b",
@@ -685,7 +680,7 @@ describe("annotation desk token contract", () => {
     expect(layout).toContain("var(--desk-layout-focus-max)");
     expect(layout).toContain("var(--desk-layout-reading-max)");
     expect(layout).toContain("var(--desk-layout-workspace-max)");
-    expect(shell).toContain("var(--desk-layout-sidebar)");
-    expect(shell).toContain("var(--desk-layout-mobile-header)");
+    expect(shell).toContain("var(--workspace-header-height)");
+    expect(shell).toContain("var(--desk-layout-workspace-max)");
   });
 });

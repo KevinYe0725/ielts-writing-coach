@@ -1,0 +1,195 @@
+.trigger {
+  display: flex;
+  width: clamp(160px, 22vw, 280px);
+  min-width: 0;
+  min-height: 40px;
+  padding: 8px 12px;
+  gap: 8px;
+  align-items: center;
+  color: var(--desk-ink);
+  background: var(--desk-canvas);
+  border: 1px solid var(--desk-line);
+  border-radius: var(--desk-radius-md);
+  font-family: var(--desk-font-utility);
+  font-size: var(--desk-type-label);
+  cursor: pointer;
+}
+.trigger > span {
+  overflow: hidden;
+  flex: 1;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.trigger > svg {
+  flex: none;
+  color: var(--desk-ink-muted);
+}
+.trigger:hover {
+  border-color: var(--desk-blue);
+}
+.trigger:focus-visible,
+.close:focus-visible,
+.footer a:focus-visible,
+.message button:focus-visible {
+  outline: 2px solid var(--desk-blue);
+  outline-offset: 3px;
+}
+.overlay {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  background: color-mix(in srgb, var(--desk-ink) 24%, transparent);
+}
+.dialog {
+  position: fixed;
+  z-index: 101;
+  top: min(18vh, 160px);
+  left: 50%;
+  width: min(620px, calc(100vw - 32px));
+  max-height: calc(100dvh - 48px);
+  overflow: auto;
+  transform: translateX(-50%);
+  color: var(--desk-ink);
+  background: var(--desk-paper);
+  border: 1px solid var(--desk-line-strong);
+  border-radius: var(--desk-radius-lg);
+  box-shadow: var(--desk-shadow-floating);
+}
+.heading {
+  display: flex;
+  padding: 16px 24px 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+.heading h2 {
+  margin: 0;
+  font-size: var(--desk-type-subheading);
+  font-weight: var(--desk-body-weight-semibold);
+}
+.close {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  color: var(--desk-ink-muted);
+  background: transparent;
+  border: 0;
+  border-radius: var(--desk-radius-sm);
+  cursor: pointer;
+}
+.close:hover {
+  background: var(--desk-canvas);
+}
+.search {
+  display: flex;
+  padding: 8px 24px 16px;
+  gap: 12px;
+  align-items: center;
+  border-bottom: 1px solid var(--desk-line);
+}
+.search svg {
+  flex: none;
+  color: var(--desk-blue);
+}
+.search input {
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  padding: 0;
+  color: var(--desk-ink);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  font-size: var(--desk-type-body);
+  outline: none;
+}
+.list {
+  max-height: min(440px, 52dvh);
+  min-height: 112px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding: 12px;
+  padding: 8px;
+}
+.essay {
+  display: flex;
+  padding: 16px 12px;
+  gap: 12px;
+  align-items: flex-start;
+  border-radius: var(--desk-radius-md);
+  cursor: pointer;
+}
+.essay > svg {
+  flex: none;
+  margin-top: 4px;
+  color: var(--desk-blue);
+}
+.essay[data-selected="true"] {
+  background: var(--desk-blue-soft);
+}
+.essayCopy {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+}
+.prompt {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  font-family: var(--desk-font-reading);
+  font-size: var(--desk-type-reading);
+  font-weight: var(--desk-reading-weight-regular);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.action {
+  color: var(--desk-ink-muted);
+  font-family: var(--desk-font-utility);
+  font-size: var(--desk-type-label);
+}
+.message {
+  padding: 24px 16px;
+  margin: 0;
+  color: var(--desk-ink-muted);
+  font-size: var(--desk-type-label);
+  line-height: 1.7;
+}
+.message p {
+  margin: 0 0 12px;
+}
+.message button {
+  min-height: 40px;
+  padding: 8px 16px;
+  color: var(--desk-blue);
+  background: var(--desk-blue-soft);
+  border: 1px solid var(--desk-line);
+  border-radius: var(--desk-radius-sm);
+  cursor: pointer;
+}
+.footer {
+  display: flex;
+  padding: 12px 24px;
+  border-top: 1px solid var(--desk-line);
+  justify-content: space-between;
+  gap: 16px;
+}
+.footer a {
+  display: inline-flex;
+  min-height: 40px;
+  gap: 8px;
+  align-items: center;
+  color: var(--desk-blue);
+  font-family: var(--desk-font-utility);
+  font-size: var(--desk-type-label);
+}
+@media (max-width: 760px) {
+  .trigger {
+    width: 100%;
+    padding-inline: 8px;
+  }
+  .dialog {
+    top: 24px;
+  }
+}

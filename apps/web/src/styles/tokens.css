@@ -1,8 +1,8 @@
 :root {
   /* Approved base palette. Derived colors below must resolve from these roles. */
   --desk-ink: #172033;
-  --desk-paper: #fcfbf8;
-  --desk-canvas: #eef1f5;
+  --desk-paper: #ffffff;
+  --desk-canvas: #f6f8fb;
   --desk-blue: #1d56a0;
   --desk-green: #2f6d5a;
   --desk-amber: #7c531b;

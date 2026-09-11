@@ -416,7 +416,7 @@ test.describe("account controls", () => {
     await expect(page).toHaveURL(/\/signin$/);
   });
 
-  test("opens from the sidebar, restores focus after Escape, and signs out", async ({
+  test("opens from the topbar, restores focus after Escape, and signs out", async ({
     page,
   }, testInfo) => {
     test.skip(
@@ -448,14 +448,13 @@ test.describe("account controls", () => {
     await expect(page).toHaveURL(/\/signin$/);
   });
 
-  test("keeps the same account actions reachable inside the mobile navigation", async ({
+  test("keeps the same account actions reachable in the mobile topbar", async ({
     page,
   }) => {
     await signedInSession(page);
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/today");
 
-    await page.locator(".mobile-menu > summary").click();
     await page.getByRole("button", { name: /learner@example\.com/i }).click();
     await expect(
       page.getByRole("menuitem", { name: /账户与安全|account and security/i }),

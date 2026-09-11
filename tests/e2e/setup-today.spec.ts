@@ -291,10 +291,7 @@ test.describe("deterministic setup and Today experience", () => {
     await page.goto("/today");
     const taskPrompt = "Closed-book rewrite: early language learning";
 
-    const header =
-      (page.viewportSize()?.width ?? 1_000) < 700
-        ? page.locator(".mobile-header")
-        : page.locator(".topbar");
+    const header = page.locator("[data-workspace-header]");
     const localeSwitch = header.getByRole("button", {
       name: "切换到英文界面",
       exact: true,
@@ -322,7 +319,7 @@ test.describe("deterministic setup and Today experience", () => {
     test.skip(testInfo.project.name !== "mobile", "Mobile-only smoke check.");
     await page.goto("/today?new-essay=1");
 
-    await page.locator('summary[aria-label="打开导航"]').click();
+    await page.locator("[data-workspace-more] > summary").click();
     await expect(
       page.getByRole("navigation", { name: "主导航" }),
     ).toBeVisible();
@@ -1205,8 +1202,6 @@ test.describe("Today query states at the HTTP boundary", () => {
     await expect.poll(() => accountAKeys.length).toBe(1);
 
     await accountB.goto("/today?mixed-review=1");
-    const accountBMobileMenu = accountB.locator(".mobile-menu > summary");
-    if (await accountBMobileMenu.isVisible()) await accountBMobileMenu.click();
     await accountB
       .getByRole("button", { name: /learner@example\.com/i })
       .first()

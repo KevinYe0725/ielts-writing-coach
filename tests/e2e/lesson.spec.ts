@@ -471,13 +471,11 @@ async function navigationLink(
   page: import("@playwright/test").Page,
   name: string,
 ) {
-  const link = page.getByRole("link", { name });
-  if ((page.viewportSize()?.width ?? 1_000) < 700) {
-    if (!(await link.isVisible())) {
-      await page.locator(".mobile-menu > summary").click();
-    }
-  }
-  return link;
+  const label =
+    name === "批改报告" ? "批改" : name === "专项提升" ? "提升" : name;
+  return page
+    .locator("[data-workspace-header]")
+    .getByRole("link", { name: label, exact: true });
 }
 
 test.describe("feedback, focused teaching and complete practice paper", () => {
@@ -1317,7 +1315,7 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
     );
   });
 
-  test("opens report and paper from their real sidebar destinations", async ({
+  test("opens report and paper from their real workspace destinations", async ({
     page,
   }) => {
     await page.goto("/today");
@@ -1334,7 +1332,7 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
     );
   });
 
-  test("restores sidebar destinations when the paper is opened directly", async ({
+  test("restores workspace destinations when the paper is opened directly", async ({
     page,
   }) => {
     await page.goto(paperUrl);
