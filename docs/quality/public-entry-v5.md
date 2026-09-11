@@ -10,7 +10,15 @@ Existing white/ink/blue/green tokens and Noto Sans/Source Serif/IBM Plex roles a
 
 Login and signup open the same existing `/api/v1/account-entry` form, with mode-specific labels and password autocomplete. Server-side automatic registration and invitation restrictions are retained. Return paths, input validation, localized errors, duplicate-submit prevention and recovery remain. Dismissing the dialog aborts its outstanding browser request and clears its form state; it does not purport to undo an account operation already processed by the server.
 
-## Verification in progress
+## Final verification
+
+- Final complete DEMO browser suite:387 passed,171 mode/project skips,0 failures (Chromium and mobile WebKit,2 workers).
+- Final complete HTTP-mode browser suite against the production standalone build:102 passed,177 mode/project skips,0 failures (Chromium,port3295 required by the existing Origin assertion).
+- Production source is committed through `cf722f1`; `008ffdb` only adds a font-readiness condition to an existing geometry test. Build48/48, web typecheck and lint passed (4 pre-existing Fast Refresh warnings,0 errors). Client/components/root-route unit suite246 passed,12 DB-environment skips; no backend/schema or dependency changes warranted rebuilding a test database this round.
+- Independent review approved the auth extraction, lifecycle cancellation, focus restoration and policy preservation. Follow-ups fixed public landmark placement and retained Radix's generated dialog title ID. The explicit accessible-name regression failed on an empty name before the fix and passed afterward.
+- During broad regression, an unchanged long-annotation geometry test compared fallback-font bounds against loaded Source Serif bounds (4px glyph-height difference and one extra wrapped line). It now awaits `document.fonts.ready` before measuring, without changing assertions or production annotation logic. Another unchanged mobile practice case passed5 isolated repeats; the final full run also passed it.
+
+### Staged evidence
 
 - TDD: the first5 public-entry browser contracts failed against the old page (missing public home/auth buttons). New public entry plus cancellation tests passed12/12 across Chromium/mobile after implementation.
 - Existing account journeys migrated to explicit dialog opening, including normalization, shared-space invitation refusal, unsafe redirects, duplicate submission and credential errors. Combined public/account suite:49 passed,3 mode-specific skips.
