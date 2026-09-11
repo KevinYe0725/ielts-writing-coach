@@ -100,4 +100,43 @@ describe("workspace destinations", () => {
     expect(links.lesson).toBeNull();
     expect(links.rewrite).toBeNull();
   });
+
+  it.each(["/today", "/essays", "/growth", "/settings"])(
+    "identifies the essay used by cached navigation on %s",
+    (href) => {
+      const links = workspaceDestinations(href, cachedA);
+      expect(links.cycleId).toBe("A");
+      expect(links.feedback).toBe("/feedback?cycle=A");
+    },
+  );
+
+  it("identifies the current URL cycle instead of a different cached cycle", () => {
+    expect(workspaceDestinations("/feedback?cycle=B", cachedA).cycleId).toBe(
+      "B",
+    );
+    expect(workspaceDestinations("/growth", null).cycleId).toBeNull();
+  });
+
+  it("skips an invalid cached pathname when choosing a global-page essay", () => {
+    const links = workspaceDestinations("/growth", {
+      ...cachedA,
+      write: "/settings?cycle=B",
+    });
+    expect(links.feedback).toBe("/feedback?cycle=A");
+    expect(links.lesson).toBe("/lesson?cycle=A&lesson=lesson-A");
+    expect(links.cycleId).toBe("A");
+    expect(links.write).toBeNull();
+  });
+
+  it("skips a missing resource ID when choosing a global-page essay", () => {
+    const links = workspaceDestinations("/settings", {
+      ...cachedA,
+      write: null,
+      feedback: null,
+      lesson: "/lesson?cycle=B",
+    });
+    expect(links.rewrite).toBe("/rewrite?cycle=A&task=rewrite-A");
+    expect(links.cycleId).toBe("A");
+    expect(links.lesson).toBeNull();
+  });
 });

@@ -9,6 +9,11 @@ const resourceRoutes = {
   transfer: "/transfer",
 } as const;
 
+interface WorkspaceDestinations extends LearningDestinations {
+  essays: string;
+  cycleId: string | null;
+}
+
 function localUrl(href: unknown): URL | null {
   if (
     typeof href !== "string" ||
@@ -24,11 +29,32 @@ function localUrl(href: unknown): URL | null {
   }
 }
 
+function resourceUrl(
+  key: keyof typeof resourceRoutes,
+  href: unknown,
+): URL | null {
+  const url = localUrl(href);
+  if (
+    !url ||
+    url.pathname !== resourceRoutes[key] ||
+    !url.searchParams.get("cycle")
+  )
+    return null;
+  const requiredId =
+    key === "lesson"
+      ? "lesson"
+      : key === "rewrite" || key === "transfer"
+        ? "task"
+        : null;
+  return requiredId && !url.searchParams.get(requiredId) ? null : url;
+}
+
 export function workspaceDestinations(
   currentHref: string,
   cached: LearningDestinations | null,
-): LearningDestinations & { essays: string } {
-  const links: LearningDestinations & { essays: string } = {
+): WorkspaceDestinations {
+  const links: WorkspaceDestinations = {
+    cycleId: null,
     today: "/today",
     essays: "/essays",
     growth: "/growth",
@@ -49,38 +75,31 @@ export function workspaceDestinations(
       current?.pathname === route ||
       (route === "/lesson" && current?.pathname === "/lesson/paper"),
   )?.[0];
+  const validResources = entries.map(
+    ([key]) => [key, resourceUrl(key, cached?.[key])] as const,
+  );
   // A resource route without an identity is still resolving its current essay.
   // Global pages may continue one consistent recent essay from the saved links.
-  const cycle =
+  links.cycleId =
     current?.searchParams.get("cycle") ||
     (!active
-      ? entries
-          .map(([key]) => localUrl(cached?.[key])?.searchParams.get("cycle"))
-          .find(Boolean)
+      ? (validResources
+          .find(([, url]) => url)?.[1]
+          ?.searchParams.get("cycle") ?? null)
       : null);
 
-  for (const [key, route] of entries) {
+  for (const [key, url] of validResources) {
     if (key === active) {
       links[key] = currentHref;
       continue;
     }
-    const href = cached?.[key];
-    const url = localUrl(href);
     if (
-      !cycle ||
+      !links.cycleId ||
       !url ||
-      url.pathname !== route ||
-      url.searchParams.get("cycle") !== cycle
+      url.searchParams.get("cycle") !== links.cycleId
     )
       continue;
-    const requiredId =
-      key === "lesson"
-        ? "lesson"
-        : key === "rewrite" || key === "transfer"
-          ? "task"
-          : null;
-    if (requiredId && !url.searchParams.get(requiredId)) continue;
-    links[key] = href ?? null;
+    links[key] = cached?.[key] ?? null;
   }
   return links;
 }

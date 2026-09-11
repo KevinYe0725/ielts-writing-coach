@@ -170,6 +170,49 @@ test.describe("document workspace navigation", () => {
     );
   });
 
+  test("identifies the cached essay behind global-page learning links", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      sessionStorage.setItem(
+        "iwc:learning-navigation:v1",
+        JSON.stringify({
+          write: "/write?cycle=cycle-demo",
+          feedback: "/feedback?cycle=cycle-demo",
+          lesson:
+            "/lesson?cycle=cycle-demo&lesson=lesson-collocation-perspective",
+        }),
+      );
+    });
+    await page.goto("/growth");
+    const header = page.locator("[data-workspace-header]");
+    const feedback = header.getByRole("link", { name: "批改", exact: true });
+    await expect(feedback).toHaveAttribute(
+      "href",
+      "/feedback?cycle=cycle-demo",
+    );
+    const trigger = header.getByRole("button", { name: "切换作文" });
+    await trigger.click();
+    const dialog = page.getByRole("dialog", { name: "切换作文" });
+    const selectedEssay = dialog.getByRole("option", {
+      name: /Some experts believe/,
+    });
+    await expect(selectedEssay.getByLabel("当前作文")).toBeVisible();
+    await expect(
+      dialog
+        .getByRole("option", { name: /Some people think governments/ })
+        .getByLabel("当前作文"),
+    ).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await expect(trigger).toContainText("Some experts believe");
+    await expect(feedback).toHaveAttribute(
+      "href",
+      "/feedback?cycle=cycle-demo",
+    );
+    await feedback.click();
+    await expect(page).toHaveURL(/\/feedback\?cycle=cycle-demo$/);
+  });
+
   for (const width of [1440, 1280, 390, 375]) {
     test(`keeps navigation and floating controls inside ${width}px`, async ({
       page,

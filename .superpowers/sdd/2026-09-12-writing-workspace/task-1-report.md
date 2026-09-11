@@ -67,3 +67,15 @@ Screenshots captured and visually inspected: `output/playwright/workspace-naviga
 - Mind MCP tools were absent from the available tool list. Relevant registry memory was checked for prior constraints; durable handoff is recorded here instead of claiming a Mind save.
 
 Frontend-design influenced the restrained topbar, token reuse, three-line essay summaries, and actual-content screenshot critique. TDD and systematic-debugging drove the cycle-isolation, storage-denial, and focus/timing regression checks.
+
+## Task 1 review follow-up: shared projected essay identity
+
+Review base: `3847002`. Fixed the P2 global-page selection mismatch and the related malformed-cache fallback issue without changing page bodies or loading policy.
+
+- `workspaceDestinations()` now returns the same `cycleId` that governs its resource links. The topbar passes that projected identity to `EssaySwitcher` instead of independently reading only the URL query. On Today/Essays/Growth/Settings, the switcher therefore identifies the cached essay when opened and keeps that essay's prompt in its trigger after closing.
+- Global fallback now chooses the first fully validated resource tuple: same-origin local URL, correct pathname, nonempty cycle, and required lesson/task ID. A malformed early cached entry cannot suppress a valid later essay's resources.
+- RED: all 7 newly added unit cases failed, including the two malformed-first-entry counterexamples. The new global-page browser test failed because the expected essay had no Current essay marker despite its feedback link being enabled.
+- GREEN: navigation unit suite 22/22 passed (20 projection cases plus 2 existing navigation cases); new-navigation browser suite 20 passed / 4 expected HTTP-mode skips across Chromium and mobile. The browser regression checks the selected marker, absence of a marker on the other essay, retained prompt after Escape, matching feedback href, and actual navigation to that feedback cycle.
+- Formatting and `git diff --check` passed. Per the follow-up scope, no full build/database/HTTP suite was run; those remain controller-owned.
+
+Changed only `workspace-navigation.ts`, its unit test, `app-shell.tsx`, `tests/e2e/workspace-navigation.spec.ts`, and this report. No outstanding issue remains from this review request.

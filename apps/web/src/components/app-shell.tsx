@@ -113,12 +113,7 @@ function Topbar({
   return (
     <header className={cn("topbar", styles.topbar)} data-workspace-header>
       <Brand />
-      <EssaySwitcher
-        currentCycleId={new URL(
-          currentHref,
-          "https://workspace.local",
-        ).searchParams.get("cycle")}
-      />
+      <EssaySwitcher currentCycleId={links.cycleId} />
       <nav
         aria-label={text("主导航", "Primary navigation")}
         className={styles.navigation}
