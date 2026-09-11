@@ -19,6 +19,7 @@ import { EssaySwitcher } from "@/components/essay-switcher";
 import { layoutVariantForPathname } from "@/components/layout/page-layout";
 import { useLocale } from "@/components/locale-provider";
 import { NotificationCenter } from "@/components/notification-center";
+import { useClientReady } from "@/components/use-client-ready";
 import { cn } from "@/components/utils";
 import {
   readLearningDestinations,
@@ -30,10 +31,13 @@ import styles from "./app-shell.module.css";
 
 function LocaleSwitch() {
   const { locale, setLocale, text } = useLocale();
+  const interactive = useClientReady();
   return (
     <button
       aria-label={text("切换到英文界面", "Switch to Chinese interface")}
       className={cn("locale-switch", styles.localeSwitch)}
+      data-interactive={interactive ? "true" : "false"}
+      disabled={!interactive}
       onClick={() => setLocale(locale === "zh-CN" ? "en" : "zh-CN")}
       type="button"
     >

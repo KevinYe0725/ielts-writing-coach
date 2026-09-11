@@ -50,6 +50,50 @@ test.describe("document-first workspace", () => {
     await expect(separator).toBeFocused();
   });
 
+  test("keeps long-report suggestions below the header while the original remains alongside", async ({
+    page,
+  }) => {
+    await page.goto("/feedback?cycle=cycle-demo");
+    await page.locator("[data-essay-pane] details summary").first().click();
+
+    const geometry = await page.evaluate(() => {
+      const header = document.querySelector<HTMLElement>(
+        "[data-workspace-header]",
+      )!;
+      const group = document.querySelector<HTMLElement>(
+        "[data-feedback-workbench]",
+      )!;
+      const suggestions = document.querySelector<HTMLElement>(
+        "[data-suggestion-panel]",
+      )!;
+      const groupRect = group.getBoundingClientRect();
+      const suggestionRect = suggestions.getBoundingClientRect();
+      const stickyTop = header.getBoundingClientRect().bottom + 12;
+      const groupTop = groupRect.top + window.scrollY;
+      const groupBottom = groupRect.bottom + window.scrollY;
+      const start = groupTop - stickyTop + 24;
+      const end = groupBottom - suggestionRect.height - stickyTop - 24;
+      return { end, start };
+    });
+    expect(geometry.end).toBeGreaterThan(geometry.start);
+    await page.evaluate(
+      (scrollTop) => window.scrollTo({ top: scrollTop, behavior: "instant" }),
+      Math.min(geometry.start + 48, geometry.end),
+    );
+
+    await expect
+      .poll(async () => {
+        const [headerBox, suggestionBox] = await Promise.all([
+          page.locator("[data-workspace-header]").boundingBox(),
+          page.locator("[data-suggestion-panel]").boundingBox(),
+        ]);
+        if (!headerBox || !suggestionBox) return Number.NEGATIVE_INFINITY;
+        return suggestionBox.y - (headerBox.y + headerBox.height);
+      })
+      .toBeGreaterThanOrEqual(12);
+    await expect(page.locator("[data-feedback-essay]")).toBeInViewport();
+  });
+
   test("uses one report document on mobile with a readable diagnosis", async ({
     page,
   }) => {

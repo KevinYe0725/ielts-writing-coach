@@ -146,3 +146,37 @@ TDD evidence:
 - GREEN: the new regression passed 2/2 across Chromium + mobile; the complete document-workspace suite passed 14/14 across both projects.
 
 No other implementation or polish was added in round 2. No full suite, build, push, merge or deployment was run.
+
+## Final review fixes — desktop sticky behavior and first-action readiness
+
+### Desktop report stickiness
+
+The committed group rendered `overflow: hidden` on its root and `overflow: auto` on each panel's inner wrapper. CSS-module declarations could not override the inner inline style, so at scroll 600 both source and suggestion tops moved to -84.33px despite their sticky declarations.
+
+The installed 4.12.4 implementation was inspected directly. `Group` spreads its `style` prop after default height/width/overflow, then reapplies only flex mechanics; `Panel` spreads its `style` prop after the inner wrapper's default overflow. `ResponsiveReport` now uses:
+
+- group `overflow: visible`, `height: auto`, `alignItems: stretch`;
+- each panel inner wrapper `overflow: visible`.
+
+The regression expands an existing source paragraph disclosure so the source creates a longer legitimate containing block. It calculates the sticky start/end interval from the group and suggestion geometry, scrolls inside that interval, then requires the suggestion to remain 12px below the header and the source essay to stay visible alongside. RED clearance was -60.33px; GREEN passes in both browser profiles. It does not demand stickiness after the containing block ends.
+
+### First-action hydration readiness
+
+The locale switch and setup mode/Continue buttons were usable in server HTML before React attached their handlers. Under a loaded mobile run, a click could therefore be lost and leave the locale in Chinese.
+
+- Extracted `useClientReady` from the essay switcher's proven `useSyncExternalStore` hydration guard and reused it for both EssaySwitcher and LocaleSwitch.
+- Locale and essay-switcher native buttons render disabled on the server, then enable when handlers are interactive.
+- Setup already exposes `setupLink.ready` as false on the server and true after its one-time-link hydration effect; both mode buttons and Continue now consume that readiness directly.
+- The two setup tests now wait for `toBeEnabled()` rather than sleeping 300ms.
+- A controlled JavaScript-disabled browser context verifies the SSR buttons are disabled; the hydrated page proves exactly one shared-mode click, one Continue click and one locale click reach their next observable state.
+
+### Verification
+
+- Sticky RED → GREEN: -60.33px behind header → at least 12px clearance with original visible.
+- Readiness RED → GREEN: SSR setup buttons enabled → setup and locale actions disabled until hydration.
+- Requested mobile setup + locale repeat, 5 repetitions each / 4 workers: 10 passed.
+- Final combined focused run (`document-workspace-v4`, readiness, locale persistence), Chromium + mobile: 20 passed.
+- Existing document coverage in that run includes keyboard resize, responsive 390/768/820/900/1024 behavior, selected state, source-to-suggestion activation and teaching alignment.
+- CSS style contract: 19 passed. Web typecheck passed. Web lint reported 0 errors and the same four pre-existing Fast Refresh warnings outside changed files. Targeted Prettier and `git diff --check` passed.
+
+No other product behavior, backend, locale persistence, auth, package, full-suite, build, push, merge or deployment change was made. Controller owns final combined verification.

@@ -14,6 +14,56 @@ test.describe("deterministic setup and Today experience", () => {
 
   test.beforeEach(async ({ page }) => resetDemoState(page));
 
+  test("keeps server-rendered first actions disabled until their handlers are ready", async ({
+    baseURL,
+    browser,
+    page,
+  }) => {
+    if (!baseURL) throw new Error("This readiness test requires a base URL.");
+    const serverContext = await browser.newContext({
+      javaScriptEnabled: false,
+    });
+    const serverPage = await serverContext.newPage();
+    try {
+      await serverPage.goto(new URL("/setup", baseURL).toString());
+      await expect(
+        serverPage.getByRole("button", { name: /仅我使用/ }),
+      ).toBeDisabled();
+      await expect(
+        serverPage.getByRole("button", { name: /与多人共享/ }),
+      ).toBeDisabled();
+      await expect(
+        serverPage.getByRole("button", { name: "继续", exact: true }),
+      ).toBeDisabled();
+
+      await serverPage.goto(new URL("/today", baseURL).toString());
+      await expect(serverPage.locator(".locale-switch")).toBeDisabled();
+    } finally {
+      await serverContext.close();
+    }
+
+    await page.goto("/setup");
+    const sharedMode = page.getByRole("button", { name: /与多人共享/ });
+    const continueButton = page.getByRole("button", {
+      name: "继续",
+      exact: true,
+    });
+    await expect(sharedMode).toBeEnabled();
+    await sharedMode.click();
+    await expect(sharedMode).toHaveAttribute("aria-pressed", "true");
+    await expect(continueButton).toBeEnabled();
+    await continueButton.click();
+    await expect(
+      page.getByRole("heading", { name: "创建首位管理员" }),
+    ).toBeVisible();
+
+    await page.goto("/today");
+    const localeSwitch = page.locator(".locale-switch");
+    await expect(localeSwitch).toBeEnabled();
+    await localeSwitch.click();
+    await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  });
+
   test("first setup remains low-decision and verifies the AI connection", async ({
     page,
   }) => {
@@ -26,11 +76,12 @@ test.describe("deterministic setup and Today experience", () => {
       page.getByRole("button", { name: /仅我使用/ }),
     ).toHaveAttribute("aria-pressed", "true");
     await expectBasicAccessibility(page);
-    // The setup panel is server-rendered first. Wait for its client handler to
-    // hydrate before exercising the first state transition on a busy mobile
-    // browser, rather than treating a pre-hydration click as a user action.
-    await page.waitForTimeout(300);
-    await page.getByRole("button", { name: "继续", exact: true }).click();
+    const continueButton = page.getByRole("button", {
+      name: "继续",
+      exact: true,
+    });
+    await expect(continueButton).toBeEnabled();
+    await continueButton.click();
 
     await expect(
       page.getByRole("heading", { name: "创建首位管理员" }),
@@ -57,8 +108,12 @@ test.describe("deterministic setup and Today experience", () => {
   }) => {
     await page.goto("/setup");
     await expect(page.locator("[data-entry-surface='setup']")).toBeVisible();
-    await page.waitForTimeout(300);
-    await page.getByRole("button", { name: "继续", exact: true }).click();
+    const continueButton = page.getByRole("button", {
+      name: "继续",
+      exact: true,
+    });
+    await expect(continueButton).toBeEnabled();
+    await continueButton.click();
     await page.getByLabel("你的名字").fill("Simon");
     await page.getByLabel("登录邮箱").fill("simon@example.com");
     await page.getByLabel("密码").fill("a-secure-demo-password");
@@ -296,6 +351,7 @@ test.describe("deterministic setup and Today experience", () => {
       name: "切换到英文界面",
       exact: true,
     });
+    await expect(localeSwitch).toBeEnabled();
     await localeSwitch.click();
 
     await expect(page.locator("html")).toHaveAttribute("lang", "en");

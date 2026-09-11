@@ -76,3 +76,12 @@ Reviewed against the baseline for content visibility, resolved spacing tokens, 1
 - `report-layout.ts` now exports the 940px resizable threshold and both matching media queries. `ResponsiveReport` consumes the wide query; source-highlight activation consumes the complementary single-pane query. CSS behavior remains covered by the existing geometry suite.
 - The actual source-tab → source-mark → visible expanded suggestion flow passes at both 768px and 900px in Chromium and mobile projects. Full document-workspace verification: 14 passed across both projects.
 - No other source, visual or infrastructure work was included. Full suite and build remain controller-owned.
+
+## Task 2 final review fixes
+
+- Desktop sticky RED used a genuinely longer report by expanding an existing source paragraph disclosure, then scrolled only inside the calculated sticky interval. The suggestion pane landed 60.33px behind the 72px header. Inspection of react-resizable-panels 4.12.4 showed `Group` user styles merge after its default hidden overflow and `Panel.style` merges after the inner wrapper's default auto overflow.
+- The resizable group now explicitly uses visible overflow, auto height and stretched panel containers; both panel inner wrappers explicitly use visible overflow. The long-report suggestion remains at least 12px below the header while the source essay remains visible alongside. Existing resize, responsive and selected-state checks remain green.
+- Added shared `useClientReady` for the essay switcher and locale switch. Both native triggers are disabled in the server render and enabled only when client handlers are available. Setup reuses its existing one-time-link `ready` transition to disable both initial mode choices and Continue until hydrated; locale persistence and setup/backend behavior are unchanged.
+- Replaced the two fixed 300ms setup sleeps with enabled-state assertions. A controlled no-JavaScript server snapshot verifies setup and locale first actions are disabled; the hydrated page verifies one click changes each intended state.
+- TDD RED: sticky clearance was -60.33px; server-rendered setup controls were enabled. GREEN: final combined focused browser run 20 passed across Chromium + mobile, including the full document suite, SSR/hydration readiness and locale persistence. Requested four-worker mobile setup/locale repeat: 10 passed / 10.
+- Typecheck, lint and final formatting/style checks are recorded in the task report. Full suite/build remain controller-owned.
