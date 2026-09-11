@@ -1,6 +1,44 @@
 import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
+test("skip link bypasses the public navigation and reaches a content action", async ({
+  page,
+}, testInfo) => {
+  await page.goto("/signin");
+  await expect(
+    page.getByRole("button", { name: "开始写作", exact: true }),
+  ).toBeEnabled();
+  await page.getByRole("link", { name: "跳到主要内容", exact: true }).focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("main")).toBeFocused();
+  expect(
+    await page.evaluate(() =>
+      document
+        .querySelector("main")
+        ?.contains(document.querySelector("[data-public-header]")),
+    ),
+  ).toBe(false);
+  // The touch WebKit profile does not emulate Safari's full keyboard-access
+  // preference. Main focus and landmark separation are still verified above.
+  if (testInfo.project.name === "mobile") return;
+  await page.keyboard.press("Tab");
+  // Safari's platform preference can skip buttons during Tab traversal; the
+  // invariant is reaching content, never returning through the header.
+  expect(
+    await page.evaluate(() => ({
+      inContent: document
+        .querySelector("main")
+        ?.contains(document.activeElement),
+      inHeader: document
+        .querySelector("[data-public-header]")
+        ?.contains(document.activeElement),
+      interactive: ["A", "BUTTON"].includes(
+        document.activeElement?.tagName ?? "",
+      ),
+    })),
+  ).toEqual({ inContent: true, inHeader: false, interactive: true });
+});
+
 test("closing pending account entry leaves the public page usable", async ({
   page,
 }) => {
@@ -24,8 +62,13 @@ test("closing pending account entry leaves the public page usable", async ({
   const request = page.waitForRequest("**/api/v1/account-entry");
   await page.getByRole("button", { name: "登录并继续", exact: true }).click();
   await request;
+  const canceled = page.waitForEvent("requestfailed", {
+    predicate: (request) =>
+      new URL(request.url()).pathname === "/api/v1/account-entry",
+  });
   await page.getByRole("button", { name: "关闭登录窗口" }).click();
   release();
+  await canceled;
   await expect(page.getByRole("dialog")).toBeHidden();
   await page.getByRole("button", { name: "注册", exact: true }).click();
   await expect(page.getByLabel("邮箱", { exact: true })).toHaveValue("");

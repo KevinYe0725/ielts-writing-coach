@@ -249,6 +249,17 @@ export function AppShell({ children }: { children: ReactNode }) {
     pathname.startsWith(path),
   );
 
+  if (publicHome) {
+    return (
+      <div className={styles.entryShell}>
+        <a className="skip-link" href="#main-content">
+          {text("跳到主要内容", "Skip to main content")}
+        </a>
+        {children}
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(
@@ -262,7 +273,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <a className="skip-link" href="#main-content">
         {text("跳到主要内容", "Skip to main content")}
       </a>
-      {publicHome ? null : setup ? (
+      {setup ? (
         <header className={cn("setup-topbar", styles.entryTopbar)}>
           <Brand />
           <LocaleSwitch />
@@ -279,11 +290,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <main
         className={cn(
           "main-content",
-          publicHome
-            ? styles.publicMain
-            : setup
-              ? styles.entryMain
-              : styles.mainContent,
+          setup ? styles.entryMain : styles.mainContent,
         )}
         data-page-layout={layoutVariant}
         id="main-content"

@@ -17,5 +17,7 @@ Login and signup open the same existing `/api/v1/account-entry` form, with mode-
 - Client/components/root-route Vitest:246 passed,12 DB-environment skips. Style contracts19/19 included, unchanged assertions; CSS was adapted to tokens rather than relaxing the rules.
 - Web build generated48/48 pages; typecheck passed. Lint0errors,4 existing Fast Refresh warnings.
 - Desktop1440 and mobile390 screenshots inspected. Wide-page geometry waits for global CSS and compares available document width, accounting for WebKit scrollbars.
+- The public header/footer sit outside `main`, so the skip link really bypasses navigation. The new keyboard test failed against the nested layout and passes after the boundary correction; mobile WebKit verifies main focus and landmark separation without assuming its platform Tab preference. Public-entry suite now14/14 across Chromium/mobile.
+- Dialog dismissal is verified through the actual `requestfailed` event for its aborted account-entry request, followed by a clean reopened form and unchanged URL.
 
 No main merge, push or deployment. Original real-account app3201 is preserved;3202 is an isolated example preview. Browser auth tests use controlled API responses, not the user's real account or a live registration.
