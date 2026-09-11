@@ -117,7 +117,21 @@ export function EssayWorkspaceContent({
           >
             <div className={styles.cardTopline}>
               <Badge tone="blue">{topicLabel(essay.topic, locale)}</Badge>
-              <span>{updatedLabel(essay.updatedAt, locale)}</span>
+              <div className={styles.cardMeta}>
+                <span className={styles.cardUpdated}>
+                  {updatedLabel(essay.updatedAt, locale)}
+                </span>
+                <span
+                  className={styles.cardDue}
+                  data-essay-due
+                  data-overdue={essay.nextAction.overdue ? "true" : "false"}
+                >
+                  {text(essay.nextTask.dueLabelZh, essay.nextTask.dueLabelEn)}
+                  {essay.nextAction.overdue
+                    ? ` · ${text("已过期", "Overdue")}`
+                    : null}
+                </span>
+              </div>
             </div>
             <p className={styles.prompt} lang="en">
               {essay.prompt}

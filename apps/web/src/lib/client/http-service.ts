@@ -376,6 +376,10 @@ interface WireCycle extends JsonRecord {
 }
 
 interface TodayWire {
+  ai_service?: {
+    state?: "configured" | "needs_setup" | "unknown";
+    can_manage?: boolean;
+  };
   cycle: null | {
     core_skill_id?: string | null;
     id: string;
@@ -669,7 +673,7 @@ function blockedJobPresentation(pendingJob: {
 }): ReturnType<typeof actionPresentation> {
   const nouns: Record<string, { zh: string; en: string }> = {
     ielts_assessment: { zh: "批改", en: "feedback" },
-    issue_classification: { zh: "问题归类", en: "issue classification" },
+    issue_classification: { zh: "逐句建议", en: "sentence suggestions" },
     exercise_generation: { zh: "专项训练", en: "focused practice" },
     version_comparison: { zh: "对比分析", en: "comparison" },
   };
@@ -2455,11 +2459,18 @@ export class HttpLearningClient implements LearningClient {
   }
 
   async getToday() {
-    const [wire, providers, growth] = await Promise.all([
+    const [wire, growth] = await Promise.all([
       this.getTodayWire(),
-      this.getProviders().catch(() => []),
       this.getGrowth().catch(() => null),
     ]);
+    const aiService = {
+      state:
+        wire.ai_service?.state === "configured" ||
+        wire.ai_service?.state === "needs_setup"
+          ? wire.ai_service.state
+          : ("unknown" as const),
+      canManage: wire.ai_service?.can_manage === true,
+    };
     const pendingJobWire = wire.cycle?.resources?.pending_job ?? null;
     const pendingJob = pendingJobWire
       ? {
@@ -2521,11 +2532,15 @@ export class HttpLearningClient implements LearningClient {
     });
     return {
       learnerName: "Learner",
-      greetingZh: "今天只做这一件事。",
-      greetingEn: "There is only one thing to do today.",
-      aiState: providers.some((provider) => provider.enabled !== false)
-        ? ("connected" as const)
-        : ("missing" as const),
+      greetingZh: "今天，从这里继续。",
+      greetingEn: "Continue from here today.",
+      aiService,
+      aiState:
+        aiService.state === "configured"
+          ? ("connected" as const)
+          : aiService.state === "needs_setup"
+            ? ("missing" as const)
+            : ("compatibility" as const),
       nextTask: task,
       pendingJob,
       pendingJobAction,

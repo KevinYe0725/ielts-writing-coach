@@ -266,6 +266,14 @@ export default function PracticePaperPage({
   }
 
   if (data.evaluationPending) {
+    const teachingHref = learningRouteHref("/lesson", {
+      cycleId: data.cycleId,
+      lessonId: data.id,
+    });
+    const pendingFeedbackHref = learningRouteHref("/feedback", {
+      cycleId: data.cycleId,
+      lessonId: data.id,
+    });
     return (
       <Card className={cn("practice-paper-processing", styles.processingState)}>
         <LoaderCircle className="spin" aria-hidden="true" size={42} />
@@ -274,13 +282,24 @@ export default function PracticePaperPage({
         </h1>
         <p>
           {text(
-            "八道题会使用交卷前公开的评分点统一批改，完成后只展开需要改进的题目。",
-            "All eight answers are marked against the criteria shown before submission.",
+            "会按每道题的要求批改，完成后重点讲解需要改进的地方。",
+            "Each answer is reviewed against its own task, with extra explanation for anything that needs work.",
           )}
         </p>
-        <Button onClick={retry} variant="secondary">
-          {text("查看是否完成", "Check progress")}
-        </Button>
+        <div className={styles.processingActions}>
+          <Button onClick={retry} variant="secondary">
+            {text("查看是否完成", "Check progress")}
+          </Button>
+          <ActionLink href={teachingHref} variant="secondary">
+            {text("返回专项教学", "Back to focused teaching")}
+          </ActionLink>
+          <ActionLink href={pendingFeedbackHref} variant="secondary">
+            {text("查看批改报告", "View feedback")}
+          </ActionLink>
+          <ActionLink href="/today" variant="ghost">
+            {text("回到今日计划", "Back to Today")}
+          </ActionLink>
+        </div>
       </Card>
     );
   }

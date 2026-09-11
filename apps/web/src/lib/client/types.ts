@@ -63,6 +63,10 @@ export interface TodayData {
   greetingZh: string;
   greetingEn: string;
   aiState: AiConnectionState;
+  aiService?: {
+    state: "configured" | "needs_setup" | "unknown";
+    canManage: boolean;
+  };
   nextTask: NextTask;
   pendingJob: PendingAiJob | null;
   /**

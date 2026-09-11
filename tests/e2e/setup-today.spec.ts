@@ -83,7 +83,7 @@ test.describe("deterministic setup and Today experience", () => {
 
     await expect(
       page.getByRole("heading", {
-        name: "晚上好，Simon。今天只做这一件事。",
+        name: "今天，从这里继续。",
       }),
     ).toBeVisible();
     await expect(page.locator(".next-task-card")).toHaveCount(1);
@@ -304,7 +304,7 @@ test.describe("deterministic setup and Today experience", () => {
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
     await expect(
       page.getByRole("heading", {
-        name: "Good evening, Simon. There is only one thing to do today.",
+        name: "Continue from here today.",
       }),
     ).toBeVisible();
     await expect(page.getByText(taskPrompt, { exact: true })).toBeVisible();

@@ -17,7 +17,7 @@ describe("public version descriptor", () => {
       [...AI_TASK_KINDS].sort(),
     );
     expect(descriptor.prompts.registry.teaching_practice_analysis).toEqual({
-      prompt: "2.1.0",
+      prompt: "2.2.0",
       rubric: "iwc-teaching-practice-analysis-atoms-2.0.0",
     });
     expect(descriptor.prompts.registry.question_bank_refill).toEqual({

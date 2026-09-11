@@ -801,6 +801,13 @@
   color: var(--desk-blue);
 }
 
+.processingActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--desk-space-2);
+}
+
 @media (max-width: 960px) {
   .submitBar {
     left: 50%;
@@ -900,6 +907,16 @@
   .emptyState,
   .processingState {
     padding: var(--desk-space-8) var(--desk-space-4);
+  }
+
+  .processingActions {
+    width: 100%;
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .processingActions :global(.button) {
+    width: 100%;
   }
 }
 

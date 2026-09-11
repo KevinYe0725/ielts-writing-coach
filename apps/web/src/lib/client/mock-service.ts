@@ -1187,8 +1187,8 @@ export class MockLearningClient implements LearningClient {
     if (split === "SCHEDULED" || split === "ACTIVE") {
       return {
         learnerName: "Simon",
-        greetingZh: "晚上好，Simon。今天只做这一件事。",
-        greetingEn: "Good evening, Simon. There is only one thing to do today.",
+        greetingZh: "今天，从这里继续。",
+        greetingEn: "Continue from here today.",
         aiState: enabled ? "connected" : "missing",
         pendingJob: null,
         pendingJobAction: "none",
@@ -1253,8 +1253,8 @@ export class MockLearningClient implements LearningClient {
     }
     return {
       learnerName: "Simon",
-      greetingZh: "晚上好，Simon。今天只做这一件事。",
-      greetingEn: "Good evening, Simon. There is only one thing to do today.",
+      greetingZh: "今天，从这里继续。",
+      greetingEn: "Continue from here today.",
       aiState: enabled ? "connected" : "missing",
       pendingJob: null,
       pendingJobAction: "none",

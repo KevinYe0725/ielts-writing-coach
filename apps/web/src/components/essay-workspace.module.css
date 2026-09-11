@@ -72,10 +72,34 @@
   margin-top: calc(-1 * var(--desk-space-2));
 }
 
-.cardTopline > span:last-child {
-  color: var(--desk-evidence-muted);
+.cardMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--desk-space-2);
   font-family: var(--desk-font-utility);
   font-size: var(--desk-type-meta);
+  text-align: right;
+}
+
+.cardUpdated {
+  color: var(--desk-evidence-muted);
+}
+
+.cardDue {
+  color: var(--desk-blue);
+  font-weight: var(--desk-utility-weight-semibold);
+}
+
+.cardDue::before {
+  margin-right: var(--desk-space-2);
+  color: var(--desk-line-strong);
+  content: "·";
+}
+
+.cardDue[data-overdue="true"] {
+  color: var(--desk-amber);
 }
 
 .workspace :global(.badge),
