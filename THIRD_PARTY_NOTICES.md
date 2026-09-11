@@ -18,7 +18,7 @@ IBM Plex Sans, Noto Sans SC and Source Serif 4 are distributed through the corre
 
 ## Workspace interaction components
 
-`cmdk`, `motion`, and `react-resizable-panels` are MIT-licensed runtime dependencies used for essay selection, interface transitions, and report layout. Their upstream license files remain in the distributed dependency packages; no paid templates or commercial editor extensions are included.
+`cmdk`, `motion`, and `react-resizable-panels` are MIT-licensed runtime dependencies used for essay selection, interface transitions, and report layout. Their exact upstream license files are additionally served as `/licenses/cmdk.txt`, `/licenses/motion.txt`, and `/licenses/react-resizable-panels.txt` so the notices travel with standalone web bundles. No paid templates or commercial editor extensions are included.
 
 To inspect the complete installed inventory locally:
 
