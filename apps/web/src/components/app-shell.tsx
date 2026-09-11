@@ -251,7 +251,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   if (publicHome) {
     return (
-      <div className={styles.entryShell}>
+      <div className={cn("setup-shell", styles.entryShell)}>
         <a className="skip-link" href="#main-content">
           {text("跳到主要内容", "Skip to main content")}
         </a>

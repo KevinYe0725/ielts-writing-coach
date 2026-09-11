@@ -222,6 +222,9 @@ test.describe("account controls", () => {
       await page.goto("/signin");
       await expect(page.locator("[data-public-home]")).toBeVisible();
       await expect(page.locator("body")).toHaveCSS("margin", "0px");
+      await expect(
+        page.getByRole("button", { name: "登录", exact: true }),
+      ).toBeEnabled();
 
       const header = (await page
         .locator("[data-public-header]")
@@ -260,6 +263,8 @@ test.describe("account controls", () => {
       expect(geometry.layoutWidth).toBeGreaterThanOrEqual(viewport.width - 100);
       expect(geometry.formWidth).toBeGreaterThanOrEqual(360);
       expect(geometry.formWidth).toBeLessThanOrEqual(540);
+      await page.getByRole("button", { name: "关闭登录窗口" }).click();
+      await expect(page.getByRole("dialog")).toBeHidden();
     }
   });
 
