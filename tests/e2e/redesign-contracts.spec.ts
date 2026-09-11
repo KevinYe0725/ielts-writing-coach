@@ -535,8 +535,9 @@ test.describe("annotation desk redesign contracts", () => {
   }) => {
     await page.goto("/signin");
     await expect(page.locator("[data-entry-surface='signin']")).toBeVisible();
-    await expect(page.getByText(/新邮箱会自动创建账号/)).toBeVisible();
-    await expect(page.getByText(/学校或团队.*邀请链接/)).toBeVisible();
+    await page.getByRole("button", { name: "注册", exact: true }).click();
+    await expect(page.getByText(/新邮箱自动创建账号/)).toBeVisible();
+    await expect(page.getByText(/团队学习.*邀请链接/)).toBeVisible();
     await expect(
       page.getByText(/自托管实例|个人学习空间|共享空间/),
     ).toHaveCount(0);

@@ -1274,6 +1274,7 @@ test.describe("Today query states at the HTTP boundary", () => {
     ).toBeVisible();
     releaseAccountA();
 
+    await accountB.getByRole("button", { name: /^(登录|Log in)$/ }).click();
     await accountB.locator("#signin-email").fill("account-b@example.test");
     await accountB.locator("#signin-password").fill("secure-password");
     await accountB.getByRole("button", { name: /继续|continue/i }).click();

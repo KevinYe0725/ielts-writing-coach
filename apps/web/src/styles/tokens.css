@@ -55,6 +55,15 @@
   --desk-type-subheading: 20px;
   --desk-type-section-title: clamp(24px, 3vw, 28px);
   --desk-type-page-title: clamp(30px, 4vw, 40px);
+  /* Public product page uses display typography without changing workspace roles. */
+  --desk-type-public-hero: clamp(40px, 5.8vw, 80px);
+  --desk-type-public-hero-mobile: clamp(36px, 7.5vw, 52px);
+  --desk-type-public-section: clamp(25px, 2.8vw, 36px);
+  --desk-type-public-statement: clamp(32px, 3.8vw, 50px);
+  --desk-type-public-closing: clamp(30px, 4vw, 48px);
+  --desk-type-public-intro: clamp(16px, 1.6vw, 19px);
+  --desk-type-public-example: clamp(20px, 2vw, 27px);
+  --desk-type-public-dialog: 28px;
   --desk-leading-compact: 1.2;
   --desk-leading-body: 1.7;
   --desk-leading-reading: 1.82;

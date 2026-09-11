@@ -244,6 +244,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { text } = useLocale();
   const layoutVariant = layoutVariantForPathname(pathname);
+  const publicHome = pathname === "/signin";
   const setup = ["/setup", "/signin", "/join", "/recover"].some((path) =>
     pathname.startsWith(path),
   );
@@ -261,7 +262,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <a className="skip-link" href="#main-content">
         {text("跳到主要内容", "Skip to main content")}
       </a>
-      {setup ? (
+      {publicHome ? null : setup ? (
         <header className={cn("setup-topbar", styles.entryTopbar)}>
           <Brand />
           <LocaleSwitch />
@@ -278,7 +279,11 @@ export function AppShell({ children }: { children: ReactNode }) {
       <main
         className={cn(
           "main-content",
-          setup ? styles.entryMain : styles.mainContent,
+          publicHome
+            ? styles.publicMain
+            : setup
+              ? styles.entryMain
+              : styles.mainContent,
         )}
         data-page-layout={layoutVariant}
         id="main-content"

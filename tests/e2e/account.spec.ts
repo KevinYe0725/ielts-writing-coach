@@ -73,6 +73,9 @@ async function enterSignInCredentials(
   page: import("@playwright/test").Page,
   email: string,
 ) {
+  if (!(await page.locator("#signin-email").isVisible())) {
+    await page.getByRole("button", { name: /^(登录|Log in)$/ }).click();
+  }
   const emailInput = page.locator("#signin-email");
   const passwordInput = page.locator("#signin-password");
   await expect
@@ -149,9 +152,9 @@ test.describe("account controls", () => {
     await page.getByRole("button", { name: /继续|continue/i }).click();
 
     await expect(page).toHaveURL(/\/signin$/);
-    await expect(page.locator(".setup-form-card [role='alert']")).toContainText(
-      /邀请|invitation/i,
-    );
+    await expect(
+      page.locator("[data-signin-form] [role='alert']"),
+    ).toContainText(/邀请|invitation/i);
     await expect(page.locator("#signin-email")).toHaveValue("new@example.test");
   });
 
@@ -174,7 +177,7 @@ test.describe("account controls", () => {
     await expect(page).toHaveURL(/\/today$/);
   });
 
-  test("uses a login-specific composition without an empty viewport scroll", async ({
+  test("presents the public page and keeps account entry inside the viewport", async ({
     page,
   }) => {
     for (const viewport of [
@@ -185,10 +188,10 @@ test.describe("account controls", () => {
       await page.setViewportSize(viewport);
       await page.goto("/signin");
 
-      await expect(page.locator("[data-signin-layout]")).toBeVisible();
-      await expect(page.locator("[data-signin-form]")).toBeVisible();
-      await expect(page.locator("[data-signin-story]")).toBeVisible();
+      await expect(page.locator("[data-public-home]")).toBeVisible();
+      await expect(page.locator("[data-signin-form]")).toHaveCount(0);
       await expect(page.getByText("自托管实例")).toHaveCount(0);
+      await page.getByRole("button", { name: "登录", exact: true }).click();
       await expect(page.getByText("欢迎回来", { exact: true })).toBeVisible();
 
       const overflow = await page.evaluate(() => ({
@@ -200,7 +203,11 @@ test.describe("account controls", () => {
           document.documentElement.clientHeight,
       }));
       expect(overflow.horizontal).toBeLessThanOrEqual(1);
-      expect(overflow.vertical).toBeLessThanOrEqual(1);
+      const dialog = (await page.getByRole("dialog").boundingBox())!;
+      expect(dialog.y).toBeGreaterThanOrEqual(15);
+      expect(dialog.y + dialog.height).toBeLessThanOrEqual(
+        viewport.height - 15,
+      );
     }
   });
 
@@ -213,14 +220,29 @@ test.describe("account controls", () => {
     ]) {
       await page.setViewportSize(viewport);
       await page.goto("/signin");
-      await expect(page.locator("[data-signin-layout]")).toBeVisible();
+      await expect(page.locator("[data-public-home]")).toBeVisible();
+      await expect(page.locator("body")).toHaveCSS("margin", "0px");
+
+      const header = (await page
+        .locator("[data-public-header]")
+        .boundingBox())!;
+      const home = (await page.locator("[data-public-home]").boundingBox())!;
+      expect(header.x).toBeLessThanOrEqual(1);
+      expect(header.x + header.width).toBeGreaterThanOrEqual(
+        viewport.width - 1,
+      );
+      const availableWidth = await page.evaluate(
+        () => document.documentElement.clientWidth,
+      );
+      expect(home.width).toBeGreaterThanOrEqual(availableWidth - 1);
+      await page.getByRole("button", { name: "登录", exact: true }).click();
 
       const geometry = await page.evaluate(() => {
         const topbar = document
-          .querySelector(".setup-topbar")
+          .querySelector("[data-public-header]")
           ?.getBoundingClientRect();
         const layout = document
-          .querySelector("[data-signin-layout]")
+          .querySelector("[data-public-home]")
           ?.getBoundingClientRect();
         const form = document
           .querySelector("[data-signin-form] form")
@@ -258,6 +280,7 @@ test.describe("account controls", () => {
     });
 
     await page.goto("/signin");
+    await page.getByRole("button", { name: "登录", exact: true }).click();
     await page.locator("#signin-email").fill("  new@example.test  ");
     await page.locator("#signin-password").fill("12345678901");
     await expect(page.getByText(/至少 12 个字符/)).toBeVisible();
@@ -925,6 +948,7 @@ test.describe("account controls", () => {
       await page.setViewportSize(viewport);
 
       await page.goto("/signin");
+      await page.getByRole("button", { name: "登录", exact: true }).click();
       await expectAllVisibleFontsAtLeast(
         page.locator("#signin-email"),
         "/signin email input",
