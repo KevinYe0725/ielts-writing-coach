@@ -7,6 +7,23 @@ Frontend-only redesign from `cd95bd5` in the existing `codex/learning-quality-v2
 Design: `docs/superpowers/specs/2026-09-12-writing-workspace-design.md`.
 Execution plan: `docs/superpowers/plans/2026-09-12-writing-workspace.md`.
 
+## Final acceptance — code commit `eedae08`
+
+The staged histories below are superseded by this final combined verification:
+
+- Full Vitest suite against a disposable PostgreSQL17 database: **979 passed across102 files, no failures or skips**. Both `DATABASE_URL` and `IWC_TEST_DATABASE_URL` pointed to the test database. Run migrations only (not seed) and use `--no-file-parallelism`: these integration fixtures own static-question IDs, instance configuration and global-table snapshots.
+- Complete DEMO Playwright suite, Chromium and iPhone-sized WebKit: **373 passed,171 mode/project-specific skips, zero failures**.
+- Complete HTTP-mode Playwright suite, Chromium, against the production standalone build: **95 passed,177 DEMO/project-specific skips, zero failures**. This run uses port3295 because the existing owner-search contract test explicitly asserts that Origin. The first run on3203 had one port-assumption failure; the same frozen build passed on3295 without changing the business code or assertion.
+- Production build:48/48 static pages generated, TypeScript compilation passed. Web lint:0 errors,4 pre-existing Fast Refresh export warnings. `git diff --check` passed.
+- License policy:494 package records across14 reviewed expressions. Upstream license texts for the three selected UI packages and three fonts are retained in public assets; independent review compared them to the installed files.
+- Task and whole-change reviews are approved with no remaining critical/important finding. Desktop sticky containment, mobile/intermediate pane width and source-to-suggestion activation, SSR readiness, exact resource identity, preserved source text, and practice/recovery flows have dedicated regression coverage.
+
+One deliberate tradeoff: correction order versus teaching priority remains in an optional disclosure. The explanation is preserved without a permanent small-text banner; reading it costs one additional click.
+
+These results do not claim a real-account AI generation test, remote CI, push, main merge, or server deployment. Existing real-account port3201 is unchanged. Port3202 remains an independent DEMO preview. Temporary standalone test servers and the disposable test database are cleaned up after verification; learner data was not migrated, regraded, or deleted.
+
+Detailed implementation/review records are retained in `docs/quality/reviews/writing-workspace-v4-task-1.md` and `writing-workspace-v4-task-2.md`.
+
 ## Baseline
 
 - Focused navigation/design/priorities Vitest: 27 passed.

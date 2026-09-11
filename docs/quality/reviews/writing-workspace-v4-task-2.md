@@ -57,17 +57,17 @@ The retained narrow-article and mobile-paper tests supplied additional real RED 
 
 All commands used Node 24 from `/opt/homebrew/opt/node@24/bin` and the isolated DEMO preview at `http://127.0.0.1:3202`.
 
-| Check | Result |
-|---|---|
-| `document-workspace-v4.spec.ts` + complete `lesson.spec.ts`, Chromium + mobile, 2 workers | 80 passed, 68 skipped |
-| `app-shell.spec.ts`, Chromium + mobile, 2 workers | 23 passed, 5 skipped |
-| Paper focused-input + desktop-rail checks, Chromium + mobile | 4 passed |
-| Paper mobile question-anchor check, Chromium + mobile | 2 passed |
-| Controller independent source/highlight interaction slice | 8 passed |
-| `style-contract.test.ts` | 19 passed |
-| `pnpm --filter @iwc/web typecheck` | passed |
-| `pnpm --filter @iwc/web lint` | 0 errors; 4 existing Fast Refresh warnings outside Task 2 files |
-| Targeted Prettier + `git diff --check` | passed after formatting |
+| Check                                                                                     | Result                                                          |
+| ----------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `document-workspace-v4.spec.ts` + complete `lesson.spec.ts`, Chromium + mobile, 2 workers | 80 passed, 68 skipped                                           |
+| `app-shell.spec.ts`, Chromium + mobile, 2 workers                                         | 23 passed, 5 skipped                                            |
+| Paper focused-input + desktop-rail checks, Chromium + mobile                              | 4 passed                                                        |
+| Paper mobile question-anchor check, Chromium + mobile                                     | 2 passed                                                        |
+| Controller independent source/highlight interaction slice                                 | 8 passed                                                        |
+| `style-contract.test.ts`                                                                  | 19 passed                                                       |
+| `pnpm --filter @iwc/web typecheck`                                                        | passed                                                          |
+| `pnpm --filter @iwc/web lint`                                                             | 0 errors; 4 existing Fast Refresh warnings outside Task 2 files |
+| Targeted Prettier + `git diff --check`                                                    | passed after formatting                                         |
 
 The 68 lesson skips are its HTTP-boundary group, intentionally disabled under deterministic DEMO mode. The five app-shell skips are mobile-inapplicable or HTTP-boundary cases. The controller owns the final non-DEMO HTTP, full Vitest, build and license gates; this agent did not duplicate the controller build or touch ports 3201/3203.
 
