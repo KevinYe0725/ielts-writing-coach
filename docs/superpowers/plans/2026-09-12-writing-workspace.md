@@ -27,8 +27,10 @@
 - [ ] Write failing navigation tests. Required counterexample: current URL `/feedback?cycle=B` plus cached links for A must never expose lesson/rewrite/compare links for A. Current link keeps complete current query. Empty resources still expose Today, Essays, Growth, Settings.
 
 ```ts
-expect(workspaceDestinations('/feedback?cycle=B', cachedA).feedback).toBe('/feedback?cycle=B');
-expect(workspaceDestinations('/feedback?cycle=B', cachedA).lesson).toBeNull();
+expect(workspaceDestinations("/feedback?cycle=B", cachedA).feedback).toBe(
+  "/feedback?cycle=B",
+);
+expect(workspaceDestinations("/feedback?cycle=B", cachedA).lesson).toBeNull();
 ```
 
 - [ ] Run focused Vitest tests and capture RED, implement pure safe projection (do not invent lesson/task IDs), rerun GREEN.
@@ -40,22 +42,25 @@ expect(workspaceDestinations('/feedback?cycle=B', cachedA).lesson).toBeNull();
 
 ### Task 2: Document-first report, tutorial, and essay surfaces
 
-**Files:** app/feedback/page.tsx and feedback.module.css; new resizable-feedback.tsx/module.css if extraction improves clarity; app/lesson/page.tsx, teaching-article.tsx, page.module.css; app/today/page.tsx/today.module.css; components/essay-workspace.tsx/module.css; related e2e tests.
+**Files:** app/feedback/page.tsx and feedback.module.css; new resizable-feedback.tsx/module.css if extraction improves clarity; app/lesson/page.tsx, teaching-article.tsx, page.module.css; app/lesson/paper/paper.module.css for header offsets; app/today/page.tsx/today.module.css; components/essay-workspace.tsx/module.css; related e2e tests.
 
 **Interfaces:** consumes Task 1 shell width, installed motion and resizable panels; leaves all existing client loaders, event handlers and data contracts intact.
 
 - [ ] Add a failing desktop browser test proving report columns can be resized while selected issue and source highlight persist. Include mobile single-column behavior without duplicated hidden content.
 
 ```ts
-const separator = page.getByRole('separator', {name: /调整.*宽度|resize/i});
+const separator = page.getByRole("separator", { name: /调整.*宽度|resize/i });
 await separator.focus();
-await page.keyboard.press('ArrowLeft');
-await expect(page.locator('[data-feedback-summary]')).toBeVisible();
+await page.keyboard.press("ArrowLeft");
+await expect(page.locator("[data-feedback-summary]")).toBeVisible();
 ```
 
 - [ ] Capture RED, implement Group/Panel/Separator using current package API, preserve min content sizes and responsive fallback. No persisted panel widths needed this iteration.
 - [ ] Simplify report duplicate eyebrows, repeated priority instructions and decorative boxes; keep criteria explanations accessible, original issue filters/anchoring and corrective content intact. Use appropriate details for deeper ancillary content, not errors or task instructions.
+- [ ] On a 1440×1000 desktop viewport, show the beginning of the original essay within the first screen (current baseline workbench begins at y=864). Compact the summary and priorities into meaningful lines, not miniature text. Source and suggestion headings need no repeated eyebrow. Keep score and its disclaimer visible; per-criterion explanation and extended overall strengths may use disclosure. Preserve all actual feedback text, even when it moves into a disclosure.
 - [ ] Simplify tutorial heading area and article wrappers, improve typography/spacing and example contrast. Keep substantive AI lesson text unchanged, no fixed tutorial skeleton, and retain practice/nav/assessment controls.
+- [ ] Align tutorial header with the main article column instead of centering a 760px header over a wider article+TOC grid. Remove duplicate decorative numbering in article section headings; headings 24–28px rather than page-title-size. Teaching readingPage width must no longer subtract legacy sidebar width. Baseline screenshots: output/playwright/v4-before-feedback.png and v4-before-teaching.png.
+- [ ] Use Task1 `--workspace-header-height` (72px desktop,112px mobile) for sticky tools and anchor scroll offsets where header overlap could occur, notably tutorial contents and paper question rail. Existing question-anchor tests must pass below actual header bottom. Remove fixed paper-submit sidebar offset or retain safe collapsed compatibility; never cover focused input or submit controls.
 - [ ] Simplify Today and essay list duplicate scaffolding; don't remove active limit, deadlines, next action, error/queued status. Existing multi-essay continue URLs stay unchanged.
 - [ ] Run full relevant e2e browser files after updating only presentation-dependent locators/wording; execute web typecheck, lint, build and OSS license audit. Screenshot desktop report/tutorial/Today and mobile report/tutorial; review and correct collisions.
 - [ ] Commit changes and write docs/quality/writing-workspace-v4-evidence.md with exact passed/skipped checks, preview URLs and residual limitations.
