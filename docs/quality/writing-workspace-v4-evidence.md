@@ -25,3 +25,5 @@ Preview screenshots and DEMO browser tests are not a real-account AI generation 
 Existing Radix, Markdown renderer, icons and CSS Modules remain. Selected additional components have specific jobs (searchable essay switcher, resizable report, small interaction transitions); no editor migration, UI template installation or paid feature integration.
 
 Official sources checked: https://www.radix-ui.com/primitives/docs/overview/introduction ; https://github.com/dip/cmdk ; https://github.com/bvaughn/react-resizable-panels ; https://github.com/motiondivision/motion ; https://ui.shadcn.com/docs/components .
+
+License gate initially failed on the three existing Fontsource packages (OFL-1.1), not on the new MIT dependencies. After checking the installed licenses against the official SIL OFL embedding/redistribution conditions, original license texts were placed in public `/licenses/*.txt`, the third-party notice was expanded, and OFL-1.1 was added to the reviewed expressions. The real license script then passed: 494 package records,14 license expressions. No font binary was modified or relicensed.
