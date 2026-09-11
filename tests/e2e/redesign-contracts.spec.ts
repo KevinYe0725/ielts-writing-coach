@@ -189,6 +189,24 @@ async function expectColorUsesToken(
   expect(colors.actual).toBe(colors.expected);
 }
 
+async function expectBackgroundUsesToken(
+  locator: Locator,
+  token: "--desk-paper",
+): Promise<void> {
+  const colors = await locator.evaluate((element, cssToken) => {
+    const probe = document.createElement("span");
+    probe.style.backgroundColor = `var(${cssToken})`;
+    element.ownerDocument.body.append(probe);
+    const expected = window.getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    return {
+      actual: window.getComputedStyle(element).backgroundColor,
+      expected,
+    };
+  }, token);
+  expect(colors.actual).toBe(colors.expected);
+}
+
 async function expectNoErrorToken(locator: Locator): Promise<void> {
   await expect(locator).toBeVisible();
   const report = await locator.evaluate((element) => {
@@ -735,9 +753,9 @@ test.describe("annotation desk redesign contracts", () => {
       "background-image",
       "none",
     );
-    await expect(page.locator(".writing-editor")).toHaveCSS(
-      "background-color",
-      "rgb(252, 251, 248)",
+    await expectBackgroundUsesToken(
+      page.locator(".writing-editor"),
+      "--desk-paper",
     );
 
     await page.goto("/write?cycle=cycle-demo");
@@ -1333,7 +1351,7 @@ test.describe("annotation desk redesign contracts", () => {
     { label: "desktop", width: 1440, height: 960 },
     { label: "390px mobile", width: 390, height: 844 },
   ]) {
-    test(`feedback eyebrows and badges stay at least 12px on ${viewport.label}`, async ({
+    test(`feedback badges and structural headings stay readable on ${viewport.label}`, async ({
       page,
     }) => {
       await page.setViewportSize({
@@ -1344,10 +1362,6 @@ test.describe("annotation desk redesign contracts", () => {
         "/feedback?cycle=cycle-demo&lesson=lesson-collocation-perspective",
       );
 
-      const pageHeaderEyebrow = page.getByText("第1步 · 详细批改与改正", {
-        exact: true,
-      });
-      const internalEyebrow = page.getByText("本篇诊断", { exact: true });
       const trustBadge = page.getByText("示例报告 · 未评价语言", {
         exact: true,
       });
@@ -1355,13 +1369,15 @@ test.describe("annotation desk redesign contracts", () => {
         exact: true,
       });
 
-      for (const auxiliaryText of [
-        pageHeaderEyebrow,
-        internalEyebrow,
-        trustBadge,
-        modelLockBadge,
-      ]) {
+      for (const auxiliaryText of [trustBadge, modelLockBadge]) {
         await expectFontSizeAtLeast(auxiliaryText, 12);
+      }
+      for (const heading of [
+        page.locator("#feedback-assessment-heading"),
+        page.locator("[data-essay-pane] h2"),
+        page.locator("[data-suggestion-panel] h2"),
+      ]) {
+        await expectFontSizeAtLeast(heading, 16);
       }
     });
   }

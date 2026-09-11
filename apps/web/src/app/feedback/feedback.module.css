@@ -809,6 +809,34 @@
   flex: none;
 }
 
+.focusReason {
+  padding-top: var(--desk-space-3);
+  margin-top: var(--desk-space-3);
+  border-top: 1px solid color-mix(in srgb, var(--desk-blue) 18%, transparent);
+}
+
+.focusReason summary {
+  display: flex;
+  color: var(--desk-blue);
+  font-size: var(--desk-type-meta);
+  font-weight: var(--desk-body-weight-semibold);
+  cursor: pointer;
+  align-items: center;
+  gap: var(--desk-space-2);
+}
+
+.focusReason summary:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--desk-blue) 34%, transparent);
+  outline-offset: 2px;
+}
+
+.focusReason p {
+  margin: var(--desk-space-2) 0 0;
+  color: var(--desk-evidence-muted);
+  font-size: var(--desk-type-meta);
+  line-height: 1.65;
+}
+
 .locateButton {
   display: inline-flex;
   min-height: 38px;
@@ -1050,25 +1078,7 @@
   }
 }
 
-@media (max-width: 760px) {
-  .headerActions {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .scoreBadge {
-    width: 72px;
-    min-height: 72px;
-  }
-
-  .overallScore h2 {
-    font-size: var(--desk-type-body);
-  }
-
-  .strengthLine {
-    grid-column: 1 / -1;
-  }
-
+@media (max-width: 939px) {
   .mobileSwitcher {
     position: sticky;
     z-index: 12;
@@ -1115,17 +1125,34 @@
     place-items: center;
   }
 
-  .resizablePanel {
-    display: none !important;
-    flex: 0 0 100% !important;
-  }
-
-  .resizablePanel.mobilePanelActive {
-    display: block !important;
-  }
-
-  .resizeHandle {
+  .sourcePane,
+  .suggestionPane {
     display: none;
+  }
+
+  .sourcePane.mobileActive,
+  .suggestionPane.mobileActive {
+    display: block;
+  }
+}
+
+@media (max-width: 760px) {
+  .headerActions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .scoreBadge {
+    width: 72px;
+    min-height: 72px;
+  }
+
+  .overallScore h2 {
+    font-size: var(--desk-type-body);
+  }
+
+  .strengthLine {
+    grid-column: 1 / -1;
   }
 
   .essay {

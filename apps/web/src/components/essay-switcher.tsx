@@ -6,7 +6,7 @@ import { Check, ChevronDown, FileText, Plus, Search, X } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { useLocale } from "@/components/locale-provider";
 import { learningClient, type EssayWorkspaceData } from "@/lib/client";
@@ -17,6 +17,18 @@ import {
 
 import styles from "./essay-switcher.module.css";
 
+function subscribeToHydration() {
+  return () => {};
+}
+
+function hydratedBrowserSnapshot() {
+  return true;
+}
+
+function hydratedServerSnapshot() {
+  return false;
+}
+
 export function EssaySwitcher({
   currentCycleId,
 }: {
@@ -25,6 +37,11 @@ export function EssaySwitcher({
   const { text, locale } = useLocale();
   const router = useRouter();
   const reducedMotion = useReducedMotion();
+  const interactive = useSyncExternalStore(
+    subscribeToHydration,
+    hydratedBrowserSnapshot,
+    hydratedServerSnapshot,
+  );
   const searchRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -67,6 +84,8 @@ export function EssaySwitcher({
       <Dialog.Trigger asChild>
         <button
           className={styles.trigger}
+          data-interactive={interactive ? "true" : "false"}
+          disabled={!interactive}
           type="button"
           aria-label={text("切换作文", "Switch essay")}
         >

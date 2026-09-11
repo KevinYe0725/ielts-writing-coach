@@ -57,3 +57,15 @@ Isolated preview: `http://127.0.0.1:3202` with `NEXT_PUBLIC_DEMO_MODE=true`.
 - Mobile 390×844: `output/playwright/v4-after-feedback-mobile.png`, `v4-after-teaching-mobile.png`.
 
 Reviewed against the baseline for content visibility, resolved spacing tokens, 16px-or-larger core diagnosis text, Chinese UI typography, lesson line length, divider affordance, sticky offsets and horizontal overflow. These screenshots are ignored local QA artifacts, not real-account acceptance evidence.
+
+## Task 2 review round 1
+
+- The committed mobile implementation hid the class applied to the inner `Panel` wrapper, while react-resizable-panels 4.12.4 kept its outer 58/42 flex panels. A new browser regression reproduced the visible suggestion pane 163px narrower than its workbench at 390px.
+- `ResponsiveReport` now uses resizable `Group` / `Panel` / `Separator` only from 940px and an ordinary parent container below that safe threshold. The source and suggestion JSX still render exactly once, and page-owned filter/selection state survives 1440 → 390/768/820/900 → 1024 viewport transitions.
+- Final responsive regression: 12 passed across Chromium + mobile. It checks active-pane/workbench bounds within 2px and no horizontal overflow at 390, 768, 820 and 900px; at 1024px it checks source ≥420px, suggestions ≥340px, no overflow, separator visibility and retained selected mark.
+- Restored the removed focused-target rationale inside an optional disclosure on the target issue. Its dedicated RED failed because the disclosure was absent; GREEN passes after restoring the original learner guidance.
+- Migrated stale visual assertions: the writing editor is compared to the live `--desk-paper` token rather than the former off-white literal, and removed feedback eyebrows are replaced by 12px badge plus 16px diagnosis/structural-heading coverage. Focused suite: 6 passed across Chromium + mobile.
+- Sign-in RED reproduced 26px empty vertical overflow at 390×844. Mobile entry main padding now uses 24px top / 48px bottom, with no clipping or `overflow: hidden`; the original three-viewport assertion passes in both Chromium and mobile projects (2 passed).
+- The full-load switcher failure showed the trigger click landing before client event handlers existed. The server-rendered trigger is now disabled until a `useSyncExternalStore` hydration snapshot marks it interactive; the browser test waits for enabled readiness before opening. The complete open/search/focus/Escape/select flow passed 20/20 repeated runs across Chromium + mobile, and the broader feedback/navigation interaction slice passed 46/46.
+- Review screenshots: `output/playwright/v4-fix-feedback-900.png`, `v4-fix-feedback-1024.png`, `v4-fix-signin-mobile.png`.
+- Controller separately verified production HTTP mode on `e294a52`: 65 passed / 71 DEMO skips. Round 1 did not rerun the full suite or build; those remain controller-owned final gates.

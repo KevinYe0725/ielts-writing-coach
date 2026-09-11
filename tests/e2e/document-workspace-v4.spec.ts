@@ -69,6 +69,79 @@ test.describe("document-first workspace", () => {
     expect(summarySize).toBeGreaterThanOrEqual(16);
   });
 
+  test("keeps the focused-target rationale available as optional guidance", async ({
+    page,
+  }) => {
+    await page.goto("/feedback?cycle=cycle-demo");
+    const target = page.locator("[data-feedback-issue]", {
+      hasText: "本次专项重点",
+    });
+    await target.click();
+    const disclosure = page.getByText("为什么把这处作为专项重点", {
+      exact: true,
+    });
+    await expect(disclosure).toBeVisible();
+    await disclosure.click();
+    await expect(page.getByText(/编号表示本篇的纠错顺序/)).toBeVisible();
+  });
+
+  test("fills narrow report widths and preserves the selected issue across layout changes", async ({
+    page,
+  }) => {
+    await page.goto("/feedback?cycle=cycle-demo");
+    const highlight = page.locator("[data-feedback-highlight]").first();
+    const issue = await highlight.getAttribute("data-feedback-highlight");
+    await highlight.click();
+
+    for (const width of [390, 768, 820, 900]) {
+      await page.setViewportSize({ width, height: 900 });
+      const workbench = page.locator("[data-feedback-workbench]");
+      const suggestions = page.locator("[data-suggestion-panel]");
+      await expect(page.getByRole("separator")).toHaveCount(0);
+      await expect(suggestions).toBeVisible();
+      const [workbenchBox, suggestionBox] = await Promise.all([
+        workbench.boundingBox(),
+        suggestions.boundingBox(),
+      ]);
+      expect(workbenchBox).not.toBeNull();
+      expect(suggestionBox).not.toBeNull();
+      expect(
+        Math.abs(suggestionBox!.width - workbenchBox!.width),
+      ).toBeLessThanOrEqual(2);
+      expect(
+        await page.evaluate(
+          () =>
+            document.documentElement.scrollWidth <=
+            document.documentElement.clientWidth + 1,
+        ),
+      ).toBe(true);
+      await expect(
+        page.locator(`[data-feedback-issue="${issue}"]`),
+      ).toHaveAttribute("aria-expanded", "true");
+    }
+
+    await page.setViewportSize({ width: 1024, height: 900 });
+    await expect(
+      page.getByRole("separator", { name: /调整.*宽度|resize/i }),
+    ).toBeVisible();
+    const [sourceBox, suggestionBox] = await Promise.all([
+      page.locator("[data-essay-pane]").boundingBox(),
+      page.locator("[data-suggestion-panel]").boundingBox(),
+    ]);
+    expect(sourceBox).not.toBeNull();
+    expect(suggestionBox).not.toBeNull();
+    expect(sourceBox!.width).toBeGreaterThanOrEqual(420);
+    expect(suggestionBox!.width).toBeGreaterThanOrEqual(340);
+    expect(
+      await page.evaluate(
+        () =>
+          document.documentElement.scrollWidth <=
+          document.documentElement.clientWidth + 1,
+      ),
+    ).toBe(true);
+    await expect(highlight).toHaveAttribute("aria-pressed", "true");
+  });
+
   test("keeps the tutorial title on the same reading axis as its prose", async ({
     page,
   }) => {

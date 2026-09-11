@@ -101,3 +101,34 @@ These are ignored local DEMO artifacts. They prove layout behavior only, not rea
 - Validation is DEMO-browser and local static/type verification only until the controller completes the final combined real HTTP/build/license gates.
 - The repository requests durable Mind memory, but no `mind` MCP capability was exposed to this delegated agent; no memory write was attempted.
 - No push, merge or deployment was performed.
+
+## Review round 1 — responsive and full-load regressions
+
+### Findings reproduced
+
+1. `Panel.className` in react-resizable-panels 4.12.4 is applied to an inner wrapper. The committed mobile CSS hid that inner wrapper but left the package's outer 58/42 flex panels in place. The new geometry regression failed at 390px with the visible suggestions 163px narrower than the workbench. The previous 761–939px range also had no safe fallback for the 420px + 340px panel minimums and separator.
+2. The focused-target ordering rationale had been removed with the permanent helper banner even though it was unique learner guidance.
+3. Full-suite presentation assertions still expected the old off-white editor literal and removed feedback eyebrows.
+4. The mobile sign-in page had 26px of empty vertical overflow at 390×844 because the entry main retained 32px top / 80px bottom desktop padding.
+5. Under the 534-test load, one mobile switcher click happened before hydration installed the trigger handler; the DOM showed the button but no dialog.
+
+### Fixes
+
+- Added `responsive-report.tsx`. At ≥940px it renders the installed resizable group with panel minimums; below 940px it renders a normal container around the same two child nodes. There is no duplicated source or suggestion JSX. Selection/filter/mobile pane state stays in `FeedbackPage`, so it survives wrapper remounts when the media query changes.
+- Moved narrow pane switching CSS to the same 939px boundary and removed all attempts to override the package's inner panel sizing with `!important`.
+- Restored the exact ordering/focus explanation in a closed-by-default disclosure inside the focused target's expanded issue detail.
+- Added a computed-background helper that resolves `--desk-paper`, and migrated eyebrow assertions to trust/model badge floors plus diagnosis/source/suggestion heading floors.
+- Added a mobile-only `.entryMain` padding rule (24px top, 48px bottom). The content remains fully visible and scrollable if it genuinely exceeds the viewport.
+- Added an SSR-safe `useSyncExternalStore` hydration readiness snapshot to `EssaySwitcher`. Its native trigger is disabled before interactivity and enabled immediately after hydration; the test now waits for that meaningful readiness boundary rather than sleeping or retrying clicks.
+
+### TDD and verification
+
+- Responsive RED: suggestion/workbench width delta 163px at 390px. GREEN: width delta ≤2px at 390/768/820/900, no overflow at every requested width, and valid ≥420/340px panels plus separator at 1024px. Selected issue/source mark survives the responsive transitions.
+- Guidance RED: optional disclosure text absent. GREEN: rationale opens and its original guidance is visible.
+- Entry RED: 26px vertical overflow in both browser profiles. GREEN: the unchanged three-viewport assertion passes in Chromium + mobile (2/2).
+- Switcher readiness: the original full-load error context showed no dialog after a pre-hydration click. With native disabled readiness, the complete flow passed 20/20 repeated Chromium/mobile runs.
+- Feedback/document/navigation slice: 46 passed across Chromium + mobile.
+- Final serial focused checks: document workspace 12 passed; entry overflow 2 passed; migrated visual contracts 6 passed; style contract 19 passed.
+- Visual review completed at feedback 900px fallback, feedback 1024px resizable, and sign-in 390×844.
+
+No package, server, backend, build, deployment, push or merge operation was performed in round 1. Controller owns the final combined full-suite and production-build gates.

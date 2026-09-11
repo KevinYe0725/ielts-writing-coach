@@ -28,7 +28,6 @@ import {
   Target,
   TriangleAlert,
 } from "lucide-react";
-import { Group, Panel, Separator } from "react-resizable-panels";
 
 import { useLocale } from "@/components/locale-provider";
 import {
@@ -61,6 +60,7 @@ import {
 } from "@/lib/client/learning-route";
 
 import styles from "./feedback.module.css";
+import { ResponsiveReport } from "./responsive-report";
 
 type MobilePane = "source" | "suggestions";
 
@@ -578,377 +578,354 @@ export default function FeedbackPage({
         {locationMessage}
       </p>
 
-      <Group
-        className={styles.workbench}
-        data-feedback-workbench
-        defaultLayout={{ "feedback-source": 58, "feedback-suggestions": 42 }}
-        id="feedback-report-panels"
-        orientation="horizontal"
-        data-testid="feedback-workbench"
-      >
-        <Panel
-          className={`${styles.resizablePanel} ${styles.sourcePanel} ${
-            mobilePane === "source" ? styles.mobilePanelActive : ""
+      <ResponsiveReport>
+        <section
+          aria-label={text("原题与作文原文", "Task and original essay")}
+          className={`${styles.sourcePane} ${
+            mobilePane === "source" ? styles.mobileActive : ""
           }`}
-          defaultSize="58%"
-          id="feedback-source"
-          minSize={420}
+          data-essay-pane
+          data-testid="feedback-source-pane"
+          id="feedback-source-panel"
         >
-          <section
-            aria-label={text("原题与作文原文", "Task and original essay")}
-            className={`${styles.sourcePane} ${
-              mobilePane === "source" ? styles.mobileActive : ""
-            }`}
-            data-essay-pane
-            data-testid="feedback-source-pane"
-            id="feedback-source-panel"
-          >
-            <div className={styles.documentHeader}>
-              <h2>{text("原文", "Original essay")}</h2>
-              <span>
-                <LockKeyhole aria-hidden="true" size={14} />
-                {text("原样保留", "Preserved")}
-              </span>
-            </div>
+          <div className={styles.documentHeader}>
+            <h2>{text("原文", "Original essay")}</h2>
+            <span>
+              <LockKeyhole aria-hidden="true" size={14} />
+              {text("原样保留", "Preserved")}
+            </span>
+          </div>
 
-            <div className={styles.taskBlock}>
-              <span>{text("原题", "Original task")}</span>
-              <p lang="en">{data.prompt}</p>
-            </div>
+          <div className={styles.taskBlock}>
+            <span>{text("原题", "Original task")}</span>
+            <p lang="en">{data.prompt}</p>
+          </div>
 
-            <div className={styles.essay} data-feedback-essay lang="en">
-              {paragraphLayout.chunks.map((chunk) => {
-                const paragraphFeedback = paragraphFeedbackByIndex.get(
-                  chunk.index,
-                );
-                const chunkSegments = buildFeedbackSegments(
-                  chunk.text,
-                  issuesInChunk(chunk),
-                );
-                return (
-                  <Fragment key={`paragraph-${chunk.index}`}>
-                    {chunk.leading ? <span>{chunk.leading}</span> : null}
-                    {chunkSegments.map((segment, index) =>
-                      renderSourceSegment(segment, index),
-                    )}
-                    {paragraphFeedback ? (
-                      <div
-                        className={`${styles.paragraphReview} ${styles.inlineParagraphReview}`}
-                      >
-                        <details>
-                          <summary>
-                            <span>{paragraphFeedback.paragraphIndex}</span>
-                            <b>
-                              {text(
-                                paragraphFeedback.roleZh,
-                                paragraphFeedback.roleEn,
-                              )}
-                            </b>
-                            <ChevronDown aria-hidden="true" size={15} />
-                          </summary>
-                          {paragraphFeedback.revisionZh ||
-                          paragraphFeedback.revisionEn ? (
-                            <div className={styles.paragraphRevision}>
-                              <p className="eyebrow">
-                                {text("参考改写", "Polished revision")}
-                              </p>
-                              <blockquote lang="en">
-                                {text(
-                                  paragraphFeedback.revisionZh ??
-                                    paragraphFeedback.excerpt,
-                                  paragraphFeedback.revisionEn ??
-                                    paragraphFeedback.excerpt,
-                                )}
-                              </blockquote>
-                            </div>
-                          ) : (
+          <div className={styles.essay} data-feedback-essay lang="en">
+            {paragraphLayout.chunks.map((chunk) => {
+              const paragraphFeedback = paragraphFeedbackByIndex.get(
+                chunk.index,
+              );
+              const chunkSegments = buildFeedbackSegments(
+                chunk.text,
+                issuesInChunk(chunk),
+              );
+              return (
+                <Fragment key={`paragraph-${chunk.index}`}>
+                  {chunk.leading ? <span>{chunk.leading}</span> : null}
+                  {chunkSegments.map((segment, index) =>
+                    renderSourceSegment(segment, index),
+                  )}
+                  {paragraphFeedback ? (
+                    <div
+                      className={`${styles.paragraphReview} ${styles.inlineParagraphReview}`}
+                    >
+                      <details>
+                        <summary>
+                          <span>{paragraphFeedback.paragraphIndex}</span>
+                          <b>
+                            {text(
+                              paragraphFeedback.roleZh,
+                              paragraphFeedback.roleEn,
+                            )}
+                          </b>
+                          <ChevronDown aria-hidden="true" size={15} />
+                        </summary>
+                        {paragraphFeedback.revisionZh ||
+                        paragraphFeedback.revisionEn ? (
+                          <div className={styles.paragraphRevision}>
+                            <p className="eyebrow">
+                              {text("参考改写", "Polished revision")}
+                            </p>
                             <blockquote lang="en">
-                              {paragraphFeedback.excerpt}
+                              {text(
+                                paragraphFeedback.revisionZh ??
+                                  paragraphFeedback.excerpt,
+                                paragraphFeedback.revisionEn ??
+                                  paragraphFeedback.excerpt,
+                              )}
                             </blockquote>
+                          </div>
+                        ) : (
+                          <blockquote lang="en">
+                            {paragraphFeedback.excerpt}
+                          </blockquote>
+                        )}
+                        <p>
+                          {text(
+                            paragraphFeedback.diagnosisZh,
+                            paragraphFeedback.diagnosisEn,
                           )}
+                        </p>
+                        <div>
+                          <PenLine aria-hidden="true" size={15} />
+                          <span>
+                            <strong>
+                              {text("怎么改：", "Revision action: ")}
+                            </strong>
+                            {text(
+                              paragraphFeedback.actionZh,
+                              paragraphFeedback.actionEn,
+                            )}
+                          </span>
+                        </div>
+                      </details>
+                    </div>
+                  ) : null}
+                </Fragment>
+              );
+            })}
+            {paragraphLayout.trailing ? (
+              <span>{paragraphLayout.trailing}</span>
+            ) : null}
+          </div>
+
+          {data.paragraphFeedback.length === 0 ? (
+            <div className={styles.paragraphReview}>
+              <h3>{text("逐段诊断", "Paragraph review")}</h3>
+              <p className={styles.emptyCopy}>
+                {text(
+                  "本轮暂未生成段落诊断。",
+                  "Paragraph-level feedback is not available for this attempt.",
+                )}
+              </p>
+            </div>
+          ) : null}
+        </section>
+        <aside
+          aria-label={text("逐句修改建议", "Sentence-level suggestions")}
+          className={`${styles.suggestionPane} ${
+            mobilePane === "suggestions" ? styles.mobileActive : ""
+          }`}
+          data-suggestion-panel
+          data-testid="feedback-suggestion-pane"
+          id="feedback-suggestion-panel"
+        >
+          <div className={styles.suggestionHeader}>
+            <h2>{text("修改建议", "Suggestions")}</h2>
+            <span>{data.issues.length}</span>
+          </div>
+
+          <div
+            className={styles.issueFilters}
+            role="group"
+            aria-label={text("筛选修改建议", "Filter suggestions")}
+          >
+            {(["all", "must_fix", "naturalness", "polish"] as const).map(
+              (filter) => {
+                const labels = {
+                  all: text("全部", "All"),
+                  must_fix: text("需要改正", "Corrections"),
+                  naturalness: text("表达提升", "Expression"),
+                  polish: text("可选润色", "Optional polish"),
+                };
+                const count =
+                  filter === "all"
+                    ? issues.length
+                    : issues.filter((issue) => feedbackGroup(issue) === filter)
+                        .length;
+                return (
+                  <button
+                    key={filter}
+                    type="button"
+                    aria-pressed={issueFilter === filter}
+                    onClick={() => setIssueFilter(filter)}
+                  >
+                    {labels[filter]} <span>{count}</span>
+                  </button>
+                );
+              },
+            )}
+          </div>
+          {issueFilter === "polish" ? (
+            <p className={styles.filterHelp}>
+              {text(
+                "这里是可选的表达建议，不代表原句有错。",
+                "These are optional choices; the original wording is not necessarily wrong.",
+              )}
+            </p>
+          ) : null}
+
+          <div className={styles.issueList}>
+            {visibleIssues.length > 0 ? (
+              visibleIssues.map((issue) => {
+                const active = selectedIssueId === issue.id;
+                const isTarget = data.targetIssueId === issue.id;
+                const canLocate = highlightableIds.has(issue.id);
+                return (
+                  <article
+                    className={styles.issueCard}
+                    data-active={active ? "true" : "false"}
+                    id={`feedback-issue-card-${issue.id}`}
+                    key={issue.id}
+                    ref={(node) => {
+                      cardRefs.current[issue.id] = node;
+                    }}
+                  >
+                    <button
+                      aria-controls={`feedback-issue-details-${issue.id}${
+                        canLocate ? ` feedback-highlight-${issue.id}` : ""
+                      }`}
+                      aria-current={active ? "true" : undefined}
+                      aria-expanded={active}
+                      className={styles.issueTrigger}
+                      data-issue-card={issue.id}
+                      data-feedback-issue={issue.id}
+                      onClick={() => activateSuggestion(issue.id)}
+                      type="button"
+                    >
+                      <span className={styles.issueNumber}>
+                        {issue.priority}
+                      </span>
+                      <span className={styles.issueSummary}>
+                        <span className={styles.issueLabels}>
+                          <span data-tone={feedbackGroup(issue)}>
+                            {feedbackGroup(issue) === "must_fix"
+                              ? text("需要改正", "Fix this")
+                              : feedbackGroup(issue) === "naturalness"
+                                ? text("表达更自然", "More natural")
+                                : text("可选润色", "Optional polish")}
+                          </span>
+                          {isTarget ? (
+                            <span className={styles.focusTarget}>
+                              <Sparkles aria-hidden="true" size={12} />
+                              {text("本次专项重点", "Focused teaching target")}
+                            </span>
+                          ) : null}
+                        </span>
+                        <strong>{text(issue.titleZh, issue.titleEn)}</strong>
+                        <span
+                          aria-hidden="true"
+                          className={styles.evidenceRelation}
+                          data-feedback-evidence
+                        >
+                          <EvidenceLink
+                            label={text("修改建议", "Suggestion")}
+                            state="revision"
+                          >
+                            <span lang="en">{issue.evidence}</span>
+                          </EvidenceLink>
+                        </span>
+                        <small className="sr-only" lang="en">
+                          {issue.evidence}
+                        </small>
+                      </span>
+                      <ChevronDown aria-hidden="true" size={17} />
+                    </button>
+
+                    <div
+                      className={styles.issueDetails}
+                      hidden={!active}
+                      id={`feedback-issue-details-${issue.id}`}
+                    >
+                      <div className={styles.detailBlock}>
+                        <span>
+                          <Languages aria-hidden="true" size={15} />
+                          {feedbackGroup(issue) === "polish"
+                            ? text(
+                                "这项建议的作用",
+                                "What this suggestion offers",
+                              )
+                            : text("为什么要改", "Why it needs revision")}
+                        </span>
+                        <p>{text(issue.explanationZh, issue.explanationEn)}</p>
+                      </div>
+                      <div className={styles.revisionBlock}>
+                        <span>{text("参考改法", "Improved version")}</span>
+                        <p lang="en">{issue.correctedVersion}</p>
+                      </div>
+                      <div className={styles.detailBlock}>
+                        <span>
+                          <Info aria-hidden="true" size={15} />
+                          {text("记住这个知识点", "Knowledge to retain")}
+                        </span>
+                        <p>{issue.knowledgePointZh}</p>
+                      </div>
+                      <div className={styles.transferBlock}>
+                        <Target aria-hidden="true" size={15} />
+                        <p>
+                          <strong>
+                            {text("下次这样用：", "Use it next time: ")}
+                          </strong>
+                          {text(issue.transferRuleZh, issue.transferRuleEn)}
+                        </p>
+                      </div>
+                      {isTarget ? (
+                        <details className={styles.focusReason}>
+                          <summary>
+                            <Sparkles aria-hidden="true" size={15} />
+                            {text(
+                              "为什么把这处作为专项重点",
+                              "Why this is the focused teaching target",
+                            )}
+                          </summary>
                           <p>
                             {text(
-                              paragraphFeedback.diagnosisZh,
-                              paragraphFeedback.diagnosisEn,
+                              "编号表示本篇的纠错顺序；“本次专项重点”则选择最值得带到其他题目继续练的能力。",
+                              "Numbers show the correction order for this essay; the focused teaching target is the skill most worth transferring to other tasks.",
                             )}
                           </p>
-                          <div>
-                            <PenLine aria-hidden="true" size={15} />
-                            <span>
-                              <strong>
-                                {text("怎么改：", "Revision action: ")}
-                              </strong>
-                              {text(
-                                paragraphFeedback.actionZh,
-                                paragraphFeedback.actionEn,
-                              )}
-                            </span>
-                          </div>
                         </details>
-                      </div>
-                    ) : null}
-                  </Fragment>
+                      ) : null}
+                      {canLocate ? (
+                        <button
+                          className={styles.locateButton}
+                          onClick={() => showIssueInSource(issue.id)}
+                          type="button"
+                        >
+                          <LocateFixed aria-hidden="true" size={15} />
+                          {text("在原文中查看", "View in original")}
+                        </button>
+                      ) : (
+                        <p className={styles.unlocatedNote}>
+                          {text(
+                            "这条建议来自整段分析，原文中没有可安全标出的单一位置。",
+                            "This suggestion comes from paragraph-level analysis, so there is no single source span to highlight safely.",
+                          )}
+                        </p>
+                      )}
+                    </div>
+                  </article>
                 );
-              })}
-              {paragraphLayout.trailing ? (
-                <span>{paragraphLayout.trailing}</span>
-              ) : null}
-            </div>
-
-            {data.paragraphFeedback.length === 0 ? (
-              <div className={styles.paragraphReview}>
-                <h3>{text("逐段诊断", "Paragraph review")}</h3>
-                <p className={styles.emptyCopy}>
+              })
+            ) : (
+              <div className={styles.emptySuggestions}>
+                <CheckCircle2 aria-hidden="true" size={22} />
+                <p>
                   {text(
-                    "本轮暂未生成段落诊断。",
-                    "Paragraph-level feedback is not available for this attempt.",
+                    "这里没有需要查看的建议，可以切换分类或继续阅读。",
+                    "There are no suggestions in this view. Choose another category or keep reading.",
                   )}
                 </p>
               </div>
-            ) : null}
-          </section>
-        </Panel>
+            )}
+          </div>
 
-        <Separator
-          aria-label={text("调整原文与修改建议宽度", "Resize report columns")}
-          className={styles.resizeHandle}
-          id="feedback-column-separator"
-        >
-          <span aria-hidden="true" />
-        </Separator>
-
-        <Panel
-          className={`${styles.resizablePanel} ${styles.suggestionPanel} ${
-            mobilePane === "suggestions" ? styles.mobilePanelActive : ""
-          }`}
-          defaultSize="42%"
-          id="feedback-suggestions"
-          minSize={340}
-        >
-          <aside
-            aria-label={text("逐句修改建议", "Sentence-level suggestions")}
-            className={`${styles.suggestionPane} ${
-              mobilePane === "suggestions" ? styles.mobileActive : ""
-            }`}
-            data-suggestion-panel
-            data-testid="feedback-suggestion-pane"
-            id="feedback-suggestion-panel"
-          >
-            <div className={styles.suggestionHeader}>
-              <h2>{text("修改建议", "Suggestions")}</h2>
-              <span>{data.issues.length}</span>
-            </div>
-
-            <div
-              className={styles.issueFilters}
-              role="group"
-              aria-label={text("筛选修改建议", "Filter suggestions")}
-            >
-              {(["all", "must_fix", "naturalness", "polish"] as const).map(
-                (filter) => {
-                  const labels = {
-                    all: text("全部", "All"),
-                    must_fix: text("需要改正", "Corrections"),
-                    naturalness: text("表达提升", "Expression"),
-                    polish: text("可选润色", "Optional polish"),
-                  };
-                  const count =
-                    filter === "all"
-                      ? issues.length
-                      : issues.filter(
-                          (issue) => feedbackGroup(issue) === filter,
-                        ).length;
-                  return (
-                    <button
-                      key={filter}
-                      type="button"
-                      aria-pressed={issueFilter === filter}
-                      onClick={() => setIssueFilter(filter)}
-                    >
-                      {labels[filter]} <span>{count}</span>
-                    </button>
-                  );
-                },
-              )}
-            </div>
-            {issueFilter === "polish" ? (
-              <p className={styles.filterHelp}>
+          <div className={styles.leakCheck}>
+            <h3>{text("基础漏洞速查", "Basic accuracy check")}</h3>
+            {grammarLeaks.length > 0 ? (
+              <ul>
+                {grammarLeaks.map((issue) => (
+                  <li key={`leak-${issue.id}`}>
+                    <CheckCircle2 aria-hidden="true" size={14} />
+                    <span>
+                      <b lang="en">{issue.evidence}</b>
+                      {issue.knowledgePointZh}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p>
                 {text(
-                  "这里是可选的表达建议，不代表原句有错。",
-                  "These are optional choices; the original wording is not necessarily wrong.",
+                  "本轮未识别出需要单独列出的基础语法或拼写问题。",
+                  "No foundational grammar or spelling issue needs a separate note this time.",
                 )}
               </p>
-            ) : null}
-
-            <div className={styles.issueList}>
-              {visibleIssues.length > 0 ? (
-                visibleIssues.map((issue) => {
-                  const active = selectedIssueId === issue.id;
-                  const isTarget = data.targetIssueId === issue.id;
-                  const canLocate = highlightableIds.has(issue.id);
-                  return (
-                    <article
-                      className={styles.issueCard}
-                      data-active={active ? "true" : "false"}
-                      id={`feedback-issue-card-${issue.id}`}
-                      key={issue.id}
-                      ref={(node) => {
-                        cardRefs.current[issue.id] = node;
-                      }}
-                    >
-                      <button
-                        aria-controls={`feedback-issue-details-${issue.id}${
-                          canLocate ? ` feedback-highlight-${issue.id}` : ""
-                        }`}
-                        aria-current={active ? "true" : undefined}
-                        aria-expanded={active}
-                        className={styles.issueTrigger}
-                        data-issue-card={issue.id}
-                        data-feedback-issue={issue.id}
-                        onClick={() => activateSuggestion(issue.id)}
-                        type="button"
-                      >
-                        <span className={styles.issueNumber}>
-                          {issue.priority}
-                        </span>
-                        <span className={styles.issueSummary}>
-                          <span className={styles.issueLabels}>
-                            <span data-tone={feedbackGroup(issue)}>
-                              {feedbackGroup(issue) === "must_fix"
-                                ? text("需要改正", "Fix this")
-                                : feedbackGroup(issue) === "naturalness"
-                                  ? text("表达更自然", "More natural")
-                                  : text("可选润色", "Optional polish")}
-                            </span>
-                            {isTarget ? (
-                              <span className={styles.focusTarget}>
-                                <Sparkles aria-hidden="true" size={12} />
-                                {text(
-                                  "本次专项重点",
-                                  "Focused teaching target",
-                                )}
-                              </span>
-                            ) : null}
-                          </span>
-                          <strong>{text(issue.titleZh, issue.titleEn)}</strong>
-                          <span
-                            aria-hidden="true"
-                            className={styles.evidenceRelation}
-                            data-feedback-evidence
-                          >
-                            <EvidenceLink
-                              label={text("修改建议", "Suggestion")}
-                              state="revision"
-                            >
-                              <span lang="en">{issue.evidence}</span>
-                            </EvidenceLink>
-                          </span>
-                          <small className="sr-only" lang="en">
-                            {issue.evidence}
-                          </small>
-                        </span>
-                        <ChevronDown aria-hidden="true" size={17} />
-                      </button>
-
-                      <div
-                        className={styles.issueDetails}
-                        hidden={!active}
-                        id={`feedback-issue-details-${issue.id}`}
-                      >
-                        <div className={styles.detailBlock}>
-                          <span>
-                            <Languages aria-hidden="true" size={15} />
-                            {feedbackGroup(issue) === "polish"
-                              ? text(
-                                  "这项建议的作用",
-                                  "What this suggestion offers",
-                                )
-                              : text("为什么要改", "Why it needs revision")}
-                          </span>
-                          <p>
-                            {text(issue.explanationZh, issue.explanationEn)}
-                          </p>
-                        </div>
-                        <div className={styles.revisionBlock}>
-                          <span>{text("参考改法", "Improved version")}</span>
-                          <p lang="en">{issue.correctedVersion}</p>
-                        </div>
-                        <div className={styles.detailBlock}>
-                          <span>
-                            <Info aria-hidden="true" size={15} />
-                            {text("记住这个知识点", "Knowledge to retain")}
-                          </span>
-                          <p>{issue.knowledgePointZh}</p>
-                        </div>
-                        <div className={styles.transferBlock}>
-                          <Target aria-hidden="true" size={15} />
-                          <p>
-                            <strong>
-                              {text("下次这样用：", "Use it next time: ")}
-                            </strong>
-                            {text(issue.transferRuleZh, issue.transferRuleEn)}
-                          </p>
-                        </div>
-                        {canLocate ? (
-                          <button
-                            className={styles.locateButton}
-                            onClick={() => showIssueInSource(issue.id)}
-                            type="button"
-                          >
-                            <LocateFixed aria-hidden="true" size={15} />
-                            {text("在原文中查看", "View in original")}
-                          </button>
-                        ) : (
-                          <p className={styles.unlocatedNote}>
-                            {text(
-                              "这条建议来自整段分析，原文中没有可安全标出的单一位置。",
-                              "This suggestion comes from paragraph-level analysis, so there is no single source span to highlight safely.",
-                            )}
-                          </p>
-                        )}
-                      </div>
-                    </article>
-                  );
-                })
-              ) : (
-                <div className={styles.emptySuggestions}>
-                  <CheckCircle2 aria-hidden="true" size={22} />
-                  <p>
-                    {text(
-                      "这里没有需要查看的建议，可以切换分类或继续阅读。",
-                      "There are no suggestions in this view. Choose another category or keep reading.",
-                    )}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            <div className={styles.leakCheck}>
-              <h3>{text("基础漏洞速查", "Basic accuracy check")}</h3>
-              {grammarLeaks.length > 0 ? (
-                <ul>
-                  {grammarLeaks.map((issue) => (
-                    <li key={`leak-${issue.id}`}>
-                      <CheckCircle2 aria-hidden="true" size={14} />
-                      <span>
-                        <b lang="en">{issue.evidence}</b>
-                        {issue.knowledgePointZh}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p>
-                  {text(
-                    "本轮未识别出需要单独列出的基础语法或拼写问题。",
-                    "No foundational grammar or spelling issue needs a separate note this time.",
-                  )}
-                </p>
-              )}
-            </div>
-          </aside>
-        </Panel>
-      </Group>
+            )}
+          </div>
+        </aside>
+      </ResponsiveReport>
 
       <Card className={styles.nextStepCard}>
         <span className={styles.nextStepIcon}>

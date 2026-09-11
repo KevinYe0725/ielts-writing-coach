@@ -43,6 +43,7 @@ test.describe("document workspace navigation", () => {
   }) => {
     await page.goto("/write?cycle=cycle-demo");
     const trigger = page.getByRole("button", { name: "切换作文" });
+    await expect(trigger).toBeEnabled();
     await trigger.click();
     const dialog = page.getByRole("dialog", { name: "切换作文" });
     const search = dialog.getByRole("combobox");

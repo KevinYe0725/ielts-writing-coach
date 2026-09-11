@@ -505,6 +505,9 @@
   .mainContent {
     padding: 24px 16px 64px;
   }
+  .entryMain {
+    padding: 24px 16px 48px;
+  }
   .morePanel {
     top: calc(100% + 8px);
   }
