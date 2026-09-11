@@ -305,7 +305,7 @@ export function PublicHome() {
               returnFocus.current?.focus();
             }}
           >
-            <Dialog.Title className={styles.authTitle} id="signin-title">
+            <Dialog.Title className={styles.authTitle}>
               {mode === "login"
                 ? text("欢迎回来", "Welcome back")
                 : text("创建你的学习账号", "Create your learning account")}

@@ -86,6 +86,7 @@ test("public page leads with the product and opens accessible account entry", as
   const login = page.getByRole("button", { name: "登录", exact: true });
   await login.click();
   const dialog = page.getByRole("dialog");
+  await expect(dialog).toHaveAccessibleName("欢迎回来");
   await expect(dialog.getByLabel("邮箱", { exact: true })).toBeFocused();
   await expect(
     dialog.getByRole("link", { name: "忘记密码？" }),
@@ -94,6 +95,7 @@ test("public page leads with the product and opens accessible account entry", as
   await expect(dialog).toBeHidden();
   await expect(login).toBeFocused();
   await page.getByRole("button", { name: "注册", exact: true }).click();
+  await expect(dialog).toHaveAccessibleName("创建你的学习账号");
   await expect(
     dialog.getByRole("heading", { name: "创建你的学习账号" }),
   ).toBeVisible();
