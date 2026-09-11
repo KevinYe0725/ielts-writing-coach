@@ -650,6 +650,11 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
     await expect(mark).toHaveAttribute("role", "button");
     await expect(mark).toHaveAttribute("data-annotation-kind", "development");
 
+    // Compare activation geometry using the same loaded font. A fallback-to-
+    // Source Serif swap can change glyph boxes and wrapping without any hover
+    // or selection layout change.
+    await page.evaluate(() => document.fonts.ready);
+
     const before = await mark.evaluate((element) => {
       const essayRect = element
         .closest("[data-feedback-essay]")!
