@@ -426,7 +426,7 @@
 }
 
 .topbar :global(.writing-title-group > strong) {
-  color: color-mix(in srgb, var(--desk-ink) 68%, transparent);
+  color: var(--desk-ink-muted);
 }
 
 .topbar :global(.badge) {
@@ -536,7 +536,7 @@
 }
 
 .prompt :global(.exam-rules) {
-  color: color-mix(in srgb, var(--desk-ink) 66%, transparent);
+  color: var(--desk-ink-muted);
   border-color: color-mix(in srgb, var(--desk-ink) 14%, transparent);
 }
 
@@ -596,7 +596,7 @@
 }
 
 .editor :global(.editor-heading label) {
-  color: color-mix(in srgb, var(--desk-ink) 68%, transparent);
+  color: var(--desk-ink-muted);
 }
 
 .editor :global(.word-count) {

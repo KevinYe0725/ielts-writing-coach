@@ -131,7 +131,7 @@
   display: -webkit-box;
   margin: 0;
   overflow: hidden;
-  color: color-mix(in srgb, var(--desk-ink) 62%, transparent);
+  color: var(--desk-ink-muted);
   font-size: var(--desk-type-label);
   line-height: 1.45;
   -webkit-box-orient: vertical;
@@ -147,7 +147,7 @@
   display: flex;
   max-width: 660px;
   padding: var(--desk-space-6);
-  color: color-mix(in srgb, var(--desk-ink) 62%, transparent);
+  color: var(--desk-ink-muted);
   align-items: flex-start;
   gap: var(--desk-space-4);
 }
@@ -215,7 +215,7 @@
 .compactLoading {
   display: flex;
   padding: var(--desk-space-6) 0 var(--desk-space-2);
-  color: color-mix(in srgb, var(--desk-ink) 68%, transparent);
+  color: var(--desk-ink-muted);
   align-items: center;
   gap: var(--desk-space-2);
 }

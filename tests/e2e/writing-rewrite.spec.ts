@@ -151,11 +151,11 @@ test.describe("timed writing rooms", () => {
     await expect(submissionToast).toBeVisible();
     await expect(submissionToast).toHaveCSS(
       "background-color",
-      "rgb(29, 86, 160)",
+      "rgb(7, 117, 129)",
     );
     await expect(submissionToast).not.toHaveCSS(
       "background-color",
-      "rgb(47, 109, 90)",
+      "rgb(47, 125, 90)",
     );
 
     await expect(page).toHaveURL(/\/feedback\?cycle=cycle-demo$/);

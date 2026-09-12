@@ -598,7 +598,7 @@
   display: grid;
   min-width: 0;
   padding: var(--desk-space-2) var(--desk-space-4);
-  color: color-mix(in srgb, var(--desk-ink) 72%, transparent);
+  color: var(--desk-ink-muted);
   border-right: 1px solid color-mix(in srgb, var(--desk-ink) 12%, transparent);
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;

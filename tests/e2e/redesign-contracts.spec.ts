@@ -745,11 +745,11 @@ test.describe("annotation desk redesign contracts", () => {
 
     await expect(page.getByText("已自动保存", { exact: true })).toHaveCSS(
       "color",
-      "rgb(23, 32, 51)",
+      "rgb(18, 51, 48)",
     );
     await expect(
       page.getByText("Version 2 · 闭卷重写", { exact: true }),
-    ).toHaveCSS("color", "rgb(29, 86, 160)");
+    ).toHaveCSS("color", "rgb(7, 117, 129)");
     await expect(page.locator(".writing-prompt")).toHaveCSS(
       "background-image",
       "none",
@@ -767,7 +767,7 @@ test.describe("annotation desk redesign contracts", () => {
       );
     await expect(page.getByText("250 词", { exact: true })).toHaveCSS(
       "color",
-      "rgb(29, 86, 160)",
+      "rgb(7, 117, 129)",
     );
   });
 
@@ -1121,7 +1121,7 @@ test.describe("annotation desk redesign contracts", () => {
 
     const chineseStrong = page
       .locator('[data-teaching-block="MARKDOWN"] strong')
-      .filter({ hasText: "核心判断" })
+      .filter({ hasText: /机制说明中间发生了什么变化|核心判断/ })
       .first();
     await expect(chineseStrong).toBeVisible();
     const chineseFont = await chineseStrong.evaluate((element) => {

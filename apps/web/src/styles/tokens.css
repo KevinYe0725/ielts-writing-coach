@@ -1,19 +1,19 @@
 :root {
-  /* Approved base palette. Derived colors below must resolve from these roles. */
-  --desk-ink: #172033;
+  /* Fresh reading palette: sea-glass canvas, clear ink, and a cool teal action. */
+  --desk-ink: #123330;
   --desk-paper: #ffffff;
-  --desk-canvas: #f6f8fb;
-  --desk-blue: #1d56a0;
-  --desk-green: #2f6d5a;
+  --desk-canvas: #f3faf7;
+  --desk-blue: #077581;
+  --desk-green: #2f7d5a;
   --desk-amber: #7c531b;
   --desk-error: #b4474c;
   --desk-error-strong: #9f3840;
   --desk-evidence-muted: color-mix(
     in srgb,
-    var(--desk-ink) 64%,
+    var(--desk-ink) 76%,
     var(--desk-canvas)
   );
-  --desk-ink-muted: color-mix(in srgb, var(--desk-ink) 72%, var(--desk-canvas));
+  --desk-ink-muted: color-mix(in srgb, var(--desk-ink) 80%, var(--desk-canvas));
   --desk-line: color-mix(in srgb, var(--desk-ink) 14%, transparent);
   --desk-line-strong: color-mix(in srgb, var(--desk-ink) 24%, transparent);
   --desk-blue-soft: color-mix(in srgb, var(--desk-blue) 11%, var(--desk-paper));

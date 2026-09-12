@@ -377,11 +377,11 @@ describe("annotation desk token contract", () => {
   it("declares the complete approved role and scale tokens", () => {
     const defined = customProperties(tokensRoot);
     const expected = {
-      "--desk-ink": "#172033",
+      "--desk-ink": "#123330",
       "--desk-paper": "#ffffff",
-      "--desk-canvas": "#f6f8fb",
-      "--desk-blue": "#1d56a0",
-      "--desk-green": "#2f6d5a",
+      "--desk-canvas": "#f3faf7",
+      "--desk-blue": "#077581",
+      "--desk-green": "#2f7d5a",
       "--desk-amber": "#7c531b",
       "--desk-error": "#b4474c",
       "--desk-type-auxiliary": "12px",
@@ -445,6 +445,44 @@ describe("annotation desk token contract", () => {
     ]) {
       expect(defined.get(property), property).toMatch(/^color-mix\(/u);
     }
+  });
+
+  it("keeps the fresh palette readable and semantically separated", () => {
+    const defined = customProperties(tokensRoot);
+    const hex = (property: string) => {
+      const value = defined.get(property);
+      expect(value, property).toMatch(/^#[0-9a-f]{6}$/u);
+      return value!.slice(1);
+    };
+    const channel = (value: string, offset: number) =>
+      Number.parseInt(value.slice(offset, offset + 2), 16) / 255;
+    const luminance = (value: string) => {
+      const linear = (channelValue: number) =>
+        channelValue <= 0.03928
+          ? channelValue / 12.92
+          : ((channelValue + 0.055) / 1.055) ** 2.4;
+      return (
+        linear(channel(value, 0)) * 0.2126 +
+        linear(channel(value, 2)) * 0.7152 +
+        linear(channel(value, 4)) * 0.0722
+      );
+    };
+    const contrast = (foreground: string, background: string) => {
+      const light = Math.max(luminance(foreground), luminance(background));
+      const dark = Math.min(luminance(foreground), luminance(background));
+      return (light + 0.05) / (dark + 0.05);
+    };
+    const ink = hex("--desk-ink");
+    const paper = hex("--desk-paper");
+    const canvas = hex("--desk-canvas");
+    const action = hex("--desk-blue");
+    const success = hex("--desk-green");
+    expect(contrast(ink, canvas)).toBeGreaterThanOrEqual(7);
+    expect(contrast(ink, paper)).toBeGreaterThanOrEqual(7);
+    expect(contrast(paper, action)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(action, canvas)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(success, paper)).toBeGreaterThanOrEqual(4.5);
+    expect(action).not.toBe(success);
   });
 
   it("keeps all typography roles in the approved token system", () => {

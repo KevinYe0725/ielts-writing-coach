@@ -264,7 +264,7 @@
 
 .archiveHeading > p:last-child {
   margin: 0;
-  color: color-mix(in srgb, var(--desk-ink) 68%, transparent);
+  color: var(--desk-ink-muted);
   font-size: var(--desk-type-label);
   line-height: 1.65;
 }

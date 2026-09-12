@@ -626,7 +626,7 @@ test.describe("secure administration surfaces", () => {
 
     const success = page.getByText(/加密实例备份已下载/);
     await expect(success).toHaveAttribute("data-backup-status", "success");
-    await expect(success).not.toHaveCSS("color", "rgb(47, 109, 90)");
+    await expect(success).not.toHaveCSS("color", "rgb(47, 125, 90)");
   });
 
   for (const viewport of [

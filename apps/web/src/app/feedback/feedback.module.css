@@ -218,7 +218,7 @@
 
 .scoreBadge span {
   margin-top: var(--desk-space-2);
-  color: color-mix(in srgb, var(--desk-ink) 76%, transparent);
+  color: var(--desk-ink-muted);
   font-family: var(--desk-font-utility);
   font-size: var(--desk-type-auxiliary);
 }
@@ -283,7 +283,7 @@
 .criterionCard summary > span {
   display: flex;
   min-width: 0;
-  color: color-mix(in srgb, var(--desk-ink) 76%, transparent);
+  color: var(--desk-ink-muted);
   font-family: var(--desk-font-utility);
   font-size: var(--desk-type-auxiliary);
   flex-direction: column;
@@ -402,7 +402,7 @@
 .documentHeader > span {
   display: inline-flex;
   padding: var(--desk-space-2) var(--desk-space-3);
-  color: color-mix(in srgb, var(--desk-ink) 76%, transparent);
+  color: var(--desk-ink-muted);
   background: color-mix(in srgb, var(--desk-ink) 4%, var(--desk-paper));
   border-radius: var(--desk-radius-sm);
   font-family: var(--desk-font-utility);
@@ -559,7 +559,7 @@
 .paragraphReview blockquote {
   padding: var(--desk-space-3);
   margin: 0 var(--desk-space-3) var(--desk-space-3);
-  color: color-mix(in srgb, var(--desk-ink) 76%, transparent);
+  color: var(--desk-ink-muted);
   background: color-mix(in srgb, var(--desk-canvas) 54%, var(--desk-paper));
   border-left: 3px solid var(--desk-blue);
   font-family: var(--desk-font-reading);
@@ -578,7 +578,7 @@
   display: flex;
   padding: var(--desk-space-3);
   margin: 0 var(--desk-space-3) var(--desk-space-3);
-  color: color-mix(in srgb, var(--desk-ink) 78%, transparent);
+  color: var(--desk-ink-muted);
   background: color-mix(in srgb, var(--desk-blue) 7%, var(--desk-paper));
   border-radius: var(--desk-radius-sm);
   font-family: var(--desk-font-body);
@@ -767,7 +767,7 @@
 .detailBlock > span,
 .revisionBlock > span {
   display: flex;
-  color: color-mix(in srgb, var(--desk-ink) 68%, transparent);
+  color: var(--desk-ink-muted);
   font-family: var(--desk-font-utility);
   font-size: var(--desk-type-meta);
   font-weight: var(--desk-utility-weight-semibold);
@@ -971,13 +971,13 @@
 
 .nextStepCard p:not(:global(.eyebrow)) {
   margin: 0 0 var(--desk-space-2);
-  color: color-mix(in srgb, var(--desk-ink) 76%, transparent);
+  color: var(--desk-ink-muted);
   font-size: var(--desk-type-meta);
 }
 
 .duration {
   display: inline-flex;
-  color: color-mix(in srgb, var(--desk-ink) 76%, transparent);
+  color: var(--desk-ink-muted);
   font-family: var(--desk-font-utility);
   font-size: var(--desk-type-auxiliary);
   align-items: center;
