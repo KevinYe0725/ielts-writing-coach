@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
 
 import { deterministicDemo, resetDemoState } from "./support";
 
@@ -17,10 +18,35 @@ test.describe("course roadmap preview", () => {
     page,
   }) => {
     const roadmap = page.locator("[data-course-roadmap]");
-    await expect(roadmap.locator("[data-roadmap-node]")).toHaveCount(5);
+    await expect(roadmap.locator("[data-roadmap-unit]")).toHaveCount(3);
+    await expect(roadmap.locator("[data-roadmap-node]")).toHaveCount(12);
+    await expect(
+      roadmap.locator('[data-roadmap-node-kind="branch"]'),
+    ).toBeVisible();
+    await expect(
+      roadmap.locator('[data-roadmap-node-state="locked"]'),
+    ).toHaveCount(4);
+    await expect(
+      roadmap.locator(
+        '[data-roadmap-unit="notice"] [data-roadmap-unit-branch="false"]',
+      ),
+    ).toHaveCount(1);
+    await expect(
+      roadmap.locator(
+        '[data-roadmap-unit="build"] [data-roadmap-unit-branch="true"]',
+      ),
+    ).toHaveCount(1);
+    await expect(
+      roadmap.locator(
+        '[data-roadmap-unit="transfer"] [data-roadmap-unit-branch="false"]',
+      ),
+    ).toHaveCount(1);
     await expect(
       roadmap.locator('[data-roadmap-node="rewrite"] button'),
     ).toHaveAttribute("aria-current", "step");
+    await expect(
+      roadmap.locator('[data-roadmap-node="rewrite"] button'),
+    ).toHaveAttribute("aria-controls", "roadmap-node-details");
     await expect(roadmap.locator("[data-roadmap-details] h2")).toHaveText(
       "延迟重写",
     );
@@ -30,7 +56,7 @@ test.describe("course roadmap preview", () => {
 
     await roadmap.locator('[data-roadmap-node="feedback"] button').click();
     await expect(roadmap.locator("[data-roadmap-details] h2")).toHaveText(
-      "批改",
+      "看懂批改",
     );
     await expect(
       roadmap.locator('[data-roadmap-node="feedback"] button'),
@@ -41,6 +67,12 @@ test.describe("course roadmap preview", () => {
     await expect(roadmap.locator("[data-roadmap-details] a")).toHaveAttribute(
       "href",
       "/feedback?cycle=cycle-demo",
+    );
+
+    await roadmap.locator('[data-roadmap-node="mechanism"] button').focus();
+    await page.keyboard.press("Enter");
+    await expect(roadmap.locator("[data-roadmap-details] h2")).toHaveText(
+      "补上论证",
     );
   });
 
@@ -94,5 +126,12 @@ test.describe("course roadmap preview", () => {
     await page.locator('[data-roadmap-node="feedback"] button').click();
     await expect(details).toHaveAttribute("data-roadmap-motion", "reduced");
     await expect(details).toHaveCSS("transform", "none");
+  });
+
+  test("keeps the learning map accessible", async ({ page }) => {
+    const scan = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+      .analyze();
+    expect(scan.violations).toEqual([]);
   });
 });
