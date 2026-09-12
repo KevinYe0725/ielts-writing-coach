@@ -28,6 +28,7 @@ import type {
 } from "@/lib/client/types";
 
 import styles from "./page.module.css";
+import { placeTeachingPractices } from "./teaching-practice-placement";
 
 const ANALYSIS_POLL_INTERVAL_MS = 350;
 const ANALYSIS_MAX_POLL_ATTEMPTS = 75;
@@ -210,6 +211,7 @@ function AnalysisDetails({ analysis }: { analysis: TeachingPracticeAnalysis }) {
 
 function PracticePrompt({
   prompt,
+  inline = false,
   view,
   onDraft,
   onSubmit,
@@ -218,6 +220,7 @@ function PracticePrompt({
   onToggleRewrite,
 }: {
   prompt: TeachingPracticePrompt;
+  inline?: boolean;
   view: PracticeView;
   onDraft: (answer: string) => void;
   onSubmit: () => void;
@@ -255,9 +258,20 @@ function PracticePrompt({
   };
 
   return (
-    <div className={styles.practicePrompt} data-teaching-practice ref={rootRef}>
+    <div
+      className={styles.practicePrompt}
+      data-teaching-practice
+      data-inline={inline || undefined}
+      ref={rootRef}
+    >
       <div className={styles.practiceInstruction}>
-        <strong>{text(prompt.instructionZh, prompt.instructionEn)}</strong>
+        {inline ? (
+          <h3 tabIndex={-1}>
+            {text(prompt.instructionZh, prompt.instructionEn)}
+          </h3>
+        ) : (
+          <strong>{text(prompt.instructionZh, prompt.instructionEn)}</strong>
+        )}
         <p lang="en">{prompt.promptEn}</p>
       </div>
 
@@ -311,7 +325,9 @@ function PracticePrompt({
           type="button"
           variant="secondary"
         >
-          {text("提交并查看对照", "Submit and compare")}
+          {inline
+            ? text("看看我的思路", "Reflect on my answer")
+            : text("提交并查看对照", "Submit and compare")}
         </Button>
       ) : null}
 
@@ -322,21 +338,26 @@ function PracticePrompt({
           data-teaching-answer-review
         >
           <header>
-            <span>{text("提交后的对照", "Post-answer comparison")}</span>
+            {!inline ? (
+              <span>{text("提交后的对照", "Post-answer comparison")}</span>
+            ) : null}
             <h4
               data-teaching-answer-heading
               id={`teaching-answer-${prompt.id}`}
               tabIndex={-1}
             >
-              {text(
-                "你的答案与一种可行写法",
-                "Your answer and one possible approach",
-              )}
+              {inline
+                ? text("从你的这次表达说起", "Start with your answer")
+                : text(
+                    "你的答案与一种可行写法",
+                    "Your answer and one possible approach",
+                  )}
             </h4>
           </header>
           <div
             className={styles.answerComparison}
             data-teaching-answer-comparison
+            data-inline={inline || undefined}
           >
             <div className={styles.answerPanel}>
               <span>{text("你的首次答案", "Your first answer")}</span>
@@ -344,25 +365,34 @@ function PracticePrompt({
                 {view.submittedAnswer}
               </blockquote>
             </div>
-            <div className={styles.answerPanel}>
-              <span>{text("一种可行写法", "One possible approach")}</span>
-              <blockquote data-teaching-reference-answer lang="en">
-                {prompt.referenceAnswerEn}
-              </blockquote>
-            </div>
+            {!inline ? (
+              <div className={styles.answerPanel}>
+                <span>{text("一种可行写法", "One possible approach")}</span>
+                <blockquote data-teaching-reference-answer lang="en">
+                  {prompt.referenceAnswerEn}
+                </blockquote>
+              </div>
+            ) : null}
           </div>
-          <div
-            className={styles.referenceReasoning}
-            data-teaching-reference-reasoning
-          >
-            <Lightbulb aria-hidden="true" size={18} />
-            <div>
-              <strong>{text("这条思路怎样展开", "How this path works")}</strong>
-              <p>
-                {text(prompt.referenceReasoningZh, prompt.referenceReasoningEn)}
-              </p>
+          {!inline ? (
+            <div
+              className={styles.referenceReasoning}
+              data-teaching-reference-reasoning
+            >
+              <Lightbulb aria-hidden="true" size={18} />
+              <div>
+                <strong>
+                  {text("这条思路怎样展开", "How this path works")}
+                </strong>
+                <p>
+                  {text(
+                    prompt.referenceReasoningZh,
+                    prompt.referenceReasoningEn,
+                  )}
+                </p>
+              </div>
             </div>
-          </div>
+          ) : null}
 
           {displayState !== "reference" ? (
             <>
@@ -409,8 +439,8 @@ function PracticePrompt({
                   {displayState === "demo" ? (
                     <p>
                       {text(
-                        "当前只演示讲解会怎样呈现，不评价你的英文质量。你仍可先用上面的参考思路自行检查。",
-                        "This view only shows how an explanation may be presented; it does not judge your English. You can still self-check with the approach above.",
+                        "这是示例课程，不评价你的英文质量。可以展开参考写法，自行检查思路。",
+                        "This example course does not judge your English. Use the reference approach to check your reasoning.",
                       )}
                     </p>
                   ) : displayState === "ready" && analysis ? (
@@ -419,8 +449,8 @@ function PracticePrompt({
                     <div className={styles.unavailableAnalysis}>
                       <p>
                         {text(
-                          "进一步讲解暂时没有生成。这次没有足够依据勉强下结论；你的答案和参考思路都已保留，不影响继续学习。",
-                          "A closer explanation is not available yet. There is not enough basis to force a conclusion; your answer and the reference approach remain available, and you can keep learning.",
+                          "进一步讲解暂时不可用。答案仍在本页，可以先看参考思路或继续学习。",
+                          "The closer explanation is unavailable. Your answer remains on this page; you can use the reference or keep reading.",
                         )}
                       </p>
                       {canRetry ? (
@@ -486,6 +516,37 @@ function PracticePrompt({
                 </label>
               ) : null}
             </div>
+          ) : null}
+
+          {inline ? (
+            <details
+              className={styles.referenceDisclosure}
+              data-teaching-reference-disclosure
+            >
+              <summary>
+                {text(
+                  "一种写法，以及它为什么有效",
+                  "One approach, and why it works",
+                )}
+              </summary>
+              <div className={styles.answerPanel}>
+                <blockquote data-teaching-reference-answer lang="en">
+                  {prompt.referenceAnswerEn}
+                </blockquote>
+              </div>
+              <div
+                className={styles.referenceReasoning}
+                data-teaching-reference-reasoning
+              >
+                <Lightbulb aria-hidden="true" size={18} />
+                <p>
+                  {text(
+                    prompt.referenceReasoningZh,
+                    prompt.referenceReasoningEn,
+                  )}
+                </p>
+              </div>
+            </details>
           ) : null}
         </section>
       ) : null}
@@ -560,6 +621,9 @@ function sectionAnchors(
 
 function PracticePrompts({
   practicePrompts,
+  inline = false,
+  anchor = "teaching-practice-prompts",
+  continuation,
   practiceViews,
   onPracticeDraft,
   onPracticeSubmit,
@@ -568,6 +632,9 @@ function PracticePrompts({
   onToggleRewrite,
 }: {
   practicePrompts: readonly TeachingPracticePrompt[];
+  inline?: boolean;
+  anchor?: string;
+  continuation?: { href: string; zh: string; en: string };
   practiceViews: Readonly<Record<string, PracticeView>>;
   onPracticeDraft: (id: string, answer: string) => void;
   onPracticeSubmit: (prompt: TeachingPracticePrompt) => void;
@@ -580,22 +647,30 @@ function PracticePrompts({
     <section
       className={styles.practiceBlock}
       data-teaching-block="PRACTICE"
-      id="teaching-practice-prompts"
-      aria-labelledby="teaching-practice-heading"
+      id={anchor}
+      data-inline={inline || undefined}
+      aria-label={inline ? text("随堂练习", "Practice as you read") : undefined}
+      aria-labelledby={!inline ? "teaching-practice-heading" : undefined}
+      tabIndex={inline ? -1 : undefined}
     >
-      <h2 id="teaching-practice-heading" tabIndex={-1}>
-        {text("现在，换你试一试", "Now try it yourself")}
-      </h2>
-      <p className={styles.practiceLead}>
-        {text(
-          "先独立作答。提交后，你会立即看到自己的首次答案、另一种可行路径，以及针对这次表达的进一步讲解。",
-          "Answer independently. After submitting, compare your saved first answer with another viable path and a closer explanation of this attempt.",
-        )}
-      </p>
+      {!inline ? (
+        <>
+          <h2 id="teaching-practice-heading" tabIndex={-1}>
+            {text("现在，换你试一试", "Now try it yourself")}
+          </h2>
+          <p className={styles.practiceLead}>
+            {text(
+              "先独立作答。提交后，你会立即看到自己的首次答案、另一种可行路径，以及针对这次表达的进一步讲解。",
+              "Answer independently. After submitting, compare your saved first answer with another viable path and a closer explanation of this attempt.",
+            )}
+          </p>
+        </>
+      ) : null}
       <div className={styles.practiceList}>
         {practicePrompts.map((prompt) => (
           <PracticePrompt
             key={prompt.id}
+            inline={inline}
             onDraft={(answer) => onPracticeDraft(prompt.id, answer)}
             onRetry={() => onPracticeRetry(prompt)}
             onRewriteDraft={(answer) => onRewriteDraft(prompt.id, answer)}
@@ -606,6 +681,32 @@ function PracticePrompts({
           />
         ))}
       </div>
+      {continuation ? (
+        <a
+          className={styles.practiceContinue}
+          data-teaching-continue
+          href={continuation.href}
+          onClick={(event) => {
+            const destination = document.getElementById(
+              continuation.href.slice(1),
+            );
+            if (!destination) return;
+            event.preventDefault();
+            window.history.replaceState(
+              window.history.state,
+              "",
+              continuation.href,
+            );
+            destination.scrollIntoView({ behavior: "instant", block: "start" });
+            destination
+              .querySelector<HTMLElement>("h2")
+              ?.focus({ preventScroll: true });
+          }}
+        >
+          {text(continuation.zh, continuation.en)}{" "}
+          <ArrowRight aria-hidden="true" size={16} />
+        </a>
+      ) : null}
     </section>
   );
 }
@@ -629,6 +730,13 @@ function TeachingArticleContent({
   const practiceSignature = useMemo(
     () => practicePrompts.map((prompt) => prompt.id).join("|"),
     [practicePrompts],
+  );
+  const placement = useMemo(
+    () => placeTeachingPractices(practicePrompts, data.sections.length),
+    [practicePrompts, data.sections.length],
+  );
+  const firstInlineSection = placement.bySection.findIndex(
+    (group) => group.length > 0,
   );
   const [practiceViews, setPracticeViews] = useState<
     Record<string, PracticeView>
@@ -1044,13 +1152,18 @@ function TeachingArticleContent({
         <div className={styles.prose} data-teaching-prose>
           <Markdown>{data.introductionMarkdown}</Markdown>
         </div>
-        <a className={styles.practiceJump} href="#teaching-practice-prompts">
-          {text(
-            `读懂方法后，试做 ${practicePrompts.length} 道随堂练习`,
-            `After reading, try ${practicePrompts.length} short exercises`,
-          )}{" "}
-          <ArrowRight size={15} aria-hidden="true" />
-        </a>
+        <div className={styles.articleEntryActions}>
+          <a className={styles.practiceJump} href="#teaching-practice-prompts">
+            {text(
+              `动笔试试 · ${practicePrompts.length} 道随堂练习`,
+              `Try it yourself · ${practicePrompts.length} short exercises`,
+            )}{" "}
+            <ArrowRight size={15} aria-hidden="true" />
+          </a>
+          <ActionLink href={paperHref} variant="ghost">
+            {text("直接进入训练卷", "Go to the practice paper")}
+          </ActionLink>
+        </div>
       </header>
 
       <div className={styles.readingLayout} data-teaching-layout>
@@ -1073,29 +1186,67 @@ function TeachingArticleContent({
                 <div className={styles.sectionBlocks}>
                   <MarkdownSection section={section} />
                 </div>
+                {placement.bySection[sectionIndex]!.length > 0 ? (
+                  <PracticePrompts
+                    inline
+                    anchor={
+                      sectionIndex === firstInlineSection
+                        ? "teaching-practice-prompts"
+                        : `teaching-practice-after-${sectionIndex + 1}`
+                    }
+                    continuation={{
+                      href:
+                        sectionIndex < data.sections.length - 1
+                          ? `#${anchors[sectionIndex + 1]}`
+                          : "#teaching-paper-next",
+                      zh:
+                        sectionIndex < data.sections.length - 1
+                          ? "继续往下读"
+                          : "去试试独立运用",
+                      en:
+                        sectionIndex < data.sections.length - 1
+                          ? "Keep reading"
+                          : "Try using it independently",
+                    }}
+                    onPracticeDraft={updatePracticeDraft}
+                    onPracticeRetry={retryPractice}
+                    onPracticeSubmit={submitPractice}
+                    onRewriteDraft={updateRewriteDraft}
+                    onToggleRewrite={toggleRewrite}
+                    practicePrompts={placement.bySection[sectionIndex]!}
+                    practiceViews={practiceViews}
+                  />
+                ) : null}
               </section>
             );
           })}
 
-          <PracticePrompts
-            onPracticeDraft={updatePracticeDraft}
-            onPracticeRetry={retryPractice}
-            onPracticeSubmit={submitPractice}
-            onRewriteDraft={updateRewriteDraft}
-            onToggleRewrite={toggleRewrite}
-            practicePrompts={practicePrompts}
-            practiceViews={practiceViews}
-          />
+          {placement.trailing.length > 0 ? (
+            <PracticePrompts
+              anchor={
+                firstInlineSection < 0
+                  ? "teaching-practice-prompts"
+                  : "teaching-practice-trailing"
+              }
+              onPracticeDraft={updatePracticeDraft}
+              onPracticeRetry={retryPractice}
+              onPracticeSubmit={submitPractice}
+              onRewriteDraft={updateRewriteDraft}
+              onToggleRewrite={toggleRewrite}
+              practicePrompts={placement.trailing}
+              practiceViews={practiceViews}
+            />
+          ) : null}
 
-          <footer className={styles.articleActions}>
+          <footer className={styles.articleActions} id="teaching-paper-next">
             <div>
               <span>{text("下一步", "Next")}</span>
-              <strong>
+              <h2 tabIndex={-1}>
                 {text(
                   "趁方法清晰，完成整份专项训练卷",
                   "Apply the method in the complete focused paper",
                 )}
-              </strong>
+              </h2>
               <p>
                 {text(
                   "训练卷会换用新的语境，检验你能否独立迁移，而不是照抄教程例句。",
@@ -1214,9 +1365,12 @@ function TeachingArticleContent({
                   document
                     .getElementById("teaching-practice-prompts")
                     ?.scrollIntoView({ block: "start", behavior: "instant" });
-                  document
-                    .getElementById("teaching-practice-heading")
-                    ?.focus({ preventScroll: true });
+                  const practice = document.getElementById(
+                    "teaching-practice-prompts",
+                  );
+                  (
+                    practice?.querySelector<HTMLElement>("h2, h3") ?? practice
+                  )?.focus({ preventScroll: true });
                 });
               }}
             >

@@ -212,6 +212,49 @@ describe("focused teaching adaptive article routes", () => {
     expect(body.teaching).not.toHaveProperty("coreAbilityEn");
   });
 
+  it.each([1, 2, 99])(
+    "retains optional practice placement %s without making it a delivery gate",
+    async (afterSection) => {
+      const focusedPackage = await adaptivePackage();
+      focusedPackage.teachingModule.practicePrompts[0]!.afterSection =
+        afterSection;
+      routeState.lesson = {
+        id: lessonId,
+        cycle: { userId: routeState.actor.id },
+        paperContent: focusedPackage,
+      };
+      const response = await getTeaching(
+        new Request(`https://coach.test/api/v1/lessons/${lessonId}/teaching`),
+        { params: Promise.resolve({ id: lessonId }) },
+      );
+      expect(response.status).toBe(200);
+      expect(
+        (await response.json()).teaching.practicePrompts[0].afterSection,
+      ).toBe(afterSection);
+    },
+  );
+
+  it("ignores malformed optional placement while preserving the exercise", async () => {
+    const focusedPackage = await adaptivePackage();
+    focusedPackage.teachingModule.practicePrompts[0]!.afterSection =
+      "not-a-position";
+    routeState.lesson = {
+      id: lessonId,
+      cycle: { userId: routeState.actor.id },
+      paperContent: focusedPackage,
+    };
+    const response = await getTeaching(
+      new Request(`https://coach.test/api/v1/lessons/${lessonId}/teaching`),
+      { params: Promise.resolve({ id: lessonId }) },
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.teaching.practicePrompts).toHaveLength(
+      focusedPackage.teachingModule.practicePrompts.length,
+    );
+    expect(body.teaching.practicePrompts[0]).not.toHaveProperty("afterSection");
+  });
+
   it.each(["internal", "future-answer"])(
     "omits an unsafe %s learning goal while preserving the existing article",
     async (kind) => {

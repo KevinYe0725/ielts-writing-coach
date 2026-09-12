@@ -654,24 +654,25 @@ export const mechanismChainTeachingFixture: FocusedTeachingData = {
       titleZh: "看见被跳过的一步",
       titleEn: "See the missing link",
       markdown:
-        "原因告诉读者起点，结果告诉读者终点，机制说明变化如何从起点走到终点。只有补出中间发生的变化，论证才真正向前推进。\n\n**核心判断**：机制句必须增加一个新的中间步骤。\n\n对比下面两个表达：\n\n- 较弱：Remote work is flexible, so employees are more productive.\n- 较强：Remote work removes many daily interruptions, allowing employees to protect longer periods for concentrated tasks and therefore complete demanding work more efficiently.\n\n较强的句子补上了“减少打断”和“保留专注时间”两个可理解步骤，而不是只重复远程办公有好处。",
+        "原因告诉读者起点，结果告诉读者终点，**机制说明中间发生了什么变化**。这篇课不是要求你把每句话写长，而是帮助你辨认：读者在哪一步还需要解释。\n\n先看一个常见的论证：\n\n> Remote work is flexible, so employees are more productive.\n\n这句话表达了立场，却把最重要的推理留给了读者：为什么“灵活”就能提高效率？时间自由也可能让人分心，结果并不会自动发生。\n\n补上一个具体过程，论证就有了可以讨论的内容：\n\n> Remote work **can reduce office interruptions**, allowing employees to **protect longer periods for concentrated tasks** and complete demanding work more efficiently.\n\n新增的不是形容词，而是“减少打断 → 保留专注时间”这两个步骤。读者现在能够判断，这个解释是否适用于讨论中的工作。\n\n**判断解释有没有向前走，不看连接词有多少，而看它有没有增加新信息。** *This is beneficial because it has many advantages* 即使用了 because，也只是在重复“有好处”。\n\n还要留意 can：在这里，它把结果表达为一种可能，而不是声称所有人在家工作都会更有效率。",
     },
     {
       titleZh: "从一个问题推出机制",
       titleEn: "Build the mechanism one step at a time",
       markdown:
-        "城市增加独立自行车道为什么可以改善通勤？\n\n1. 先找到直接变化：骑行者不必与汽车争抢道路空间。\n2. 再追问行为会怎样改变：更多人愿意在短途通勤时骑车。\n3. 最后落到可以观察的结果：繁忙道路上的汽车压力下降。\n\n> Separated cycle lanes make short journeys feel safer, which encourages commuters to replace some car trips and reduces pressure on busy roads.\n\n**写前检查**：用 This means that 连接“具体变化→下一步影响”，不要用它连接两个空泛的积极判断。\n\n**常见误区**：把积极评价当成解释。*Exercise improves concentration because it is healthy.* 没有说明身体活动怎样影响课堂注意力。",
+        "城市增加独立自行车道，为什么可能改善通勤？不要急着找 therefore，先把这件事想明白。\n\n1. **直接变化**：骑行者与汽车之间有了物理隔离。\n2. **行为变化**：部分原本担心安全的人，更愿意骑车完成短途出行。\n3. **讨论中的结果**：如果这些人减少了开车，道路上的汽车压力就可能下降。\n\n> Separated cycle lanes can make short journeys feel safer, encouraging some commuters to replace car trips with cycling and easing pressure on busy roads.\n\n这里 some 很重要：我们不需要断言每个通勤者都会骑车。机制写得具体，并不意味着结论可以写得绝对。\n\n### 先选一个过程，再决定写几句\n\n“减少危险”“降低成本”“节省时间”都可能成为解释，但一段里全部展开，反而容易失去重点。选出最能支持本段观点的一条路径，把它说完整。\n\n可以先用两句朴素的英文：\n\n> Protected lanes separate cyclists from moving traffic. This can make cycling a more realistic option for people who avoid busy roads.\n\n两句之间有明确推进，不需要为了显得高级而合成一个很长的句子。*This means that*、*allowing*、*which can* 都只是连接手段，**不是缺少推理时的补丁**。\n\n### 哪些情况下还要补充条件？\n\n如果你的结论依赖一个现实条件，就写出关键条件。例如，骑行路线需要连接到实际目的地，才更可能改变通勤选择。无需罗列所有例外，但不要把“有了设施”直接等同于“每个人都会使用”。\n\n现在换到灵活工作：请自己决定，时间上的灵活会先改变哪一种具体行为。",
     },
     {
       titleZh: "换一个话题验证方法",
       titleEn: "Transfer the method to a new topic",
       markdown:
-        "下次写作只检查这三件事：\n\n1. 原因和结果之间是否出现了新的中间步骤？\n2. 中间步骤是否回答了影响如何发生？\n3. 结果是否具体到可以被观察？\n\n**自检**：删掉中间句后，推理是否几乎没有变？如果是，它可能只在重复。",
+        "方法可以迁移，但例句不能直接搬家。换到公共图书馆这个话题，先重新找出受到影响的人和他们原本遇到的困难。\n\n> Public libraries can support independent learning by giving residents access to books they may not be able to afford.\n\n这里讨论的不是“减少打断”，而是“降低获取资料的障碍”。同样是解释好处，**中间过程必须由新语境决定**。\n\n还可以进一步说明影响：\n\n> This access allows readers to explore a subject before deciding whether to invest in their own materials.\n\n第二句增加了一个使用资料的具体方式。它不是唯一正确的展开，也不保证所有读者都会这样做；它让观点有了可理解的依据。\n\n### 不要把因果链当作万能结构\n\n如果题目要求比较两种政策，或者说明你的立场，你仍然需要先完成那个任务。机制只是展开其中一个理由的方法，不能替代比较或立场本身。拼写、时态等问题也应按各自规则处理，不必每次都重新组织整段论证。\n\n写完后只问自己三个问题：\n\n- 中间解释增加了什么，而不是换词重复结论？\n- 这一步确实可能引出我写的结果吗？是否需要 can、some 或一个必要条件？\n- 这个过程属于当前话题，还是从上一道题硬搬过来的？\n\n接下来不提供句子开头。换到环境话题，用你自己的两句英文说明变化怎样发生。",
     },
   ],
   practicePrompts: [
     {
       id: "spot-the-mechanism",
+      afterSection: 1,
       instructionZh: "选出真正写出中间机制的一句英文。",
       instructionEn:
         "Choose the English sentence that states an intermediate mechanism.",
@@ -691,6 +692,7 @@ export const mechanismChainTeachingFixture: FocusedTeachingData = {
     },
     {
       id: "workplace-mechanism",
+      afterSection: 2,
       instructionZh: "用一句英文补出灵活工作与生产力之间的中间机制。",
       instructionEn:
         "Write one English sentence that supplies the mechanism between flexible work and productivity.",
@@ -708,6 +710,7 @@ export const mechanismChainTeachingFixture: FocusedTeachingData = {
     },
     {
       id: "environment-transfer",
+      afterSection: 3,
       instructionZh: "换到环境话题，用两句英文写出一条新的机制链。",
       instructionEn:
         "Move to an environmental topic and write a new two-sentence mechanism chain.",
@@ -756,6 +759,7 @@ export const collocationControlTeachingFixture: FocusedTeachingData = {
   practicePrompts: [
     {
       id: "risk-choice",
+      afterSection: 1,
       instructionZh: "选出能表示潜在危害的自然搭配。",
       instructionEn:
         "Choose the natural expression for creating a potential danger.",
@@ -771,6 +775,7 @@ export const collocationControlTeachingFixture: FocusedTeachingData = {
     },
     {
       id: "health-transfer",
+      afterSection: 2,
       instructionZh: "在新的健康话题中，用一个自然搭配写一句完整英文。",
       instructionEn:
         "Write one complete English sentence with a natural collocation in a new health topic.",
@@ -787,6 +792,7 @@ export const collocationControlTeachingFixture: FocusedTeachingData = {
     },
     {
       id: "policy-transfer",
+      afterSection: 2,
       instructionZh: "在政策语境中，用一个自然搭配写一句完整英文。",
       instructionEn:
         "Write one complete English sentence with a natural collocation in a policy context.",

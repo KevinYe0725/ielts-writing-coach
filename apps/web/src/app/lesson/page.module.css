@@ -580,6 +580,95 @@
   line-height: 1.65;
 }
 
+.practiceInstruction h3 {
+  margin: 0 0 var(--desk-space-3);
+  font-size: var(--desk-type-reading);
+  font-weight: var(--desk-body-weight-semibold);
+  line-height: 1.65;
+}
+
+.articleEntryActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--desk-space-3);
+}
+
+.practiceBlock[data-inline] {
+  margin-top: var(--desk-space-6);
+  padding: var(--desk-space-4) 0 0 var(--desk-space-6);
+  border-left: 2px solid var(--desk-blue);
+  scroll-margin-top: calc(
+    var(--workspace-header-height, 72px) + var(--desk-space-6)
+  );
+}
+
+.practiceBlock[data-inline] .practiceList {
+  margin-top: 0;
+  border-top: 0;
+}
+
+.practicePrompt[data-inline] {
+  padding: 0 0 var(--desk-space-4);
+  border-bottom: 0;
+}
+
+.practicePrompt[data-inline] + .practicePrompt[data-inline] {
+  padding-top: var(--desk-space-6);
+  border-top: 1px solid var(--line);
+}
+
+.practiceContinue {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--desk-blue);
+  font-size: var(--desk-type-body);
+  gap: var(--desk-space-2);
+}
+
+.referenceDisclosure {
+  padding: var(--desk-space-4) 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.referenceDisclosure summary {
+  padding: var(--desk-space-2) 0;
+  color: var(--desk-blue);
+  cursor: pointer;
+  font-weight: var(--desk-body-weight-semibold);
+  line-height: 1.65;
+}
+
+.referenceDisclosure .answerPanel {
+  padding: var(--desk-space-4) 0;
+}
+
+.referenceDisclosure .referenceReasoning p {
+  margin: 0;
+}
+
+.practiceContinue:focus-visible,
+.referenceDisclosure summary:focus-visible,
+.practiceInstruction h3:focus-visible {
+  outline: 2px solid var(--desk-blue);
+  outline-offset: 4px;
+}
+
+.answerComparison[data-inline] {
+  grid-template-columns: minmax(0, 1fr);
+  border-bottom: 0;
+}
+
+.practicePrompt[data-inline] .analysisRegion[data-state="ready"] {
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
 .practiceInstruction p {
   margin: 0;
   color: var(--desk-ink);
@@ -955,6 +1044,9 @@
 }
 
 .articleActions {
+  scroll-margin-top: calc(
+    var(--workspace-header-height, 72px) + var(--desk-space-6)
+  );
   display: grid;
   padding: var(--desk-space-8);
   margin: var(--desk-space-16) 0 var(--desk-space-4);
@@ -965,9 +1057,9 @@
   gap: var(--desk-space-6);
 }
 
-.articleActions strong {
+.articleActions h2 {
   display: block;
-  margin-top: var(--desk-space-1);
+  margin: var(--desk-space-1) 0 0;
   font-size: var(--desk-type-subheading);
   line-height: 1.45;
 }

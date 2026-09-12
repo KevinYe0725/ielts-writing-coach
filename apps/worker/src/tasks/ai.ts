@@ -79,11 +79,11 @@ import {
   type ClaimedJob,
 } from "../runtime";
 import {
-  adaptiveTeachingModuleSchema,
+  adaptiveTeachingGenerationSchema,
   assessmentJudgmentSchema,
   comparisonSchema,
   evaluationSchema,
-  focusedLearningPackageSchema,
+  focusedLearningGenerationSchema,
   issueBatchSchema,
   practicePaperEvaluationSchema,
   practicePaperItemContentSchema,
@@ -1325,7 +1325,7 @@ Write the article body as Markdown. Return ADAPTIVE_ARTICLE_V1 with:
 - estimatedMinutes: an integer from 15 to 35.
 - coreAbilityZh (<= 40 characters) and coreAbilityEn (<= 160 characters): one concise bilingual sentence naming the observable micro-skill. The later practice paper must train exactly this.
 - sections: 2-6 sections, each with titleZh / titleEn and a single \`markdown\` body. Teach the decision with contrast and reasoning; add examples and, when it would prevent a realistic mistake, a short pitfall or toolkit; finish the final section with a short summary. Use Markdown headings (##), bold, and bullet/numbered lists; keep English example sentences in the prose. Write Chinese explanations with English material inline.
-- practicePrompts: 3-4 interactive prompts, each with id, instructionZh, instructionEn, promptEn, responseMode (CHOICE or SHORT_TEXT), context (SAME_TOPIC or UNSEEN_TOPIC), optionsEn (2-4 options for CHOICE, empty for SHORT_TEXT), referenceAnswerEn, referenceReasoningZh, and referenceReasoningEn. At least one prompt must use SHORT_TEXT and at least one UNSEEN_TOPIC. A CHOICE instruction asks only for selecting an option; any explanation or reference reveal happens after submission and is not extra learner output. At least one unseen SHORT_TEXT prompt asks for an original sentence or short paragraph in a new context without supplying a complete subject, reference answer, or fill-in frame.
+- practicePrompts: 3-4 interactive prompts, each with afterSection (one-based section position where its prerequisite is taught), id, instructionZh, instructionEn, promptEn, responseMode (CHOICE or SHORT_TEXT), context (SAME_TOPIC or UNSEEN_TOPIC), optionsEn (2-4 options for CHOICE, empty for SHORT_TEXT), referenceAnswerEn, referenceReasoningZh, and referenceReasoningEn. At least one prompt must use SHORT_TEXT and at least one UNSEEN_TOPIC. A CHOICE instruction asks only for selecting an option; any explanation or reference reveal happens after submission and is not extra learner output. At least one unseen SHORT_TEXT prompt asks for an original sentence or short paragraph in a new context without supplying a complete subject, reference answer, or fill-in frame.
 
 Do not locate, highlight, quote, or closely imitate the learner's Version 1, and do not reproduce a complete essay. Keep implementation vocabulary out of learner-facing prose. Reference answers are reveal-after-attempt only; a later practice paper uses different material, so do not write any future-paper answer.
 
@@ -1337,7 +1337,7 @@ Teaching resource for this priority (use it for planning; do not expose these la
 ${focusedTeachingProfileFor(canonicalSkillId)}
 Learner Version 1 for context only: ${(version1?.content ?? "").slice(0, 4_000)}`,
             schemaName: "iwc_adaptive_teaching_article_v1",
-            schema: adaptiveTeachingModuleSchema as unknown as Record<
+            schema: adaptiveTeachingGenerationSchema as unknown as Record<
               string,
               unknown
             >,
@@ -1576,7 +1576,7 @@ Original IELTS question: ${cycle.question.prompt}`,
         system: PROMPT_REGISTRY.exercise_generation.system,
         input: `Create one complete focused-learning package for the learner. First generate a self-contained adaptive teaching article, then create the 60-minute practice paper. The diagnosed top-level priority is ${canonicalSkillId}; narrow it to one observable micro-skill rather than covering every issue in the essay.
 
-Write the teaching article body as Markdown. Return teachingModule.format ADAPTIVE_ARTICLE_V1 with: titleZh/titleEn (short bilingual title); introductionMarkdown (2-4 sentence Chinese introduction); estimatedMinutes 15-35; coreAbilityZh (<=40 chars) and coreAbilityEn (<=160 chars) naming the observable micro-skill; sections (2-6) each with titleZh/titleEn and a single \`markdown\` body using Markdown headings, bold, and lists with Chinese explanation and English examples inline, ending the final section with a short summary; and practicePrompts (3-4) with id, instructionZh/instructionEn, promptEn, responseMode (CHOICE or SHORT_TEXT), context (SAME_TOPIC or UNSEEN_TOPIC), optionsEn, referenceAnswerEn, referenceReasoningZh/referenceReasoningEn — at least one SHORT_TEXT and one UNSEEN_TOPIC. A CHOICE instruction asks only for selecting an option; any explanation or reference reveal happens after submission and is not extra learner output. At least one unseen SHORT_TEXT prompt asks for an original sentence or short paragraph in a new context without supplying a complete subject, reference answer, or fill-in frame.
+Write the teaching article body as Markdown. Return teachingModule.format ADAPTIVE_ARTICLE_V1 with: titleZh/titleEn (short bilingual title); introductionMarkdown (2-4 sentence Chinese introduction); estimatedMinutes 15-35; coreAbilityZh (<=40 chars) and coreAbilityEn (<=160 chars) naming the observable micro-skill; sections (2-6) each with titleZh/titleEn and a single \`markdown\` body using Markdown headings, bold, and lists with Chinese explanation and English examples inline, ending the final section with a short summary; and practicePrompts (3-4) with afterSection (one-based position of the relevant prerequisite section), id, instructionZh/instructionEn, promptEn, responseMode (CHOICE or SHORT_TEXT), context (SAME_TOPIC or UNSEEN_TOPIC), optionsEn, referenceAnswerEn, referenceReasoningZh/referenceReasoningEn — at least one SHORT_TEXT and one UNSEEN_TOPIC. A CHOICE instruction asks only for selecting an option; any explanation or reference reveal happens after submission and is not extra learner output. At least one unseen SHORT_TEXT prompt asks for an original sentence or short paragraph in a new context without supplying a complete subject, reference answer, or fill-in frame.
 
 Do not locate, highlight, quote, or closely imitate the learner's Version 1, and do not reproduce a complete essay. Keep implementation vocabulary out of learner-facing prose.
 
@@ -1600,7 +1600,7 @@ Teaching resource for this priority (use it for planning; do not expose these la
 ${focusedTeachingProfileFor(canonicalSkillId)}
 Learner Version 1 for context only: ${(version1?.content ?? "").slice(0, 4_000)}`,
         schemaName: "iwc_focused_learning_package_v4",
-        schema: focusedLearningPackageSchema as unknown as Record<
+        schema: focusedLearningGenerationSchema as unknown as Record<
           string,
           unknown
         >,

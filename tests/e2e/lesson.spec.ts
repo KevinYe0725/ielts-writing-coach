@@ -82,6 +82,7 @@ type ResponseSource =
       | Promise<PublicPracticeResponse | null>);
 
 type HttpTeachingScenario = {
+  inlineTeaching?: boolean;
   restore: ResponseSource;
   submit?: ResponseSource;
   retry?: ResponseSource;
@@ -300,7 +301,14 @@ async function installHttpTeachingApi(
       }
       await route.fulfill({
         contentType: "application/json",
-        body: JSON.stringify({ teaching: httpTeaching }),
+        body: JSON.stringify({
+          teaching: scenario.inlineTeaching
+            ? {
+                ...httpTeaching,
+                practicePrompts: [{ ...httpPrompt, afterSection: 1 }],
+              }
+            : httpTeaching,
+        }),
       });
       return;
     }
@@ -550,11 +558,9 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
       .getByRole("link", { name: /随堂练习/ })
       .click();
     await expect(
-      page.getByRole("heading", { name: "现在，换你试一试" }),
+      page.locator("#teaching-practice-prompts h3").first(),
     ).toBeFocused();
-    await expect(
-      page.locator("[data-teaching-block='PRACTICE']"),
-    ).toBeInViewport();
+    await expect(page.locator("#teaching-practice-prompts")).toBeInViewport();
   });
 
   test("offers resizable feedback columns only when the report has enough content space", async ({
@@ -965,15 +971,22 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
     const markdownBlocks = article.locator('[data-teaching-block="MARKDOWN"]');
     await expect(markdownBlocks).toHaveCount(3);
     await expect(markdownBlocks.nth(0)).toContainText(
-      "机制说明变化如何从起点走到终点",
+      "机制说明中间发生了什么变化",
     );
     await expect(markdownBlocks.nth(1)).toContainText(
-      "Separated cycle lanes make short journeys feel safer",
+      "Separated cycle lanes can make short journeys feel safer",
     );
-    await expect(markdownBlocks.nth(2)).toContainText("下次写作只检查这三件事");
+    await expect(markdownBlocks.nth(2)).toContainText("因果链当作万能结构");
     await expect(
       article.locator('[data-teaching-block="PRACTICE"]'),
-    ).toBeVisible();
+    ).toHaveCount(3);
+    // Practice is inside the section that teaches its prerequisite, not one final pile.
+    for (const section of await article
+      .locator("[data-teaching-section]")
+      .all()) {
+      await expect(section.locator("[data-teaching-practice]")).toHaveCount(1);
+      await expect(section.locator("[data-teaching-continue]")).toBeVisible();
+    }
     await expect(article.locator("[data-teaching-practice]")).toHaveCount(3);
     await expect(article.locator("textarea")).toHaveCount(2);
     await expect(
@@ -1030,7 +1043,7 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
 
     await first.locator("textarea").fill(httpAnswer);
     const submit = first.locator("[data-teaching-practice-submit]");
-    await expect(submit).toHaveAccessibleName("提交并查看对照");
+    await expect(submit).toHaveAccessibleName("看看我的思路");
     await submit.click();
 
     const review = first.locator("[data-teaching-answer-review]");
@@ -1039,6 +1052,17 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
     await expect(first.locator("[data-teaching-submitted-answer]")).toHaveText(
       httpAnswer,
     );
+    const referenceDisclosure = first.locator(
+      "[data-teaching-reference-disclosure]",
+    );
+    await expect(
+      first.locator("[data-teaching-reference-answer]"),
+    ).toBeHidden();
+    await referenceDisclosure.locator("summary").focus();
+    await page.keyboard.press("Enter");
+    await expect(
+      first.locator("[data-teaching-reference-answer]"),
+    ).toBeVisible();
     await expect(first.locator("[data-teaching-reference-answer]")).toHaveText(
       "Employees can reserve their most demanding tasks for the hours when they concentrate best.",
     );
@@ -1083,6 +1107,9 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
       restored.locator("[data-teaching-submitted-answer]"),
     ).toHaveText(httpAnswer);
     await expect(restored.locator("textarea")).toHaveCount(0);
+    await expect(
+      restored.locator("[data-teaching-reference-answer]"),
+    ).toBeHidden();
     await expect(
       page.getByRole("link", { name: "开始60分钟训练卷" }),
     ).toBeEnabled();
@@ -1147,6 +1174,12 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
 
     const comparison = prompt.locator("[data-teaching-answer-comparison]");
     expect(await gridColumnCount(comparison)).toBe(1);
+    await expect(
+      prompt.locator("[data-teaching-reference-answer]"),
+    ).toBeHidden();
+    await prompt
+      .locator("[data-teaching-reference-disclosure] summary")
+      .click();
     await page.evaluate(async () => {
       await document.fonts.ready;
       await new Promise<void>((resolve) => {
@@ -1170,13 +1203,13 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
       };
     });
     expect(stackedRects.submitted.bottom).toBeLessThanOrEqual(
-      stackedRects.reference.top + 2,
+      stackedRects.analysis.top + 2,
     );
     expect(stackedRects.reference.bottom).toBeLessThanOrEqual(
       stackedRects.reasoning.top + 2,
     );
-    expect(stackedRects.reasoning.bottom).toBeLessThanOrEqual(
-      stackedRects.analysis.top + 2,
+    expect(stackedRects.analysis.bottom).toBeLessThanOrEqual(
+      stackedRects.reference.top + 2,
     );
     expect(
       await page.evaluate(
@@ -1219,7 +1252,7 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
     await expect(
       prompt.locator('[data-teaching-analysis][data-state="unavailable"]'),
     ).toBeVisible();
-    await expect(prompt).toContainText("没有足够依据勉强下结论");
+    await expect(prompt).toContainText("答案仍在本页");
     await expectPaperLinkNavigable(page);
   });
 
@@ -2004,6 +2037,70 @@ test.describe("tutorial answer analysis over the public HTTP contract", () => {
     "Run with NEXT_PUBLIC_DEMO_MODE=false and an HTTP-mode web server.",
   );
 
+  for (const state of ["improve", "effective", "unavailable"] as const) {
+    test(`inline teaching prioritizes ${state} answer feedback without a learning gate`, async ({
+      page,
+    }) => {
+      const response =
+        state === "unavailable"
+          ? practiceResponse("ANALYSIS_UNAVAILABLE")
+          : practiceResponse("ANALYSIS_READY", {
+              ...personalizedAnalysis,
+              improvements:
+                state === "effective" ? [] : personalizedAnalysis.improvements,
+            });
+      const requests = await installHttpTeachingApi(page, {
+        inlineTeaching: true,
+        restore: response,
+      });
+      await page.goto(httpLessonUrl);
+      const section = page.locator("[data-teaching-section]");
+      const prompt = section.locator("[data-teaching-practice]");
+      await expect(
+        prompt.locator("[data-teaching-submitted-answer]"),
+      ).toHaveText(httpAnswer);
+      const reference = prompt.locator("[data-teaching-reference-answer]");
+      await expect(reference).toBeHidden();
+      if (state !== "unavailable") {
+        await expect(
+          prompt.locator("[data-teaching-key-improvement]"),
+        ).toHaveCount(state === "improve" ? 1 : 0);
+        for (const evidence of await prompt
+          .locator("[data-teaching-evidence]")
+          .allTextContents()) {
+          expect(httpAnswer).toContain(evidence.trim());
+        }
+        if (state === "effective")
+          await expect(
+            prompt.getByRole("button", { name: "现在自己改一次（可选）" }),
+          ).toHaveCount(0);
+      } else {
+        await expect(
+          prompt.locator("[data-teaching-analysis-retry]"),
+        ).toBeEnabled();
+      }
+      const disclosure = prompt.locator(
+        "[data-teaching-reference-disclosure] summary",
+      );
+      await disclosure.focus();
+      await page.keyboard.press("Enter");
+      await expect(reference).toBeVisible();
+      await expectAbove(
+        prompt.locator("[data-teaching-analysis][data-state]"),
+        reference,
+      );
+      await expect(
+        prompt.locator("[data-teaching-submitted-answer]"),
+      ).toHaveText(httpAnswer);
+      await section.locator("[data-teaching-continue]").click();
+      await expect(page.locator("#teaching-paper-next h2")).toBeFocused();
+      expect(
+        requests.filter((request) => request.startsWith("POST ")),
+      ).toHaveLength(0);
+      await expectPaperLinkNavigable(page, /\/lesson\/paper\?cycle=cycle-http/);
+    });
+  }
+
   test("dynamic Markdown assigns English only to deterministically English quotes", async ({
     page,
   }) => {
@@ -2598,13 +2695,13 @@ test.describe("tutorial answer analysis over the public HTTP contract", () => {
       label: "unavailable or unconfigured",
       response: practiceResponse("ANALYSIS_UNAVAILABLE"),
       dataState: "unavailable",
-      expectedText: "没有足够依据勉强下结论",
+      expectedText: "答案仍在本页",
     },
     {
       label: "uncertain without a forced weakness",
       response: practiceResponse("ANALYSIS_UNAVAILABLE"),
       dataState: "unavailable",
-      expectedText: "没有足够依据勉强下结论",
+      expectedText: "答案仍在本页",
     },
     {
       label: "personalized ready",

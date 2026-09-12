@@ -95,6 +95,8 @@ export interface PracticePaperContent {
 
 export interface TeachingPracticePrompt {
   readonly id: string;
+  /** One-based article section; absent or out-of-range placement stays at the end. */
+  readonly afterSection?: number;
   readonly instructionZh: string;
   readonly instructionEn: string;
   readonly promptEn: string;

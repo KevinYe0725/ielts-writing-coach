@@ -307,6 +307,7 @@ export interface FeedbackData {
 
 export interface TeachingPracticePrompt {
   readonly id: string;
+  readonly afterSection?: number;
   readonly instructionZh: string;
   readonly instructionEn: string;
   readonly promptEn: string;

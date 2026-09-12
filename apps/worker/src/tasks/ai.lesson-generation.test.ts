@@ -26,6 +26,7 @@ const lessonState = vi.hoisted(() => ({
   } as Record<string, string>,
   generatedInput: "",
   generatedSchemaNames: [] as string[],
+  generatedSchemas: [] as Record<string, unknown>[],
   generatedIdempotencyKeys: [] as Array<string | undefined>,
   adapterKind: "mock" as "compatible" | "mock",
   paperFailure: undefined as unknown,
@@ -64,10 +65,12 @@ vi.mock("../runtime", () => {
         async (request: {
           input: string;
           schemaName: string;
+          schema: Record<string, unknown>;
           idempotencyKey?: string;
         }) => {
           if (lessonState.adapterFailure) throw lessonState.adapterFailure;
           lessonState.generatedSchemaNames.push(request.schemaName);
+          lessonState.generatedSchemas.push(request.schema);
           lessonState.generatedIdempotencyKeys.push(request.idempotencyKey);
           if (
             lessonState.paperFailure &&
@@ -219,6 +222,7 @@ describe("adaptive lesson generation evidence", () => {
   beforeEach(async () => {
     lessonState.generatedInput = "";
     lessonState.generatedSchemaNames = [];
+    lessonState.generatedSchemas = [];
     lessonState.generatedIdempotencyKeys = [];
     lessonState.adapterKind = "mock";
     lessonState.paperFailure = undefined;
@@ -235,6 +239,36 @@ describe("adaptive lesson generation evidence", () => {
     lessonState.inserted = [];
     lessonState.updated = [];
   });
+
+  it.each(["mock", "compatible"] as const)(
+    "sends strict-compatible teaching schemas through the %s generation path",
+    async (kind) => {
+      lessonState.adapterKind = kind;
+      await generateLesson();
+      const candidates = lessonState.generatedSchemas.filter((_schema, index) =>
+        [
+          "iwc_focused_learning_package_v4",
+          "iwc_adaptive_teaching_article_v1",
+        ].includes(lessonState.generatedSchemaNames[index]!),
+      );
+      expect(candidates.length).toBeGreaterThan(0);
+      const checkRequiredProperties = (schema: Record<string, unknown>) => {
+        if (schema.properties && typeof schema.properties === "object") {
+          for (const [key, property] of Object.entries(schema.properties)) {
+            expect(
+              schema.required,
+              `provider schema must require ${key}`,
+            ).toContain(key);
+            checkRequiredProperties(property as Record<string, unknown>);
+          }
+        }
+        if (schema.items)
+          checkRequiredProperties(schema.items as Record<string, unknown>);
+      };
+      candidates.forEach(checkRequiredProperties);
+      expect(lessonState.failure).toBeUndefined();
+    },
+  );
 
   it("persists only visible instructions as grading requirements, even if a model adds a hidden criterion", async () => {
     const original = lessonState.package!;

@@ -86,6 +86,9 @@ function projectTeachingPrompt(value: unknown): TeachingPracticePrompt | null {
     return null;
   return {
     id,
+    ...(asInteger(prompt.afterSection) !== null
+      ? { afterSection: asInteger(prompt.afterSection)! }
+      : {}),
     instructionZh,
     instructionEn,
     promptEn,

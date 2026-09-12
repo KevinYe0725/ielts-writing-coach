@@ -552,6 +552,11 @@ const teachingPracticePromptSchema = {
     "referenceReasoningEn",
   ],
   properties: {
+    afterSection: {
+      type: "integer",
+      description:
+        "One-based position of the article section this exercise follows. Use a relevant section, not a fixed lesson sequence.",
+    },
     id: {
       type: "string",
       pattern: "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
@@ -665,6 +670,31 @@ export const focusedLearningPackageSchema = {
  * return the teaching article and eight-question paper in one response. */
 export const adaptiveTeachingModuleSchema =
   focusedLearningPackageSchema.properties.teachingModule;
+
+// Provider strict mode requires every property in `required`. Keep persisted
+// readers on the optional contract above so an upgrade never invalidates a
+// previously generated course. New providers always name a position (0 = end).
+export const adaptiveTeachingGenerationSchema = {
+  ...adaptiveTeachingModuleSchema,
+  properties: {
+    ...adaptiveTeachingModuleSchema.properties,
+    practicePrompts: {
+      ...adaptiveTeachingModuleSchema.properties.practicePrompts,
+      items: {
+        ...teachingPracticePromptSchema,
+        required: [...teachingPracticePromptSchema.required, "afterSection"],
+      },
+    },
+  },
+} as const;
+
+export const focusedLearningGenerationSchema = {
+  ...focusedLearningPackageSchema,
+  properties: {
+    ...focusedLearningPackageSchema.properties,
+    teachingModule: adaptiveTeachingGenerationSchema,
+  },
+} as const;
 
 export const timedPracticePaperSchema =
   focusedLearningPackageSchema.properties.paper;
