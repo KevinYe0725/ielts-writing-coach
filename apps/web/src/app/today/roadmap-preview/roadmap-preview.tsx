@@ -12,9 +12,10 @@ import {
   RefreshCw,
   Sparkles,
 } from "lucide-react";
-import { useEffect, useMemo, useReducer, useState } from "react";
+import { useMemo, useReducer } from "react";
 
 import { useLocale } from "@/components/locale-provider";
+import { useClientReady } from "@/components/use-client-ready";
 import { cn } from "@/components/utils";
 
 import {
@@ -201,8 +202,7 @@ function RoadmapNode({
 export function CourseRoadmapPreview() {
   const { text } = useLocale();
   const reducedMotion = useReducedMotion();
-  const [interactive, setInteractive] = useState(false);
-  useEffect(() => setInteractive(true), []);
+  const interactive = useClientReady();
   const [state, dispatch] = useReducer(
     (
       current: ReturnType<typeof createRoadmapState>,
