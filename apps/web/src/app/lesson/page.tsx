@@ -25,6 +25,10 @@ export default function FocusedTeachingPage({
   const query = use(searchParams);
   const cycleId = singleRouteParam(query, "cycle");
   const lessonId = singleRouteParam(query, "lesson");
+  const requestedStep = singleRouteParam(query, "step");
+  const parsedStep = requestedStep ? Number(requestedStep) : NaN;
+  const initialStep =
+    Number.isInteger(parsedStep) && parsedStep > 0 ? parsedStep : undefined;
   const { text } = useLocale();
   const loader = useCallback(
     () =>
@@ -113,6 +117,7 @@ export default function FocusedTeachingPage({
           cycleId: data.cycleId,
           lessonId: data.id,
         })}
+        initialStep={initialStep}
         paperHref={learningRouteHref("/lesson/paper", {
           cycleId: data.cycleId,
           lessonId: data.id,

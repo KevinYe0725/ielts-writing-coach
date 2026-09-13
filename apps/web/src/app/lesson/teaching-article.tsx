@@ -570,7 +570,13 @@ function markdownQuoteLanguage(children: ReactNode): "en" | undefined {
     : undefined;
 }
 
-function MarkdownSection({ section }: { section: TeachingSectionMarkdown }) {
+function MarkdownSection({
+  section,
+  markdown = section.markdown,
+}: {
+  section: TeachingSectionMarkdown;
+  markdown?: string;
+}) {
   return (
     <div
       className={styles.prose}
@@ -586,7 +592,7 @@ function MarkdownSection({ section }: { section: TeachingSectionMarkdown }) {
           ),
         }}
       >
-        {section.markdown}
+        {markdown}
       </Markdown>
     </div>
   );
@@ -625,6 +631,7 @@ function PracticePrompts({
   onPracticeRetry,
   onRewriteDraft,
   onToggleRewrite,
+  onContinue,
 }: {
   practicePrompts: readonly TeachingPracticePrompt[];
   inline?: boolean;
@@ -636,6 +643,7 @@ function PracticePrompts({
   onPracticeRetry: (prompt: TeachingPracticePrompt) => void;
   onRewriteDraft: (id: string, answer: string) => void;
   onToggleRewrite: (id: string) => void;
+  onContinue?: () => void;
 }) {
   const { text } = useLocale();
   return (
@@ -693,6 +701,11 @@ function PracticePrompts({
           data-teaching-continue
           href={continuation.href}
           onClick={(event) => {
+            if (onContinue) {
+              event.preventDefault();
+              onContinue();
+              return;
+            }
             const destination = document.getElementById(
               continuation.href.slice(1),
             );
@@ -721,12 +734,54 @@ type TeachingArticleProps = {
   data: FocusedTeachingData;
   feedbackHref: string;
   paperHref: string;
+  initialStep?: number | undefined;
 };
+
+type TeachingPage =
+  | {
+      kind: "section";
+      sectionIndex: number;
+      chunkIndex: number;
+      chunkCount: number;
+      markdown: string;
+      practicePrompts: readonly TeachingPracticePrompt[];
+    }
+  | {
+      kind: "practice";
+      practicePrompts: readonly TeachingPracticePrompt[];
+    }
+  | { kind: "finish" };
+
+function splitTeachingMarkdown(
+  markdown: string,
+  maxCharacters = 720,
+): string[] {
+  const blocks = markdown
+    .split(/\n{2,}/u)
+    .map((block) => block.trim())
+    .filter(Boolean);
+  if (blocks.length === 0) return [markdown];
+
+  const chunks: string[] = [];
+  let current = "";
+  for (const block of blocks) {
+    const candidate = current ? `${current}\n\n${block}` : block;
+    if (current && candidate.length > maxCharacters) {
+      chunks.push(current);
+      current = block;
+    } else {
+      current = candidate;
+    }
+  }
+  if (current) chunks.push(current);
+  return chunks;
+}
 
 function TeachingArticleContent({
   data,
   feedbackHref,
   paperHref,
+  initialStep,
 }: TeachingArticleProps) {
   const { text } = useLocale();
   const practicePrompts = useMemo(
@@ -741,9 +796,6 @@ function TeachingArticleContent({
     () => placeTeachingPractices(practicePrompts, data.sections.length),
     [practicePrompts, data.sections.length],
   );
-  const firstInlineSection = placement.bySection.findIndex(
-    (group) => group.length > 0,
-  );
   const [practiceViews, setPracticeViews] = useState<
     Record<string, PracticeView>
   >(() =>
@@ -757,8 +809,38 @@ function TeachingArticleContent({
   const mounted = useRef(true);
   const [contentsOpen, setContentsOpen] = useState(false);
   const anchors = useMemo(() => sectionAnchors(data.sections), [data.sections]);
-  const [activeAnchor, setActiveAnchor] = useState(anchors[0] ?? "section-1");
-  const sectionSignature = anchors.join("|");
+  const pages = useMemo<TeachingPage[]>(() => {
+    const nextPages: TeachingPage[] = [];
+    data.sections.forEach((section, sectionIndex) => {
+      const chunks = splitTeachingMarkdown(section.markdown);
+      chunks.forEach((markdown, chunkIndex) => {
+        nextPages.push({
+          kind: "section",
+          sectionIndex,
+          chunkIndex,
+          chunkCount: chunks.length,
+          markdown,
+          practicePrompts:
+            chunkIndex === chunks.length - 1
+              ? (placement.bySection[sectionIndex] ?? [])
+              : [],
+        });
+      });
+    });
+    if (placement.trailing.length > 0) {
+      nextPages.push({
+        kind: "practice",
+        practicePrompts: placement.trailing,
+      });
+    }
+    nextPages.push({ kind: "finish" });
+    return nextPages;
+  }, [data.sections, placement]);
+  const [activeStep, setActiveStep] = useState(() => {
+    const requestedIndex = (initialStep ?? 1) - 1;
+    return Math.min(Math.max(requestedIndex, 0), pages.length - 1);
+  });
+  const currentPage = pages[activeStep] ?? pages[0]!;
 
   const clearPoll = (promptId: string) => {
     const timers = pollTimers.current[promptId];
@@ -1107,50 +1189,96 @@ function TeachingArticleContent({
     });
   };
 
-  useEffect(() => {
-    const sections = [...anchors, "teaching-practice-prompts"]
-      .map((anchor) => document.getElementById(anchor))
-      .filter((section): section is HTMLElement => Boolean(section));
-    if (sections.length === 0 || !("IntersectionObserver" in window)) return;
+  const progressMax = pages.length;
+  const progressValue = activeStep + 1;
+  const activeAnchor =
+    currentPage.kind === "section"
+      ? (anchors[currentPage.sectionIndex] ?? "section-1")
+      : currentPage.kind === "practice"
+        ? "teaching-practice-prompts"
+        : "teaching-paper-next";
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort(
-            (left, right) =>
-              Math.abs(left.boundingClientRect.top) -
-              Math.abs(right.boundingClientRect.top),
-          );
-        const next = visible[0]?.target.id;
-        if (next) setActiveAnchor(next);
-      },
-      { rootMargin: "-18% 0px -68% 0px", threshold: [0, 0.1, 0.5] },
+  const moveToStep = (nextStep: number, targetId?: string) => {
+    const safeStep = Math.max(0, Math.min(nextStep, pages.length - 1));
+    setActiveStep(safeStep);
+    setContentsOpen(false);
+    const params = new URLSearchParams(window.location.search);
+    params.set("step", String(safeStep + 1));
+    window.history.replaceState(
+      window.history.state,
+      "",
+      `${window.location.pathname}?${params.toString()}`,
     );
-    sections.forEach((section) => observer.observe(section));
-    return () => observer.disconnect();
-  }, [anchors, data.sections, sectionSignature]);
+    window.requestAnimationFrame(() => {
+      const target = targetId
+        ? document.getElementById(targetId)
+        : document.querySelector<HTMLElement>(
+            `[data-teaching-step="${safeStep + 1}"] h2, [data-teaching-step="${safeStep + 1}"] h3`,
+          );
+      if (!target) return;
+      if (targetId) {
+        target.scrollIntoView({ behavior: "instant", block: "start" });
+      }
+      (target.matches("h2, h3")
+        ? target
+        : target.querySelector<HTMLElement>("h2, h3")
+      )?.focus({
+        preventScroll: true,
+      });
+    });
+  };
 
-  const progressMax = anchors.length + 1;
-  const progressValue =
-    activeAnchor === "teaching-practice-prompts"
-      ? progressMax
-      : Math.max(anchors.indexOf(activeAnchor) + 1, 1);
+  const stepForAnchor = (anchor: string) => {
+    if (anchor === "teaching-practice-prompts") {
+      const practiceStep = pages.findIndex(
+        (page) =>
+          page.kind === "practice" ||
+          (page.kind === "section" && page.practicePrompts.length > 0),
+      );
+      return practiceStep >= 0 ? practiceStep : pages.length - 1;
+    }
+    if (anchor === "teaching-paper-next") return pages.length - 1;
+    const sectionIndex = anchors.indexOf(anchor);
+    const step = pages.findIndex(
+      (page) => page.kind === "section" && page.sectionIndex === sectionIndex,
+    );
+    return step >= 0 ? step : 0;
+  };
 
   return (
     <article className={styles.article} data-teaching-article>
       <header className={styles.articleHeader}>
         <h1>{text(data.titleZh, data.titleEn)}</h1>
-        {data.learningGoal ? (
-          <div
-            className={styles.learningGoal}
-            data-teaching-focus
-            data-teaching-focus-goal
-          >
-            <span>{text("本节只练一种能力", "One skill for this lesson")}</span>
-            <p>{text(data.learningGoal.zh, data.learningGoal.en)}</p>
-          </div>
-        ) : null}
+        {activeStep === 0 ? (
+          data.learningGoal ? (
+            <div
+              className={styles.learningGoal}
+              data-teaching-focus
+              data-teaching-focus-goal
+            >
+              <span>
+                {text("本节只练一种能力", "One skill for this lesson")}
+              </span>
+              <p>{text(data.learningGoal.zh, data.learningGoal.en)}</p>
+            </div>
+          ) : null
+        ) : (
+          <p className={styles.stepContext} data-teaching-step-context>
+            {currentPage.kind === "section"
+              ? text(
+                  data.sections[currentPage.sectionIndex]?.titleZh ??
+                    "继续这一项能力",
+                  data.sections[currentPage.sectionIndex]?.titleEn ??
+                    "Continue this skill",
+                )
+              : currentPage.kind === "practice"
+                ? text("把方法用到新题目", "Apply the method to a new prompt")
+                : text(
+                    "完成迁移，进入训练卷",
+                    "Complete the transfer and start the paper",
+                  )}
+          </p>
+        )}
         <div
           aria-label={text("专项教学进度", "Focused teaching progress")}
           aria-valuemax={progressMax}
@@ -1170,123 +1298,182 @@ function TeachingArticleContent({
             {progressValue} / {progressMax}
           </strong>
         </div>
-        <div className={styles.prose} data-teaching-prose>
-          <Markdown>{data.introductionMarkdown}</Markdown>
-        </div>
-        <div className={styles.articleEntryActions} data-teaching-entry-actions>
-          <a
-            className={`${styles.practiceJump} ${styles.primaryPracticeJump}`}
-            data-teaching-primary-action
-            href="#teaching-practice-prompts"
-          >
-            {text(
-              `动笔试试 · ${practicePrompts.length} 道随堂练习`,
-              `Try it yourself · ${practicePrompts.length} short exercises`,
-            )}{" "}
-            <ArrowRight size={15} aria-hidden="true" />
-          </a>
-        </div>
+        {activeStep === 0 ? (
+          <>
+            <div className={styles.prose} data-teaching-prose>
+              <Markdown>{data.introductionMarkdown}</Markdown>
+            </div>
+            <div
+              className={styles.articleEntryActions}
+              data-teaching-entry-actions
+            >
+              <a
+                className={`${styles.practiceJump} ${styles.primaryPracticeJump}`}
+                data-teaching-primary-action
+                href="#teaching-practice-prompts"
+                onClick={(event) => {
+                  event.preventDefault();
+                  moveToStep(
+                    stepForAnchor("teaching-practice-prompts"),
+                    "teaching-practice-prompts",
+                  );
+                }}
+              >
+                {text(
+                  `开始第一道练习 · ${practicePrompts.length} 道练习`,
+                  `Start the first exercise · ${practicePrompts.length} exercises`,
+                )}{" "}
+                <ArrowRight size={15} aria-hidden="true" />
+              </a>
+            </div>
+          </>
+        ) : null}
       </header>
 
       <div className={styles.readingLayout} data-teaching-layout>
         <div className={styles.articleBody} data-teaching-content>
-          {data.sections.map((section, sectionIndex) => {
-            const slug = anchors[sectionIndex] ?? `section-${sectionIndex + 1}`;
-            return (
-              <section
-                aria-labelledby={`${slug}-heading`}
-                className={styles.articleSection}
-                data-active={activeAnchor === slug ? "true" : undefined}
-                data-teaching-section
-                id={slug}
-                key={slug}
+          <div className={styles.teachingPlayer} data-teaching-player>
+            <div
+              className={styles.playerViewport}
+              data-teaching-step={activeStep + 1}
+            >
+              {currentPage.kind === "section" ? (
+                <section
+                  aria-labelledby={`teaching-step-${activeStep}-heading`}
+                  className={styles.articleSection}
+                  data-active="true"
+                  data-teaching-section
+                  id={anchors[currentPage.sectionIndex]}
+                >
+                  <header className={styles.sectionHeading}>
+                    <h2
+                      id={`teaching-step-${activeStep}-heading`}
+                      tabIndex={-1}
+                    >
+                      {text(
+                        data.sections[currentPage.sectionIndex]!.titleZh,
+                        data.sections[currentPage.sectionIndex]!.titleEn,
+                      )}
+                    </h2>
+                  </header>
+                  <div className={styles.sectionBlocks}>
+                    <MarkdownSection
+                      markdown={currentPage.markdown}
+                      section={data.sections[currentPage.sectionIndex]!}
+                    />
+                  </div>
+                  {currentPage.practicePrompts.length > 0 ? (
+                    <PracticePrompts
+                      inline
+                      anchor="teaching-practice-prompts"
+                      continuation={{
+                        href:
+                          activeStep < pages.length - 2
+                            ? `#${anchors[currentPage.sectionIndex + 1] ?? "teaching-next-step"}`
+                            : "#teaching-paper-next",
+                        zh:
+                          activeStep < pages.length - 2
+                            ? "继续往下读"
+                            : "去试试独立运用",
+                        en:
+                          activeStep < pages.length - 2
+                            ? "Keep reading"
+                            : "Try using it independently",
+                      }}
+                      onContinue={() => moveToStep(activeStep + 1)}
+                      onPracticeDraft={updatePracticeDraft}
+                      onPracticeRetry={retryPractice}
+                      onPracticeSubmit={submitPractice}
+                      onRewriteDraft={updateRewriteDraft}
+                      onToggleRewrite={toggleRewrite}
+                      practicePrompts={currentPage.practicePrompts}
+                      practiceViews={practiceViews}
+                    />
+                  ) : null}
+                </section>
+              ) : currentPage.kind === "practice" ? (
+                <PracticePrompts
+                  anchor="teaching-practice-prompts"
+                  continuation={{
+                    href: "#teaching-paper-next",
+                    zh: "去试试独立运用",
+                    en: "Try using it independently",
+                  }}
+                  onContinue={() => moveToStep(activeStep + 1)}
+                  onPracticeDraft={updatePracticeDraft}
+                  onPracticeRetry={retryPractice}
+                  onPracticeSubmit={submitPractice}
+                  onRewriteDraft={updateRewriteDraft}
+                  onToggleRewrite={toggleRewrite}
+                  practicePrompts={currentPage.practicePrompts}
+                  practiceViews={practiceViews}
+                />
+              ) : null}
+            </div>
+
+            {currentPage.kind === "finish" ? (
+              <footer
+                className={styles.articleActions}
+                id="teaching-paper-next"
               >
-                <header className={styles.sectionHeading}>
-                  <h2 id={`${slug}-heading`} tabIndex={-1}>
-                    {text(section.titleZh, section.titleEn)}
+                <div>
+                  <span>{text("下一步", "Next")}</span>
+                  <h2 tabIndex={-1}>
+                    {text(
+                      "趁方法清晰，完成整份专项训练卷",
+                      "Apply the method in the complete focused paper",
+                    )}
                   </h2>
-                </header>
-                <div className={styles.sectionBlocks}>
-                  <MarkdownSection section={section} />
+                  <p>
+                    {text(
+                      "训练卷会换用新的语境，检验你能否独立迁移，而不是照抄教程例句。",
+                      "The paper uses new contexts to test independent transfer rather than copying tutorial examples.",
+                    )}
+                  </p>
                 </div>
-                {placement.bySection[sectionIndex]!.length > 0 ? (
-                  <PracticePrompts
-                    inline
-                    anchor={
-                      sectionIndex === firstInlineSection
-                        ? "teaching-practice-prompts"
-                        : `teaching-practice-after-${sectionIndex + 1}`
-                    }
-                    continuation={{
-                      href:
-                        sectionIndex < data.sections.length - 1
-                          ? `#${anchors[sectionIndex + 1]}`
-                          : "#teaching-paper-next",
-                      zh:
-                        sectionIndex < data.sections.length - 1
-                          ? "继续往下读"
-                          : "去试试独立运用",
-                      en:
-                        sectionIndex < data.sections.length - 1
-                          ? "Keep reading"
-                          : "Try using it independently",
-                    }}
-                    onPracticeDraft={updatePracticeDraft}
-                    onPracticeRetry={retryPractice}
-                    onPracticeSubmit={submitPractice}
-                    onRewriteDraft={updateRewriteDraft}
-                    onToggleRewrite={toggleRewrite}
-                    practicePrompts={placement.bySection[sectionIndex]!}
-                    practiceViews={practiceViews}
-                  />
-                ) : null}
-              </section>
-            );
-          })}
+                <div>
+                  <ActionLink href={feedbackHref} variant="secondary">
+                    {text("返回详细批改", "Back to detailed feedback")}
+                  </ActionLink>
+                  <ActionLink href={paperHref} size="lg" trailing={false}>
+                    {text("开始60分钟训练卷", "Start the 60-minute paper")}
+                    <ArrowRight aria-hidden="true" size={17} />
+                  </ActionLink>
+                </div>
+              </footer>
+            ) : null}
 
-          {placement.trailing.length > 0 ? (
-            <PracticePrompts
-              anchor={
-                firstInlineSection < 0
-                  ? "teaching-practice-prompts"
-                  : "teaching-practice-trailing"
-              }
-              onPracticeDraft={updatePracticeDraft}
-              onPracticeRetry={retryPractice}
-              onPracticeSubmit={submitPractice}
-              onRewriteDraft={updateRewriteDraft}
-              onToggleRewrite={toggleRewrite}
-              practicePrompts={placement.trailing}
-              practiceViews={practiceViews}
-            />
-          ) : null}
-
-          <footer className={styles.articleActions} id="teaching-paper-next">
-            <div>
-              <span>{text("下一步", "Next")}</span>
-              <h2 tabIndex={-1}>
+            <nav
+              aria-label={text("专项教学步骤", "Focused teaching steps")}
+              className={styles.playerNav}
+              data-teaching-step-nav
+            >
+              <button
+                data-teaching-step-prev
+                disabled={activeStep === 0}
+                onClick={() => moveToStep(activeStep - 1)}
+                type="button"
+              >
+                <span aria-hidden="true">←</span>
+                {text("上一步", "Previous")}
+              </button>
+              <span aria-live="polite">
                 {text(
-                  "趁方法清晰，完成整份专项训练卷",
-                  "Apply the method in the complete focused paper",
+                  `第 ${activeStep + 1} / ${pages.length} 步`,
+                  `Step ${activeStep + 1} of ${pages.length}`,
                 )}
-              </h2>
-              <p>
-                {text(
-                  "训练卷会换用新的语境，检验你能否独立迁移，而不是照抄教程例句。",
-                  "The paper uses new contexts to test independent transfer rather than copying tutorial examples.",
-                )}
-              </p>
-            </div>
-            <div>
-              <ActionLink href={feedbackHref} variant="secondary">
-                {text("返回详细批改", "Back to detailed feedback")}
-              </ActionLink>
-              <ActionLink href={paperHref} size="lg" trailing={false}>
-                {text("开始60分钟训练卷", "Start the 60-minute paper")}
-                <ArrowRight aria-hidden="true" size={17} />
-              </ActionLink>
-            </div>
-          </footer>
+              </span>
+              <button
+                data-teaching-step-next
+                disabled={activeStep >= pages.length - 1}
+                onClick={() => moveToStep(activeStep + 1)}
+                type="button"
+              >
+                {text("下一步", "Next")}
+                <span aria-hidden="true">→</span>
+              </button>
+            </nav>
+          </div>
         </div>
 
         <div
@@ -1325,41 +1512,8 @@ function TeachingArticleContent({
                       href={`#${slug}`}
                       onClick={(event) => {
                         event.preventDefault();
-                        const link = event.currentTarget;
-                        const disclosure = document.querySelector(
-                          "[data-teaching-toc-toggle]",
-                        );
-                        const usesDisclosure =
-                          disclosure instanceof HTMLElement &&
-                          window.getComputedStyle(disclosure).display !==
-                            "none";
-                        setActiveAnchor(slug);
-                        setContentsOpen(false);
-                        window.history.replaceState(
-                          window.history.state,
-                          "",
-                          `#${slug}`,
-                        );
-                        const focusDestination = () => {
-                          const heading = document.getElementById(
-                            `${slug}-heading`,
-                          );
-                          document.getElementById(slug)?.scrollIntoView({
-                            behavior: "instant",
-                            block: "start",
-                          });
-                          heading?.focus({ preventScroll: true });
-                        };
-                        if (usesDisclosure) {
-                          window.requestAnimationFrame(() =>
-                            window.requestAnimationFrame(focusDestination),
-                          );
-                        } else {
-                          document
-                            .getElementById(slug)
-                            ?.scrollIntoView({ block: "start" });
-                          link.focus({ preventScroll: true });
-                        }
+                        moveToStep(stepForAnchor(slug));
+                        event.currentTarget.focus({ preventScroll: true });
                       }}
                     >
                       <span aria-hidden="true">
@@ -1381,24 +1535,8 @@ function TeachingArticleContent({
               }
               onClick={(event) => {
                 event.preventDefault();
-                setContentsOpen(false);
-                setActiveAnchor("teaching-practice-prompts");
-                window.history.replaceState(
-                  window.history.state,
-                  "",
-                  "#teaching-practice-prompts",
-                );
-                window.requestAnimationFrame(() => {
-                  document
-                    .getElementById("teaching-practice-prompts")
-                    ?.scrollIntoView({ block: "start", behavior: "instant" });
-                  const practice = document.getElementById(
-                    "teaching-practice-prompts",
-                  );
-                  (
-                    practice?.querySelector<HTMLElement>("h2, h3") ?? practice
-                  )?.focus({ preventScroll: true });
-                });
+                moveToStep(stepForAnchor("teaching-practice-prompts"));
+                event.currentTarget.focus({ preventScroll: true });
               }}
             >
               {text("随堂练习", "Try it yourself")}{" "}
@@ -1412,5 +1550,10 @@ function TeachingArticleContent({
 }
 
 export function TeachingArticle(props: TeachingArticleProps) {
-  return <TeachingArticleContent key={props.data.id} {...props} />;
+  return (
+    <TeachingArticleContent
+      key={`${props.data.id}-${props.initialStep ?? 1}`}
+      {...props}
+    />
+  );
 }

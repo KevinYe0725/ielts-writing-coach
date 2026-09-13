@@ -263,6 +263,74 @@
   gap: var(--desk-space-12);
 }
 
+.teachingPlayer {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--desk-space-3);
+}
+
+.playerViewport {
+  min-height: 0;
+  height: clamp(360px, 42dvh, 480px);
+  padding-right: var(--desk-space-3);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.playerViewport .articleSection {
+  padding-top: var(--desk-space-4);
+}
+
+.playerNav {
+  display: flex;
+  min-height: 48px;
+  padding-top: var(--desk-space-3);
+  border-top: 1px solid var(--line);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--desk-space-3);
+}
+
+.playerNav button {
+  display: inline-flex;
+  min-height: 40px;
+  padding: var(--desk-space-2) var(--desk-space-3);
+  color: var(--desk-ink);
+  background: var(--desk-paper);
+  border: 1px solid var(--desk-line-strong);
+  border-radius: var(--desk-radius-sm);
+  font: inherit;
+  font-size: var(--desk-type-meta);
+  font-weight: var(--desk-body-weight-semibold);
+  cursor: pointer;
+  align-items: center;
+  gap: var(--desk-space-2);
+}
+
+.playerNav button:hover:not(:disabled) {
+  background: var(--desk-canvas);
+}
+
+.playerNav button:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--desk-blue) 34%, transparent);
+  outline-offset: 2px;
+}
+
+.playerNav button:disabled {
+  color: var(--desk-evidence-muted);
+  background: var(--desk-canvas);
+  cursor: not-allowed;
+}
+
+.playerNav > span {
+  color: var(--desk-ink-muted);
+  font-family: var(--desk-font-utility);
+  font-size: var(--desk-type-meta);
+}
+
 .articleBody {
   min-width: 0;
 }
@@ -1235,7 +1303,7 @@
 
   .contentsColumn {
     position: static;
-    order: -1;
+    order: 1;
     width: 100%;
     max-height: none;
     margin-top: var(--desk-space-6);
@@ -1303,6 +1371,17 @@
   .learningProgress {
     margin-top: var(--desk-space-4);
     gap: var(--desk-space-2);
+  }
+  .playerViewport {
+    height: clamp(300px, 36dvh, 400px);
+    padding-right: 0;
+  }
+  .playerNav button {
+    padding-right: var(--desk-space-2);
+    padding-left: var(--desk-space-2);
+  }
+  .playerNav button:first-child {
+    margin-left: var(--desk-space-12);
   }
   .practiceJump {
     margin-top: var(--desk-space-2);
