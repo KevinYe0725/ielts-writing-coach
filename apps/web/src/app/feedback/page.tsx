@@ -5,10 +5,9 @@ import {
   use,
   useCallback,
   useMemo,
-  useRef,
   useState,
+  useSyncExternalStore,
   type ReactNode,
-  type RefObject,
 } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -17,7 +16,9 @@ import {
   BookLock,
   BrainCircuit,
   CheckCircle2,
+  ChevronLeft,
   ChevronDown,
+  ChevronRight,
   Info,
   Languages,
   LocateFixed,
@@ -65,6 +66,19 @@ import { ResponsiveReport } from "./responsive-report";
 type MobilePane = "source" | "suggestions";
 type ReportMode = "quick" | "full";
 export type FeedbackView = "summary" | "compare";
+type EssayParagraphChunk = {
+  index: number;
+  text: string;
+  leading: string;
+  start: number;
+};
+type ComparisonPage = {
+  pageNumber: number;
+  chunks: EssayParagraphChunk[];
+  issueIds: Set<string>;
+};
+
+const MOBILE_COMPARISON_QUERY = "(max-width: 939px)";
 
 function feedbackCompareHref(
   cycleId: string | null,
@@ -77,28 +91,18 @@ function feedbackCompareHref(
   return query ? `/feedback/compare?${query}` : "/feedback/compare";
 }
 
-function scrollBehavior(): ScrollBehavior {
-  return window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    ? "auto"
-    : "smooth";
-}
-
 function usesSinglePaneReport() {
   return window.matchMedia(SINGLE_PANE_REPORT_QUERY).matches;
 }
 
-function panesAreSideBySide() {
-  const source = document.querySelector<HTMLElement>("[data-essay-pane]");
-  const suggestions = document.querySelector<HTMLElement>(
-    "[data-suggestion-panel]",
-  );
-  if (!source || !suggestions) return false;
-  const sourceRect = source.getBoundingClientRect();
-  const suggestionRect = suggestions.getBoundingClientRect();
-  return (
-    Math.abs(sourceRect.top - suggestionRect.top) < 4 &&
-    sourceRect.right <= suggestionRect.left + 2
-  );
+function subscribeToComparisonViewport(onStoreChange: () => void) {
+  const query = window.matchMedia(MOBILE_COMPARISON_QUERY);
+  query.addEventListener("change", onStoreChange);
+  return () => query.removeEventListener("change", onStoreChange);
+}
+
+function comparisonParagraphsPerPageSnapshot() {
+  return window.matchMedia(MOBILE_COMPARISON_QUERY).matches ? 1 : 2;
 }
 
 function annotationKind(issueType: string, severity: string) {
@@ -149,13 +153,16 @@ export function FeedbackPage({
   const [reportMode, setReportMode] = useState<ReportMode>(
     requestedMode === "full" ? "full" : "quick",
   );
+  const paragraphsPerPage = useSyncExternalStore(
+    subscribeToComparisonViewport,
+    comparisonParagraphsPerPageSnapshot,
+    () => 2,
+  );
   const [locationMessage, setLocationMessage] = useState("");
   const [retryingGeneration, setRetryingGeneration] = useState(false);
   const [generationRetryError, setGenerationRetryError] = useState("");
   const [retryingIssues, setRetryingIssues] = useState(false);
   const [issueRetryError, setIssueRetryError] = useState("");
-  const highlightRefs = useRef<Record<string, HTMLElement | null>>({});
-  const cardRefs = useRef<Record<string, HTMLElement | null>>({});
 
   const issues = useMemo(() => data?.issues ?? [], [data?.issues]);
   const visibleIssues = useMemo(
@@ -181,14 +188,6 @@ export function FeedbackPage({
     );
     return prioritized.length > 0 ? prioritized : visibleIssues.slice(0, 3);
   }, [priorityIds, reportMode, visibleIssues]);
-  const selectedIssueId =
-    activeIssueId === undefined
-      ? (reportIssues[0]?.id ?? null)
-      : activeIssueId === null
-        ? null
-        : reportIssues.some((issue) => issue.id === activeIssueId)
-          ? activeIssueId
-          : (reportIssues[0]?.id ?? null);
   const segments = useMemo(
     () => buildFeedbackSegments(data?.originalEssay ?? "", issues),
     [data?.originalEssay, issues],
@@ -211,12 +210,7 @@ export function FeedbackPage({
    */
   const paragraphLayout = useMemo(() => {
     const source = data?.originalEssay ?? "";
-    const chunks: Array<{
-      index: number;
-      text: string;
-      leading: string;
-      start: number;
-    }> = [];
+    const chunks: EssayParagraphChunk[] = [];
     let textOffset = 0;
     let pendingLeading = "";
     let paragraphIndex = 0;
@@ -254,7 +248,7 @@ export function FeedbackPage({
   );
 
   const issuesInChunk = useCallback(
-    (chunk: { index: number; text: string; leading: string; start: number }) =>
+    (chunk: EssayParagraphChunk) =>
       issues
         .filter((issue) => {
           if (issue.startOffset !== null && issue.endOffset !== null) {
@@ -275,6 +269,94 @@ export function FeedbackPage({
     [issues],
   );
 
+  const comparisonPages = useMemo<ComparisonPage[]>(() => {
+    const chunks = paragraphLayout.chunks;
+    const pages: ComparisonPage[] = [];
+    for (let offset = 0; offset < chunks.length; offset += paragraphsPerPage) {
+      const pageChunks = chunks.slice(offset, offset + paragraphsPerPage);
+      const issueIds = pageChunks.flatMap((chunk) =>
+        issuesInChunk(chunk).map((issue) => issue.id),
+      );
+      if (issueIds.length <= 1) {
+        pages.push({
+          pageNumber: pages.length + 1,
+          chunks: pageChunks,
+          issueIds: new Set(issueIds),
+        });
+      } else {
+        for (const issueId of issueIds) {
+          pages.push({
+            pageNumber: pages.length + 1,
+            chunks: pageChunks,
+            issueIds: new Set([issueId]),
+          });
+        }
+      }
+    }
+    if (pages.length === 0) {
+      pages.push({ pageNumber: 1, chunks: [], issueIds: new Set() });
+    }
+
+    const assignedIssueIds = new Set(
+      pages.flatMap((page) => Array.from(page.issueIds)),
+    );
+    const firstPage = pages[0];
+    if (!firstPage) return pages;
+    for (const issue of issues) {
+      if (!assignedIssueIds.has(issue.id)) {
+        pages.push({
+          pageNumber: pages.length + 1,
+          chunks: [],
+          issueIds: new Set([issue.id]),
+        });
+      }
+    }
+    pages.forEach((page, index) => {
+      page.pageNumber = index + 1;
+    });
+    return pages;
+  }, [issues, issuesInChunk, paragraphLayout.chunks, paragraphsPerPage]);
+
+  const issuePageIndex = useMemo(() => {
+    const map = new Map<string, number>();
+    comparisonPages.forEach((page, index) => {
+      page.issueIds.forEach((issueId) => map.set(issueId, index));
+    });
+    return map;
+  }, [comparisonPages]);
+
+  const [manualPageIndex, setManualPageIndex] = useState<number | null>(null);
+  const requestedPageIndex =
+    view === "compare" && requestedIssueId
+      ? issuePageIndex.get(requestedIssueId)
+      : undefined;
+  const currentPageIndex = Math.min(
+    manualPageIndex ?? requestedPageIndex ?? 0,
+    Math.max(comparisonPages.length - 1, 0),
+  );
+  const currentComparisonPage = comparisonPages[currentPageIndex] ?? {
+    pageNumber: 1,
+    chunks: [],
+    issueIds: new Set<string>(),
+  };
+  const pageReportIssues = useMemo(
+    () =>
+      view === "compare"
+        ? reportIssues.filter((issue) =>
+            currentComparisonPage.issueIds.has(issue.id),
+          )
+        : reportIssues,
+    [currentComparisonPage.issueIds, reportIssues, view],
+  );
+  const selectedIssueId =
+    activeIssueId === undefined
+      ? (pageReportIssues[0]?.id ?? null)
+      : activeIssueId === null
+        ? null
+        : pageReportIssues.some((issue) => issue.id === activeIssueId)
+          ? activeIssueId
+          : (pageReportIssues[0]?.id ?? null);
+
   const announceIssue = useCallback(
     (issueId: string, destination: MobilePane) => {
       const issue = issues.find((candidate) => candidate.id === issueId);
@@ -294,40 +376,57 @@ export function FeedbackPage({
     [issues, text],
   );
 
-  const scrollToRef = useCallback(
-    (refs: RefObject<Record<string, HTMLElement | null>>, issueId: string) => {
-      window.requestAnimationFrame(() => {
-        refs.current[issueId]?.scrollIntoView({
-          behavior: scrollBehavior(),
-          block: "center",
-        });
-      });
+  const changeComparisonPage = useCallback(
+    (nextIndex: number) => {
+      const safeIndex = Math.max(
+        0,
+        Math.min(nextIndex, comparisonPages.length - 1),
+      );
+      const nextPage = comparisonPages[safeIndex];
+      setManualPageIndex(safeIndex);
+      if (!nextPage) return;
+      if (selectedIssueId && nextPage.issueIds.has(selectedIssueId)) return;
+      const nextIssue = reportIssues.find((issue) =>
+        nextPage.issueIds.has(issue.id),
+      );
+      setActiveIssueId(nextIssue?.id ?? null);
     },
-    [],
+    [comparisonPages, reportIssues, selectedIssueId],
   );
 
   const activateSuggestion = useCallback(
     (issueId: string) => {
       setActiveIssueId((current) => {
-        const selected = current === undefined ? reportIssues[0]?.id : current;
+        const selected = current === undefined ? selectedIssueId : current;
         return selected === issueId ? null : issueId;
       });
-      if (panesAreSideBySide() && highlightableIds.has(issueId)) {
-        scrollToRef(highlightRefs, issueId);
-        announceIssue(issueId, "source");
+      if (view === "compare") {
+        const pageIndex = issuePageIndex.get(issueId);
+        if (pageIndex !== undefined && pageIndex !== currentPageIndex) {
+          setManualPageIndex(pageIndex);
+        }
+        if (highlightableIds.has(issueId)) announceIssue(issueId, "source");
       }
     },
-    [announceIssue, highlightableIds, reportIssues, scrollToRef],
+    [
+      announceIssue,
+      currentPageIndex,
+      highlightableIds,
+      issuePageIndex,
+      selectedIssueId,
+      view,
+    ],
   );
 
   const showIssueInSource = useCallback(
     (issueId: string) => {
       setActiveIssueId(issueId);
       setMobilePane("source");
-      scrollToRef(highlightRefs, issueId);
+      const pageIndex = issuePageIndex.get(issueId);
+      if (pageIndex !== undefined) setManualPageIndex(pageIndex);
       announceIssue(issueId, "source");
     },
-    [announceIssue, scrollToRef],
+    [announceIssue, issuePageIndex],
   );
 
   const activateFromHighlight = useCallback(
@@ -338,10 +437,9 @@ export function FeedbackPage({
       }
       setActiveIssueId(issueId);
       if (usesSinglePaneReport()) setMobilePane("suggestions");
-      scrollToRef(cardRefs, issueId);
       announceIssue(issueId, "suggestions");
     },
-    [announceIssue, priorityIds, reportMode, scrollToRef],
+    [announceIssue, priorityIds, reportMode],
   );
 
   const renderSourceSegment = useCallback(
@@ -372,9 +470,6 @@ export function FeedbackPage({
               event.preventDefault();
               activateFromHighlight(segment.issueId);
             }
-          }}
-          ref={(node) => {
-            highlightRefs.current[segment.issueId] = node;
           }}
           role="button"
           tabIndex={0}
@@ -407,12 +502,11 @@ export function FeedbackPage({
     return <Skeleton label={messages.common.loading} />;
   }
 
-  const grammarLeaks = data.issues.filter((issue) =>
-    ["GRAMMAR", "SPELLING", "WORD_FORM"].includes(issue.issueType),
-  );
-
   return (
-    <PageLayout variant="workspace" className={styles.page!}>
+    <PageLayout
+      variant="workspace"
+      className={`${styles.page!} ${view === "compare" ? styles.focusPage! : ""}`}
+    >
       <div data-feedback-report data-feedback-report-mode={reportMode}>
         <PageHeader
           actions={
@@ -622,7 +716,12 @@ export function FeedbackPage({
         ) : null}
 
         {view === "compare" ? (
-          <>
+          <div
+            className={styles.focusWorkspace}
+            data-feedback-focus-workbench
+            data-feedback-page={currentComparisonPage.pageNumber}
+            data-feedback-page-count={comparisonPages.length}
+          >
             <div
               aria-label={text("报告视图", "Report view")}
               className={styles.mobileSwitcher}
@@ -645,7 +744,7 @@ export function FeedbackPage({
                 type="button"
               >
                 {text("修改建议", "Suggestions")}
-                <span>{reportIssues.length}</span>
+                <span>{pageReportIssues.length}</span>
               </button>
             </div>
 
@@ -653,7 +752,7 @@ export function FeedbackPage({
               {locationMessage}
             </p>
 
-            <ResponsiveReport>
+            <ResponsiveReport focus>
               <section
                 aria-label={text("原题与作文原文", "Task and original essay")}
                 className={`${styles.sourcePane} ${
@@ -672,7 +771,7 @@ export function FeedbackPage({
                 </div>
 
                 <div className={styles.essay} data-feedback-essay lang="en">
-                  {paragraphLayout.chunks.map((chunk) => {
+                  {currentComparisonPage.chunks.map((chunk) => {
                     const paragraphFeedback = paragraphFeedbackByIndex.get(
                       chunk.index,
                     );
@@ -745,7 +844,8 @@ export function FeedbackPage({
                       </Fragment>
                     );
                   })}
-                  {paragraphLayout.trailing ? (
+                  {currentPageIndex === comparisonPages.length - 1 &&
+                  paragraphLayout.trailing ? (
                     <span>{paragraphLayout.trailing}</span>
                   ) : null}
                 </div>
@@ -768,12 +868,17 @@ export function FeedbackPage({
                   mobilePane === "suggestions" ? styles.mobileActive : ""
                 }`}
                 data-suggestion-panel
+                data-feedback-mobile-detail={
+                  paragraphsPerPage === 1 && selectedIssueId
+                    ? "true"
+                    : undefined
+                }
                 data-testid="feedback-suggestion-pane"
                 id="feedback-suggestion-panel"
               >
                 <div className={styles.suggestionHeader}>
                   <h2>{text("修改建议", "Suggestions")}</h2>
-                  <span>{reportIssues.length}</span>
+                  <span>{pageReportIssues.length}</span>
                 </div>
 
                 <div
@@ -843,8 +948,8 @@ export function FeedbackPage({
                 ) : null}
 
                 <div className={styles.issueList}>
-                  {reportIssues.length > 0 ? (
-                    reportIssues.map((issue) => {
+                  {pageReportIssues.length > 0 ? (
+                    pageReportIssues.map((issue) => {
                       const active = selectedIssueId === issue.id;
                       const isTarget = data.targetIssueId === issue.id;
                       const canLocate = highlightableIds.has(issue.id);
@@ -855,9 +960,6 @@ export function FeedbackPage({
                           data-feedback-issue-card={issue.id}
                           id={`feedback-issue-card-${issue.id}`}
                           key={issue.id}
-                          ref={(node) => {
-                            cardRefs.current[issue.id] = node;
-                          }}
                         >
                           <button
                             aria-controls={`feedback-issue-details-${issue.id}${
@@ -1024,17 +1126,27 @@ export function FeedbackPage({
                     data-feedback-full-detail="accuracy"
                   >
                     <h3>{text("基础漏洞速查", "Basic accuracy check")}</h3>
-                    {grammarLeaks.length > 0 ? (
+                    {pageReportIssues.filter((issue) =>
+                      ["GRAMMAR", "SPELLING", "WORD_FORM"].includes(
+                        issue.issueType,
+                      ),
+                    ).length > 0 ? (
                       <ul>
-                        {grammarLeaks.map((issue) => (
-                          <li key={`leak-${issue.id}`}>
-                            <CheckCircle2 aria-hidden="true" size={14} />
-                            <span>
-                              <b lang="en">{issue.evidence}</b>
-                              {issue.knowledgePointZh}
-                            </span>
-                          </li>
-                        ))}
+                        {pageReportIssues
+                          .filter((issue) =>
+                            ["GRAMMAR", "SPELLING", "WORD_FORM"].includes(
+                              issue.issueType,
+                            ),
+                          )
+                          .map((issue) => (
+                            <li key={`leak-${issue.id}`}>
+                              <CheckCircle2 aria-hidden="true" size={14} />
+                              <span>
+                                <b lang="en">{issue.evidence}</b>
+                                {issue.knowledgePointZh}
+                              </span>
+                            </li>
+                          ))}
                       </ul>
                     ) : (
                       <p>
@@ -1048,7 +1160,38 @@ export function FeedbackPage({
                 ) : null}
               </aside>
             </ResponsiveReport>
-          </>
+
+            <nav
+              aria-label={text("原文对照分页", "Original comparison pages")}
+              className={styles.comparisonPager}
+              data-feedback-pagination
+            >
+              <button
+                data-feedback-page-prev
+                disabled={currentPageIndex === 0}
+                onClick={() => changeComparisonPage(currentPageIndex - 1)}
+                type="button"
+              >
+                <ChevronLeft aria-hidden="true" size={16} />
+                {text("上一页", "Previous")}
+              </button>
+              <span aria-live="polite">
+                {text(
+                  `第 ${currentComparisonPage.pageNumber} / ${comparisonPages.length} 页`,
+                  `Page ${currentComparisonPage.pageNumber} of ${comparisonPages.length}`,
+                )}
+              </span>
+              <button
+                data-feedback-page-next
+                disabled={currentPageIndex >= comparisonPages.length - 1}
+                onClick={() => changeComparisonPage(currentPageIndex + 1)}
+                type="button"
+              >
+                {text("下一页", "Next")}
+                <ChevronRight aria-hidden="true" size={16} />
+              </button>
+            </nav>
+          </div>
         ) : null}
 
         {view === "summary" ? (

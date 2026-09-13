@@ -36,6 +36,22 @@
   container-type: inline-size;
 }
 
+.focusPage {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: var(--desk-space-4) var(--desk-space-6) var(--desk-space-3);
+  flex-direction: column;
+}
+
+.focusPage > [data-feedback-report] {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
 .page :global(.eyebrow),
 .page :global(.badge) {
   font-size: var(--desk-type-meta);
@@ -343,8 +359,129 @@
 
 .workbench {
   width: 100%;
+  min-height: 0;
   align-items: start;
   overflow: visible;
+}
+
+.focusWorkspace {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--desk-space-3);
+  overflow: hidden;
+}
+
+.focusWorkspace [data-feedback-workbench] {
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.focusWorkspace .resizablePanel {
+  min-height: 0;
+}
+
+.focusWorkspace .sourcePane,
+.focusWorkspace .suggestionPane {
+  position: static;
+  display: flex;
+  height: 100%;
+  max-height: none;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.focusWorkspace .essay,
+.focusWorkspace .issueList {
+  min-height: 0;
+  overflow: hidden;
+  flex: 1;
+}
+
+.focusWorkspace .issueDetails {
+  display: grid;
+  padding-right: var(--desk-space-4);
+  padding-left: var(--desk-space-4);
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  gap: var(--desk-space-2) var(--desk-space-3);
+}
+
+.focusWorkspace .issueDetails > .detailBlock,
+.focusWorkspace .issueDetails > .revisionBlock,
+.focusWorkspace .issueDetails > .transferBlock,
+.focusWorkspace .issueDetails > .focusReason,
+.focusWorkspace .issueDetails > .locateButton,
+.focusWorkspace .issueDetails > .unlocatedNote {
+  min-width: 0;
+}
+
+.focusWorkspace .issueDetails > .revisionBlock,
+.focusWorkspace .issueDetails > .transferBlock,
+.focusWorkspace .issueDetails > .focusReason,
+.focusWorkspace .issueDetails > .locateButton,
+.focusWorkspace .issueDetails > .unlocatedNote {
+  grid-column: 1 / -1;
+}
+
+.focusWorkspace .issueDetails > .detailBlock:nth-of-type(3) {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.focusWorkspace .issueDetails > .detailBlock + .revisionBlock,
+.focusWorkspace .issueDetails > .revisionBlock + .detailBlock,
+.focusWorkspace .issueDetails > .detailBlock + .transferBlock {
+  margin-top: 0;
+}
+
+.comparisonPager {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: var(--desk-space-4);
+}
+
+.comparisonPager button {
+  display: inline-flex;
+  min-height: 40px;
+  padding: var(--desk-space-2) var(--desk-space-3);
+  color: var(--desk-ink);
+  background: var(--desk-paper);
+  border: 1px solid color-mix(in srgb, var(--desk-ink) 18%, transparent);
+  border-radius: var(--desk-radius-sm);
+  font: inherit;
+  font-size: var(--desk-type-meta);
+  font-weight: var(--desk-body-weight-semibold);
+  cursor: pointer;
+  align-items: center;
+  gap: var(--desk-space-1);
+}
+
+.comparisonPager button:hover:not(:disabled) {
+  background: var(--desk-canvas);
+}
+
+.comparisonPager button:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--desk-blue) 34%, transparent);
+  outline-offset: 2px;
+}
+
+.comparisonPager button:disabled {
+  color: var(--desk-evidence-muted);
+  background: color-mix(in srgb, var(--desk-ink) 4%, var(--desk-paper));
+  cursor: not-allowed;
+}
+
+.comparisonPager > span {
+  min-width: 110px;
+  color: var(--desk-ink-muted);
+  font-family: var(--desk-font-utility);
+  font-size: var(--desk-type-meta);
+  text-align: center;
 }
 
 .resizablePanel {
@@ -1266,6 +1403,124 @@
 
   .lockedModelCard {
     align-items: flex-start;
+  }
+}
+
+@media (max-width: 939px) {
+  .focusPage {
+    padding: var(--desk-space-2) var(--desk-space-3) var(--desk-space-2);
+  }
+
+  .focusWorkspace .mobileSwitcher {
+    position: static;
+  }
+
+  .focusWorkspace .issueDetails {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .focusWorkspace .issueDetails > .detailBlock:nth-of-type(3) {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .focusWorkspace
+    .suggestionPane[data-feedback-mobile-detail="true"]
+    .issueFilters,
+  .focusWorkspace
+    .suggestionPane[data-feedback-mobile-detail="true"]
+    .filterHelp {
+    display: none;
+  }
+
+  .focusWorkspace
+    .suggestionPane[data-feedback-mobile-detail="true"]
+    .detailBlock:nth-of-type(3),
+  .focusWorkspace
+    .suggestionPane[data-feedback-mobile-detail="true"]
+    .transferBlock,
+  .focusWorkspace
+    .suggestionPane[data-feedback-mobile-detail="true"]
+    .focusReason,
+  .focusWorkspace
+    .suggestionPane[data-feedback-mobile-detail="true"]
+    .locateButton {
+    display: none;
+  }
+
+  .focusWorkspace
+    .suggestionPane[data-feedback-mobile-detail="true"]
+    .issueTrigger {
+    padding: var(--desk-space-3);
+  }
+
+  .focusWorkspace
+    .suggestionPane[data-feedback-mobile-detail="true"]
+    .issueDetails {
+    padding: 0 var(--desk-space-3) var(--desk-space-3);
+    gap: var(--desk-space-1);
+  }
+
+  .focusWorkspace
+    .suggestionPane[data-feedback-mobile-detail="true"]
+    .detailBlock,
+  .focusWorkspace
+    .suggestionPane[data-feedback-mobile-detail="true"]
+    .revisionBlock,
+  .focusWorkspace
+    .suggestionPane[data-feedback-mobile-detail="true"]
+    .transferBlock {
+    padding-top: var(--desk-space-2);
+  }
+
+  .focusWorkspace
+    .suggestionPane[data-feedback-mobile-detail="true"]
+    .detailBlock
+    p,
+  .focusWorkspace
+    .suggestionPane[data-feedback-mobile-detail="true"]
+    .transferBlock
+    p {
+    line-height: 1.45;
+  }
+
+  .focusWorkspace
+    .suggestionPane[data-feedback-mobile-detail="true"]
+    .revisionBlock {
+    padding: var(--desk-space-2);
+  }
+
+  .focusWorkspace
+    .suggestionPane[data-feedback-mobile-detail="true"]
+    .revisionBlock
+    p {
+    line-height: 1.45;
+  }
+
+  .focusWorkspace
+    .suggestionPane[data-feedback-mobile-detail="true"]
+    .evidenceRelation {
+    display: none;
+  }
+
+  .focusWorkspace .sourcePane,
+  .focusWorkspace .suggestionPane {
+    display: none;
+  }
+
+  .focusWorkspace .sourcePane.mobileActive,
+  .focusWorkspace .suggestionPane.mobileActive {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+  }
+
+  .focusWorkspace .comparisonPager {
+    gap: var(--desk-space-2);
+  }
+
+  .comparisonPager > span {
+    min-width: 88px;
   }
 }
 

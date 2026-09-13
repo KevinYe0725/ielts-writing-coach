@@ -51,5 +51,46 @@ test.describe("feedback report views", () => {
           document.documentElement.clientWidth + 1,
       ),
     ).toBe(true);
+    await page.getByRole("tab", { name: "原文", exact: true }).click();
+    await expect(
+      page.locator("[data-testid='feedback-source-pane']"),
+    ).toBeVisible();
+    await expect(
+      page.locator("[data-testid='feedback-suggestion-pane']"),
+    ).toBeHidden();
+  });
+
+  test("paginates the focused comparison without vertical scrolling", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/feedback/compare?cycle=cycle-demo");
+
+    const workbench = page.locator("[data-feedback-focus-workbench]");
+    await expect(workbench).toHaveAttribute("data-feedback-page", "1");
+    await expect(workbench).toHaveAttribute("data-feedback-page-count", "4");
+    await expect(page.locator("[data-feedback-page='1']")).toBeVisible();
+    await expect(page.locator("[data-feedback-page='2']")).toHaveCount(0);
+    await expect(page.locator("[data-feedback-page-prev]")).toBeDisabled();
+    await expect(page.locator("[data-feedback-page-next]")).toBeEnabled();
+    expect(
+      await workbench.evaluate((node) => {
+        const element = node as HTMLElement;
+        return getComputedStyle(element).overflowY;
+      }),
+    ).toBe("hidden");
+    expect(
+      await page.evaluate(() => {
+        const documentElement = document.documentElement;
+        return documentElement.scrollHeight <= documentElement.clientHeight + 1;
+      }),
+    ).toBe(true);
+
+    await page.locator("[data-feedback-page-next]").click();
+    await expect(workbench).toHaveAttribute("data-feedback-page", "2");
+    await expect(page.locator("[data-feedback-page='1']")).toHaveCount(0);
+    await expect(page.locator("[data-feedback-page='2']")).toBeVisible();
+    await expect(page.locator("[data-feedback-page-prev]")).toBeEnabled();
+    await expect(page.locator("[data-feedback-page-next]")).toBeEnabled();
   });
 });

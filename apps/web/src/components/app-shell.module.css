@@ -267,6 +267,15 @@
 .mainContent[data-page-layout="workspace"] {
   max-width: var(--desk-layout-workspace-max);
 }
+.mainContent[data-feedback-focus="true"] {
+  display: flex;
+  max-width: none;
+  height: calc(100svh - var(--workspace-header-height));
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+  flex-direction: column;
+}
 .entryShell {
   min-height: 100svh;
   color: var(--desk-ink);

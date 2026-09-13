@@ -20,8 +20,10 @@ function reportWidthSnapshot() {
 
 export function ResponsiveReport({
   children,
+  focus = false,
 }: {
   children: [ReactNode, ReactNode];
+  focus?: boolean;
 }) {
   const { text } = useLocale();
   const resizable = useSyncExternalStore(
@@ -51,7 +53,11 @@ export function ResponsiveReport({
       defaultLayout={{ "feedback-source": 58, "feedback-suggestions": 42 }}
       id="feedback-report-panels"
       orientation="horizontal"
-      style={{ alignItems: "stretch", height: "auto", overflow: "visible" }}
+      style={{
+        alignItems: "stretch",
+        height: focus ? "100%" : "auto",
+        overflow: focus ? "hidden" : "visible",
+      }}
       data-testid="feedback-workbench"
     >
       <Panel
@@ -59,7 +65,7 @@ export function ResponsiveReport({
         defaultSize="58%"
         id="feedback-source"
         minSize={420}
-        style={{ overflow: "visible" }}
+        style={{ overflow: focus ? "hidden" : "visible" }}
       >
         {source}
       </Panel>
@@ -75,7 +81,7 @@ export function ResponsiveReport({
         defaultSize="42%"
         id="feedback-suggestions"
         minSize={340}
-        style={{ overflow: "visible" }}
+        style={{ overflow: focus ? "hidden" : "visible" }}
       >
         {suggestions}
       </Panel>

@@ -249,6 +249,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const writingPage = pathname === "/write" || pathname === "/rewrite";
   const feedbackPage =
     pathname === "/feedback" || pathname.startsWith("/feedback/");
+  const feedbackComparePage =
+    pathname === "/feedback/compare" ||
+    pathname.startsWith("/feedback/compare/");
   const setup = ["/setup", "/signin", "/join", "/recover"].some((path) =>
     pathname.startsWith(path),
   );
@@ -299,6 +302,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           setup ? styles.entryMain : styles.mainContent,
         )}
         data-page-layout={layoutVariant}
+        data-feedback-focus={feedbackComparePage ? "true" : undefined}
         id="main-content"
         tabIndex={-1}
       >
