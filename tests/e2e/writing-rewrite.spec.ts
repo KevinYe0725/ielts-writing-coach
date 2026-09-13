@@ -151,7 +151,7 @@ test.describe("timed writing rooms", () => {
     await expect(submissionToast).toBeVisible();
     await expect(submissionToast).toHaveCSS(
       "background-color",
-      "rgb(7, 117, 129)",
+      "rgb(17, 17, 17)",
     );
     await expect(submissionToast).not.toHaveCSS(
       "background-color",

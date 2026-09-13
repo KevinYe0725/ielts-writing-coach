@@ -7,7 +7,7 @@
 
 /* Today is the focused course home. Keep the learning content monochrome so
    the next action, rather than semantic color, carries the visual emphasis. */
-.courseHomeShell {
+.monochromeShell {
   --desk-ink: var(--desk-mono-ink);
   --desk-paper: var(--desk-mono-paper);
   --desk-canvas: var(--desk-mono-canvas);

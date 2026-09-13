@@ -246,6 +246,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const layoutVariant = layoutVariantForPathname(pathname);
   const publicHome = pathname === "/signin";
   const courseHome = pathname === "/today";
+  const writingPage = pathname === "/write" || pathname === "/rewrite";
   const setup = ["/setup", "/signin", "/join", "/recover"].some((path) =>
     pathname.startsWith(path),
   );
@@ -266,7 +267,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       className={cn(
         setup ? "setup-shell" : "app-shell",
         setup ? styles.entryShell : styles.shell,
-        courseHome && styles.courseHomeShell,
+        (courseHome || writingPage) && styles.monochromeShell,
       )}
       data-app-shell={setup ? undefined : ""}
       data-course-home={courseHome ? "true" : undefined}
