@@ -47,7 +47,7 @@ export const PROMPT_REGISTRY: Readonly<Record<AITaskKind, PromptDefinition>> = {
   },
   issue_classification: {
     task: "issue_classification",
-    version: "1.4.0",
+    version: "1.5.0",
     rubricVersion: "iwc-skill-taxonomy-1.0.0",
     system: withKnowledge(
       "issue_classification",

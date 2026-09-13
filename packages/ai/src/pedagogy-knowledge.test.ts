@@ -27,6 +27,15 @@ describe("runtime pedagogy knowledge", () => {
     expect(guidance).toContain("not a language error");
   });
 
+  it("requires learner-facing issue titles to name an observable action", () => {
+    const guidance = pedagogyGuidanceFor("issue_classification");
+
+    expect(guidance).toContain("user-facing title");
+    expect(guidance).toContain("knowledgePointZh");
+    expect(guidance).toContain("exact original term");
+    expect(guidance).toContain("Do not use abstract noun-only labels");
+  });
+
   it("gives paper generation a one-place instruction contract", () => {
     const guidance = pedagogyGuidanceFor("exercise_generation");
 

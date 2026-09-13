@@ -802,7 +802,7 @@ test.describe("annotation desk redesign contracts", () => {
       evidence.locator('[data-evidence-state="revision"]'),
     ).toBeVisible();
     const evidenceLabelMetrics = await evidence
-      .getByText("修改建议", { exact: true })
+      .getByText("原句", { exact: true })
       .evaluate((element) => {
         const style = window.getComputedStyle(element);
         return {
