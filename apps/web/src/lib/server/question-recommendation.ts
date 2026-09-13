@@ -253,13 +253,13 @@ export async function createQuestionRecommendation(
         question: selection.question,
       };
       if (selection.remainingEligibleCount < REFILL_THRESHOLD) {
-        await reserveRefillWithoutRollingBackReady(transaction, actorId);
+        await reserveRefillWithoutRollingBackReady(transaction, actorId, now);
       }
       await options.afterPersist?.(transaction, result);
       return result;
     }
 
-    const refill = await reserveRefill(transaction, actorId);
+    const refill = await reserveRefill(transaction, actorId, now);
     if (refill.kind === "RECHECK") {
       const refreshed = await selectForLearner(transaction, actorId, {
         now,
@@ -284,7 +284,7 @@ export async function createQuestionRecommendation(
           question: refreshed.question,
         };
         if (refreshed.remainingEligibleCount < REFILL_THRESHOLD) {
-          await reserveRefillWithoutRollingBackReady(transaction, actorId);
+          await reserveRefillWithoutRollingBackReady(transaction, actorId, now);
         }
         await options.afterPersist?.(transaction, result);
         return result;
@@ -441,7 +441,7 @@ export async function getQuestionRecommendation(
         ),
       );
     if (selection.remainingEligibleCount < REFILL_THRESHOLD) {
-      await reserveRefillWithoutRollingBackReady(transaction, actorId);
+      await reserveRefillWithoutRollingBackReady(transaction, actorId, now);
     }
     return { id: stored.id, status: "READY", question: selection.question };
   });
@@ -756,9 +756,10 @@ async function selectForLearner(
 async function reserveRefillWithoutRollingBackReady(
   transaction: DatabaseTransaction,
   actorId: string,
+  now: Date,
 ): Promise<void> {
   try {
-    await reserveRefill(transaction, actorId);
+    await reserveRefill(transaction, actorId, now);
   } catch (error) {
     const code = (error as { code?: string }).code;
     if (
@@ -774,6 +775,7 @@ async function reserveRefillWithoutRollingBackReady(
 async function reserveRefill(
   transaction: DatabaseTransaction,
   actorId: string,
+  now: Date,
 ): Promise<
   | { kind: "RESERVED" | "ACTIVE"; batchId: string }
   | { kind: "COOLDOWN" }
@@ -792,7 +794,9 @@ async function reserveRefill(
         promptVersion: "1.0.0",
         rubricVersion: "iwc-question-bank-refill-1.0.0",
       });
-      await enqueueQuestionBankRefill(savepoint, actorId, reservedBatchId);
+      await enqueueQuestionBankRefill(savepoint, actorId, reservedBatchId, {
+        now,
+      });
       return reservedBatchId;
     });
     return { kind: "RESERVED", batchId };
@@ -819,7 +823,7 @@ async function reserveRefill(
       const currentDecision = automaticQuestionBankRefillDecision({
         hasOtherNonTerminalBatch: false,
         latestFailedAt: latestFailed?.updatedAt ?? null,
-        now: new Date(),
+        now,
       });
       return currentDecision.allowed
         ? { kind: "RECHECK" }

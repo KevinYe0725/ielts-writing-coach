@@ -12,6 +12,7 @@ import {
 import { getServerContext } from "@/lib/server/context";
 import { apiRoute } from "@/lib/server/problem";
 import { requireSession } from "@/lib/server/session";
+import { learnerAiStatus } from "@/lib/server/learner-ai-status";
 
 const actionPriority: Readonly<Record<NextAction["kind"], number>> = {
   CONTINUE_ATTEMPT_1: 1,
@@ -54,6 +55,7 @@ function deriveLessonStatus(state: string) {
 export const GET = apiRoute(async (request) => {
   const actor = await requireSession(request);
   const { db } = getServerContext();
+  const aiService = await learnerAiStatus(actor);
   const cycles = await db.query.trainingCycle.findMany({
     where: and(
       eq(trainingCycle.userId, actor.id),
@@ -73,6 +75,7 @@ export const GET = apiRoute(async (request) => {
 
   if (cycles.length === 0) {
     return Response.json({
+      ai_service: aiService,
       next_action: {
         kind: "START_NEW_CYCLE",
         entityId: "question-bank",
@@ -134,34 +137,45 @@ export const GET = apiRoute(async (request) => {
       left.cycle.id.localeCompare(right.cycle.id),
   );
   const [selected, ...queue] = candidates;
-  // Any job in the cycle's scoring chain that is not making progress — still
-  // waiting for consent, failed, or blocked — is surfaced so the learner sees
-  // an actionable state instead of an endless "waiting" card. This covers
-  // issue classification and focused-package generation failures, not just
-  // the terminal assessment/comparison jobs.
+  // Read the latest chain attempt, including successful retries. Filtering only
+  // failures would resurrect an older failure after a later attempt completed.
   const chainTaskKinds = [
     "ielts_assessment",
     "issue_classification",
     "exercise_generation",
     "version_comparison",
   ];
-  const pendingJob =
+  const activeJob = selected
+    ? await db.query.aiJob.findFirst({
+        where: and(
+          eq(aiJob.ownerId, actor.id),
+          inArray(aiJob.taskKind, chainTaskKinds),
+          inArray(aiJob.status, [
+            "QUEUED",
+            "LEASED",
+            "RUNNING",
+            "RETRY_SCHEDULED",
+          ]),
+          sql`${aiJob.protectedReference}->>'cycleId' = ${selected.cycle.id}`,
+        ),
+        orderBy: [desc(aiJob.updatedAt), desc(aiJob.createdAt), desc(aiJob.id)],
+      })
+    : null;
+  const latestJob =
     selected != null
       ? await db.query.aiJob.findFirst({
           where: and(
             eq(aiJob.ownerId, actor.id),
             inArray(aiJob.taskKind, chainTaskKinds),
-            inArray(aiJob.status, [
-              "WAITING_FOR_CONSENT",
-              "FAILED",
-              "AI_BLOCKED",
-            ]),
             sql`${aiJob.protectedReference}->>'cycleId' = ${selected.cycle.id}`,
           ),
-          orderBy: [desc(aiJob.createdAt)],
+          orderBy: [desc(aiJob.createdAt), desc(aiJob.id)],
         })
       : null;
+  const pendingJob =
+    activeJob ?? (latestJob?.status === "SUCCEEDED" ? null : latestJob);
   return Response.json({
+    ai_service: aiService,
     next_action: selected?.action,
     cycle: selected
       ? {

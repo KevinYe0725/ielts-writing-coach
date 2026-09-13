@@ -2,142 +2,43 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import {
-  Suspense,
-  useEffect,
-  useState,
-  useSyncExternalStore,
-  type Dispatch,
-  type ReactNode,
-  type SetStateAction,
-} from "react";
+import { Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   BarChart3,
-  BookOpenCheck,
-  BrainCircuit,
-  ChevronRight,
-  ClipboardCheck,
+  ChevronDown,
   FileDiff,
   Feather,
-  Home,
   Languages,
-  Menu,
-  PanelLeftClose,
-  PanelLeftOpen,
-  PenLine,
   RefreshCw,
   Settings,
   Sparkles,
-  UserRound,
 } from "lucide-react";
 
+import { AccountMenu } from "@/components/account-menu";
+import { EssaySwitcher } from "@/components/essay-switcher";
+import { layoutVariantForPathname } from "@/components/layout/page-layout";
 import { useLocale } from "@/components/locale-provider";
 import { NotificationCenter } from "@/components/notification-center";
-import { AccountMenu } from "@/components/account-menu";
-import { layoutVariantForPathname } from "@/components/layout/page-layout";
+import { useClientReady } from "@/components/use-client-ready";
 import { cn } from "@/components/utils";
 import {
-  buildLearningDestinations,
   readLearningDestinations,
   type LearningDestinations,
 } from "@/lib/client/learning-navigation";
+import { workspaceDestinations } from "@/lib/client/workspace-navigation";
 
 import styles from "./app-shell.module.css";
 
-const navItems = [
-  { href: "/today", key: "today", icon: Home },
-  { href: "/essays", key: "essays", icon: BookOpenCheck },
-  { href: "/write", key: "write", icon: PenLine },
-  { href: "/feedback", key: "feedback", icon: ClipboardCheck },
-  { href: "/lesson", key: "lesson", icon: BrainCircuit },
-  { href: "/rewrite", key: "rewrite", icon: RefreshCw },
-  { href: "/compare", key: "compare", icon: FileDiff },
-  { href: "/growth", key: "growth", icon: BarChart3 },
-] as const;
-
-const utilityItems = [
-  { href: "/settings", key: "settings", icon: Settings },
-] as const;
-
-const SIDEBAR_STORAGE_KEY = "iwc:sidebar-collapsed:v1";
-const SIDEBAR_CHANGE_EVENT = "iwc:sidebar-preference";
-let transientSidebarCollapsed = false;
-
-function useLearningDestinations(pathname: string) {
-  const [destinations, setDestinations] = useState<LearningDestinations>(() =>
-    buildLearningDestinations({
-      cycleId: null,
-      writingAvailable: false,
-      feedbackAvailable: false,
-      lessonId: null,
-      rewriteTaskId: null,
-      comparisonAvailable: false,
-      transferTaskId: null,
-    }),
-  );
-
-  useEffect(() => {
-    const update = () => setDestinations(readLearningDestinations());
-    window.addEventListener("storage", update);
-    window.addEventListener("iwc:learning-navigation", update);
-    update();
-    return () => {
-      window.removeEventListener("storage", update);
-      window.removeEventListener("iwc:learning-navigation", update);
-    };
-  }, [pathname]);
-
-  return destinations;
-}
-
-function sidebarCollapsedSnapshot() {
-  if (typeof window === "undefined") return false;
-  try {
-    const saved = window.localStorage.getItem(SIDEBAR_STORAGE_KEY);
-    if (saved !== null) transientSidebarCollapsed = saved === "true";
-  } catch {
-    // The in-memory preference still keeps this tab usable when storage is off.
-  }
-  return transientSidebarCollapsed;
-}
-
-function subscribeToSidebarPreference(onStoreChange: () => void) {
-  const handleStorage = (event: StorageEvent) => {
-    if (event.key === SIDEBAR_STORAGE_KEY) {
-      transientSidebarCollapsed = event.newValue === "true";
-      onStoreChange();
-    }
-  };
-  window.addEventListener("storage", handleStorage);
-  window.addEventListener(SIDEBAR_CHANGE_EVENT, onStoreChange);
-  return () => {
-    window.removeEventListener("storage", handleStorage);
-    window.removeEventListener(SIDEBAR_CHANGE_EVENT, onStoreChange);
-  };
-}
-
-function saveSidebarPreference(collapsed: boolean) {
-  transientSidebarCollapsed = collapsed;
-  try {
-    if (collapsed) {
-      window.localStorage.setItem(SIDEBAR_STORAGE_KEY, "true");
-    } else {
-      window.localStorage.removeItem(SIDEBAR_STORAGE_KEY);
-    }
-  } catch {
-    // Keep the in-memory preference for this tab.
-  }
-  window.dispatchEvent(new Event(SIDEBAR_CHANGE_EVENT));
-}
-
 function LocaleSwitch() {
   const { locale, setLocale, text } = useLocale();
-  const next = locale === "zh-CN" ? "en" : "zh-CN";
+  const interactive = useClientReady();
   return (
     <button
       aria-label={text("切换到英文界面", "Switch to Chinese interface")}
       className={cn("locale-switch", styles.localeSwitch)}
-      onClick={() => setLocale(next)}
+      data-interactive={interactive ? "true" : "false"}
+      disabled={!interactive}
+      onClick={() => setLocale(locale === "zh-CN" ? "en" : "zh-CN")}
       type="button"
     >
       <Languages aria-hidden="true" size={16} />
@@ -150,414 +51,258 @@ function Brand() {
   const { messages } = useLocale();
   return (
     <Link
-      aria-label={`${messages.brand} · ${messages.nav.today}`}
-      className={cn("brand", styles.brand)}
+      aria-label={messages.brand + " · " + messages.nav.today}
+      className={styles.brand}
       href="/today"
     >
-      <span className="brand-mark" aria-hidden="true">
-        <Feather size={21} strokeWidth={2.1} />
+      <span className={styles.brandMark} aria-hidden="true">
+        <Feather size={20} strokeWidth={2} />
       </span>
-      <span className="brand-copy">
-        <strong>{messages.brand}</strong>
-        <small>{messages.brandTagline}</small>
-      </span>
+      <strong>{messages.brand}</strong>
     </Link>
   );
 }
 
-function destinationForItem(
-  item: (typeof navItems)[number],
-  destinations: LearningDestinations,
-) {
-  return item.key === "essays" ? item.href : destinations[item.key];
-}
+const moreItems = [
+  { key: "rewrite", icon: RefreshCw, zh: "重写", en: "Rewrite" },
+  { key: "compare", icon: FileDiff, zh: "对比", en: "Compare" },
+  { key: "transfer", icon: Sparkles, zh: "陌生题迁移", en: "Transfer" },
+  { key: "growth", icon: BarChart3, zh: "成长记录", en: "Growth" },
+  { key: "settings", icon: Settings, zh: "设置", en: "Settings" },
+] as const;
 
-function itemIsActive(pathname: string, item: (typeof navItems)[number]) {
-  return (
-    pathname === item.href ||
-    (item.href === "/lesson" && pathname.startsWith("/lesson/"))
-  );
-}
-
-function itemUsesCurrentResourceIdentity(item: (typeof navItems)[number]) {
-  return (
-    item.key === "write" ||
-    item.key === "feedback" ||
-    item.key === "lesson" ||
-    item.key === "rewrite" ||
-    item.key === "compare"
-  );
-}
-
-function Navigation({
-  compact = false,
-  destinations,
+function Topbar({
+  currentHref,
+  pathname,
+  cached = null,
 }: {
-  compact?: boolean;
-  destinations: LearningDestinations;
+  currentHref: string;
+  pathname: string;
+  cached?: LearningDestinations | null;
 }) {
-  const pathname = usePathname();
-  const { messages, text } = useLocale();
+  const { text, messages } = useLocale();
+  const links = workspaceDestinations(currentHref, cached);
+  const moreRef = useRef<HTMLDetailsElement>(null);
+  const moreTrigger = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const close = (event: PointerEvent) => {
+      if (!moreRef.current?.contains(event.target as Node) && moreRef.current)
+        moreRef.current.open = false;
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || !moreRef.current?.open) return;
+      moreRef.current.open = false;
+      moreTrigger.current?.focus();
+    };
+    document.addEventListener("pointerdown", close);
+    document.addEventListener("keydown", escape);
+    return () => {
+      document.removeEventListener("pointerdown", close);
+      document.removeEventListener("keydown", escape);
+    };
+  }, []);
+
+  const currentMore = moreItems.find((item) => pathname === "/" + item.key);
+  const extraContext = currentMore
+    ? text(currentMore.zh, currentMore.en)
+    : pathname === "/account"
+      ? text("账户", "Account")
+      : pathname === "/admin/backup"
+        ? text("创建备份", "Create backup")
+        : pathname === "/admin"
+          ? messages.nav.admin
+          : null;
+
   return (
-    <nav
-      aria-label={text("主导航", "Primary navigation")}
-      className={cn("navigation", compact && "navigation-compact")}
-    >
-      <div className="nav-group">
-        {!compact ? (
-          <p className="nav-label">{text("学习闭环", "Learning loop")}</p>
-        ) : null}
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const active = itemIsActive(pathname, item);
-          const destination = destinationForItem(item, destinations);
-          if (!destination) {
-            return (
+    <header className={cn("topbar", styles.topbar)} data-workspace-header>
+      <Brand />
+      <EssaySwitcher currentCycleId={links.cycleId} />
+      <nav
+        aria-label={text("主导航", "Primary navigation")}
+        className={styles.navigation}
+        data-context-topbar
+      >
+        <div className={styles.primaryLinks}>
+          {(
+            [
+              ["write", text("写作", "Write")],
+              ["feedback", text("批改", "Feedback")],
+              ["lesson", text("提升", "Learn")],
+            ] as const
+          ).map(([key, label]) => {
+            const href = links[key];
+            const active =
+              pathname === "/" + key ||
+              (key === "lesson" && pathname === "/lesson/paper");
+            return href ? (
+              <Link
+                aria-current={active ? "page" : undefined}
+                className={styles.navLink}
+                href={href}
+                key={key}
+              >
+                {label}
+              </Link>
+            ) : (
               <span
                 aria-disabled="true"
-                className="nav-link nav-link-disabled"
-                key={item.href}
+                className={styles.unavailableLink}
+                key={key}
                 title={text(
                   "完成前面的学习步骤后即可查看",
                   "Available after the earlier learning step",
                 )}
               >
-                <Icon aria-hidden="true" size={18} />
-                <span>{messages.nav[item.key]}</span>
+                {label}
               </span>
             );
-          }
-          return (
-            <Link
-              aria-current={active ? "page" : undefined}
-              className={cn("nav-link", active && "nav-link-active")}
-              href={destination}
-              key={item.href}
-            >
-              <Icon aria-hidden="true" size={18} />
-              <span>{messages.nav[item.key]}</span>
-              {active && !compact ? (
-                <span className="nav-active-dot" aria-hidden="true" />
-              ) : null}
-            </Link>
-          );
-        })}
-      </div>
-      {!compact ? (
-        <div className="nav-group nav-utility-group">
-          <p className="nav-label">{text("更多", "More")}</p>
-          {utilityItems.map((item) => {
-            const Icon = item.icon;
-            const active = pathname === item.href;
-            return (
-              <Link
-                aria-current={active ? "page" : undefined}
-                className={cn("nav-link", active && "nav-link-active")}
-                href={item.href}
-                key={item.href}
-              >
-                <Icon aria-hidden="true" size={18} />
-                <span>{messages.nav[item.key]}</span>
-              </Link>
-            );
           })}
+          {extraContext ? (
+            <Link
+              aria-current="page"
+              className={styles.navLink}
+              href={currentHref}
+            >
+              {extraContext}
+            </Link>
+          ) : null}
         </div>
-      ) : null}
-    </nav>
-  );
-}
-
-function Sidebar({
-  destinations,
-  hidden,
-}: {
-  destinations: LearningDestinations;
-  hidden: boolean;
-}) {
-  const { text } = useLocale();
-  return (
-    <aside
-      className={cn("sidebar", styles.sidebar)}
-      hidden={hidden}
-      id="primary-sidebar"
-    >
-      <Brand />
-      <Navigation destinations={destinations} />
-      <div className={cn("sidebar-foot", styles.sidebarFoot)}>
-        <div className="system-mini-card">
-          <span className="system-mini-icon" aria-hidden="true">
-            <UserRound size={17} />
-          </span>
-          <div>
-            <strong>{text("专注学习", "Focused study")}</strong>
-            <span>
-              {text("今天只完成眼前一步", "One clear step at a time")}
-            </span>
-          </div>
-        </div>
-        <AccountMenu variant="sidebar" />
-      </div>
-    </aside>
-  );
-}
-
-function MobileHeader({
-  destinations,
-}: {
-  destinations: LearningDestinations;
-}) {
-  const { messages, text } = useLocale();
-  return (
-    <header className={cn("mobile-header", styles.mobileHeader)}>
-      <Brand />
-      <div className="mobile-header-actions">
-        <LocaleSwitch />
-        <details className={cn("mobile-menu", styles.mobileMenu)}>
-          <summary aria-label={text("打开导航", "Open navigation")}>
-            <Menu aria-hidden="true" size={21} />
+        <details className={styles.more} data-workspace-more ref={moreRef}>
+          <summary
+            aria-label={text("更多导航", "More navigation")}
+            ref={moreTrigger}
+          >
+            {text("更多", "More")}
+            <ChevronDown aria-hidden="true" size={15} />
           </summary>
-          <div className={cn("mobile-menu-panel", styles.mobileMenuPanel)}>
-            <p>{messages.brandTagline}</p>
-            <Navigation compact destinations={destinations} />
-            <div className="mobile-utility-links">
-              <Link href="/settings">
-                <Settings aria-hidden="true" size={17} />
-                {messages.nav.settings}
-              </Link>
-              <AccountMenu variant="mobile" />
-            </div>
+          <div
+            className={styles.morePanel}
+            onClick={(event) => {
+              if ((event.target as HTMLElement).closest("a") && moreRef.current)
+                moreRef.current.open = false;
+            }}
+          >
+            <Link href={links.essays}>{text("全部作文", "All essays")}</Link>
+            {moreItems.map(({ key, icon: Icon, zh, en }) =>
+              links[key] ? (
+                <Link href={links[key]} key={key}>
+                  <Icon aria-hidden="true" size={17} />
+                  {text(zh, en)}
+                </Link>
+              ) : (
+                <span
+                  aria-disabled="true"
+                  className={styles.unavailableItem}
+                  key={key}
+                >
+                  <Icon aria-hidden="true" size={17} />
+                  <span>
+                    {text(zh, en)}
+                    <small>
+                      {text(
+                        "完成前一步后开启",
+                        "Available after the previous step",
+                      )}
+                    </small>
+                  </span>
+                </span>
+              ),
+            )}
           </div>
         </details>
-      </div>
-    </header>
-  );
-}
-
-interface TopbarProps {
-  destinations: LearningDestinations;
-  currentHref: string;
-  pathname: string;
-  sidebarExpanded: boolean;
-  onToggleSidebar: () => void;
-}
-
-function Topbar({
-  destinations,
-  currentHref,
-  pathname,
-  sidebarExpanded,
-  onToggleSidebar,
-}: TopbarProps) {
-  const { messages, text } = useLocale();
-  const activeItem = navItems.find((item) => itemIsActive(pathname, item));
-  const activeUtility = utilityItems.find((item) => pathname === item.href);
-  const routeContext =
-    pathname === "/transfer"
-      ? {
-          href: currentHref,
-          icon: Sparkles,
-          label: text("陌生题迁移", "Transfer"),
-        }
-      : pathname === "/account"
-        ? {
-            href: "/account",
-            icon: UserRound,
-            label: text("账户", "Account"),
-          }
-        : pathname === "/admin/backup"
-          ? {
-              href: "/admin/backup",
-              icon: Settings,
-              label: text("创建备份", "Create backup"),
-            }
-          : pathname === "/admin"
-            ? {
-                href: "/admin",
-                icon: Settings,
-                label: messages.nav.admin,
-              }
-            : null;
-  const context = activeItem
-    ? {
-        href: itemUsesCurrentResourceIdentity(activeItem)
-          ? currentHref
-          : (destinationForItem(activeItem, destinations) ?? activeItem.href),
-        icon: activeItem.icon,
-        label: messages.nav[activeItem.key],
-        current: true,
-      }
-    : activeUtility
-      ? {
-          href: activeUtility.href,
-          icon: activeUtility.icon,
-          label: messages.nav[activeUtility.key],
-          current: true,
-        }
-      : routeContext
-        ? { ...routeContext, current: true }
-        : {
-            href: destinations.today,
-            icon: Home,
-            label: messages.nav.today,
-            current: false,
-          };
-  const ContextIcon = context.icon;
-  return (
-    <header className={cn("topbar", styles.topbar)}>
-      <div className="topbar-leading">
-        <button
-          aria-controls="primary-sidebar"
-          aria-expanded={sidebarExpanded}
-          aria-label={text(
-            sidebarExpanded ? "隐藏侧边栏" : "显示侧边栏",
-            sidebarExpanded ? "Hide sidebar" : "Show sidebar",
-          )}
-          className="sidebar-toggle"
-          data-sidebar-toggle
-          onClick={onToggleSidebar}
-          type="button"
-        >
-          {sidebarExpanded ? (
-            <PanelLeftClose aria-hidden="true" size={18} />
-          ) : (
-            <PanelLeftOpen aria-hidden="true" size={18} />
-          )}
-          <span>
-            {text(
-              sidebarExpanded ? "隐藏侧栏" : "显示侧栏",
-              sidebarExpanded ? "Hide sidebar" : "Show sidebar",
-            )}
-          </span>
-        </button>
-        <div
-          className={cn("focus-message", styles.contextTopbar)}
-          data-context-topbar
-        >
-          <span className={styles.contextKicker}>
-            <Sparkles aria-hidden="true" size={14} />
-            {text("当前步骤", "Current step")}
-          </span>
-          <Link
-            aria-current={context.current ? "page" : undefined}
-            className={styles.contextLink}
-            href={context.href}
-          >
-            <ContextIcon aria-hidden="true" size={17} />
-            <span>{context.label}</span>
-            <ChevronRight aria-hidden="true" size={15} />
-          </Link>
-        </div>
-      </div>
-      <div className="topbar-actions">
+      </nav>
+      <div className={styles.controls}>
         <LocaleSwitch />
+        <NotificationCenter />
+        <AccountMenu variant="topbar" />
       </div>
     </header>
   );
 }
 
-interface CurrentRouteIdentity {
-  href: string;
-  pathname: string;
-}
-
-function CurrentRouteObserver({
-  onChange,
-  pathname,
-}: {
-  onChange: Dispatch<SetStateAction<CurrentRouteIdentity>>;
-  pathname: string;
-}) {
-  const searchParams = useSearchParams();
-  const search = searchParams.toString();
-  const currentHref = search ? `${pathname}?${search}` : pathname;
+function WorkspaceHeader({ pathname }: { pathname: string }) {
+  const search = useSearchParams().toString();
+  const currentHref = search ? pathname + "?" + search : pathname;
+  const [cached, setCached] = useState<LearningDestinations | null>(null);
   useEffect(() => {
-    onChange((current) =>
-      current.href === currentHref && current.pathname === pathname
-        ? current
-        : { href: currentHref, pathname },
-    );
-  }, [currentHref, onChange, pathname]);
-  return null;
+    const update = () => setCached(readLearningDestinations());
+    window.addEventListener("storage", update);
+    window.addEventListener("iwc:learning-navigation", update);
+    update();
+    return () => {
+      window.removeEventListener("storage", update);
+      window.removeEventListener("iwc:learning-navigation", update);
+    };
+  }, []);
+  return (
+    <Topbar currentHref={currentHref} pathname={pathname} cached={cached} />
+  );
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const [currentRoute, setCurrentRoute] = useState<CurrentRouteIdentity>({
-    href: pathname,
-    pathname,
-  });
-  const currentHref =
-    currentRoute.pathname === pathname ? currentRoute.href : pathname;
   const { text } = useLocale();
-  const destinations = useLearningDestinations(pathname);
   const layoutVariant = layoutVariantForPathname(pathname);
-  const sidebarCollapsed = useSyncExternalStore(
-    subscribeToSidebarPreference,
-    sidebarCollapsedSnapshot,
-    () => false,
-  );
+  const publicHome = pathname === "/signin";
+  const courseHome = pathname === "/today";
+  const writingPage = pathname === "/write" || pathname === "/rewrite";
+  const feedbackPage = pathname === "/feedback";
   const setup = ["/setup", "/signin", "/join", "/recover"].some((path) =>
     pathname.startsWith(path),
   );
 
-  if (setup) {
+  if (publicHome) {
     return (
       <div className={cn("setup-shell", styles.entryShell)}>
         <a className="skip-link" href="#main-content">
           {text("跳到主要内容", "Skip to main content")}
         </a>
-        <header className={cn("setup-topbar", styles.entryTopbar)}>
-          <Brand />
-          <LocaleSwitch />
-        </header>
-        <main
-          className={styles.entryMain}
-          data-page-layout={layoutVariant}
-          id="main-content"
-          tabIndex={-1}
-        >
-          {children}
-        </main>
+        {children}
       </div>
     );
   }
 
   return (
     <div
-      className={cn("app-shell", styles.shell)}
-      data-app-shell
-      data-design-system="annotation-desk-v1"
-      data-sidebar-state={sidebarCollapsed ? "collapsed" : "expanded"}
+      className={cn(
+        setup ? "setup-shell" : "app-shell",
+        setup ? styles.entryShell : styles.shell,
+        (courseHome || writingPage || feedbackPage) && styles.monochromeShell,
+      )}
+      data-app-shell={setup ? undefined : ""}
+      data-course-home={courseHome ? "true" : undefined}
+      data-design-system={setup ? undefined : "annotation-desk-v1"}
+      data-sidebar-state={setup ? undefined : "collapsed"}
     >
       <a className="skip-link" href="#main-content">
         {text("跳到主要内容", "Skip to main content")}
       </a>
-      <Sidebar destinations={destinations} hidden={sidebarCollapsed} />
-      <div className={cn("app-column", styles.appColumn)}>
-        <MobileHeader destinations={destinations} />
-        <NotificationCenter />
-        <Suspense fallback={null}>
-          <CurrentRouteObserver
-            onChange={setCurrentRoute}
-            pathname={pathname}
-          />
-        </Suspense>
-        <Topbar
-          currentHref={currentHref}
-          destinations={destinations}
-          onToggleSidebar={() => saveSidebarPreference(!sidebarCollapsed)}
-          pathname={pathname}
-          sidebarExpanded={!sidebarCollapsed}
-        />
-        <main
-          className={cn("main-content", styles.mainContent)}
-          data-page-layout={layoutVariant}
-          id="main-content"
-          tabIndex={-1}
+      {setup ? (
+        <header className={cn("setup-topbar", styles.entryTopbar)}>
+          <Brand />
+          <LocaleSwitch />
+        </header>
+      ) : (
+        <Suspense
+          fallback={
+            <div className={styles.headerPlaceholder} aria-hidden="true" />
+          }
         >
-          {children}
-        </main>
-      </div>
+          <WorkspaceHeader pathname={pathname} />
+        </Suspense>
+      )}
+      <main
+        className={cn(
+          "main-content",
+          setup ? styles.entryMain : styles.mainContent,
+        )}
+        data-page-layout={layoutVariant}
+        id="main-content"
+        tabIndex={-1}
+      >
+        {children}
+      </main>
     </div>
   );
 }

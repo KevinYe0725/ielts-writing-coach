@@ -14,6 +14,56 @@ test.describe("deterministic setup and Today experience", () => {
 
   test.beforeEach(async ({ page }) => resetDemoState(page));
 
+  test("keeps server-rendered first actions disabled until their handlers are ready", async ({
+    baseURL,
+    browser,
+    page,
+  }) => {
+    if (!baseURL) throw new Error("This readiness test requires a base URL.");
+    const serverContext = await browser.newContext({
+      javaScriptEnabled: false,
+    });
+    const serverPage = await serverContext.newPage();
+    try {
+      await serverPage.goto(new URL("/setup", baseURL).toString());
+      await expect(
+        serverPage.getByRole("button", { name: /仅我使用/ }),
+      ).toBeDisabled();
+      await expect(
+        serverPage.getByRole("button", { name: /与多人共享/ }),
+      ).toBeDisabled();
+      await expect(
+        serverPage.getByRole("button", { name: "继续", exact: true }),
+      ).toBeDisabled();
+
+      await serverPage.goto(new URL("/today", baseURL).toString());
+      await expect(serverPage.locator(".locale-switch")).toBeDisabled();
+    } finally {
+      await serverContext.close();
+    }
+
+    await page.goto("/setup");
+    const sharedMode = page.getByRole("button", { name: /与多人共享/ });
+    const continueButton = page.getByRole("button", {
+      name: "继续",
+      exact: true,
+    });
+    await expect(sharedMode).toBeEnabled();
+    await sharedMode.click();
+    await expect(sharedMode).toHaveAttribute("aria-pressed", "true");
+    await expect(continueButton).toBeEnabled();
+    await continueButton.click();
+    await expect(
+      page.getByRole("heading", { name: "创建首位管理员" }),
+    ).toBeVisible();
+
+    await page.goto("/today");
+    const localeSwitch = page.locator(".locale-switch");
+    await expect(localeSwitch).toBeEnabled();
+    await localeSwitch.click();
+    await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  });
+
   test("first setup remains low-decision and verifies the AI connection", async ({
     page,
   }) => {
@@ -26,11 +76,12 @@ test.describe("deterministic setup and Today experience", () => {
       page.getByRole("button", { name: /仅我使用/ }),
     ).toHaveAttribute("aria-pressed", "true");
     await expectBasicAccessibility(page);
-    // The setup panel is server-rendered first. Wait for its client handler to
-    // hydrate before exercising the first state transition on a busy mobile
-    // browser, rather than treating a pre-hydration click as a user action.
-    await page.waitForTimeout(300);
-    await page.getByRole("button", { name: "继续", exact: true }).click();
+    const continueButton = page.getByRole("button", {
+      name: "继续",
+      exact: true,
+    });
+    await expect(continueButton).toBeEnabled();
+    await continueButton.click();
 
     await expect(
       page.getByRole("heading", { name: "创建首位管理员" }),
@@ -57,8 +108,12 @@ test.describe("deterministic setup and Today experience", () => {
   }) => {
     await page.goto("/setup");
     await expect(page.locator("[data-entry-surface='setup']")).toBeVisible();
-    await page.waitForTimeout(300);
-    await page.getByRole("button", { name: "继续", exact: true }).click();
+    const continueButton = page.getByRole("button", {
+      name: "继续",
+      exact: true,
+    });
+    await expect(continueButton).toBeEnabled();
+    await continueButton.click();
     await page.getByLabel("你的名字").fill("Simon");
     await page.getByLabel("登录邮箱").fill("simon@example.com");
     await page.getByLabel("密码").fill("a-secure-demo-password");
@@ -83,7 +138,7 @@ test.describe("deterministic setup and Today experience", () => {
 
     await expect(
       page.getByRole("heading", {
-        name: "晚上好，Simon。今天只做这一件事。",
+        name: "今天，从这里继续。",
       }),
     ).toBeVisible();
     await expect(page.locator(".next-task-card")).toHaveCount(1);
@@ -289,22 +344,20 @@ test.describe("deterministic setup and Today experience", () => {
     page,
   }) => {
     await page.goto("/today");
-    const taskPrompt = "Closed-book rewrite: early language learning";
+    const taskPrompt = "Closed-book rewrite";
 
-    const header =
-      (page.viewportSize()?.width ?? 1_000) < 700
-        ? page.locator(".mobile-header")
-        : page.locator(".topbar");
+    const header = page.locator("[data-workspace-header]");
     const localeSwitch = header.getByRole("button", {
       name: "切换到英文界面",
       exact: true,
     });
+    await expect(localeSwitch).toBeEnabled();
     await localeSwitch.click();
 
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
     await expect(
       page.getByRole("heading", {
-        name: "Good evening, Simon. There is only one thing to do today.",
+        name: "Continue from here today.",
       }),
     ).toBeVisible();
     await expect(page.getByText(taskPrompt, { exact: true })).toBeVisible();
@@ -322,7 +375,7 @@ test.describe("deterministic setup and Today experience", () => {
     test.skip(testInfo.project.name !== "mobile", "Mobile-only smoke check.");
     await page.goto("/today?new-essay=1");
 
-    await page.locator('summary[aria-label="打开导航"]').click();
+    await page.locator("[data-workspace-more] > summary").click();
     await expect(
       page.getByRole("navigation", { name: "主导航" }),
     ).toBeVisible();
@@ -1205,8 +1258,6 @@ test.describe("Today query states at the HTTP boundary", () => {
     await expect.poll(() => accountAKeys.length).toBe(1);
 
     await accountB.goto("/today?mixed-review=1");
-    const accountBMobileMenu = accountB.locator(".mobile-menu > summary");
-    if (await accountBMobileMenu.isVisible()) await accountBMobileMenu.click();
     await accountB
       .getByRole("button", { name: /learner@example\.com/i })
       .first()
@@ -1223,6 +1274,7 @@ test.describe("Today query states at the HTTP boundary", () => {
     ).toBeVisible();
     releaseAccountA();
 
+    await accountB.getByRole("button", { name: /^(登录|Log in)$/ }).click();
     await accountB.locator("#signin-email").fill("account-b@example.test");
     await accountB.locator("#signin-password").fill("secure-password");
     await accountB.getByRole("button", { name: /继续|continue/i }).click();

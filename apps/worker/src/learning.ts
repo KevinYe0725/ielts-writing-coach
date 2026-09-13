@@ -95,6 +95,8 @@ export interface PracticePaperContent {
 
 export interface TeachingPracticePrompt {
   readonly id: string;
+  /** One-based article section; absent or out-of-range placement stays at the end. */
+  readonly afterSection?: number;
   readonly instructionZh: string;
   readonly instructionEn: string;
   readonly promptEn: string;
@@ -183,22 +185,80 @@ function hasClearOutputAction(instruction: string): boolean {
   );
 }
 
+function asksForAdditionalWrittenOutput(instruction: string): boolean {
+  const actionText = instruction.replace(
+    /(?:查看|参看|阅读|看)(?:(?:一下|下方|下面|参考|相关|详细|对应|提供的|这段|其|该|的))*(?:解释|说明)/gu,
+    "参考内容",
+  );
+  return (
+    /(?:选择|选出|判断)[^。！？.!?]*(?:并|同时|然后|再)[^。！？.!?]*(?:解释|说明|写|回答)/u.test(
+      actionText,
+    ) ||
+    /\b(?:choose|select|identify)[^.?!]*(?:and|then|also)\s+(?:explain|describe|write|justify|state)\b/iu.test(
+      instruction,
+    )
+  );
+}
+
+function asksForRewrite(instruction: string): boolean {
+  const chineseRewriteWithSource =
+    /(?:改写|重写|修复|修改|润色|改进)[^。！？.!?]{0,24}(?:下面|上面|以下|上述|这段|该段|原文|这个句子|这个段落|这句话)/u.test(
+      instruction,
+    );
+  const englishRewriteWithSource =
+    /\b(?:rewrite|revise|repair|edit|improve)\s+(?:(?:the|this|that|a|an|following|above|given|original)\s+){0,2}(?:paragraph|passage|sentence|text|excerpt|draft|answer)\b/iu.test(
+      instruction,
+    );
+  return chineseRewriteWithSource || englishRewriteWithSource;
+}
+
+function practiceItemNeedsSource(item: PracticePaperItemContent): boolean {
+  return (
+    item.responseMode === "paragraph" &&
+    asksForRewrite(`${item.instructionZh}\n${item.promptEn}`)
+  );
+}
+
+export interface LearningValidationOptions {
+  /** Apply new semantic impossibility checks only to freshly generated content. */
+  readonly freshGeneration?: boolean;
+}
+
 function criteriaAreVisibleInInstruction(
   item: PracticePaperItemContent,
 ): boolean {
-  // The learner-facing instruction must state its own requirements, but the
-  // criterion description is evaluator metadata and does not need to repeat
-  // the instruction word-for-word. A non-empty instruction with a clear
-  // output action (checked separately) is sufficient for the learner.
+  // Preserve readability of older papers whose metadata paraphrased the task.
+  // These descriptions are never authoritative: withVisiblePracticeCriteria
+  // replaces them from the visible instruction before persistence and grading.
   return item.publicCriteria.every(
     (criterion) => criterion.descriptionZh.trim().length > 0,
   );
 }
 
+/** Build evaluator requirements from what the learner actually saw, including for historical papers. */
+export function withVisiblePracticeCriteria<
+  T extends { readonly instructionZh: string },
+>(items: readonly T[]) {
+  return items.map((item) => ({
+    ...item,
+    publicCriteria: [
+      {
+        labelZh: "题目要求",
+        labelEn: "Visible task requirements",
+        descriptionZh: item.instructionZh,
+        descriptionEn: item.instructionZh,
+        weight: 100,
+      },
+    ],
+  }));
+}
+
 /** Product-level guardrails that reject confusing or internally inconsistent AI papers. */
 export function validatePracticePaperContent(
   value: PracticePaperContent,
+  options: LearningValidationOptions = {},
 ): boolean {
+  const freshGeneration = options.freshGeneration === true;
   if (value.items.length !== 8) return false;
   if (
     value.items.some(
@@ -207,6 +267,9 @@ export function validatePracticePaperContent(
         item.titleZh.trim().length === 0 ||
         item.instructionZh.trim().length < 8 ||
         !hasClearOutputAction(item.instructionZh) ||
+        (freshGeneration &&
+          item.responseMode === "choice" &&
+          asksForAdditionalWrittenOutput(item.instructionZh)) ||
         !criteriaAreVisibleInInstruction(item) ||
         item.promptEn.trim().length === 0 ||
         item.publicCriteria.length < 1 ||
@@ -254,6 +317,12 @@ export function validatePracticePaperContent(
       return false;
     if (item.section === "REPAIR" && item.sourceText.trim().length === 0)
       return false;
+    if (
+      freshGeneration &&
+      practiceItemNeedsSource(item) &&
+      item.sourceText.trim().length === 0
+    )
+      return false;
     if (item.responseMode === "paragraph")
       return item.minimumWords >= 60 && item.maximumWords <= 150;
     return item.minimumWords >= 1 && item.maximumWords >= item.minimumWords;
@@ -265,7 +334,9 @@ export function validatePracticePaperContent(
  * is authored one question at a time. */
 export function validatePracticePaperItemContent(
   item: PracticePaperItemContent,
+  options: LearningValidationOptions = {},
 ): boolean {
+  const freshGeneration = options.freshGeneration === true;
   if (
     item.titleZh.trim().length < 2 ||
     item.titleZh.length > 30 ||
@@ -274,6 +345,9 @@ export function validatePracticePaperItemContent(
     item.instructionZh.trim().length < 8 ||
     item.instructionZh.length > 500 ||
     !hasClearOutputAction(item.instructionZh) ||
+    (freshGeneration &&
+      item.responseMode === "choice" &&
+      asksForAdditionalWrittenOutput(item.instructionZh)) ||
     !criteriaAreVisibleInInstruction(item) ||
     item.promptEn.trim().length < 4 ||
     item.promptEn.length > 900 ||
@@ -310,6 +384,12 @@ export function validatePracticePaperItemContent(
   }
   if (item.options.length > 0 || item.acceptedAnswers.length > 0) return false;
   if (item.section === "REPAIR" && item.sourceText.trim().length === 0)
+    return false;
+  if (
+    freshGeneration &&
+    practiceItemNeedsSource(item) &&
+    item.sourceText.trim().length === 0
+  )
     return false;
   if (item.responseMode === "paragraph")
     return item.minimumWords >= 60 && item.maximumWords <= 150;
@@ -547,7 +627,9 @@ function hasInternalVocabulary(fields: readonly string[]): boolean {
 export function validateAdaptiveTeachingModule(
   teaching: AdaptiveTeachingModule,
   version1Essay?: string,
+  options: LearningValidationOptions = {},
 ): boolean {
+  const freshGeneration = options.freshGeneration === true;
   if (
     teaching.format !== "ADAPTIVE_ARTICLE_V1" ||
     !validBilingualCopy(teaching.titleZh, teaching.titleEn, 6) ||
@@ -574,7 +656,15 @@ export function validateAdaptiveTeachingModule(
     ) ||
     !teaching.practicePrompts.some(
       (prompt) => prompt.context === "UNSEEN_TOPIC",
-    )
+    ) ||
+    (freshGeneration &&
+      teaching.practicePrompts.some(
+        (prompt) =>
+          prompt.responseMode === "CHOICE" &&
+          asksForAdditionalWrittenOutput(
+            `${prompt.instructionZh}\n${prompt.instructionEn}`,
+          ),
+      ))
   )
     return false;
 
@@ -594,11 +684,12 @@ export function validateAdaptiveTeachingModule(
 export function validateFocusedLearningPackage(
   value: FocusedLearningPackage,
   version1Essay?: string,
+  options: LearningValidationOptions = {},
 ): boolean {
   const teaching = value.teachingModule;
   if (
-    !validateAdaptiveTeachingModule(teaching, version1Essay) ||
-    !validatePracticePaperContent(value.paper) ||
+    !validateAdaptiveTeachingModule(teaching, version1Essay, options) ||
+    !validatePracticePaperContent(value.paper, options) ||
     !substantive(value.paper.objectiveZh, 12) ||
     !substantive(value.paper.objectiveEn, 12)
   )
@@ -618,6 +709,22 @@ export function validateFocusedLearningPackage(
     return false;
 
   return true;
+}
+
+/** New public copy is checked separately so an old private goal cannot hide an otherwise usable course. */
+export function learnerFacingTeachingGoal(
+  value: FocusedLearningPackage,
+): { zh: string; en: string } | null {
+  const fields = [
+    value.teachingModule.coreAbilityZh,
+    value.teachingModule.coreAbilityEn,
+  ];
+  if (
+    hasInternalVocabulary(fields) ||
+    leaksFuturePaperAnswer(fields, value.paper)
+  )
+    return null;
+  return { zh: fields[0]!, en: fields[1]! };
 }
 
 export function sanitizePracticePaperJudgment(input: {
@@ -1553,6 +1660,14 @@ export interface PersistedIssueClassification {
 export function classifyIssueForPersistence(
   issue: AiIssueJudgment,
 ): PersistedIssueClassification {
+  if (issue.issueType === "OPTIONAL_POLISH") {
+    return {
+      skillId: issue.skillId,
+      categories: ["OPTIONAL_OPTIMIZATION"],
+      hardGrammarError: false,
+      diagnosis: issue.diagnosis,
+    };
+  }
   if (
     /much\s+(?:\+\s*)?slighter|much\s*\+\s*comparative/i.test(
       `${issue.excerpt} ${issue.diagnosis}`,

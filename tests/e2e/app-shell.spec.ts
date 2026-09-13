@@ -42,87 +42,59 @@ test.describe("desktop learning workspace", () => {
 
   test.beforeEach(async ({ page }) => resetDemoState(page));
 
-  test("hides the sidebar, expands the workspace and remembers the choice", async ({
+  test("keeps the full workspace available across reload and route changes", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto(feedbackUrl);
-
-    const shell = page.locator("[data-app-shell]");
-    const sidebar = page.locator("#primary-sidebar");
-    const toggle = page.locator("[data-sidebar-toggle]");
-    const main = page.locator("#main-content");
-    const workbench = page.locator("[data-feedback-workbench]");
-
-    await expect(shell).toHaveAttribute("data-sidebar-state", "expanded");
-    await expect(sidebar).toBeVisible();
-    await expect(toggle).toHaveAttribute("aria-expanded", "true");
-    expect(await gridColumnCount(workbench)).toBe(1);
-    const expandedWidth = (await main.boundingBox())!.width;
-
-    await toggle.focus();
-    await page.keyboard.press("Enter");
-    await expect(toggle).toBeFocused();
-    await expect(toggle).toHaveAttribute("aria-expanded", "false");
-    await expect(shell).toHaveAttribute("data-sidebar-state", "collapsed");
-    await expect(sidebar).toBeHidden();
-    const collapsedWidth = (await main.boundingBox())!.width;
-    expect(collapsedWidth).toBeGreaterThan(expandedWidth + 100);
-    expect(await gridColumnCount(workbench)).toBe(2);
-    await expect
-      .poll(() =>
-        page.evaluate(() =>
-          window.localStorage.getItem("iwc:sidebar-collapsed:v1"),
-        ),
-      )
-      .toBe("true");
-
+    const header = page.locator("[data-workspace-header]");
+    await expect(header).toBeVisible();
+    await expect(page.locator("#primary-sidebar")).toHaveCount(0);
+    await expect(page.locator("[data-sidebar-toggle]")).toHaveCount(0);
+    expect(
+      (await page.locator("#main-content").boundingBox())!.width,
+    ).toBeGreaterThan(1200);
     await page.reload();
-    await expect(shell).toHaveAttribute("data-sidebar-state", "collapsed");
-    await expect(sidebar).toBeHidden();
-    await expect(toggle).toHaveAttribute("aria-expanded", "false");
-
+    await expect(
+      header.getByRole("link", { name: "批改", exact: true }),
+    ).toHaveAttribute("href", feedbackUrl);
     await page.goto(lessonUrl);
-    await expect(shell).toHaveAttribute("data-sidebar-state", "collapsed");
-    await expect(sidebar).toBeHidden();
-
-    await toggle.click();
-    await expect(shell).toHaveAttribute("data-sidebar-state", "expanded");
-    await expect(sidebar).toBeVisible();
-    await expect
-      .poll(() =>
-        page.evaluate(() =>
-          window.localStorage.getItem("iwc:sidebar-collapsed:v1"),
-        ),
-      )
-      .toBeNull();
+    await expect(
+      header.getByRole("link", { name: "提升", exact: true }),
+    ).toHaveAttribute("href", lessonUrl);
+    await expect(page.locator("#primary-sidebar")).toHaveCount(0);
   });
 
-  test("keeps the existing mobile menu instead of showing the desktop toggle", async ({
+  test("keeps touch navigation visible and More inside the mobile viewport", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(feedbackUrl);
-
-    await expect(page.locator("[data-sidebar-toggle]")).toBeHidden();
-    await expect(page.locator("#primary-sidebar")).toBeHidden();
-    await expect(page.locator(".mobile-header")).toBeVisible();
-    const menu = page.locator(".mobile-menu > summary");
-    await expect(menu).toHaveAccessibleName(/打开导航|open navigation/i);
-    await menu.click();
-    await expect(page.locator(".mobile-menu-panel")).toBeVisible();
+    const header = page.locator("[data-workspace-header]");
+    await expect(
+      header.getByRole("link", { name: "批改", exact: true }),
+    ).toBeVisible();
+    await header.locator("[data-workspace-more] > summary").click();
+    await expect(header.getByRole("link", { name: "设置" })).toBeVisible();
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth),
     ).toBeLessThanOrEqual(390);
   });
 
-  test("keeps multiple essays available through the workspace and sidebar", async ({
+  test("keeps multiple essays available through the workspace and essay switcher", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto("/today");
 
-    await page.getByRole("link", { name: "我的作文" }).click();
+    await expect(
+      page.locator('[data-essay-workspace="compact"]'),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "切换作文" }).click();
+    await page
+      .getByRole("dialog")
+      .getByRole("link", { name: "全部作文" })
+      .click();
     await expect(page).toHaveURL(/\/essays$/);
     await expect(page.getByRole("heading", { name: "我的作文" })).toBeVisible();
 
@@ -176,7 +148,7 @@ test.describe("desktop learning workspace", () => {
     expect(await gridColumnCount(grid)).toBe(2);
   });
 
-  test("keeps essay badge, date, and page eyebrow at least 12px at 390px", async ({
+  test("keeps essay metadata readable below the document-first page title", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 844 });
@@ -194,125 +166,99 @@ test.describe("desktop learning workspace", () => {
         .evaluate((element) =>
           Number.parseFloat(window.getComputedStyle(element).fontSize),
         ),
-      page
-        .locator(".page-header .eyebrow")
-        .evaluate((element) =>
-          Number.parseFloat(window.getComputedStyle(element).fontSize),
-        ),
     ]);
 
     for (const size of supportSizes) {
-      expect(
-        size,
-        "badge, date, and page eyebrow computed font sizes",
-      ).toBeGreaterThanOrEqual(12);
+      expect(size, "badge and date computed font sizes").toBeGreaterThanOrEqual(
+        12,
+      );
     }
+    const titleSize = await page
+      .getByRole("heading", { name: "我的作文", exact: true })
+      .evaluate((element) =>
+        Number.parseFloat(window.getComputedStyle(element).fontSize),
+      );
+    expect(titleSize).toBeGreaterThanOrEqual(28);
   });
 
-  test("keeps the current feedback identity in the topbar when stored navigation is stale", async ({
+  test("keeps the complete current identity when stored navigation is stale", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
-    await page.addInitScript(() => {
-      window.sessionStorage.setItem(
+    await page.goto(feedbackUrl);
+    const header = page.locator("[data-workspace-header]");
+    await expect(
+      header.getByRole("link", { name: "批改", exact: true }),
+    ).toHaveAttribute("href", feedbackUrl);
+    await page.evaluate(() => {
+      sessionStorage.setItem(
         "iwc:learning-navigation:v1",
         JSON.stringify({
           feedback: "/feedback?cycle=old-cycle&lesson=old-lesson",
+          lesson: "/lesson?cycle=old-cycle&lesson=old-lesson",
+          rewrite: "/rewrite?cycle=old-cycle&task=old-task",
+          compare: "/compare?cycle=old-cycle",
         }),
       );
+      window.dispatchEvent(new Event("iwc:learning-navigation"));
     });
-    await page.goto(feedbackUrl);
-
-    const contextLink = page
-      .locator("[data-context-topbar]")
-      .getByRole("link", { name: /批改|feedback/i });
-    await expect(contextLink).toBeVisible();
-    await expect(contextLink).toHaveAttribute("href", feedbackUrl);
-    await expect(contextLink).toHaveAttribute("aria-current", "page");
     await expect(
-      page.locator("#primary-sidebar").getByRole("link", {
-        name: /批改|feedback/i,
-      }),
-    ).toHaveAttribute("href", "/feedback?cycle=cycle-demo");
+      header.getByRole("link", { name: "批改", exact: true }),
+    ).toHaveAttribute("href", feedbackUrl);
+    await expect(
+      header.getByRole("link", { name: "批改", exact: true }),
+    ).toHaveAttribute("aria-current", "page");
+    await expect(header.locator('a[href*="old-cycle"]')).toHaveCount(0);
   });
 
-  test("updates the feedback context after same-route Link navigation", async ({
-    page,
-  }, testInfo) => {
-    test.skip(
-      testInfo.project.name === "mobile",
-      "The touch project uses mobile navigation instead of the desktop sidebar Link.",
+  for (const [route, label] of [
+    ["feedback", "批改"],
+    ["compare", "对比"],
+  ] as const) {
+    test(
+      "updates the current " +
+        route +
+        " identity on same-route history navigation",
+      async ({ page }) => {
+        await page.goto("/" + route + "?cycle=old");
+        await expect(
+          page.locator(
+            route === "compare"
+              ? '[data-evidence-record="comparison"]'
+              : "[data-feedback-workbench]",
+          ),
+        ).toBeVisible();
+        const current = page
+          .locator("[data-context-topbar]")
+          .getByRole("link", { name: label, exact: true });
+        await expect(current).toHaveAttribute(
+          "href",
+          "/" + route + "?cycle=old",
+        );
+        await page.evaluate((path) => {
+          window.history.pushState(
+            null,
+            "",
+            "/" + path + "?cycle=new&view=details",
+          );
+        }, route);
+        await expect(current).toHaveAttribute(
+          "href",
+          "/" + route + "?cycle=new&view=details",
+        );
+        await expect(current).toHaveAttribute("aria-current", "page");
+        await page.goBack();
+        await expect(current).toHaveAttribute(
+          "href",
+          "/" + route + "?cycle=old",
+        );
+      },
     );
-    await page.setViewportSize({ width: 1280, height: 900 });
-    await page.goto("/feedback?cycle=old");
-
-    const sidebarLink = page
-      .locator("#primary-sidebar")
-      .getByRole("link", { name: /批改|feedback/i });
-    const contextLink = page
-      .locator("[data-context-topbar]")
-      .getByRole("link", { name: /批改|feedback/i });
-    await expect(contextLink).toHaveAttribute("href", "/feedback?cycle=old");
-
-    await page.evaluate(() => {
-      const key = "iwc:learning-navigation:v1";
-      const stored = JSON.parse(window.sessionStorage.getItem(key) ?? "{}");
-      window.sessionStorage.setItem(
-        key,
-        JSON.stringify({ ...stored, feedback: "/feedback?cycle=new" }),
-      );
-      window.dispatchEvent(new Event("iwc:learning-navigation"));
-    });
-    await expect(sidebarLink).toHaveAttribute("href", "/feedback?cycle=new");
-
-    await sidebarLink.click();
-    await expect(page).toHaveURL(/\/feedback\?cycle=new$/);
-    await expect(contextLink).toHaveAttribute("href", "/feedback?cycle=new");
-    await expect(contextLink).toHaveAttribute("aria-current", "page");
-  });
-
-  test("updates the compare context after same-route Link navigation", async ({
-    page,
-  }, testInfo) => {
-    test.skip(
-      testInfo.project.name === "mobile",
-      "The touch project uses mobile navigation instead of the desktop sidebar Link.",
-    );
-    await page.setViewportSize({ width: 1280, height: 900 });
-    await page.goto("/compare?cycle=old");
-
-    const sidebarLink = page
-      .locator("#primary-sidebar")
-      .getByRole("link", { name: /对比|compare/i });
-    const contextLink = page
-      .locator("[data-context-topbar]")
-      .getByRole("link", { name: /对比|compare/i });
-    await expect(contextLink).toHaveAttribute("href", "/compare?cycle=old");
-
-    await page.evaluate(() => {
-      const key = "iwc:learning-navigation:v1";
-      const stored = JSON.parse(window.sessionStorage.getItem(key) ?? "{}");
-      window.sessionStorage.setItem(
-        key,
-        JSON.stringify({ ...stored, compare: "/compare?cycle=new" }),
-      );
-      window.dispatchEvent(new Event("iwc:learning-navigation"));
-    });
-    await expect(sidebarLink).toHaveAttribute("href", "/compare?cycle=new");
-
-    await sidebarLink.click();
-    await expect(page).toHaveURL(/\/compare\?cycle=new$/);
-    await expect(contextLink).toHaveAttribute("href", "/compare?cycle=new");
-    await expect(contextLink).toHaveAttribute("aria-current", "page");
-  });
+  }
 
   test("maps transfer, account, and administration to their real current context", async ({
     page,
   }, testInfo) => {
-    test.skip(
-      testInfo.project.name === "mobile",
-      "The touch project uses the mobile navigation instead of the desktop context topbar.",
-    );
     await signedInSession(page);
     await page.addInitScript(() => {
       window.sessionStorage.setItem(
@@ -346,20 +292,11 @@ test.describe("desktop learning workspace", () => {
   test("persists the locale choice in storage and across app navigation", async ({
     page,
   }, testInfo) => {
-    test.skip(
-      testInfo.project.name === "mobile",
-      "The touch project exercises the visible mobile locale switch separately.",
-    );
     await page.goto("/today");
 
-    // The locale button is present in the server-rendered shell before its
-    // click handler is attached. Wait for Today's client-loaded workspace so
-    // a busy four-project run cannot mistake a pre-hydration click for a user
-    // interaction.
-    await expect(
-      page.locator('[data-essay-workspace="compact"]'),
-    ).toBeVisible();
-    await page.locator(".topbar .locale-switch").click();
+    const localeSwitch = page.locator(".topbar .locale-switch");
+    await expect(localeSwitch).toBeEnabled();
+    await localeSwitch.click();
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
     await expect
       .poll(() =>
@@ -367,7 +304,11 @@ test.describe("desktop learning workspace", () => {
       )
       .toBe("en");
 
-    await page.getByRole("link", { name: /我的作文|my essays/i }).click();
+    await page.getByRole("button", { name: "Switch essay" }).click();
+    await page
+      .getByRole("dialog")
+      .getByRole("link", { name: "All essays" })
+      .click();
     await expect(page).toHaveURL(/\/essays$/);
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
     await expect(page.locator(".topbar .locale-switch")).toHaveAccessibleName(
@@ -389,10 +330,6 @@ test.describe("desktop learning workspace", () => {
   test("returns account-menu focus on Escape and clears learning destinations on logout", async ({
     page,
   }, testInfo) => {
-    test.skip(
-      testInfo.project.name === "mobile",
-      "The touch project covers account actions in the mobile navigation.",
-    );
     await signedInSession(page);
     await page.route("**/api/v1/auth/sign-out", async (route) => {
       await route.fulfill({

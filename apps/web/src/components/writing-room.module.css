@@ -31,6 +31,21 @@
   align-items: center;
   gap: var(--desk-space-2);
 }
+:global(.writing-fullscreen-toggle) {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  color: var(--desk-ink);
+  background: transparent;
+  border: 1px solid var(--desk-line);
+  border-radius: var(--desk-radius-md);
+  place-items: center;
+}
+:global(.writing-fullscreen-toggle:hover) {
+  background: var(--desk-canvas);
+  border-color: var(--desk-line-strong);
+}
 :global(.save-state) {
   display: inline-flex;
   min-width: 90px;
@@ -419,6 +434,28 @@
   box-shadow: none;
 }
 
+.immersive,
+:global(.writing-page:fullscreen) {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  width: 100%;
+  min-height: 100svh;
+  overflow: auto;
+  border: 0;
+  border-radius: 0;
+}
+
+.immersive :global(.writing-topbar),
+:global(.writing-page:fullscreen) :global(.writing-topbar) {
+  top: 0;
+}
+
+.immersive .room,
+:global(.writing-page:fullscreen) .room {
+  min-height: calc(100svh - 66px);
+}
+
 .topbar {
   background: var(--desk-paper);
   border-color: color-mix(in srgb, var(--desk-ink) 13%, transparent);
@@ -426,7 +463,7 @@
 }
 
 .topbar :global(.writing-title-group > strong) {
-  color: color-mix(in srgb, var(--desk-ink) 68%, transparent);
+  color: var(--desk-ink-muted);
 }
 
 .topbar :global(.badge) {
@@ -536,7 +573,7 @@
 }
 
 .prompt :global(.exam-rules) {
-  color: color-mix(in srgb, var(--desk-ink) 66%, transparent);
+  color: var(--desk-ink-muted);
   border-color: color-mix(in srgb, var(--desk-ink) 14%, transparent);
 }
 
@@ -596,7 +633,7 @@
 }
 
 .editor :global(.editor-heading label) {
-  color: color-mix(in srgb, var(--desk-ink) 68%, transparent);
+  color: var(--desk-ink-muted);
 }
 
 .editor :global(.word-count) {

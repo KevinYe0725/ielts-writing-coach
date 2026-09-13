@@ -26,6 +26,7 @@ const lessonState = vi.hoisted(() => ({
   } as Record<string, string>,
   generatedInput: "",
   generatedSchemaNames: [] as string[],
+  generatedSchemas: [] as Record<string, unknown>[],
   generatedIdempotencyKeys: [] as Array<string | undefined>,
   adapterKind: "mock" as "compatible" | "mock",
   paperFailure: undefined as unknown,
@@ -64,10 +65,12 @@ vi.mock("../runtime", () => {
         async (request: {
           input: string;
           schemaName: string;
+          schema: Record<string, unknown>;
           idempotencyKey?: string;
         }) => {
           if (lessonState.adapterFailure) throw lessonState.adapterFailure;
           lessonState.generatedSchemaNames.push(request.schemaName);
+          lessonState.generatedSchemas.push(request.schema);
           lessonState.generatedIdempotencyKeys.push(request.idempotencyKey);
           if (
             lessonState.paperFailure &&
@@ -219,6 +222,7 @@ describe("adaptive lesson generation evidence", () => {
   beforeEach(async () => {
     lessonState.generatedInput = "";
     lessonState.generatedSchemaNames = [];
+    lessonState.generatedSchemas = [];
     lessonState.generatedIdempotencyKeys = [];
     lessonState.adapterKind = "mock";
     lessonState.paperFailure = undefined;
@@ -234,6 +238,87 @@ describe("adaptive lesson generation evidence", () => {
     lessonState.lessonPlans = [];
     lessonState.inserted = [];
     lessonState.updated = [];
+  });
+
+  it.each(["mock", "compatible"] as const)(
+    "sends strict-compatible teaching schemas through the %s generation path",
+    async (kind) => {
+      lessonState.adapterKind = kind;
+      await generateLesson();
+      const candidates = lessonState.generatedSchemas.filter((_schema, index) =>
+        [
+          "iwc_focused_learning_package_v4",
+          "iwc_adaptive_teaching_article_v1",
+        ].includes(lessonState.generatedSchemaNames[index]!),
+      );
+      expect(candidates.length).toBeGreaterThan(0);
+      const checkRequiredProperties = (schema: Record<string, unknown>) => {
+        if (schema.properties && typeof schema.properties === "object") {
+          for (const [key, property] of Object.entries(schema.properties)) {
+            expect(
+              schema.required,
+              `provider schema must require ${key}`,
+            ).toContain(key);
+            checkRequiredProperties(property as Record<string, unknown>);
+          }
+        }
+        if (schema.items)
+          checkRequiredProperties(schema.items as Record<string, unknown>);
+      };
+      candidates.forEach(checkRequiredProperties);
+      expect(lessonState.failure).toBeUndefined();
+    },
+  );
+
+  it("persists only visible instructions as grading requirements, even if a model adds a hidden criterion", async () => {
+    const original = lessonState.package!;
+    const hidden = "必须额外比较三个国家的金融法规。";
+    lessonState.package = {
+      ...original,
+      paper: {
+        ...original.paper,
+        items: original.paper.items.map((item, index) =>
+          index === 0
+            ? {
+                ...item,
+                publicCriteria: [
+                  {
+                    labelZh: hidden,
+                    labelEn: "Hidden comparison",
+                    descriptionZh: hidden,
+                    descriptionEn:
+                      "Compare three national financial regulations",
+                    weight: 100,
+                  },
+                ],
+              }
+            : item,
+        ),
+      },
+    };
+    await generateLesson();
+    expect(lessonState.failure).toBeUndefined();
+    const saved = lessonState.inserted.find(
+      (entry) => entry.table === lessonPlan,
+    )?.values;
+    expect(JSON.stringify(saved)).not.toContain(hidden);
+    expect(saved).toMatchObject({
+      paperContent: {
+        paper: {
+          items: expect.arrayContaining([
+            expect.objectContaining({
+              instructionZh: original.paper.items[0]!.instructionZh,
+              publicCriteria: [
+                expect.objectContaining({
+                  descriptionZh: original.paper.items[0]!.instructionZh,
+                  weight: 100,
+                }),
+              ],
+            }),
+          ]),
+        },
+      },
+    });
   });
 
   it("passes only the selected skill's top four issues in stable priority and position order", async () => {

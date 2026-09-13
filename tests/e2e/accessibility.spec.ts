@@ -45,11 +45,7 @@ async function expectAxeRoute(
 async function switchToEnglish(
   page: import("@playwright/test").Page,
 ): Promise<void> {
-  const switcher = page.locator(
-    (page.viewportSize()?.width ?? 1280) <= 960
-      ? ".mobile-header .locale-switch"
-      : ".topbar .locale-switch",
-  );
+  const switcher = page.locator("[data-workspace-header] .locale-switch");
   await expect(switcher).toBeVisible();
   await expect(switcher).toHaveAccessibleName("切换到英文界面");
   await switcher.click();

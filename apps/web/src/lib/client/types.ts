@@ -63,6 +63,10 @@ export interface TodayData {
   greetingZh: string;
   greetingEn: string;
   aiState: AiConnectionState;
+  aiService?: {
+    state: "configured" | "needs_setup" | "unknown";
+    canManage: boolean;
+  };
   nextTask: NextTask;
   pendingJob: PendingAiJob | null;
   /**
@@ -77,6 +81,7 @@ export interface TodayData {
   blockedJobNotice: PendingAiJob | null;
   navigation: import("./learning-navigation").LearningDestinations;
   cycleTitle: string;
+  cycleTitleEn?: string;
   timeline: TimelineStep[];
   week: {
     focusedMinutes: number | null;
@@ -303,6 +308,7 @@ export interface FeedbackData {
 
 export interface TeachingPracticePrompt {
   readonly id: string;
+  readonly afterSection?: number;
   readonly instructionZh: string;
   readonly instructionEn: string;
   readonly promptEn: string;
@@ -332,6 +338,11 @@ export interface TeachingPracticeAnalysis {
     readonly explanation: TeachingPracticeLocalizedText;
     readonly whyItMatters: TeachingPracticeLocalizedText;
     readonly userAnswerEvidence: readonly string[];
+    readonly example?: {
+      readonly before: string;
+      readonly after: string;
+      readonly explanation: TeachingPracticeLocalizedText;
+    };
   };
   readonly comparisonPoints: readonly {
     readonly aspect: TeachingPracticeLocalizedText;
@@ -373,6 +384,7 @@ export interface FocusedTeachingData {
   readonly titleEn: string;
   readonly introductionMarkdown: string;
   readonly estimatedMinutes: number;
+  readonly learningGoal?: TeachingPracticeLocalizedText;
   readonly sections: readonly TeachingSectionMarkdown[];
   readonly practicePrompts: readonly TeachingPracticePrompt[];
 }

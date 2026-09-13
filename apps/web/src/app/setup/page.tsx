@@ -217,6 +217,7 @@ export default function SetupPage() {
                 "setup-choice",
                 form.deploymentMode === "personal" && "selected",
               )}
+              disabled={!setupLink.ready}
               onClick={() => selectMode("personal")}
               type="button"
             >
@@ -243,6 +244,7 @@ export default function SetupPage() {
                 "setup-choice",
                 form.deploymentMode === "shared" && "selected",
               )}
+              disabled={!setupLink.ready}
               onClick={() => selectMode("shared")}
               type="button"
             >
@@ -273,7 +275,11 @@ export default function SetupPage() {
             </p>
           </div>
           <div className="setup-footer">
-            <Button onClick={() => setStep(1)} size="lg">
+            <Button
+              disabled={!setupLink.ready}
+              onClick={() => setStep(1)}
+              size="lg"
+            >
               {text("继续", "Continue")}
               <ArrowRight aria-hidden="true" size={18} />
             </Button>

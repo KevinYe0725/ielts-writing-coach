@@ -1,5 +1,6 @@
 import {
   validateFocusedLearningPackage,
+  learnerFacingTeachingGoal,
   type AdaptiveTeachingModule,
   type FocusedLearningPackage,
   type PracticePaperContent,
@@ -85,6 +86,9 @@ function projectTeachingPrompt(value: unknown): TeachingPracticePrompt | null {
     return null;
   return {
     id,
+    ...(asInteger(prompt.afterSection) !== null
+      ? { afterSection: asInteger(prompt.afterSection)! }
+      : {}),
     instructionZh,
     instructionEn,
     promptEn,
@@ -276,12 +280,14 @@ export function learnerFacingTeachingArticle(
   const focusedPackage = validatedFocusedLearningPackage(value);
   if (!focusedPackage) return null;
   const module = focusedPackage.teachingModule;
+  const learningGoal = learnerFacingTeachingGoal(focusedPackage);
   return {
     format: module.format,
     titleZh: module.titleZh,
     titleEn: module.titleEn,
     introductionMarkdown: module.introductionMarkdown,
     estimatedMinutes: module.estimatedMinutes,
+    ...(learningGoal ? { learningGoal } : {}),
     sections: module.sections,
     practicePrompts: module.practicePrompts,
   };

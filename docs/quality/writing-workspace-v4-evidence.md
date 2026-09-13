@@ -1,0 +1,104 @@
+# Writing workspace v4 verification
+
+## Scope
+
+Frontend-only redesign from `cd95bd5` in the existing `codex/learning-quality-v2` worktree. Existing local account app on 3201 is not modified or restarted; 3202 is an isolated DEMO preview. No main merge, remote push or deployment is part of this request.
+
+Design: `docs/superpowers/specs/2026-09-12-writing-workspace-design.md`.
+Execution plan: `docs/superpowers/plans/2026-09-12-writing-workspace.md`.
+
+## Final acceptance — code commit `eedae08`
+
+The staged histories below are superseded by this final combined verification:
+
+- Full Vitest suite against a disposable PostgreSQL17 database: **979 passed across102 files, no failures or skips**. Both `DATABASE_URL` and `IWC_TEST_DATABASE_URL` pointed to the test database. Run migrations only (not seed) and use `--no-file-parallelism`: these integration fixtures own static-question IDs, instance configuration and global-table snapshots.
+- Complete DEMO Playwright suite, Chromium and iPhone-sized WebKit: **373 passed,171 mode/project-specific skips, zero failures**.
+- Complete HTTP-mode Playwright suite, Chromium, against the production standalone build: **95 passed,177 DEMO/project-specific skips, zero failures**. This run uses port3295 because the existing owner-search contract test explicitly asserts that Origin. The first run on3203 had one port-assumption failure; the same frozen build passed on3295 without changing the business code or assertion.
+- Production build:48/48 static pages generated, TypeScript compilation passed. Web lint:0 errors,4 pre-existing Fast Refresh export warnings. `git diff --check` passed.
+- License policy:494 package records across14 reviewed expressions. Upstream license texts for the three selected UI packages and three fonts are retained in public assets; independent review compared them to the installed files.
+- Task and whole-change reviews are approved with no remaining critical/important finding. Desktop sticky containment, mobile/intermediate pane width and source-to-suggestion activation, SSR readiness, exact resource identity, preserved source text, and practice/recovery flows have dedicated regression coverage.
+
+One deliberate tradeoff: correction order versus teaching priority remains in an optional disclosure. The explanation is preserved without a permanent small-text banner; reading it costs one additional click.
+
+These results do not claim a real-account AI generation test, remote CI, push, main merge, or server deployment. Existing real-account port3201 is unchanged. Port3202 remains an independent DEMO preview. Temporary standalone test servers and the disposable test database are cleaned up after verification; learner data was not migrated, regraded, or deleted.
+
+Detailed implementation/review records are retained in `docs/quality/reviews/writing-workspace-v4-task-1.md` and `writing-workspace-v4-task-2.md`.
+
+## Baseline
+
+- Focused navigation/design/priorities Vitest: 27 passed.
+- Expanded client/components baseline: 225 passed, 12 environment-specific skipped tests.
+- Chromium accessibility smoke before redesign: 13 passed, including keyboard skip links and writing submit-dialog focus containment/restoration.
+- Baseline screenshots in ignored output: `output/playwright/v4-before-feedback.png`, `output/playwright/v4-before-teaching.png`.
+- Visual findings: original document starts below the first screen after a large assessment/priority area; article header and body are on different reading axes; persistent product sidebar reduces available content width.
+- New document-workspace browser regressions reproduced all three intended failures before page implementation: essay starts at y=1093 on a 1440×1000 viewport; no keyboard resize separator exists; header/body horizontal mismatch is 140px.
+
+## Acceptance boundaries
+
+Preview screenshots and DEMO browser tests are not a real-account AI generation acceptance. This redesign must preserve current client/server contracts; production checks and deployments are separate delivery gates.
+
+## Reuse
+
+Existing Radix, Markdown renderer, icons and CSS Modules remain. Selected additional components have specific jobs (searchable essay switcher, resizable report, small interaction transitions); no editor migration, UI template installation or paid feature integration.
+
+Official sources checked: https://www.radix-ui.com/primitives/docs/overview/introduction ; https://github.com/dip/cmdk ; https://github.com/bvaughn/react-resizable-panels ; https://github.com/motiondivision/motion ; https://ui.shadcn.com/docs/components .
+
+License gate initially failed on the three existing Fontsource packages (OFL-1.1), not on the new MIT dependencies. After checking the installed licenses against the official SIL OFL embedding/redistribution conditions, original license texts were placed in public `/licenses/*.txt`, the third-party notice was expanded, and OFL-1.1 was added to the reviewed expressions. The real license script then passed: 494 package records,14 license expressions. No font binary was modified or relicensed.
+
+## Task 2 — document-first learning surfaces
+
+Task 2 keeps all loaders, mutations, route identities, source annotations, practice state, paper answers and backend contracts unchanged. The presentation now prioritizes the learner's actual document:
+
+- Feedback uses `react-resizable-panels` 4.12.4 `Group` / `Panel` / `Separator` with a named keyboard-operable separator. The source and suggestion panes remain a single DOM/state tree; mobile switches visibility without cloning either pane. Keyboard resizing retains the selected issue and source mark.
+- The assessment is a compact score-and-diagnosis row with 2×2 criterion disclosures on 390px. Priority shortcuts are concise category/title/actions; the full transfer rule remains in its issue detail. Decorative/repeated report labels and ordering helper copy were removed.
+- At 1440×1000 the original essay begins at y=711.8px (RED baseline y=1093px) with 17px text. The lesson header and prose both begin at x=200px (0px axis delta; RED baseline 140px), and the header remains 760px wide.
+- Teaching uses the full post-sidebar reading width, section headings use the approved 24–28px token without duplicate section numbers, and the mobile container-query override no longer forces a 760px header.
+- Tutorial contents, feedback panes and paper question rails consume `--workspace-header-height`. The fixed paper submit bar is centered in the shell without a legacy sidebar offset. Mobile question anchors clear both the 112px app header and the sticky question rail.
+- Today and My essays remove repeated page-purpose copy, decorative card strokes/icons and internal “training loop” terminology while keeping the next action, current essay, due time, progress, active limit and queued/error states.
+
+### RED / GREEN evidence
+
+- Initial `tests/e2e/document-workspace-v4.spec.ts` Chromium RED: 3 failed / 3 — essay y=1077.17 in the implementer rerun (controller baseline y=1093), no separator, lesson axis delta 140px.
+- Final owned browser suites on DEMO 3202, Chromium + mobile projects: 80 passed / 68 skipped (`document-workspace-v4.spec.ts` and complete `lesson.spec.ts`). The skips are the HTTP-boundary group intentionally disabled by the deterministic DEMO fixture.
+- App shell / essay workspace suite on DEMO 3202, Chromium + mobile: 23 passed / 5 skipped. Presentation-dependent sidebar/eyebrow assertions were migrated to the top-header and readable page-title contracts.
+- Paper layout regressions: focused input plus desktop sticky rail 4 passed; mobile question anchors 2 passed after increasing the scroll clearance from 204px to the tokenized 216px.
+- Independent controller source interaction check: 8 passed across Chromium + mobile (one-to-one issue/source mapping, multiline annotations, keyboard activation, mobile pane switching).
+- CSS token/style contract: 19 passed. Web TypeScript: passed. Web ESLint: 0 errors, 4 existing Fast Refresh export warnings outside Task 2 files. Targeted Prettier check passed after formatting the migrated app-shell test.
+- Build, non-DEMO HTTP boundary coverage, full Vitest and license audit are intentionally left to the controller's final combined gate; Task 2 did not run a second build or touch the real 3201 app.
+
+### Visual review
+
+Isolated preview: `http://127.0.0.1:3202` with `NEXT_PUBLIC_DEMO_MODE=true`.
+
+- Desktop: `output/playwright/v4-after-feedback.png`, `v4-after-teaching.png`, `v4-after-today.png`.
+- Mobile 390×844: `output/playwright/v4-after-feedback-mobile.png`, `v4-after-teaching-mobile.png`.
+
+Reviewed against the baseline for content visibility, resolved spacing tokens, 16px-or-larger core diagnosis text, Chinese UI typography, lesson line length, divider affordance, sticky offsets and horizontal overflow. These screenshots are ignored local QA artifacts, not real-account acceptance evidence.
+
+## Task 2 review round 1
+
+- The committed mobile implementation hid the class applied to the inner `Panel` wrapper, while react-resizable-panels 4.12.4 kept its outer 58/42 flex panels. A new browser regression reproduced the visible suggestion pane 163px narrower than its workbench at 390px.
+- `ResponsiveReport` now uses resizable `Group` / `Panel` / `Separator` only from 940px and an ordinary parent container below that safe threshold. The source and suggestion JSX still render exactly once, and page-owned filter/selection state survives 1440 → 390/768/820/900 → 1024 viewport transitions.
+- Final responsive regression: 12 passed across Chromium + mobile. It checks active-pane/workbench bounds within 2px and no horizontal overflow at 390, 768, 820 and 900px; at 1024px it checks source ≥420px, suggestions ≥340px, no overflow, separator visibility and retained selected mark.
+- Restored the removed focused-target rationale inside an optional disclosure on the target issue. Its dedicated RED failed because the disclosure was absent; GREEN passes after restoring the original learner guidance.
+- Migrated stale visual assertions: the writing editor is compared to the live `--desk-paper` token rather than the former off-white literal, and removed feedback eyebrows are replaced by 12px badge plus 16px diagnosis/structural-heading coverage. Focused suite: 6 passed across Chromium + mobile.
+- Sign-in RED reproduced 26px empty vertical overflow at 390×844. Mobile entry main padding now uses 24px top / 48px bottom, with no clipping or `overflow: hidden`; the original three-viewport assertion passes in both Chromium and mobile projects (2 passed).
+- The full-load switcher failure showed the trigger click landing before client event handlers existed. The server-rendered trigger is now disabled until a `useSyncExternalStore` hydration snapshot marks it interactive; the browser test waits for enabled readiness before opening. The complete open/search/focus/Escape/select flow passed 20/20 repeated runs across Chromium + mobile, and the broader feedback/navigation interaction slice passed 46/46.
+- Review screenshots: `output/playwright/v4-fix-feedback-900.png`, `v4-fix-feedback-1024.png`, `v4-fix-signin-mobile.png`.
+- Controller separately verified production HTTP mode on `e294a52`: 65 passed / 71 DEMO skips. Round 1 did not rerun the full suite or build; those remain controller-owned final gates.
+
+## Task 2 review round 2
+
+- Re-review found that the responsive wrapper used a 940px breakpoint while source-highlight activation still treated only ≤760px as single-pane. The dedicated RED at 768px switched to the source, activated its mark and observed the corresponding suggestion remain hidden.
+- `report-layout.ts` now exports the 940px resizable threshold and both matching media queries. `ResponsiveReport` consumes the wide query; source-highlight activation consumes the complementary single-pane query. CSS behavior remains covered by the existing geometry suite.
+- The actual source-tab → source-mark → visible expanded suggestion flow passes at both 768px and 900px in Chromium and mobile projects. Full document-workspace verification: 14 passed across both projects.
+- No other source, visual or infrastructure work was included. Full suite and build remain controller-owned.
+
+## Task 2 final review fixes
+
+- Desktop sticky RED used a genuinely longer report by expanding an existing source paragraph disclosure, then scrolled only inside the calculated sticky interval. The suggestion pane landed 60.33px behind the 72px header. Inspection of react-resizable-panels 4.12.4 showed `Group` user styles merge after its default hidden overflow and `Panel.style` merges after the inner wrapper's default auto overflow.
+- The resizable group now explicitly uses visible overflow, auto height and stretched panel containers; both panel inner wrappers explicitly use visible overflow. The long-report suggestion remains at least 12px below the header while the source essay remains visible alongside. Existing resize, responsive and selected-state checks remain green.
+- Added shared `useClientReady` for the essay switcher and locale switch. Both native triggers are disabled in the server render and enabled only when client handlers are available. Setup reuses its existing one-time-link `ready` transition to disable both initial mode choices and Continue until hydrated; locale persistence and setup/backend behavior are unchanged.
+- Replaced the two fixed 300ms setup sleeps with enabled-state assertions. A controlled no-JavaScript server snapshot verifies setup and locale first actions are disabled; the hydrated page verifies one click changes each intended state.
+- TDD RED: sticky clearance was -60.33px; server-rendered setup controls were enabled. GREEN: final combined focused browser run 20 passed across Chromium + mobile, including the full document suite, SSR/hydration readiness and locale persistence. Requested four-worker mobile setup/locale repeat: 10 passed / 10.
+- Typecheck, lint and final formatting/style checks are recorded in the task report. Full suite/build remain controller-owned.

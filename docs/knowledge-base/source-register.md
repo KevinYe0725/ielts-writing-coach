@@ -29,6 +29,11 @@ Retrieved 13 August 2026. “Product use” is our inference from the source, no
 
 ## Explicit limits
 
+Additional checks on 11 September 2026:
+
+- [Cambridge English Grammar Today: collective nouns](https://dictionary.cambridge.org/grammar/british-grammar/collective-nouns) explains singular/plural agreement according to whether a group is viewed as a unit or as individuals. Product use: teach the meaning distinction; never invent an IELTS-only preference for singular agreement.
+- [British Council: British or American English in IELTS](https://takeielts.britishcouncil.org/blog/british-or-american-english-ielts) accepts both varieties and recommends consistency as good practice. Product use: distinguish a stylistic recommendation from an error or a score penalty.
+
 - These studies do not prove that one fixed feedback format is optimal for every learner.
 - Same-text correction is evidence of successful revision, not automatically of delayed retention or cross-topic transfer.
 - AI agreement with its own rubric is not official examiner calibration.

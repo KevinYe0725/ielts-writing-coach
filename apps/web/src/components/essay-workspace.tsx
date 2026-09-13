@@ -1,12 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
-import {
-  BookOpenCheck,
-  CirclePlus,
-  FileText,
-  LoaderCircle,
-} from "lucide-react";
+import { BookOpenCheck, CirclePlus, LoaderCircle } from "lucide-react";
 
 import { useLocale } from "@/components/locale-provider";
 import { ActionLink, Badge, Button, Card, PageHeader } from "@/components/ui";
@@ -59,10 +54,7 @@ export function EssayWorkspaceContent({
     >
       {compact ? (
         <div className={styles.compactHeading}>
-          <div>
-            <p className="eyebrow">{text("继续写作", "Keep writing")}</p>
-            <h2 id="essay-workspace-title">{title}</h2>
-          </div>
+          <h2 id="essay-workspace-title">{title}</h2>
           <ActionLink href="/essays" size="sm" variant="ghost">
             {text("查看全部", "View all")}
           </ActionLink>
@@ -77,11 +69,6 @@ export function EssayWorkspaceContent({
               </ActionLink>
             )
           }
-          description={text(
-            "保留正在进行的作文，随时切换并继续。每篇文章都有独立的草稿、进度和下一步。",
-            "Keep your in-progress essays and resume any one at any time. Each has its own draft, progress, and next step.",
-          )}
-          eyebrow={text("写作工作台", "Writing workspace")}
           title={title}
         />
       )}
@@ -117,25 +104,38 @@ export function EssayWorkspaceContent({
           >
             <div className={styles.cardTopline}>
               <Badge tone="blue">{topicLabel(essay.topic, locale)}</Badge>
-              <span>{updatedLabel(essay.updatedAt, locale)}</span>
+              <div className={styles.cardMeta}>
+                <span className={styles.cardUpdated}>
+                  {updatedLabel(essay.updatedAt, locale)}
+                </span>
+                <span
+                  className={styles.cardDue}
+                  data-essay-due
+                  data-overdue={essay.nextAction.overdue ? "true" : "false"}
+                >
+                  {text(essay.nextTask.dueLabelZh, essay.nextTask.dueLabelEn)}
+                  {essay.nextAction.overdue
+                    ? ` · ${text("已过期", "Overdue")}`
+                    : null}
+                </span>
+              </div>
             </div>
             <p className={styles.prompt} lang="en">
               {essay.prompt}
             </p>
             <div className={styles.nextStep}>
-              <span className={styles.nextIcon} aria-hidden="true">
-                <FileText size={16} />
-              </span>
               <div>
                 <strong>
                   {text(essay.nextTask.titleZh, essay.nextTask.titleEn)}
                 </strong>
-                <p>
-                  {text(
-                    essay.nextTask.descriptionZh,
-                    essay.nextTask.descriptionEn,
-                  )}
-                </p>
+                {!compact ? (
+                  <p>
+                    {text(
+                      essay.nextTask.descriptionZh,
+                      essay.nextTask.descriptionEn,
+                    )}
+                  </p>
+                ) : null}
               </div>
             </div>
             <ActionLink

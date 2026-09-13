@@ -458,7 +458,7 @@ export async function enqueueQuestionBankRefill(
   transaction: DatabaseTransaction,
   triggerUserId: string,
   batchId: string,
-  options: { bypassFailedCooldown?: boolean } = {},
+  options: { bypassFailedCooldown?: boolean; now?: Date } = {},
 ): Promise<EnqueuedAIJob> {
   await lockQuestionBankRefillAdmission(transaction);
   const [batch] = await transaction
@@ -517,7 +517,7 @@ export async function enqueueQuestionBankRefill(
   const decision = automaticQuestionBankRefillDecision({
     hasOtherNonTerminalBatch: Boolean(otherNonTerminal),
     latestFailedAt: latestFailed?.updatedAt ?? null,
-    now: new Date(),
+    now: options.now ?? new Date(),
     ...(options.bypassFailedCooldown === undefined
       ? {}
       : { bypassFailedCooldown: options.bypassFailedCooldown }),

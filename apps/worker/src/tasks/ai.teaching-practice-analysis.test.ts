@@ -23,6 +23,7 @@ const workerState = vi.hoisted(() => ({
   responseVisible: true,
   lessonPlan: null as null | {
     id: string;
+    coreSkillId?: string | null;
     paperContent: Record<string, unknown> | null;
   },
   providerValue: null as unknown,
@@ -211,6 +212,7 @@ beforeEach(() => {
   workerState.responseVisible = true;
   workerState.lessonPlan = {
     id: "lesson-1",
+    coreSkillId: "mechanism_chain",
     paperContent: canonicalPaperContent(),
   };
   workerState.providerValue = judgment();
@@ -350,6 +352,35 @@ describe("teaching-practice typed analysis worker", () => {
       improvements: [
         { code: "MAKE_OUTCOME_SPECIFIC", evidence: "daily journeys" },
       ],
+      uncertainty: "PARTIAL_EVIDENCE",
+    });
+  });
+
+  it("drops an improvement for the wrong canonical skill but preserves valid evidence", async () => {
+    workerState.providerValue = judgment({
+      improvements: [
+        {
+          code: "CHECK_SUBJECT_VERB_AGREEMENT",
+          evidence: "reduce perceived danger",
+        },
+      ],
+    });
+
+    await run();
+
+    expect(workerState.providerRequests[0]).toMatchObject({
+      input: expect.stringContaining('"mechanism_chain"'),
+    });
+    expect(workerState.response?.status).toBe("ANALYSIS_READY");
+    expect(analysis()).toEqual({
+      kind: "PERSONALIZED_ATOMS_V1",
+      strengths: [
+        { code: "EXPLICIT_CAUSAL_LINK", evidence: "reduce perceived danger" },
+      ],
+      comparisons: [
+        { code: "VALID_ALTERNATIVE_PATH", evidence: "daily journeys" },
+      ],
+      improvements: [],
       uncertainty: "PARTIAL_EVIDENCE",
     });
   });

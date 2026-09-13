@@ -37,7 +37,7 @@ import { useDemoResource } from "@/components/use-demo-resource";
 import { EssayWorkspace } from "@/components/essay-workspace";
 import { PageLayout } from "@/components/layout/page-layout";
 import { cn } from "@/components/utils";
-import { learningClient } from "@/lib/client";
+import { learningClient, LearningClientError } from "@/lib/client";
 import type {
   QuestionOption,
   QuestionRecommendation,
@@ -81,6 +81,10 @@ function optionLabel<T extends string>(
   return locale === "zh-CN" ? (value?.zh ?? id) : (value?.en ?? id);
 }
 
+function taskActionTitle(value: string): string {
+  return value.split(/[:：]/u, 1)[0]?.trim() || value;
+}
+
 function subscribeToLocation(onStoreChange: () => void) {
   window.addEventListener("popstate", onStoreChange);
   return () => window.removeEventListener("popstate", onStoreChange);
@@ -117,7 +121,26 @@ export default function TodayPage() {
   const [retryError, setRetryError] = useState<string | null>(null);
   const { locale, text, messages } = useLocale();
   const loader = useCallback(() => learningClient.getToday(), []);
-  const { data, error, loading, retry } = useDemoResource(loader);
+  const { data, error, loading, retry, refresh } = useDemoResource(loader);
+  const processing = Boolean(
+    !error &&
+      data?.pendingJob &&
+      ["QUEUED", "LEASED", "RUNNING", "RETRY_SCHEDULED"].includes(
+        data.pendingJob.status,
+      ),
+  );
+  useEffect(() => {
+    if (!processing) return;
+    const update = () => {
+      if (document.visibilityState !== "hidden") refresh();
+    };
+    const timer = window.setInterval(update, 5000);
+    document.addEventListener("visibilitychange", update);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", update);
+    };
+  }, [processing, refresh]);
   const [questions, setQuestions] = useState<QuestionOption[]>([]);
   const [questionLoading, setQuestionLoading] = useState(false);
   const [questionError, setQuestionError] = useState<string | null>(null);
@@ -494,60 +517,102 @@ export default function TodayPage() {
 
   if (loading) return <Skeleton label={messages.common.loading} />;
   if (error || !data) {
+    const needsSignIn =
+      error instanceof LearningClientError &&
+      (error.status === 401 || error.status === 403);
     return (
       <Card className="transfer-result-card" role="alert">
         <AlertTriangle aria-hidden="true" size={36} />
-        <h1>{text("今日计划暂时无法读取", "Today’s plan is unavailable")}</h1>
+        <h1>
+          {needsSignIn
+            ? text("请重新登录后继续", "Sign in again to continue")
+            : text("今日计划暂时无法读取", "Today’s plan is unavailable")}
+        </h1>
         <p>
-          {error?.message ??
-            text(
-              "服务器没有返回可用的计划。",
-              "The server did not return a usable plan.",
-            )}
+          {needsSignIn
+            ? text(
+                "当前登录状态已失效或无法访问学习内容。已保存的作文会保留，重新登录后可以继续。",
+                "Your session has expired or cannot access this learning content. Saved essays remain available after you sign in again.",
+              )
+            : (error?.message ??
+              text(
+                "服务器没有返回可用的计划。",
+                "The server did not return a usable plan.",
+              ))}
         </p>
         <div className="completion-actions">
-          <Button onClick={retry}>{text("重试", "Try again")}</Button>
-          <ActionLink href="/settings" variant="secondary">
-            {text("检查设置", "Check settings")}
-          </ActionLink>
+          {needsSignIn ? (
+            <ActionLink href="/signin?next=%2Ftoday">
+              {text("重新登录", "Sign in again")}
+            </ActionLink>
+          ) : (
+            <>
+              <Button onClick={retry}>{text("重试", "Try again")}</Button>
+              <ActionLink href="/settings" variant="secondary">
+                {text("检查设置", "Check settings")}
+              </ActionLink>
+            </>
+          )}
         </div>
       </Card>
     );
   }
 
   const task = data.nextTask;
+  const actionTitleZh = taskActionTitle(task.titleZh);
+  const actionTitleEn = taskActionTitle(task.titleEn);
+  const completedTimelineSteps = data.timeline.filter(
+    (step) => step.state === "done",
+  ).length;
+  const timelineTotal = Math.max(data.timeline.length, 1);
+  const currentTimelineStep = Math.min(
+    completedTimelineSteps + 1,
+    timelineTotal,
+  );
+  const timelineProgress = Math.round(
+    (currentTimelineStep / timelineTotal) * 100,
+  );
+  const aiService = data.aiService ?? {
+    state:
+      data.aiState === "connected"
+        ? "configured"
+        : data.aiState === "missing"
+          ? "needs_setup"
+          : "unknown",
+    canManage: true,
+  };
   return (
     <PageLayout variant="focus">
       <div className={styles.desk} data-today-desk="focus">
-        <PageHeader
-          eyebrow={text("今日计划", "Today’s plan")}
-          title={text(data.greetingZh, data.greetingEn)}
-          description={text(
-            "系统已经替你选好优先级。完成眼前这一步，其余任务会自动排程。",
-            "The system has set the priorities. Complete this action and everything else is scheduled automatically.",
-          )}
-        />
+        <PageHeader title={text(data.greetingZh, data.greetingEn)} />
 
-        {data.aiState !== "connected" ? (
+        {aiService.state === "needs_setup" ? (
           <div className="status-banner status-banner-warning" role="status">
             <CloudOff aria-hidden="true" size={21} />
             <div>
               <strong>
                 {text(
-                  "AI 尚未连接，但写作不会被阻塞",
-                  "AI is not connected, but writing remains available",
+                  "批改服务尚未配置，可以先开始写作",
+                  "Feedback is not configured yet; you can still start writing",
                 )}
               </strong>
               <p>
-                {text(
-                  "计时、自动保存与历史记录照常工作；批改可以等待 AI 恢复后再运行。",
-                  "Timing, autosave, and history continue to work; feedback can run when AI is restored.",
-                )}
+                {aiService.canManage
+                  ? text(
+                      "计时、自动保存与历史记录照常工作；批改可以等待 AI 恢复后再运行。",
+                      "Timing, autosave, and history continue to work; feedback can run when AI is restored.",
+                    )
+                  : text(
+                      "计时和草稿保存照常可用。请联系管理员完成批改服务配置，作文不用重新写。",
+                      "Timing and draft saving remain available. Ask your administrator to configure feedback; you do not need to rewrite your essay.",
+                    )}
               </p>
             </div>
-            <ActionLink href="/settings" size="sm" variant="secondary">
-              {text("配置 AI", "Configure AI")}
-            </ActionLink>
+            {aiService.canManage ? (
+              <ActionLink href="/settings" size="sm" variant="secondary">
+                {text("配置 AI", "Configure AI")}
+              </ActionLink>
+            ) : null}
           </div>
         ) : null}
 
@@ -564,18 +629,28 @@ export default function TodayPage() {
                 )}
               </strong>
               <p>
-                {data.aiState === "connected"
+                {aiService.state === "configured"
                   ? text(
-                      "AI 连接正常，批改处理中；完成后今日计划会自动更新。",
-                      "The AI connection is healthy; feedback is processing and Today updates automatically.",
+                      "批改服务已配置，正在处理你的作文；完成后这里会自动更新。",
+                      "Feedback is configured and your essay is being processed. This page updates when it is ready.",
                     )
-                  : text(
-                      "批改需要先配置 AI 连接。在设置中保存可用的 AI 后，批改会自动开始，无需重写作文。",
-                      "Feedback starts automatically once a working AI connection is saved in Settings; you do not need to rewrite the essay.",
-                    )}
+                  : aiService.state === "needs_setup"
+                    ? aiService.canManage
+                      ? text(
+                          "批改需要先配置 AI 连接。在设置中保存可用的 AI 后，批改会自动开始，无需重写作文。",
+                          "Feedback starts automatically once a working AI connection is saved in Settings; you do not need to rewrite the essay.",
+                        )
+                      : text(
+                          "请联系管理员配置批改服务；你的作文和提交记录已经保留。",
+                          "Ask your administrator to configure feedback. Your essay and submission are saved.",
+                        )
+                    : text(
+                        "作文和提交记录已保留，正在确认最新批改进度。你可以稍后回来查看。",
+                        "Your essay and submission are saved. We are checking the latest feedback progress; you can return later.",
+                      )}
               </p>
             </div>
-            {data.aiState !== "connected" ? (
+            {aiService.state === "needs_setup" && aiService.canManage ? (
               <ActionLink href="/settings" size="sm">
                 {text("配置 AI", "Configure AI")}
               </ActionLink>
@@ -589,8 +664,8 @@ export default function TodayPage() {
             <div>
               <strong>
                 {text(
-                  "前一步已完成，但后续 AI 任务没有跑完",
-                  "The previous step finished, but a follow-up AI task did not",
+                  "已有内容已保存，后续学习材料还未准备好",
+                  "Your completed work is saved; the next learning material is not ready yet",
                 )}
               </strong>
               <p>
@@ -610,9 +685,18 @@ export default function TodayPage() {
               {retryError ? <p role="alert">{retryError}</p> : null}
             </div>
             {data.blockedJobNotice.status === "AI_BLOCKED" ? (
-              <ActionLink href="/settings" size="sm">
-                {text("检查 AI 连接", "Review AI connection")}
-              </ActionLink>
+              aiService.canManage ? (
+                <ActionLink href="/settings" size="sm">
+                  {text("检查 AI 连接", "Review AI connection")}
+                </ActionLink>
+              ) : (
+                <p>
+                  {text(
+                    "请联系管理员检查批改服务。",
+                    "Ask your administrator to check the feedback service.",
+                  )}
+                </p>
+              )
             ) : (
               <Button
                 disabled={retryingJob}
@@ -820,32 +904,23 @@ export default function TodayPage() {
           <section
             className={cn("next-task-card", styles.primaryAction)}
             data-today-primary
+            data-next-task-card
           >
-            <div className="next-task-accent" aria-hidden="true" />
-            <div className="next-task-topline">
-              <Badge tone="blue">
-                <Sparkles aria-hidden="true" size={13} />
-                {text(task.eyebrowZh, task.eyebrowEn)}
-              </Badge>
-              <span className="due-label">
-                <CalendarClock aria-hidden="true" size={15} />
-                {text(task.dueLabelZh, task.dueLabelEn)}
+            <div className={styles.taskProgress} data-next-task-progress>
+              <span className={styles.taskProgressCount}>
+                {currentTimelineStep}
+                <span>/{timelineTotal}</span>
+              </span>
+              <span className={styles.taskProgressTrack} aria-hidden="true">
+                <span style={{ width: `${timelineProgress}%` }} />
               </span>
             </div>
             <div className="next-task-body">
               <div className="next-task-copy">
-                <h2>{text(task.titleZh, task.titleEn)}</h2>
-                <p>{text(task.descriptionZh, task.descriptionEn)}</p>
-                <div className="task-meta">
-                  <span>
-                    <Clock3 aria-hidden="true" size={16} />
-                    {task.durationMinutes} {messages.common.minutes}
-                  </span>
-                  <span>
-                    <Target aria-hidden="true" size={16} />
-                    {text("闭卷独立输出", "Closed-book production")}
-                  </span>
+                <div className={styles.currentEssay}>
+                  <p lang="en">{data.cycleTitleEn ?? data.cycleTitle}</p>
                 </div>
+                <h2>{text(actionTitleZh, actionTitleEn)}</h2>
               </div>
               {data.pendingJobAction === "retry" ? (
                 <Button
@@ -865,15 +940,35 @@ export default function TodayPage() {
                   {text(task.actionZh, task.actionEn)}
                 </Button>
               ) : data.pendingJobAction === "review-connection" ? (
-                <ActionLink href="/settings" size="lg">
-                  {text("检查 AI 连接", "Review AI connection")}
-                </ActionLink>
+                aiService.canManage ? (
+                  <ActionLink href="/settings" size="lg">
+                    {text("检查 AI 连接", "Review AI connection")}
+                  </ActionLink>
+                ) : (
+                  <ActionLink href="/essays" size="lg">
+                    {text("先继续其他作文", "Continue another essay")}
+                  </ActionLink>
+                )
               ) : (
                 <ActionLink href={task.href} size="lg">
                   {text(task.actionZh, task.actionEn)}
                 </ActionLink>
               )}
             </div>
+            {processing ? (
+              <div className={styles.processingNote} role="status">
+                <LoaderCircle aria-hidden="true" className="spin" size={16} />
+                <span>
+                  {text(
+                    "正在处理，准备好后这里会自动更新。可以先继续其他作文。",
+                    "Processing; this page updates when ready. You can continue another essay meanwhile.",
+                  )}
+                </span>
+                <ActionLink href="/essays" size="sm" variant="secondary">
+                  {text("查看其他作文", "Other essays")}
+                </ActionLink>
+              </div>
+            ) : null}
           </section>
         )}
 
@@ -1047,91 +1142,95 @@ export default function TodayPage() {
 
         <EssayWorkspace compact />
 
-        <section className={styles.learningThread} data-today-learning-thread>
-          <SectionHeader
-            title={text("本篇训练闭环", "This learning loop")}
-            description={data.cycleTitle}
-          />
-          <Card className={cn("cycle-timeline-card", styles.timelineCard)}>
-            <ol className="cycle-timeline">
-              {data.timeline.map((step, index) => (
-                <li
-                  className={cn("cycle-step", `cycle-step-${step.state}`)}
-                  key={step.id}
-                >
-                  <span className="cycle-node" aria-hidden="true">
-                    {step.state === "done" ? <Check size={15} /> : index + 1}
-                  </span>
-                  <div>
-                    <strong>{text(step.labelZh, step.labelEn)}</strong>
-                    <span>{step.dateLabel}</span>
-                  </div>
-                  {index < data.timeline.length - 1 ? (
-                    <span className="cycle-line" aria-hidden="true" />
-                  ) : null}
-                </li>
-              ))}
-            </ol>
-          </Card>
-        </section>
+        <div className={styles.progressPanel} data-today-progress-panel>
+          <section className={styles.learningThread} data-today-learning-thread>
+            <SectionHeader
+              title={text("本篇进度", "Essay progress")}
+              description={data.cycleTitle}
+            />
+            <Card className={cn("cycle-timeline-card", styles.timelineCard)}>
+              <ol className="cycle-timeline">
+                {data.timeline.map((step, index) => (
+                  <li
+                    className={cn("cycle-step", `cycle-step-${step.state}`)}
+                    key={step.id}
+                  >
+                    <span className="cycle-node" aria-hidden="true">
+                      {step.state === "done" ? <Check size={15} /> : index + 1}
+                    </span>
+                    <div>
+                      <strong>{text(step.labelZh, step.labelEn)}</strong>
+                      <span>{step.dateLabel}</span>
+                    </div>
+                    {index < data.timeline.length - 1 ? (
+                      <span className="cycle-line" aria-hidden="true" />
+                    ) : null}
+                  </li>
+                ))}
+              </ol>
+            </Card>
+          </section>
 
-        <section className={styles.evidenceSummary} data-today-evidence>
-          <div
-            aria-label={text("本周学习证据", "This week’s learning evidence")}
-            className={styles.evidenceList}
-            role="list"
-          >
-            <div className={styles.evidenceItem} role="listitem">
-              <span className="stat-icon blue">
-                <Clock3 aria-hidden="true" size={19} />
-              </span>
-              <div>
-                <span>{text("已记录学习时长", "Recorded learning time")}</span>
-                <strong>
-                  {data.week.focusedMinutes ?? "—"}
-                  {data.week.focusedMinutes === null ? null : (
-                    <small> min</small>
-                  )}
-                </strong>
-              </div>
-            </div>
-            <div className={styles.evidenceItem} role="listitem">
-              <span className="stat-icon blue">
-                <Gauge aria-hidden="true" size={19} />
-              </span>
-              <div>
-                <span>{text("已提交首稿", "First drafts submitted")}</span>
-                <strong>{data.week.completedActions ?? "—"}</strong>
-              </div>
-            </div>
-            <div className={styles.evidenceItem} role="listitem">
-              <span className="stat-icon blue">
-                <Target aria-hidden="true" size={19} />
-              </span>
-              <div>
-                <span>
-                  {text(
-                    "独立复测未复发",
-                    "No recurrence in independent checks",
-                  )}
+          <section className={styles.evidenceSummary} data-today-evidence>
+            <div
+              aria-label={text("本周学习证据", "This week’s learning evidence")}
+              className={styles.evidenceList}
+              role="list"
+            >
+              <div className={styles.evidenceItem} role="listitem">
+                <span className="stat-icon blue">
+                  <Clock3 aria-hidden="true" size={19} />
                 </span>
-                <strong>
-                  {data.week.repeatedErrorReduction ?? "—"}
-                  {data.week.repeatedErrorReduction === null ? null : (
-                    <small>%</small>
-                  )}
-                </strong>
+                <div>
+                  <span>
+                    {text("已记录学习时长", "Recorded learning time")}
+                  </span>
+                  <strong>
+                    {data.week.focusedMinutes ?? "—"}
+                    {data.week.focusedMinutes === null ? null : (
+                      <small> min</small>
+                    )}
+                  </strong>
+                </div>
+              </div>
+              <div className={styles.evidenceItem} role="listitem">
+                <span className="stat-icon blue">
+                  <Gauge aria-hidden="true" size={19} />
+                </span>
+                <div>
+                  <span>{text("已提交首稿", "First drafts submitted")}</span>
+                  <strong>{data.week.completedActions ?? "—"}</strong>
+                </div>
+              </div>
+              <div className={styles.evidenceItem} role="listitem">
+                <span className="stat-icon blue">
+                  <Target aria-hidden="true" size={19} />
+                </span>
+                <div>
+                  <span>
+                    {text(
+                      "独立复测未复发",
+                      "No recurrence in independent checks",
+                    )}
+                  </span>
+                  <strong>
+                    {data.week.repeatedErrorReduction ?? "—"}
+                    {data.week.repeatedErrorReduction === null ? null : (
+                      <small>%</small>
+                    )}
+                  </strong>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className={styles.refreshAction}>
-            <Button onClick={retry} size="sm" variant="secondary">
-              {text("刷新计划", "Refresh plan")}
-              <ArrowRight aria-hidden="true" size={15} />
-            </Button>
-          </div>
-        </section>
+            <div className={styles.refreshAction}>
+              <Button onClick={retry} size="sm" variant="secondary">
+                {text("刷新计划", "Refresh plan")}
+                <ArrowRight aria-hidden="true" size={15} />
+              </Button>
+            </div>
+          </section>
+        </div>
       </div>
     </PageLayout>
   );

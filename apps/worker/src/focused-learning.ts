@@ -9,6 +9,7 @@ import {
   validatePracticePaperContent,
   type AdaptiveTeachingModule,
   type FocusedLearningPackage,
+  type LearningValidationOptions,
   type PracticePaperContent,
   type TeachingPracticePrompt,
 } from "./learning";
@@ -28,6 +29,7 @@ export type {
 } from "./learning";
 
 const ajv = new Ajv2020({ allErrors: true, strict: true });
+export { learnerFacingTeachingGoal } from "./learning";
 const validateFocusedLearningShape = ajv.compile<FocusedLearningPackage>(
   focusedLearningPackageSchema as AnySchemaObject,
 ) as ValidateFunction<FocusedLearningPackage>;
@@ -41,19 +43,21 @@ const validateTimedPracticePaperShape = ajv.compile<PracticePaperContent>(
 export function validateAdaptiveTeachingModule(
   value: unknown,
   version1Essay?: string,
+  options?: LearningValidationOptions,
 ): value is AdaptiveTeachingModule {
   return (
     validateAdaptiveTeachingModuleShape(value) &&
-    validateAdaptiveTeachingModulePedagogy(value, version1Essay)
+    validateAdaptiveTeachingModulePedagogy(value, version1Essay, options)
   );
 }
 
 export function validateTimedPracticePaper(
   value: unknown,
+  options?: LearningValidationOptions,
 ): value is PracticePaperContent {
   return (
     validateTimedPracticePaperShape(value) &&
-    validatePracticePaperContent(value)
+    validatePracticePaperContent(value, options)
   );
 }
 
@@ -61,10 +65,11 @@ export function validateTimedPracticePaper(
 export function validateFocusedLearningPackage(
   value: unknown,
   version1Essay?: string,
+  options?: LearningValidationOptions,
 ): value is FocusedLearningPackage {
   return (
     validateFocusedLearningShape(value) &&
-    validateFocusedLearningPedagogy(value, version1Essay)
+    validateFocusedLearningPedagogy(value, version1Essay, options)
   );
 }
 

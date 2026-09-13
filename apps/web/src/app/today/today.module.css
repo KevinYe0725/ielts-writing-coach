@@ -68,6 +68,42 @@
 :global(.next-task-copy) {
   max-width: 650px;
 }
+
+.currentEssay {
+  margin-bottom: var(--desk-space-4);
+  padding-bottom: var(--desk-space-3);
+  border-bottom: 1px solid var(--desk-line);
+}
+.currentEssay > span {
+  color: var(--ink-soft);
+  font-size: var(--desk-type-meta);
+}
+.currentEssay > p {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: var(--desk-space-2) 0 0;
+  font-family: var(--desk-font-reading);
+  font-size: var(--desk-type-body);
+  line-height: 1.6;
+}
+.processingNote {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--desk-space-3);
+  margin-top: var(--desk-space-6);
+  padding-top: var(--desk-space-4);
+  border-top: 1px solid var(--desk-line);
+  font-size: var(--desk-type-meta);
+  line-height: 1.6;
+  color: var(--ink-soft);
+}
+.processingNote > span {
+  flex: 1;
+  min-width: 160px;
+}
 :global(.next-task-copy h2) {
   margin-bottom: var(--desk-space-2);
   font-size: var(--desk-type-page-title);
@@ -253,6 +289,45 @@
   content: "";
   background: color-mix(in srgb, var(--desk-blue) 25%, transparent);
   inset: var(--desk-space-6) auto var(--desk-space-6) 18px;
+}
+
+.taskProgress {
+  display: flex;
+  max-width: 360px;
+  align-items: center;
+  margin-bottom: var(--desk-space-6);
+  padding-left: var(--desk-space-4);
+  gap: var(--desk-space-3);
+}
+
+.taskProgressCount {
+  color: var(--desk-ink);
+  font-family: var(--desk-font-utility);
+  font-size: var(--desk-type-subheading);
+  font-weight: var(--desk-utility-weight-semibold);
+  line-height: var(--desk-leading-compact);
+}
+
+.taskProgressCount span {
+  color: var(--desk-ink-muted);
+  font-size: var(--desk-type-label);
+  font-weight: var(--desk-utility-weight-medium);
+}
+
+.taskProgressTrack {
+  display: block;
+  flex: 1;
+  height: var(--desk-space-1);
+  overflow: hidden;
+  background: color-mix(in srgb, var(--desk-ink) 12%, var(--desk-paper));
+  border-radius: var(--desk-radius-pill);
+}
+
+.taskProgressTrack > span {
+  display: block;
+  height: 100%;
+  background: var(--desk-ink);
+  border-radius: var(--desk-radius-pill);
 }
 
 /* The recommendation is a reading surface, not a second dashboard card. */
@@ -526,6 +601,15 @@
   z-index: 1;
 }
 
+.primaryAction :global(.next-task-body) {
+  margin-top: 0;
+}
+
+.primaryAction .currentEssay > p {
+  font-size: var(--desk-type-subheading);
+  line-height: var(--desk-leading-body);
+}
+
 .learningThread {
   min-width: 0;
   padding-top: var(--desk-space-2);
@@ -562,7 +646,7 @@
   display: grid;
   min-width: 0;
   padding: var(--desk-space-2) var(--desk-space-4);
-  color: color-mix(in srgb, var(--desk-ink) 72%, transparent);
+  color: var(--desk-ink-muted);
   border-right: 1px solid color-mix(in srgb, var(--desk-ink) 12%, transparent);
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
@@ -731,5 +815,96 @@
   }
   to {
     opacity: 1;
+  }
+}
+
+/* The course home is a focused reading surface: one task, one compact list,
+   and one continuous progress summary. */
+.progressPanel {
+  display: grid;
+  overflow: hidden;
+  background: var(--desk-paper);
+  border: 1px solid color-mix(in srgb, var(--desk-ink) 14%, transparent);
+  border-radius: var(--desk-radius-lg);
+}
+
+.progressPanel .learningThread {
+  padding: var(--desk-space-6);
+  border-top: 0;
+}
+
+.progressPanel .learningThread :global(.section-header) {
+  margin-bottom: var(--desk-space-3);
+}
+
+.progressPanel .timelineCard {
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+
+.progressPanel .evidenceSummary {
+  padding: var(--desk-space-4) var(--desk-space-6);
+  border-top: 1px solid color-mix(in srgb, var(--desk-ink) 14%, transparent);
+}
+
+.desk :global([data-essay-workspace="compact"]) {
+  padding-top: var(--desk-space-4);
+}
+
+.desk :global([data-essay-workspace="compact"] .grid) {
+  gap: 0;
+}
+
+.desk :global([data-essay-workspace="compact"] .card) {
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto auto;
+  padding: var(--desk-space-4) 0;
+  border-right: 0;
+  border-bottom: 0;
+  border-left: 0;
+  border-top: 1px solid color-mix(in srgb, var(--desk-ink) 14%, transparent);
+  border-radius: 0;
+  background: transparent;
+  gap: var(--desk-space-3) var(--desk-space-4);
+}
+
+.desk :global([data-essay-workspace="compact"] .card:first-child) {
+  border-top: 0;
+}
+
+.desk :global([data-essay-workspace="compact"] .cardTopline),
+.desk :global([data-essay-workspace="compact"] .prompt) {
+  grid-column: 1 / -1;
+}
+
+.desk :global([data-essay-workspace="compact"] .prompt) {
+  min-height: 0;
+  -webkit-line-clamp: 2;
+}
+
+.desk :global([data-essay-workspace="compact"] .nextStep) {
+  grid-column: 1;
+  padding: 0;
+  border: 0;
+}
+
+.desk :global([data-essay-workspace="compact"] .card > .button) {
+  grid-column: 2;
+  grid-row: 3;
+  align-self: end;
+}
+
+@media (max-width: 760px) {
+  .progressPanel .learningThread {
+    padding: var(--desk-space-4);
+  }
+
+  .progressPanel .evidenceSummary {
+    padding: var(--desk-space-4);
+  }
+
+  .desk :global([data-essay-workspace="compact"] .card) {
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 }

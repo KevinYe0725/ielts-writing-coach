@@ -26,6 +26,7 @@ export interface FocusedTeachingProfile {
   readonly commonConfusions: readonly string[];
   readonly transferContexts: readonly string[];
   readonly depthCue: string;
+  readonly scopeNotes?: readonly string[];
 }
 
 export const FOCUSED_TEACHING_PROFILES: Readonly<
@@ -69,6 +70,12 @@ export const FOCUSED_TEACHING_PROFILES: Readonly<
       "Move from clause marking to repair, then to choosing a boundary while preserving a new idea.",
   },
   subject_verb_agreement: {
+    scopeNotes: [
+      "Find the main-clause finite verb first; introductory adverbials are not the subject, and verbs inside relative clauses have their own subjects.",
+      "Verified clause example: in 'The researcher who studies dolphins has published a paper', researcher controls main-clause has; relative who refers to researcher and is the subject of studies. Dolphins is the object of studies and never controls that verb. Check each clause separately; do not say any noun inside a relative clause controls its verb.",
+      "For ordinary noun phrases the head controls agreement. Do not present this as universal: a number of plus plural noun takes plural agreement; the number of takes singular agreement.",
+      "Collective nouns such as team, committee, or group can use singular or plural agreement in accepted British English depending on whole-group versus individual-member meaning. Never claim that IELTS or international exams prefer, reward, require, or consider singular agreement safer. The acceptable choice follows meaning and variety, not an invented exam preference. For this narrow lesson, use ordinary noun phrases for most examples and keep collective agreement to a brief caveat, not a separate unit.",
+    ],
     decisionLens:
       "Locate the head subject, not the nearest noun, before selecting the finite verb.",
     commonConfusions: [
@@ -224,5 +231,8 @@ export function focusedTeachingProfileFor(skillId: string): string {
     `Common confusions: ${profile.commonConfusions.join("; ")}.`,
     `Use genuinely different transfer contexts such as: ${profile.transferContexts.join(", ")}.`,
     `Depth cue: ${profile.depthCue}`,
+    ...(profile.scopeNotes
+      ? [`Scope and accepted alternatives: ${profile.scopeNotes.join(" ")}`]
+      : []),
   ].join("\n");
 }

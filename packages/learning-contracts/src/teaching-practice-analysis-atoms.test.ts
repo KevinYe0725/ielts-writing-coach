@@ -9,6 +9,80 @@ const answer =
   "Protected lanes reduce perceived danger, so more commuters choose bicycles.";
 
 describe("typed teaching-practice analysis atoms", () => {
+  it.each([
+    [
+      "CHECK_SUBJECT_VERB_AGREEMENT",
+      "The number of students are increasing.",
+      "are",
+      "主语",
+      "The number of students is increasing.",
+    ],
+    [
+      "CHECK_VERB_FORM",
+      "Schools should to teach financial literacy.",
+      "should to teach",
+      "动词",
+      "Schools should teach financial literacy.",
+    ],
+    [
+      "MATCH_COLLOCATION",
+      "This policy can make benefits for residents.",
+      "make benefits",
+      "搭配",
+      "This policy can bring benefits to residents.",
+    ],
+    [
+      "CLARIFY_REFERENCE",
+      "Schools and parents should cooperate. They need more funding.",
+      "They",
+      "指代",
+      "Schools and parents should cooperate. Schools need more funding.",
+    ],
+  ])(
+    "renders actionable %s teaching without replacing the learner answer",
+    (code, learnerAnswer, evidence, concept, exampleAfter) => {
+      const atoms = projectTeachingPracticeAnalysisAtoms(
+        {
+          kind: "PERSONALIZED_ATOMS_V1",
+          strengths: [],
+          comparisons: [],
+          improvements: [{ code, evidence }],
+          uncertainty: "NONE",
+        },
+        learnerAnswer,
+      );
+      expect(atoms).not.toBeNull();
+      const result = renderTeachingPracticeAnalysisAtoms(atoms!);
+      expect(result.keyImprovement?.explanation.zh).toContain(concept);
+      expect(result.keyImprovement?.userAnswerEvidence).toEqual([evidence]);
+      expect(result.keyImprovement).toHaveProperty(
+        "example.after",
+        exampleAfter,
+      );
+      expect(result.nextCheck.zh.length).toBeGreaterThan(10);
+    },
+  );
+
+  it("still rejects fabricated evidence for a new grammar diagnosis", () => {
+    expect(
+      projectTeachingPracticeAnalysisAtoms(
+        {
+          kind: "PERSONALIZED_ATOMS_V1",
+          strengths: [],
+          comparisons: [],
+          improvements: [
+            {
+              code: "CHECK_SUBJECT_VERB_AGREEMENT",
+              evidence: "invented error",
+            },
+          ],
+          uncertainty: "NONE",
+        },
+        "The number of students is increasing.",
+      ),
+    ).toBeNull();
+  });
+
   it("renders only first-party copy around exact learner evidence", () => {
     const atoms = projectTeachingPracticeAnalysisAtoms(
       {

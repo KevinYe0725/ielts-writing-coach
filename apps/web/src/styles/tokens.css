@@ -1,19 +1,30 @@
 :root {
-  /* Approved base palette. Derived colors below must resolve from these roles. */
-  --desk-ink: #172033;
-  --desk-paper: #fcfbf8;
-  --desk-canvas: #eef1f5;
-  --desk-blue: #1d56a0;
-  --desk-green: #2f6d5a;
+  /* Fresh reading palette: sea-glass canvas, clear ink, and a cool teal action. */
+  --desk-ink: #123330;
+  --desk-paper: #ffffff;
+  --desk-canvas: #f3faf7;
+  --desk-blue: #077581;
+  --desk-green: #2f7d5a;
   --desk-amber: #7c531b;
   --desk-error: #b4474c;
   --desk-error-strong: #9f3840;
+  /* Public introduction surface: neutral black and white presentation roles. */
+  --desk-mono-ink: #111111;
+  --desk-mono-paper: #ffffff;
+  --desk-mono-canvas: #f7f7f7;
+  --desk-mono-muted: #5b5b5b;
+  --desk-mono-line: color-mix(in srgb, var(--desk-mono-ink) 14%, transparent);
+  --desk-mono-line-strong: color-mix(
+    in srgb,
+    var(--desk-mono-ink) 24%,
+    transparent
+  );
   --desk-evidence-muted: color-mix(
     in srgb,
-    var(--desk-ink) 64%,
+    var(--desk-ink) 76%,
     var(--desk-canvas)
   );
-  --desk-ink-muted: color-mix(in srgb, var(--desk-ink) 72%, var(--desk-canvas));
+  --desk-ink-muted: color-mix(in srgb, var(--desk-ink) 80%, var(--desk-canvas));
   --desk-line: color-mix(in srgb, var(--desk-ink) 14%, transparent);
   --desk-line-strong: color-mix(in srgb, var(--desk-ink) 24%, transparent);
   --desk-blue-soft: color-mix(in srgb, var(--desk-blue) 11%, var(--desk-paper));
@@ -55,6 +66,15 @@
   --desk-type-subheading: 20px;
   --desk-type-section-title: clamp(24px, 3vw, 28px);
   --desk-type-page-title: clamp(30px, 4vw, 40px);
+  /* Public product page uses display typography without changing workspace roles. */
+  --desk-type-public-hero: clamp(40px, 5.8vw, 80px);
+  --desk-type-public-hero-mobile: clamp(36px, 7.5vw, 52px);
+  --desk-type-public-section: clamp(25px, 2.8vw, 36px);
+  --desk-type-public-statement: clamp(32px, 3.8vw, 50px);
+  --desk-type-public-closing: clamp(30px, 4vw, 48px);
+  --desk-type-public-intro: clamp(16px, 1.6vw, 19px);
+  --desk-type-public-example: clamp(20px, 2vw, 27px);
+  --desk-type-public-dialog: 28px;
   --desk-leading-compact: 1.2;
   --desk-leading-body: 1.7;
   --desk-leading-reading: 1.82;

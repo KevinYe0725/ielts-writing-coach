@@ -62,7 +62,7 @@
 .securityNote {
   max-width: 74ch;
   margin: var(--desk-space-4) 0 var(--desk-space-6);
-  color: color-mix(in srgb, var(--desk-ink) 72%, transparent);
+  color: var(--desk-ink-muted);
   line-height: 1.7;
 }
 
@@ -118,7 +118,7 @@
 
 .actionBar > span {
   max-width: 58ch;
-  color: color-mix(in srgb, var(--desk-ink) 70%, transparent);
+  color: var(--desk-ink-muted);
 }
 
 .message,

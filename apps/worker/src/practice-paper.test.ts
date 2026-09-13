@@ -182,6 +182,18 @@ function validateFixture(
   }
 }
 
+function validateFreshFixture(value: MutablePackage): boolean {
+  try {
+    return validateFocusedLearningPackage(
+      value as unknown as FocusedLearningPackage,
+      undefined,
+      { freshGeneration: true },
+    );
+  } catch {
+    return false;
+  }
+}
+
 describe("markdown teaching article + timed paper contract", () => {
   it("accepts a valid markdown teaching article and matching paper", () => {
     expect(validateFixture(teachingPackage())).toBe(true);
@@ -224,6 +236,29 @@ describe("markdown teaching article + timed paper contract", () => {
     }
     expect(validateFixture(value)).toBe(false);
   });
+
+  it("rejects a choice prompt that also asks for a written explanation", () => {
+    const value = teachingPackage();
+    const choice = value.teachingModule.practicePrompts[0]!;
+    choice.instructionZh = "选择最清楚落实本课要求的一句，并解释你的理由。";
+    choice.instructionEn =
+      "Choose the sentence that best applies the method and explain why.";
+
+    expect(validateFixture(value)).toBe(true);
+    expect(validateFreshFixture(value)).toBe(false);
+  });
+
+  it.each(["选择一个答案，并查看解释。", "选择一个答案，并查看下方的解释。"])(
+    "allows choice wording that reveals reasoning only after answering: %s",
+    (instruction) => {
+      const value = teachingPackage();
+      const choice = value.teachingModule.practicePrompts[0]!;
+      choice.instructionZh = instruction;
+      choice.instructionEn = "Choose one answer, then view the explanation.";
+
+      expect(validateFreshFixture(value)).toBe(true);
+    },
+  );
 
   it("rejects practice without an unseen-topic transfer", () => {
     const value = teachingPackage();
@@ -373,6 +408,52 @@ describe("markdown teaching article + timed paper contract", () => {
     expect(
       validatePracticePaperContent({ ...value, items: changedItems }),
     ).toBe(false);
+  });
+
+  it("rejects a paragraph rewrite when no source paragraph is supplied", () => {
+    const value = paper();
+    const changedItems = [...value.items];
+    changedItems[6] = {
+      ...changedItems[6]!,
+      instructionZh: "改写下面的段落，保留原意并写80至120个英文词。",
+      promptEn: "Rewrite the following paragraph without changing its meaning.",
+      sourceText: "",
+      responseMode: "paragraph",
+      minimumWords: 80,
+      maximumWords: 120,
+    };
+
+    expect(
+      validatePracticePaperContent({ ...value, items: changedItems }),
+    ).toBe(true);
+    expect(
+      validatePracticePaperContent(
+        { ...value, items: changedItems },
+        { freshGeneration: true },
+      ),
+    ).toBe(false);
+  });
+
+  it("allows an original integration paragraph whose topic uses improve", () => {
+    const value = paper();
+    const changedItems = [...value.items];
+    changedItems[6] = {
+      ...changedItems[6]!,
+      instructionZh: "写一段80至120个英文词，回答公共交通如何改善城市生活。",
+      promptEn:
+        "How can public transport improve city life? Write a paragraph.",
+      sourceText: "",
+      responseMode: "paragraph",
+      minimumWords: 80,
+      maximumWords: 120,
+    };
+
+    expect(
+      validatePracticePaperContent(
+        { ...value, items: changedItems },
+        { freshGeneration: true },
+      ),
+    ).toBe(true);
   });
 
   it("removes invented evidence and details from already-passed items", () => {

@@ -12,6 +12,14 @@ Most dependencies use MIT, ISC, Apache-2.0, BSD, BlueOak, Python-2.0, or equival
 
 The native libvips package includes libraries under LGPL terms through the “any later version” option of LGPL-2.0/2.1, plus MPL and permissive components documented in that package's README. Nothing in this project's license restricts rights granted by those third-party licenses. Do not remove dependency license files or notices from redistributed source trees or container layers.
 
+## Web fonts
+
+IBM Plex Sans, Noto Sans SC and Source Serif 4 are distributed through the corresponding `@fontsource-variable` packages under SIL OFL-1.1. They are embedded in the website, not sold as standalone fonts or relicensed under this project's Apache license. Their upstream copyright and full license files are retained in `apps/web/public/licenses/` and served at `/licenses/ibm-plex-sans.txt`, `/licenses/noto-sans-sc.txt`, and `/licenses/source-serif-4.txt`. The font binaries are not modified by this project. See the [official OFL text](https://openfontlicense.org/open-font-license-official-text/) for the embedding and redistribution conditions.
+
+## Workspace interaction components
+
+`cmdk`, `motion`, and `react-resizable-panels` are MIT-licensed runtime dependencies used for essay selection, interface transitions, and report layout. Their exact upstream license files are additionally served as `/licenses/cmdk.txt`, `/licenses/motion.txt`, and `/licenses/react-resizable-panels.txt` so the notices travel with standalone web bundles. No paid templates or commercial editor extensions are included.
+
 To inspect the complete installed inventory locally:
 
 ```bash

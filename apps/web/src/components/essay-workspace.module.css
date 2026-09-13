@@ -49,15 +49,8 @@
   border: 1px solid color-mix(in srgb, var(--desk-ink) 13%, transparent);
   border-radius: var(--desk-radius-md);
   box-shadow: none;
-  grid-template-rows: auto auto auto 1fr auto;
+  grid-template-rows: auto auto 1fr auto;
   gap: var(--desk-space-4);
-}
-
-.card::before {
-  width: 44px;
-  height: 2px;
-  content: "";
-  background: var(--desk-blue);
 }
 
 .cardTopline,
@@ -68,14 +61,34 @@
   gap: var(--desk-space-3);
 }
 
-.cardTopline {
-  margin-top: calc(-1 * var(--desk-space-2));
-}
-
-.cardTopline > span:last-child {
-  color: var(--desk-evidence-muted);
+.cardMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--desk-space-2);
   font-family: var(--desk-font-utility);
   font-size: var(--desk-type-meta);
+  text-align: right;
+}
+
+.cardUpdated {
+  color: var(--desk-evidence-muted);
+}
+
+.cardDue {
+  color: var(--desk-blue);
+  font-weight: var(--desk-utility-weight-semibold);
+}
+
+.cardDue::before {
+  margin-right: var(--desk-space-2);
+  color: var(--desk-line-strong);
+  content: "·";
+}
+
+.cardDue[data-overdue="true"] {
+  color: var(--desk-amber);
 }
 
 .workspace :global(.badge),
@@ -103,19 +116,9 @@
   padding: var(--desk-space-3) 0;
   border-top: 1px solid color-mix(in srgb, var(--desk-ink) 11%, transparent);
   border-bottom: 1px solid color-mix(in srgb, var(--desk-ink) 11%, transparent);
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   align-self: end;
   gap: var(--desk-space-3);
-}
-
-.nextIcon {
-  display: inline-grid;
-  width: 30px;
-  height: 30px;
-  color: var(--desk-blue);
-  background: color-mix(in srgb, var(--desk-blue) 9%, transparent);
-  border-radius: var(--desk-radius-round);
-  place-items: center;
 }
 
 .nextStep strong {
@@ -128,7 +131,7 @@
   display: -webkit-box;
   margin: 0;
   overflow: hidden;
-  color: color-mix(in srgb, var(--desk-ink) 62%, transparent);
+  color: var(--desk-ink-muted);
   font-size: var(--desk-type-label);
   line-height: 1.45;
   -webkit-box-orient: vertical;
@@ -144,7 +147,7 @@
   display: flex;
   max-width: 660px;
   padding: var(--desk-space-6);
-  color: color-mix(in srgb, var(--desk-ink) 62%, transparent);
+  color: var(--desk-ink-muted);
   align-items: flex-start;
   gap: var(--desk-space-4);
 }
@@ -212,7 +215,7 @@
 .compactLoading {
   display: flex;
   padding: var(--desk-space-6) 0 var(--desk-space-2);
-  color: color-mix(in srgb, var(--desk-ink) 68%, transparent);
+  color: var(--desk-ink-muted);
   align-items: center;
   gap: var(--desk-space-2);
 }

@@ -176,7 +176,7 @@ async function expectExplicitEnglishEvidenceTypography(
 
 async function expectColorUsesToken(
   locator: Locator,
-  token: "--desk-blue",
+  token: string,
 ): Promise<void> {
   const colors = await locator.evaluate((element, cssToken) => {
     const probe = document.createElement("span");
@@ -185,6 +185,24 @@ async function expectColorUsesToken(
     const expected = window.getComputedStyle(probe).color;
     probe.remove();
     return { actual: window.getComputedStyle(element).color, expected };
+  }, token);
+  expect(colors.actual).toBe(colors.expected);
+}
+
+async function expectBackgroundUsesToken(
+  locator: Locator,
+  token: "--desk-paper",
+): Promise<void> {
+  const colors = await locator.evaluate((element, cssToken) => {
+    const probe = document.createElement("span");
+    probe.style.backgroundColor = `var(${cssToken})`;
+    element.ownerDocument.body.append(probe);
+    const expected = window.getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    return {
+      actual: window.getComputedStyle(element).backgroundColor,
+      expected,
+    };
   }, token);
   expect(colors.actual).toBe(colors.expected);
 }
@@ -253,11 +271,7 @@ async function expectNoErrorToken(locator: Locator): Promise<void> {
 
 async function switchToEnglish(page: Page): Promise<void> {
   if ((await page.locator("html").getAttribute("lang")) !== "en") {
-    const switcher = page.locator(
-      (page.viewportSize()?.width ?? 1280) <= 960
-        ? ".mobile-header .locale-switch"
-        : ".topbar .locale-switch",
-    );
+    const switcher = page.locator("[data-workspace-header] .locale-switch");
     await expect(switcher).toBeVisible();
     await expect(switcher).toHaveAccessibleName("切换到英文界面");
     await switcher.click();
@@ -470,15 +484,17 @@ test.describe("annotation desk redesign contracts", () => {
   }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/today");
-    const mobileHeader = page.locator(".mobile-header");
-    const mobileMenu = page.locator(".mobile-menu");
+    const mobileHeader = page.locator("[data-workspace-header]");
+    const mobileMenu = page.locator("[data-workspace-more]");
     const nextTask = page.locator(".next-task-card");
-    await expect(mobileHeader).toHaveClass(/mobile-header/);
+    await expect(mobileHeader).toHaveClass(/topbar/);
     await expectComputedStyles(mobileHeader, {
-      display: "flex",
+      display: "grid",
       position: "sticky",
     });
-    await expect(mobileMenu).toHaveClass(/mobile-menu/);
+    await expect(mobileMenu.locator("summary")).toHaveAccessibleName(
+      "更多导航",
+    );
     await expectComputedStyles(mobileMenu, { position: "relative" });
     await expect(nextTask).toHaveClass(/next-task-card/);
     await expectComputedStyles(nextTask, { position: "relative" });
@@ -519,8 +535,9 @@ test.describe("annotation desk redesign contracts", () => {
   }) => {
     await page.goto("/signin");
     await expect(page.locator("[data-entry-surface='signin']")).toBeVisible();
-    await expect(page.getByText(/新邮箱会自动创建账号/)).toBeVisible();
-    await expect(page.getByText(/学校或团队.*邀请链接/)).toBeVisible();
+    await page.getByRole("button", { name: "注册", exact: true }).click();
+    await expect(page.getByText(/新邮箱自动创建账号/)).toBeVisible();
+    await expect(page.getByText(/团队学习.*邀请链接/)).toBeVisible();
     await expect(
       page.getByText(/自托管实例|个人学习空间|共享空间/),
     ).toHaveCount(0);
@@ -647,7 +664,7 @@ test.describe("annotation desk redesign contracts", () => {
     await expect(desk.locator("[data-today-evidence]")).toBeVisible();
   });
 
-  test("Today keeps time and first-draft submission on neutral blue", async ({
+  test("Today keeps time and first-draft submission on monochrome ink", async ({
     page,
   }) => {
     await page.goto("/today");
@@ -658,7 +675,7 @@ test.describe("annotation desk redesign contracts", () => {
         .locator("..")
         .locator("..")
         .locator(".stat-icon");
-      await expectColorUsesToken(icon, "--desk-blue");
+      await expectColorUsesToken(icon, "--desk-mono-ink");
     }
   });
 
@@ -711,35 +728,33 @@ test.describe("annotation desk redesign contracts", () => {
         "为保留闭卷证据，剩余 5 分钟时才会显示。",
       );
 
-      await expect(rule).toBeVisible();
+      await expect(rule).toHaveCount(0);
       await expect(shortcut).toBeVisible();
       await expect(finalFive).toBeVisible();
-      for (const auxiliaryText of [rule, save, shortcut, finalFive]) {
+      for (const auxiliaryText of [save, shortcut, finalFive]) {
         await expectFontSizeAtLeast(auxiliaryText, 12);
       }
     });
   }
 
-  test("writing states use annotation tokens instead of success or violet decoration", async ({
-    page,
-  }) => {
+  test("writing states use monochrome annotation tokens", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 960 });
     await page.goto("/rewrite?cycle=cycle-demo&task=rewrite-primary-language");
 
     await expect(page.getByText("已自动保存", { exact: true })).toHaveCSS(
       "color",
-      "rgb(23, 32, 51)",
+      "rgb(17, 17, 17)",
     );
     await expect(
       page.getByText("Version 2 · 闭卷重写", { exact: true }),
-    ).toHaveCSS("color", "rgb(29, 86, 160)");
+    ).toHaveCSS("color", "rgb(17, 17, 17)");
     await expect(page.locator(".writing-prompt")).toHaveCSS(
       "background-image",
       "none",
     );
-    await expect(page.locator(".writing-editor")).toHaveCSS(
-      "background-color",
-      "rgb(252, 251, 248)",
+    await expectBackgroundUsesToken(
+      page.locator(".writing-editor"),
+      "--desk-paper",
     );
 
     await page.goto("/write?cycle=cycle-demo");
@@ -750,7 +765,7 @@ test.describe("annotation desk redesign contracts", () => {
       );
     await expect(page.getByText("250 词", { exact: true })).toHaveCSS(
       "color",
-      "rgb(29, 86, 160)",
+      "rgb(17, 17, 17)",
     );
   });
 
@@ -787,7 +802,7 @@ test.describe("annotation desk redesign contracts", () => {
       evidence.locator('[data-evidence-state="revision"]'),
     ).toBeVisible();
     const evidenceLabelMetrics = await evidence
-      .getByText("修改建议", { exact: true })
+      .getByText("原句", { exact: true })
       .evaluate((element) => {
         const style = window.getComputedStyle(element);
         return {
@@ -894,7 +909,7 @@ test.describe("annotation desk redesign contracts", () => {
       "/lesson/paper?cycle=cycle-demo&lesson=lesson-collocation-perspective",
     );
 
-    const mobileHeader = page.locator(".mobile-header");
+    const mobileHeader = page.locator("[data-workspace-header]");
     const navigation = page.locator("[data-paper-question-nav]");
     const questionEight = page.locator("#paper-question-demo-paper-question-8");
     const links = navigation.getByRole("link");
@@ -1104,7 +1119,7 @@ test.describe("annotation desk redesign contracts", () => {
 
     const chineseStrong = page
       .locator('[data-teaching-block="MARKDOWN"] strong')
-      .filter({ hasText: "核心判断" })
+      .filter({ hasText: /机制说明中间发生了什么变化|核心判断/ })
       .first();
     await expect(chineseStrong).toBeVisible();
     const chineseFont = await chineseStrong.evaluate((element) => {
@@ -1335,7 +1350,7 @@ test.describe("annotation desk redesign contracts", () => {
     { label: "desktop", width: 1440, height: 960 },
     { label: "390px mobile", width: 390, height: 844 },
   ]) {
-    test(`feedback eyebrows and badges stay at least 12px on ${viewport.label}`, async ({
+    test(`feedback structural headings stay readable on ${viewport.label}`, async ({
       page,
     }) => {
       await page.setViewportSize({
@@ -1346,10 +1361,6 @@ test.describe("annotation desk redesign contracts", () => {
         "/feedback?cycle=cycle-demo&lesson=lesson-collocation-perspective",
       );
 
-      const pageHeaderEyebrow = page.getByText("第1步 · 详细批改与改正", {
-        exact: true,
-      });
-      const internalEyebrow = page.getByText("本篇诊断", { exact: true });
       const trustBadge = page.getByText("示例报告 · 未评价语言", {
         exact: true,
       });
@@ -1357,13 +1368,14 @@ test.describe("annotation desk redesign contracts", () => {
         exact: true,
       });
 
-      for (const auxiliaryText of [
-        pageHeaderEyebrow,
-        internalEyebrow,
-        trustBadge,
-        modelLockBadge,
+      await expect(trustBadge).toHaveCount(0);
+      await expectFontSizeAtLeast(modelLockBadge, 12);
+      for (const heading of [
+        page.locator("#feedback-assessment-heading"),
+        page.locator("[data-essay-pane] h2"),
+        page.locator("[data-suggestion-panel] h2"),
       ]) {
-        await expectFontSizeAtLeast(auxiliaryText, 12);
+        await expectFontSizeAtLeast(heading, 16);
       }
     });
   }

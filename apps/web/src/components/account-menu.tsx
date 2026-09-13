@@ -15,7 +15,7 @@ import {
 
 import styles from "./app-shell.module.css";
 
-type AccountMenuVariant = "sidebar" | "mobile";
+type AccountMenuVariant = "topbar" | "sidebar" | "mobile";
 
 function roleLabel(role: AccountIdentity["role"], chinese: boolean) {
   if (role === "owner") return chinese ? "实例所有者" : "Instance owner";
@@ -115,13 +115,17 @@ export function AccountMenu({ variant }: { variant: AccountMenuVariant }) {
         <span className="avatar" aria-hidden="true">
           {identity?.initial ?? "…"}
         </span>
-        <span className="account-trigger-copy">
+        <span
+          className={variant === "topbar" ? "sr-only" : "account-trigger-copy"}
+        >
           <strong>
             {identity?.email ?? text("正在读取账户", "Loading account")}
           </strong>
           {identity ? <span>{roleLabel(identity.role, chinese)}</span> : null}
         </span>
-        <ChevronDown aria-hidden="true" size={16} />
+        {variant !== "topbar" ? (
+          <ChevronDown aria-hidden="true" size={16} />
+        ) : null}
       </button>
       {open && identity ? (
         <div

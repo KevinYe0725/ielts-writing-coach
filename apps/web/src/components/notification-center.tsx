@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Bell, Check } from "lucide-react";
 
 import { useLocale } from "@/components/locale-provider";
@@ -21,6 +21,8 @@ export function NotificationCenter() {
   const pathname = usePathname();
   const { text, locale } = useLocale();
   const [items, setItems] = useState<NotificationItem[]>([]);
+  const detailsRef = useRef<HTMLDetailsElement>(null);
+  const summaryRef = useRef<HTMLElement>(null);
   const demo = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
   const refresh = useCallback(async () => {
     if (demo) return;
@@ -45,6 +47,26 @@ export function NotificationCenter() {
   }, [pathname, refresh]);
 
   const unread = items.filter((item) => item.readAt === null);
+  useEffect(() => {
+    const dismiss = (event: PointerEvent) => {
+      if (
+        !detailsRef.current?.contains(event.target as Node) &&
+        detailsRef.current
+      )
+        detailsRef.current.open = false;
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || !detailsRef.current?.open) return;
+      detailsRef.current.open = false;
+      summaryRef.current?.focus();
+    };
+    document.addEventListener("pointerdown", dismiss);
+    document.addEventListener("keydown", escape);
+    return () => {
+      document.removeEventListener("pointerdown", dismiss);
+      document.removeEventListener("keydown", escape);
+    };
+  }, []);
   const markRead = async (id: string) => {
     const response = await fetch(
       `/api/v1/notifications/${encodeURIComponent(id)}/read`,
@@ -68,10 +90,14 @@ export function NotificationCenter() {
   };
 
   return (
-    <details className={cn("notification-center", styles.notificationCenter)}>
+    <details
+      className={cn("notification-center", styles.notificationCenter)}
+      ref={detailsRef}
+    >
       <summary
         aria-label={text("查看提醒", "View notifications")}
         className={styles.notificationSummary}
+        ref={summaryRef}
       >
         <Bell aria-hidden="true" size={17} />
         {unread.length > 0 ? (

@@ -82,6 +82,7 @@ type ResponseSource =
       | Promise<PublicPracticeResponse | null>);
 
 type HttpTeachingScenario = {
+  inlineTeaching?: boolean;
   restore: ResponseSource;
   submit?: ResponseSource;
   retry?: ResponseSource;
@@ -300,7 +301,14 @@ async function installHttpTeachingApi(
       }
       await route.fulfill({
         contentType: "application/json",
-        body: JSON.stringify({ teaching: httpTeaching }),
+        body: JSON.stringify({
+          teaching: scenario.inlineTeaching
+            ? {
+                ...httpTeaching,
+                practicePrompts: [{ ...httpPrompt, afterSection: 1 }],
+              }
+            : httpTeaching,
+        }),
       });
       return;
     }
@@ -471,13 +479,11 @@ async function navigationLink(
   page: import("@playwright/test").Page,
   name: string,
 ) {
-  const link = page.getByRole("link", { name });
-  if ((page.viewportSize()?.width ?? 1_000) < 700) {
-    if (!(await link.isVisible())) {
-      await page.locator(".mobile-menu > summary").click();
-    }
-  }
-  return link;
+  const label =
+    name === "批改报告" ? "批改" : name === "专项提升" ? "提升" : name;
+  return page
+    .locator("[data-workspace-header]")
+    .getByRole("link", { name: label, exact: true });
 }
 
 test.describe("feedback, focused teaching and complete practice paper", () => {
@@ -507,7 +513,57 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
     ).toHaveAttribute("href", /lesson=lesson-collocation-perspective/);
   });
 
-  test("uses feedback columns only when the report has enough content space", async ({
+  test("opens a priority and recovers an original-text link after filtering suggestions", async ({
+    page,
+  }) => {
+    await page.goto(feedbackUrl);
+    const priorities = page.getByRole("region", {
+      name: "这篇作文，先看这几处",
+    });
+    await expect(priorities).toBeVisible();
+    await priorities.getByRole("button").first().click();
+    await expect(
+      page.locator("[data-feedback-issue][aria-expanded='true']"),
+    ).toBeVisible();
+    const filters = page.getByRole("group", { name: "筛选修改建议" });
+    await filters.getByRole("button", { name: /可选润色/ }).click();
+    await expect(
+      page.getByText("这里是可选的表达建议，不代表原句有错。", { exact: true }),
+    ).toBeVisible();
+    const sourceTab = page.getByRole("tab", { name: "原文", exact: true });
+    if (await sourceTab.isVisible()) await sourceTab.click();
+    const highlight = page.locator("[data-feedback-highlight]").first();
+    const issueId = await highlight.getAttribute("data-feedback-highlight");
+    await highlight.click();
+    await expect(filters.getByRole("button", { name: /全部/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await expect(
+      page.locator(`[data-feedback-issue="${issueId}"]`),
+    ).toHaveAttribute("aria-expanded", "true");
+  });
+
+  test("makes the tutorial goal readable and opens active practice from the contents", async ({
+    page,
+  }) => {
+    await page.goto(lessonUrl);
+    await expect(
+      page.getByText("学完这节，你能够", { exact: true }),
+    ).toBeVisible();
+    const toggle = page.locator("[data-teaching-toc-toggle]");
+    if (await toggle.isVisible()) await toggle.click();
+    await page
+      .locator("[data-teaching-toc]")
+      .getByRole("link", { name: /随堂练习/ })
+      .click();
+    await expect(
+      page.locator("#teaching-practice-prompts h3").first(),
+    ).toBeFocused();
+    await expect(page.locator("#teaching-practice-prompts")).toBeInViewport();
+  });
+
+  test("offers resizable feedback columns only when the report has enough content space", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
@@ -519,13 +575,19 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
     await expect(workbench).toBeVisible();
     await expect(essay).toBeVisible();
     await expect(suggestions).toBeVisible();
-    expect(await gridColumnCount(workbench)).toBe(2);
     await expectLeftOf(essay, suggestions);
     await expect(essay).toHaveCSS("position", "sticky");
+    await expect(
+      page.getByRole("separator", { name: /调整.*宽度|resize/i }),
+    ).toBeVisible();
 
-    await page.setViewportSize({ width: 1279, height: 900 });
-    expect(await gridColumnCount(workbench)).toBe(1);
-    await expectAbove(essay, suggestions);
+    await page.setViewportSize({ width: 760, height: 900 });
+    await expect(page.getByRole("separator")).toBeHidden();
+    await expect(suggestions).toBeVisible();
+    await expect(essay).toBeHidden();
+    await page.getByRole("tab", { name: "原文", exact: true }).click();
+    await expect(essay).toBeVisible();
+    await expect(suggestions).toBeHidden();
   });
 
   test("maps every issue card to one source mark and synchronizes both directions", async ({
@@ -593,6 +655,11 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
     await expect(mark.locator("button")).toHaveCount(0);
     await expect(mark).toHaveAttribute("role", "button");
     await expect(mark).toHaveAttribute("data-annotation-kind", "development");
+
+    // Compare activation geometry using the same loaded font. A fallback-to-
+    // Source Serif swap can change glyph boxes and wrapping without any hover
+    // or selection layout change.
+    await page.evaluate(() => document.fonts.ready);
 
     const before = await mark.evaluate((element) => {
       const essayRect = element
@@ -745,7 +812,10 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
       "build-the-mechanism-one-step-at-a-time",
       "transfer-the-method-to-a-new-topic",
     ]);
-    await expect(contents.locator("a")).toHaveCount(sectionAnchors.length);
+    await expect(contents.locator("ol a")).toHaveCount(sectionAnchors.length);
+    await expect(
+      contents.getByRole("link", { name: /随堂练习/ }),
+    ).toHaveAttribute("href", "#teaching-practice-prompts");
 
     const proseMetrics = await page
       .locator("[data-teaching-prose]")
@@ -838,7 +908,7 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
       .toBeGreaterThanOrEqual(64);
   });
 
-  test("uses the space recovered when the product sidebar is hidden", async ({
+  test("uses the full reading width under the workspace header", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
@@ -846,16 +916,15 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
 
     const shell = page.locator("[data-app-shell]");
     const layout = page.locator("[data-teaching-layout]");
-    const toggle = page.locator("[data-teaching-toc-toggle]");
-    await expect(shell).toHaveAttribute("data-sidebar-state", "expanded");
-    await expect(layout).toHaveCSS("display", "flex");
-    await expect(toggle).toBeVisible();
-
-    await page.locator("[data-sidebar-toggle]").click();
     await expect(shell).toHaveAttribute("data-sidebar-state", "collapsed");
     await expect(layout).toHaveCSS("display", "grid");
-    await expect(toggle).toBeHidden();
+    await expect(page.locator("[data-sidebar-toggle]")).toHaveCount(0);
+    await expect(page.locator("[data-teaching-toc-toggle]")).toBeHidden();
     await expect(page.locator("[data-teaching-toc]")).toBeVisible();
+    const articleBox = (await page
+      .locator("[data-teaching-article]")
+      .boundingBox())!;
+    expect(articleBox.width).toBeGreaterThanOrEqual(1000);
   });
 
   test("does not expose backend vocabulary in feedback or focused teaching", async ({
@@ -902,15 +971,22 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
     const markdownBlocks = article.locator('[data-teaching-block="MARKDOWN"]');
     await expect(markdownBlocks).toHaveCount(3);
     await expect(markdownBlocks.nth(0)).toContainText(
-      "机制说明变化如何从起点走到终点",
+      "机制说明中间发生了什么变化",
     );
     await expect(markdownBlocks.nth(1)).toContainText(
-      "Separated cycle lanes make short journeys feel safer",
+      "Separated cycle lanes can make short journeys feel safer",
     );
-    await expect(markdownBlocks.nth(2)).toContainText("下次写作只检查这三件事");
+    await expect(markdownBlocks.nth(2)).toContainText("因果链当作万能结构");
     await expect(
       article.locator('[data-teaching-block="PRACTICE"]'),
-    ).toBeVisible();
+    ).toHaveCount(3);
+    // Practice is inside the section that teaches its prerequisite, not one final pile.
+    for (const section of await article
+      .locator("[data-teaching-section]")
+      .all()) {
+      await expect(section.locator("[data-teaching-practice]")).toHaveCount(1);
+      await expect(section.locator("[data-teaching-continue]")).toBeVisible();
+    }
     await expect(article.locator("[data-teaching-practice]")).toHaveCount(3);
     await expect(article.locator("textarea")).toHaveCount(2);
     await expect(
@@ -967,7 +1043,7 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
 
     await first.locator("textarea").fill(httpAnswer);
     const submit = first.locator("[data-teaching-practice-submit]");
-    await expect(submit).toHaveAccessibleName("提交并查看对照");
+    await expect(submit).toHaveAccessibleName("看看我的思路");
     await submit.click();
 
     const review = first.locator("[data-teaching-answer-review]");
@@ -976,6 +1052,17 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
     await expect(first.locator("[data-teaching-submitted-answer]")).toHaveText(
       httpAnswer,
     );
+    const referenceDisclosure = first.locator(
+      "[data-teaching-reference-disclosure]",
+    );
+    await expect(
+      first.locator("[data-teaching-reference-answer]"),
+    ).toBeHidden();
+    await referenceDisclosure.locator("summary").focus();
+    await page.keyboard.press("Enter");
+    await expect(
+      first.locator("[data-teaching-reference-answer]"),
+    ).toBeVisible();
     await expect(first.locator("[data-teaching-reference-answer]")).toHaveText(
       "Employees can reserve their most demanding tasks for the hours when they concentrate best.",
     );
@@ -1020,6 +1107,9 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
       restored.locator("[data-teaching-submitted-answer]"),
     ).toHaveText(httpAnswer);
     await expect(restored.locator("textarea")).toHaveCount(0);
+    await expect(
+      restored.locator("[data-teaching-reference-answer]"),
+    ).toBeHidden();
     await expect(
       page.getByRole("link", { name: "开始60分钟训练卷" }),
     ).toBeEnabled();
@@ -1084,6 +1174,12 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
 
     const comparison = prompt.locator("[data-teaching-answer-comparison]");
     expect(await gridColumnCount(comparison)).toBe(1);
+    await expect(
+      prompt.locator("[data-teaching-reference-answer]"),
+    ).toBeHidden();
+    await prompt
+      .locator("[data-teaching-reference-disclosure] summary")
+      .click();
     await page.evaluate(async () => {
       await document.fonts.ready;
       await new Promise<void>((resolve) => {
@@ -1107,13 +1203,13 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
       };
     });
     expect(stackedRects.submitted.bottom).toBeLessThanOrEqual(
-      stackedRects.reference.top + 2,
+      stackedRects.analysis.top + 2,
     );
     expect(stackedRects.reference.bottom).toBeLessThanOrEqual(
       stackedRects.reasoning.top + 2,
     );
-    expect(stackedRects.reasoning.bottom).toBeLessThanOrEqual(
-      stackedRects.analysis.top + 2,
+    expect(stackedRects.analysis.bottom).toBeLessThanOrEqual(
+      stackedRects.reference.top + 2,
     );
     expect(
       await page.evaluate(
@@ -1156,7 +1252,7 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
     await expect(
       prompt.locator('[data-teaching-analysis][data-state="unavailable"]'),
     ).toBeVisible();
-    await expect(prompt).toContainText("没有足够依据勉强下结论");
+    await expect(prompt).toContainText("答案仍在本页");
     await expectPaperLinkNavigable(page);
   });
 
@@ -1249,7 +1345,7 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
       /\/feedback\?cycle=cycle-demo&lesson=lesson-collocation-perspective$/,
     );
     await expect(
-      page.getByRole("heading", { name: "对照原文，把每一处问题改明白" }),
+      page.getByRole("heading", { name: "看懂问题，学会修改" }),
     ).toBeVisible();
     await page.getByRole("link", { name: "进入专项教学" }).click();
     await page.getByRole("link", { name: "开始60分钟训练卷" }).click();
@@ -1262,7 +1358,7 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
     );
   });
 
-  test("opens report and paper from their real sidebar destinations", async ({
+  test("opens report and paper from their real workspace destinations", async ({
     page,
   }) => {
     await page.goto("/today");
@@ -1279,7 +1375,7 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
     );
   });
 
-  test("restores sidebar destinations when the paper is opened directly", async ({
+  test("restores workspace destinations when the paper is opened directly", async ({
     page,
   }) => {
     await page.goto(paperUrl);
@@ -1941,6 +2037,70 @@ test.describe("tutorial answer analysis over the public HTTP contract", () => {
     "Run with NEXT_PUBLIC_DEMO_MODE=false and an HTTP-mode web server.",
   );
 
+  for (const state of ["improve", "effective", "unavailable"] as const) {
+    test(`inline teaching prioritizes ${state} answer feedback without a learning gate`, async ({
+      page,
+    }) => {
+      const response =
+        state === "unavailable"
+          ? practiceResponse("ANALYSIS_UNAVAILABLE")
+          : practiceResponse("ANALYSIS_READY", {
+              ...personalizedAnalysis,
+              improvements:
+                state === "effective" ? [] : personalizedAnalysis.improvements,
+            });
+      const requests = await installHttpTeachingApi(page, {
+        inlineTeaching: true,
+        restore: response,
+      });
+      await page.goto(httpLessonUrl);
+      const section = page.locator("[data-teaching-section]");
+      const prompt = section.locator("[data-teaching-practice]");
+      await expect(
+        prompt.locator("[data-teaching-submitted-answer]"),
+      ).toHaveText(httpAnswer);
+      const reference = prompt.locator("[data-teaching-reference-answer]");
+      await expect(reference).toBeHidden();
+      if (state !== "unavailable") {
+        await expect(
+          prompt.locator("[data-teaching-key-improvement]"),
+        ).toHaveCount(state === "improve" ? 1 : 0);
+        for (const evidence of await prompt
+          .locator("[data-teaching-evidence]")
+          .allTextContents()) {
+          expect(httpAnswer).toContain(evidence.trim());
+        }
+        if (state === "effective")
+          await expect(
+            prompt.getByRole("button", { name: "现在自己改一次（可选）" }),
+          ).toHaveCount(0);
+      } else {
+        await expect(
+          prompt.locator("[data-teaching-analysis-retry]"),
+        ).toBeEnabled();
+      }
+      const disclosure = prompt.locator(
+        "[data-teaching-reference-disclosure] summary",
+      );
+      await disclosure.focus();
+      await page.keyboard.press("Enter");
+      await expect(reference).toBeVisible();
+      await expectAbove(
+        prompt.locator("[data-teaching-analysis][data-state]"),
+        reference,
+      );
+      await expect(
+        prompt.locator("[data-teaching-submitted-answer]"),
+      ).toHaveText(httpAnswer);
+      await section.locator("[data-teaching-continue]").click();
+      await expect(page.locator("#teaching-paper-next h2")).toBeFocused();
+      expect(
+        requests.filter((request) => request.startsWith("POST ")),
+      ).toHaveLength(0);
+      await expectPaperLinkNavigable(page, /\/lesson\/paper\?cycle=cycle-http/);
+    });
+  }
+
   test("dynamic Markdown assigns English only to deterministically English quotes", async ({
     page,
   }) => {
@@ -2535,13 +2695,13 @@ test.describe("tutorial answer analysis over the public HTTP contract", () => {
       label: "unavailable or unconfigured",
       response: practiceResponse("ANALYSIS_UNAVAILABLE"),
       dataState: "unavailable",
-      expectedText: "没有足够依据勉强下结论",
+      expectedText: "答案仍在本页",
     },
     {
       label: "uncertain without a forced weakness",
       response: practiceResponse("ANALYSIS_UNAVAILABLE"),
       dataState: "unavailable",
-      expectedText: "没有足够依据勉强下结论",
+      expectedText: "答案仍在本页",
     },
     {
       label: "personalized ready",
