@@ -39,9 +39,10 @@
 .focusPage {
   display: flex;
   width: 100%;
-  height: 100%;
+  height: auto;
   min-height: 0;
   padding: var(--desk-space-4) var(--desk-space-6) var(--desk-space-3);
+  flex: 1;
   flex-direction: column;
 }
 
@@ -394,11 +395,22 @@
   overflow: hidden;
 }
 
-.focusWorkspace .essay,
-.focusWorkspace .issueList {
+.focusWorkspace .suggestionPane {
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.focusWorkspace .essay {
   min-height: 0;
   overflow: hidden;
   flex: 1;
+}
+
+.focusWorkspace .issueList {
+  flex: none;
+  overflow: visible;
+  align-content: start;
 }
 
 .focusWorkspace .issueDetails {
@@ -587,37 +599,6 @@
   font-size: var(--desk-type-meta);
   font-weight: var(--desk-utility-weight-semibold);
   place-items: center;
-}
-
-.reportModeSwitch {
-  display: inline-flex;
-  padding: var(--desk-space-1);
-  margin: 0 var(--desk-space-3) var(--desk-space-3);
-  background: color-mix(in srgb, var(--desk-ink) 5%, var(--desk-paper));
-  border: 1px solid color-mix(in srgb, var(--desk-ink) 14%, transparent);
-  border-radius: var(--desk-radius-pill);
-  gap: var(--desk-space-1);
-}
-
-.reportModeSwitch button {
-  min-height: 36px;
-  padding: var(--desk-space-2) var(--desk-space-3);
-  color: var(--desk-ink-muted);
-  background: transparent;
-  border: 0;
-  border-radius: var(--desk-radius-pill);
-  font-size: var(--desk-type-label);
-  cursor: pointer;
-}
-
-.reportModeSwitch button[aria-selected="true"] {
-  color: var(--desk-paper);
-  background: var(--desk-ink);
-}
-
-.reportModeSwitch button:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--desk-ink) 34%, transparent);
-  outline-offset: 2px;
 }
 
 .taskBlock {
@@ -1422,85 +1403,6 @@
   .focusWorkspace .issueDetails > .detailBlock:nth-of-type(3) {
     grid-column: auto;
     grid-row: auto;
-  }
-
-  .focusWorkspace
-    .suggestionPane[data-feedback-mobile-detail="true"]
-    .issueFilters,
-  .focusWorkspace
-    .suggestionPane[data-feedback-mobile-detail="true"]
-    .filterHelp {
-    display: none;
-  }
-
-  .focusWorkspace
-    .suggestionPane[data-feedback-mobile-detail="true"]
-    .detailBlock:nth-of-type(3),
-  .focusWorkspace
-    .suggestionPane[data-feedback-mobile-detail="true"]
-    .transferBlock,
-  .focusWorkspace
-    .suggestionPane[data-feedback-mobile-detail="true"]
-    .focusReason,
-  .focusWorkspace
-    .suggestionPane[data-feedback-mobile-detail="true"]
-    .locateButton {
-    display: none;
-  }
-
-  .focusWorkspace
-    .suggestionPane[data-feedback-mobile-detail="true"]
-    .issueTrigger {
-    padding: var(--desk-space-3);
-  }
-
-  .focusWorkspace
-    .suggestionPane[data-feedback-mobile-detail="true"]
-    .issueDetails {
-    padding: 0 var(--desk-space-3) var(--desk-space-3);
-    gap: var(--desk-space-1);
-  }
-
-  .focusWorkspace
-    .suggestionPane[data-feedback-mobile-detail="true"]
-    .detailBlock,
-  .focusWorkspace
-    .suggestionPane[data-feedback-mobile-detail="true"]
-    .revisionBlock,
-  .focusWorkspace
-    .suggestionPane[data-feedback-mobile-detail="true"]
-    .transferBlock {
-    padding-top: var(--desk-space-2);
-  }
-
-  .focusWorkspace
-    .suggestionPane[data-feedback-mobile-detail="true"]
-    .detailBlock
-    p,
-  .focusWorkspace
-    .suggestionPane[data-feedback-mobile-detail="true"]
-    .transferBlock
-    p {
-    line-height: 1.45;
-  }
-
-  .focusWorkspace
-    .suggestionPane[data-feedback-mobile-detail="true"]
-    .revisionBlock {
-    padding: var(--desk-space-2);
-  }
-
-  .focusWorkspace
-    .suggestionPane[data-feedback-mobile-detail="true"]
-    .revisionBlock
-    p {
-    line-height: 1.45;
-  }
-
-  .focusWorkspace
-    .suggestionPane[data-feedback-mobile-detail="true"]
-    .evidenceRelation {
-    display: none;
   }
 
   .focusWorkspace .sourcePane,

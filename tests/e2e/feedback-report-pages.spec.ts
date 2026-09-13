@@ -21,8 +21,14 @@ test.describe("feedback report views", () => {
     await expect(page.locator("[data-feedback-summary]")).toHaveCount(0);
     await expect(page.locator("[data-feedback-next-step]")).toHaveCount(0);
     await expect(
+      page.getByRole("heading", { name: "看懂问题，学会修改" }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("link", { name: "进入专项教学", exact: true }),
+    ).toHaveCount(0);
+    await expect(
       page.getByRole("link", { name: "总体评价", exact: true }),
-    ).toHaveAttribute("href", "/feedback?cycle=cycle-demo");
+    ).toHaveCount(0);
   });
 
   test("opens a priority directly in the comparison view", async ({ page }) => {
@@ -68,9 +74,10 @@ test.describe("feedback report views", () => {
 
     const workbench = page.locator("[data-feedback-focus-workbench]");
     await expect(workbench).toHaveAttribute("data-feedback-page", "1");
-    await expect(workbench).toHaveAttribute("data-feedback-page-count", "4");
+    await expect(workbench).toHaveAttribute("data-feedback-page-count", "2");
     await expect(page.locator("[data-feedback-page='1']")).toBeVisible();
     await expect(page.locator("[data-feedback-page='2']")).toHaveCount(0);
+    await expect(page.locator("[data-feedback-issue-card]")).toHaveCount(3);
     await expect(page.locator("[data-feedback-page-prev]")).toBeDisabled();
     await expect(page.locator("[data-feedback-page-next]")).toBeEnabled();
     expect(
@@ -81,16 +88,22 @@ test.describe("feedback report views", () => {
     ).toBe("hidden");
     expect(
       await page.evaluate(() => {
-        const documentElement = document.documentElement;
-        return documentElement.scrollHeight <= documentElement.clientHeight + 1;
+        const main = document.querySelector(".main-content");
+        return main ? main.scrollHeight <= main.clientHeight + 1 : false;
       }),
     ).toBe(true);
+    expect(
+      await page
+        .locator("[data-testid='feedback-suggestion-pane']")
+        .evaluate((node) => getComputedStyle(node).overflowY),
+    ).toBe("auto");
 
     await page.locator("[data-feedback-page-next]").click();
     await expect(workbench).toHaveAttribute("data-feedback-page", "2");
     await expect(page.locator("[data-feedback-page='1']")).toHaveCount(0);
     await expect(page.locator("[data-feedback-page='2']")).toBeVisible();
+    await expect(page.locator("[data-feedback-issue-card]")).toHaveCount(0);
     await expect(page.locator("[data-feedback-page-prev]")).toBeEnabled();
-    await expect(page.locator("[data-feedback-page-next]")).toBeEnabled();
+    await expect(page.locator("[data-feedback-page-next]")).toBeDisabled();
   });
 });

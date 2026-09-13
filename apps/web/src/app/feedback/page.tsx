@@ -64,7 +64,7 @@ import { SINGLE_PANE_REPORT_QUERY } from "./report-layout";
 import { ResponsiveReport } from "./responsive-report";
 
 type MobilePane = "source" | "suggestions";
-type ReportMode = "quick" | "full";
+type ReportMode = "full";
 export type FeedbackView = "summary" | "compare";
 type EssayParagraphChunk = {
   index: number;
@@ -129,7 +129,6 @@ export function FeedbackPage({
   const cycleId = singleRouteParam(query, "cycle");
   const lessonId = singleRouteParam(query, "lesson");
   const requestedIssueId = singleRouteParam(query, "issue");
-  const requestedMode = singleRouteParam(query, "mode");
   const { text, messages } = useLocale();
   const router = useRouter();
   const loader = useCallback(
@@ -150,9 +149,7 @@ export function FeedbackPage({
   );
   const [issueFilter, setIssueFilter] = useState<FeedbackGroup | "all">("all");
   const [mobilePane, setMobilePane] = useState<MobilePane>("suggestions");
-  const [reportMode, setReportMode] = useState<ReportMode>(
-    requestedMode === "full" ? "full" : "quick",
-  );
+  const reportMode: ReportMode = "full";
   const paragraphsPerPage = useSyncExternalStore(
     subscribeToComparisonViewport,
     comparisonParagraphsPerPageSnapshot,
@@ -177,17 +174,9 @@ export function FeedbackPage({
     () => priorityFeedback(issues, data?.targetIssueId),
     [issues, data?.targetIssueId],
   );
-  const priorityIds = useMemo(
-    () => new Set(priorities.map((issue) => issue.id)),
-    [priorities],
-  );
   const reportIssues = useMemo(() => {
-    if (reportMode === "full") return visibleIssues;
-    const prioritized = visibleIssues.filter((issue) =>
-      priorityIds.has(issue.id),
-    );
-    return prioritized.length > 0 ? prioritized : visibleIssues.slice(0, 3);
-  }, [priorityIds, reportMode, visibleIssues]);
+    return visibleIssues;
+  }, [visibleIssues]);
   const segments = useMemo(
     () => buildFeedbackSegments(data?.originalEssay ?? "", issues),
     [data?.originalEssay, issues],
@@ -277,21 +266,11 @@ export function FeedbackPage({
       const issueIds = pageChunks.flatMap((chunk) =>
         issuesInChunk(chunk).map((issue) => issue.id),
       );
-      if (issueIds.length <= 1) {
-        pages.push({
-          pageNumber: pages.length + 1,
-          chunks: pageChunks,
-          issueIds: new Set(issueIds),
-        });
-      } else {
-        for (const issueId of issueIds) {
-          pages.push({
-            pageNumber: pages.length + 1,
-            chunks: pageChunks,
-            issueIds: new Set([issueId]),
-          });
-        }
-      }
+      pages.push({
+        pageNumber: pages.length + 1,
+        chunks: pageChunks,
+        issueIds: new Set(issueIds),
+      });
     }
     if (pages.length === 0) {
       pages.push({ pageNumber: 1, chunks: [], issueIds: new Set() });
@@ -304,11 +283,7 @@ export function FeedbackPage({
     if (!firstPage) return pages;
     for (const issue of issues) {
       if (!assignedIssueIds.has(issue.id)) {
-        pages.push({
-          pageNumber: pages.length + 1,
-          chunks: [],
-          issueIds: new Set([issue.id]),
-        });
+        firstPage.issueIds.add(issue.id);
       }
     }
     pages.forEach((page, index) => {
@@ -432,14 +407,11 @@ export function FeedbackPage({
   const activateFromHighlight = useCallback(
     (issueId: string) => {
       setIssueFilter("all");
-      if (reportMode === "quick" && !priorityIds.has(issueId)) {
-        setReportMode("full");
-      }
       setActiveIssueId(issueId);
       if (usesSinglePaneReport()) setMobilePane("suggestions");
       announceIssue(issueId, "suggestions");
     },
-    [announceIssue, priorityIds, reportMode],
+    [announceIssue],
   );
 
   const renderSourceSegment = useCallback(
@@ -508,51 +480,52 @@ export function FeedbackPage({
       className={`${styles.page!} ${view === "compare" ? styles.focusPage! : ""}`}
     >
       <div data-feedback-report data-feedback-report-mode={reportMode}>
-        <PageHeader
-          actions={
-            <div className={styles.headerActions}>
-              {cycleId && (lessonId ?? data.lessonId) ? (
-                <ActionLink
-                  href={learningRouteHref("/lesson", {
-                    cycleId,
-                    lessonId: lessonId ?? data.lessonId,
-                  })}
-                  trailing={false}
-                  variant="secondary"
-                >
-                  <ArrowRight aria-hidden="true" size={17} />
-                  {text("进入专项教学", "Open focused teaching")}
-                </ActionLink>
-              ) : null}
-            </div>
-          }
-          title={text(
-            "看懂问题，学会修改",
-            "Understand the issue. Learn the revision.",
-          )}
-        />
+        {view === "summary" ? (
+          <>
+            <PageHeader
+              actions={
+                <div className={styles.headerActions}>
+                  {cycleId && (lessonId ?? data.lessonId) ? (
+                    <ActionLink
+                      href={learningRouteHref("/lesson", {
+                        cycleId,
+                        lessonId: lessonId ?? data.lessonId,
+                      })}
+                      trailing={false}
+                      variant="secondary"
+                    >
+                      <ArrowRight aria-hidden="true" size={17} />
+                      {text("进入专项教学", "Open focused teaching")}
+                    </ActionLink>
+                  ) : null}
+                </div>
+              }
+              title={text(
+                "看懂问题，学会修改",
+                "Understand the issue. Learn the revision.",
+              )}
+            />
 
-        <nav
-          aria-label={text("批改报告视图", "Feedback report views")}
-          className={styles.reportNav}
-        >
-          <Link
-            aria-current={view === "summary" ? "page" : undefined}
-            href={
-              cycleId
-                ? `/feedback?cycle=${encodeURIComponent(cycleId)}`
-                : "/feedback"
-            }
-          >
-            {text("总体评价", "Overview")}
-          </Link>
-          <Link
-            aria-current={view === "compare" ? "page" : undefined}
-            href={feedbackCompareHref(cycleId)}
-          >
-            {text("原文对照", "Compare with original")}
-          </Link>
-        </nav>
+            <nav
+              aria-label={text("批改报告视图", "Feedback report views")}
+              className={styles.reportNav}
+            >
+              <Link
+                aria-current="page"
+                href={
+                  cycleId
+                    ? `/feedback?cycle=${encodeURIComponent(cycleId)}`
+                    : "/feedback"
+                }
+              >
+                {text("总体评价", "Overview")}
+              </Link>
+              <Link href={feedbackCompareHref(cycleId)}>
+                {text("原文对照", "Compare with original")}
+              </Link>
+            </nav>
+          </>
+        ) : null}
 
         {data.issueClassificationRetry ? (
           <div className="status-banner status-banner-warning" role="status">
@@ -641,7 +614,7 @@ export function FeedbackPage({
                   </p>
                 </div>
               </div>
-              {view === "summary" || reportMode === "full" ? (
+              {view === "summary" ? (
                 <div
                   aria-label={text(
                     "IELTS 四项估分",
@@ -785,7 +758,7 @@ export function FeedbackPage({
                         {chunkSegments.map((segment, index) =>
                           renderSourceSegment(segment, index),
                         )}
-                        {reportMode === "full" && paragraphFeedback ? (
+                        {paragraphFeedback ? (
                           <div
                             className={`${styles.paragraphReview} ${styles.inlineParagraphReview}`}
                           >
@@ -868,42 +841,12 @@ export function FeedbackPage({
                   mobilePane === "suggestions" ? styles.mobileActive : ""
                 }`}
                 data-suggestion-panel
-                data-feedback-mobile-detail={
-                  paragraphsPerPage === 1 && selectedIssueId
-                    ? "true"
-                    : undefined
-                }
                 data-testid="feedback-suggestion-pane"
                 id="feedback-suggestion-panel"
               >
                 <div className={styles.suggestionHeader}>
                   <h2>{text("修改建议", "Suggestions")}</h2>
                   <span>{pageReportIssues.length}</span>
-                </div>
-
-                <div
-                  aria-label={text("报告模式", "Report mode")}
-                  className={styles.reportModeSwitch}
-                  role="tablist"
-                >
-                  <button
-                    aria-selected={reportMode === "quick"}
-                    data-feedback-mode="quick"
-                    onClick={() => setReportMode("quick")}
-                    role="tab"
-                    type="button"
-                  >
-                    {text("快速修改", "Quick fixes")}
-                  </button>
-                  <button
-                    aria-selected={reportMode === "full"}
-                    data-feedback-mode="full"
-                    onClick={() => setReportMode("full")}
-                    role="tab"
-                    type="button"
-                  >
-                    {text("完整报告", "Full report")}
-                  </button>
                 </div>
 
                 <div
@@ -1120,44 +1063,42 @@ export function FeedbackPage({
                   )}
                 </div>
 
-                {reportMode === "full" ? (
-                  <div
-                    className={styles.leakCheck}
-                    data-feedback-full-detail="accuracy"
-                  >
-                    <h3>{text("基础漏洞速查", "Basic accuracy check")}</h3>
-                    {pageReportIssues.filter((issue) =>
-                      ["GRAMMAR", "SPELLING", "WORD_FORM"].includes(
-                        issue.issueType,
-                      ),
-                    ).length > 0 ? (
-                      <ul>
-                        {pageReportIssues
-                          .filter((issue) =>
-                            ["GRAMMAR", "SPELLING", "WORD_FORM"].includes(
-                              issue.issueType,
-                            ),
-                          )
-                          .map((issue) => (
-                            <li key={`leak-${issue.id}`}>
-                              <CheckCircle2 aria-hidden="true" size={14} />
-                              <span>
-                                <b lang="en">{issue.evidence}</b>
-                                {issue.knowledgePointZh}
-                              </span>
-                            </li>
-                          ))}
-                      </ul>
-                    ) : (
-                      <p>
-                        {text(
-                          "本轮未识别出需要单独列出的基础语法或拼写问题。",
-                          "No foundational grammar or spelling issue needs a separate note this time.",
-                        )}
-                      </p>
-                    )}
-                  </div>
-                ) : null}
+                <div
+                  className={styles.leakCheck}
+                  data-feedback-full-detail="accuracy"
+                >
+                  <h3>{text("基础漏洞速查", "Basic accuracy check")}</h3>
+                  {pageReportIssues.filter((issue) =>
+                    ["GRAMMAR", "SPELLING", "WORD_FORM"].includes(
+                      issue.issueType,
+                    ),
+                  ).length > 0 ? (
+                    <ul>
+                      {pageReportIssues
+                        .filter((issue) =>
+                          ["GRAMMAR", "SPELLING", "WORD_FORM"].includes(
+                            issue.issueType,
+                          ),
+                        )
+                        .map((issue) => (
+                          <li key={`leak-${issue.id}`}>
+                            <CheckCircle2 aria-hidden="true" size={14} />
+                            <span>
+                              <b lang="en">{issue.evidence}</b>
+                              {issue.knowledgePointZh}
+                            </span>
+                          </li>
+                        ))}
+                    </ul>
+                  ) : (
+                    <p>
+                      {text(
+                        "本轮未识别出需要单独列出的基础语法或拼写问题。",
+                        "No foundational grammar or spelling issue needs a separate note this time.",
+                      )}
+                    </p>
+                  )}
+                </div>
               </aside>
             </ResponsiveReport>
 
