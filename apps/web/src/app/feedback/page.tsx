@@ -838,11 +838,18 @@ export default function FeedbackPage({
                             data-feedback-evidence
                           >
                             <EvidenceLink
-                              label={text("修改建议", "Suggestion")}
+                              label={text("原句", "Original")}
                               state="revision"
                             >
                               <span lang="en">{issue.evidence}</span>
                             </EvidenceLink>
+                          </span>
+                          <span
+                            className={styles.correctionPreview}
+                            data-feedback-correction-preview
+                          >
+                            <ArrowRight aria-hidden="true" size={14} />
+                            <span lang="en">{issue.correctedVersion}</span>
                           </span>
                           <small className="sr-only" lang="en">
                             {issue.evidence}

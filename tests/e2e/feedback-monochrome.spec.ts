@@ -43,6 +43,9 @@ test.describe("monochrome feedback report", () => {
     await expect(
       page.locator("[data-feedback-next-step] .duration"),
     ).toHaveCount(0);
+    await expect(
+      page.locator("[data-feedback-correction-preview]").first(),
+    ).toBeVisible();
   });
 
   test("starts in quick-fix mode and lets the learner open the full report", async ({

@@ -580,8 +580,8 @@ const feedback: FeedbackData = {
       priority: 2,
       categoryZh: "比较结构",
       categoryEn: "Comparison structure",
-      titleZh: "比较对象必须完整且属于同一类别",
-      titleEn: "Make both sides of a comparison complete and parallel",
+      titleZh: "把 “older one” 改成 “adults”",
+      titleEn: "Replace “older one” with “adults”",
       evidence:
         "children always have a better ability to absorb new knowledges than the elder one",
       ...feedbackSpan(
@@ -607,9 +607,9 @@ const feedback: FeedbackData = {
       priority: 3,
       categoryZh: "论证链",
       categoryEn: "Argument chain",
-      titleZh: "补足原因到长期意义之间的机制",
+      titleZh: "补一句“反复接触让语言模式变熟”",
       titleEn:
-        "Add the mechanism between a cause and its long-term significance",
+        "Add the missing step: repeated exposure makes patterns familiar",
       evidence:
         "They can understand new vocabulary and improve their listening skills easily, which makes children can develop a foreign language mindset more naturally.",
       ...feedbackSpan(

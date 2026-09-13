@@ -779,6 +779,33 @@
   white-space: nowrap;
 }
 
+.correctionPreview {
+  display: flex;
+  min-width: 0;
+  margin-top: var(--desk-space-1);
+  color: var(--desk-ink-muted);
+  align-items: flex-start;
+  gap: var(--desk-space-1);
+}
+
+.correctionPreview > svg {
+  flex: none;
+  margin-top: var(--desk-space-1);
+  color: var(--desk-ink);
+}
+
+.correctionPreview > span {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--desk-ink);
+  font-family: var(--desk-font-reading);
+  font-size: var(--desk-type-label);
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+}
+
 .issueDetails {
   padding: 0 var(--desk-space-4) var(--desk-space-4) var(--desk-space-12);
 }
