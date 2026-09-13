@@ -64,4 +64,20 @@ test.describe("monochrome feedback report", () => {
       report.getByRole("tab", { name: "完整报告", exact: true }),
     ).toHaveAttribute("aria-selected", "true");
   });
+
+  test("lets the active suggestion card collapse on a second click", async ({
+    page,
+  }) => {
+    await page.goto("/feedback?cycle=cycle-demo");
+    const firstCard = page.locator("[data-feedback-issue-card]").first();
+    const firstTrigger = firstCard.locator("[data-feedback-issue]").first();
+    await expect(
+      firstCard.locator("[data-feedback-issue-details]"),
+    ).toBeVisible();
+    await firstTrigger.click();
+    await expect(
+      firstCard.locator("[data-feedback-issue-details]"),
+    ).toBeHidden();
+    await expect(firstTrigger).toHaveAttribute("aria-expanded", "false");
+  });
 });

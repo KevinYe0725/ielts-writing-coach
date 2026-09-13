@@ -124,7 +124,9 @@ export default function FeedbackPage({
     [cycleId],
   );
   const { data, error, loading, retry } = useDemoResource(loader);
-  const [activeIssueId, setActiveIssueId] = useState<string | null>(null);
+  const [activeIssueId, setActiveIssueId] = useState<string | null | undefined>(
+    undefined,
+  );
   const [issueFilter, setIssueFilter] = useState<FeedbackGroup | "all">("all");
   const [mobilePane, setMobilePane] = useState<MobilePane>("suggestions");
   const [reportMode, setReportMode] = useState<ReportMode>("quick");
@@ -161,9 +163,13 @@ export default function FeedbackPage({
     return prioritized.length > 0 ? prioritized : visibleIssues.slice(0, 3);
   }, [priorityIds, reportMode, visibleIssues]);
   const selectedIssueId =
-    activeIssueId && reportIssues.some((issue) => issue.id === activeIssueId)
-      ? activeIssueId
-      : (reportIssues[0]?.id ?? null);
+    activeIssueId === undefined
+      ? (reportIssues[0]?.id ?? null)
+      : activeIssueId === null
+        ? null
+        : reportIssues.some((issue) => issue.id === activeIssueId)
+          ? activeIssueId
+          : (reportIssues[0]?.id ?? null);
   const segments = useMemo(
     () => buildFeedbackSegments(data?.originalEssay ?? "", issues),
     [data?.originalEssay, issues],
@@ -283,13 +289,16 @@ export default function FeedbackPage({
 
   const activateSuggestion = useCallback(
     (issueId: string) => {
-      setActiveIssueId(issueId);
+      setActiveIssueId((current) => {
+        const selected = current === undefined ? reportIssues[0]?.id : current;
+        return selected === issueId ? null : issueId;
+      });
       if (panesAreSideBySide() && highlightableIds.has(issueId)) {
         scrollToRef(highlightRefs, issueId);
         announceIssue(issueId, "source");
       }
     },
-    [announceIssue, highlightableIds, scrollToRef],
+    [announceIssue, highlightableIds, reportIssues, scrollToRef],
   );
 
   const showIssueInSource = useCallback(
@@ -781,6 +790,7 @@ export default function FeedbackPage({
                     <article
                       className={styles.issueCard}
                       data-active={active ? "true" : "false"}
+                      data-feedback-issue-card={issue.id}
                       id={`feedback-issue-card-${issue.id}`}
                       key={issue.id}
                       ref={(node) => {
@@ -843,6 +853,7 @@ export default function FeedbackPage({
 
                       <div
                         className={styles.issueDetails}
+                        data-feedback-issue-details={issue.id}
                         hidden={!active}
                         id={`feedback-issue-details-${issue.id}`}
                       >
