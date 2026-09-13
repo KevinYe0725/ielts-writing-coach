@@ -53,4 +53,19 @@ test.describe("monochrome writing room", () => {
     ).toBeVisible();
     await expect(page.getByRole("timer")).toBeVisible();
   });
+
+  test("removes secondary rule copy and toggles immersive writing", async ({
+    page,
+  }) => {
+    await page.goto("/write?cycle=cycle-demo");
+    await expect(page.locator('[data-writing-mode="first"]')).toBeVisible();
+    await expect(page.locator(".exam-rules")).toHaveCount(0);
+    const toggle = page.locator("[data-immersive-toggle]");
+    await expect(toggle).toHaveAttribute("aria-pressed", "false");
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator('[data-writing-immersive="true"]')).toBeVisible();
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  });
 });

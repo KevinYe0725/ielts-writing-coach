@@ -9,6 +9,8 @@ import {
   Clock3,
   FileText,
   LockKeyhole,
+  Maximize2,
+  Minimize2,
   Send,
   ShieldCheck,
 } from "lucide-react";
@@ -179,6 +181,48 @@ export function WritingRoom({
   const conflictDialogRef = useDialogFocus<HTMLDivElement>(
     draftConflict !== null,
   );
+  const writingPageRef = useRef<HTMLDivElement | null>(null);
+  const [immersive, setImmersive] = useState(false);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setImmersive(document.fullscreenElement === writingPageRef.current);
+    };
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () =>
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
+
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && immersive && !document.fullscreenElement) {
+        setImmersive(false);
+      }
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [immersive]);
+
+  const toggleImmersive = useCallback(async () => {
+    const page = writingPageRef.current;
+    if (!page) return;
+    try {
+      if (document.fullscreenElement === page) {
+        await document.exitFullscreen();
+      } else if (document.fullscreenElement) {
+        await document.exitFullscreen();
+        await page.requestFullscreen?.();
+      } else if (page.requestFullscreen) {
+        await page.requestFullscreen();
+      } else {
+        setImmersive((current) => !current);
+      }
+    } catch {
+      // A browser or embedded webview can refuse fullscreen. Keep an
+      // in-page immersive fallback so the writing surface remains usable.
+      setImmersive((current) => !current);
+    }
+  }, []);
 
   useEffect(() => {
     if (!data || hydrated.current) return;
@@ -547,7 +591,11 @@ export function WritingRoom({
   }
 
   return (
-    <div className={cn("writing-page", styles.page)}>
+    <div
+      className={cn("writing-page", styles.page, immersive && styles.immersive)}
+      data-writing-immersive={immersive ? "true" : "false"}
+      ref={writingPageRef}
+    >
       <header className={cn("writing-topbar", styles.topbar)}>
         <div className="writing-title-group">
           <Badge tone="blue">
@@ -558,6 +606,29 @@ export function WritingRoom({
           <strong>{data.prompt.category}</strong>
         </div>
         <div className="writing-controls">
+          <button
+            aria-label={
+              immersive
+                ? text("退出沉浸式写作", "Exit immersive writing")
+                : text("进入沉浸式写作", "Enter immersive writing")
+            }
+            aria-pressed={immersive}
+            className="writing-fullscreen-toggle"
+            data-immersive-toggle
+            onClick={() => void toggleImmersive()}
+            title={
+              immersive
+                ? text("退出沉浸式写作", "Exit immersive writing")
+                : text("沉浸式写作", "Immersive writing")
+            }
+            type="button"
+          >
+            {immersive ? (
+              <Minimize2 aria-hidden="true" size={18} />
+            ) : (
+              <Maximize2 aria-hidden="true" size={18} />
+            )}
+          </button>
           <span
             aria-live="polite"
             className="save-state"
@@ -671,30 +742,6 @@ export function WritingRoom({
             <p className="prompt-instruction" lang="en">
               {data.prompt.instruction}
             </p>
-            <div className="exam-rules">
-              <div>
-                <Clock3 aria-hidden="true" size={16} />
-                <span>
-                  {text(
-                    "构思、写作和检查均计入 40 分钟",
-                    "Planning, writing, and checking are included in 40 minutes",
-                  )}
-                </span>
-              </div>
-              <div>
-                <ShieldCheck aria-hidden="true" size={16} />
-                <span>
-                  {text(
-                    "拼写、语法与 AI 建议已关闭",
-                    "Spelling, grammar, and AI suggestions are off",
-                  )}
-                </span>
-              </div>
-              <div>
-                <FileText aria-hidden="true" size={16} />
-                <span>{text("至少写 250 词", "Write at least 250 words")}</span>
-              </div>
-            </div>
             {mode === "rewrite" ? (
               <div
                 className={`self-check-box ${selfCheckVisible ? "visible" : "locked"}`}
