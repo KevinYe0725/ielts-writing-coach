@@ -918,13 +918,7 @@ export default function TodayPage() {
             <div className="next-task-body">
               <div className="next-task-copy">
                 <div className={styles.currentEssay}>
-                  <p
-                    lang={
-                      /\p{Script=Han}/u.test(data.cycleTitle) ? "zh-CN" : "en"
-                    }
-                  >
-                    {data.cycleTitle}
-                  </p>
+                  <p lang="en">{data.cycleTitleEn ?? data.cycleTitle}</p>
                 </div>
                 <h2>{text(actionTitleZh, actionTitleEn)}</h2>
               </div>

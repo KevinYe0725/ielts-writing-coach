@@ -81,6 +81,7 @@ export interface TodayData {
   blockedJobNotice: PendingAiJob | null;
   navigation: import("./learning-navigation").LearningDestinations;
   cycleTitle: string;
+  cycleTitleEn?: string;
   timeline: TimelineStep[];
   week: {
     focusedMinutes: number | null;

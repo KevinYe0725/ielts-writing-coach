@@ -1227,6 +1227,7 @@ export class MockLearningClient implements LearningClient {
           transferTaskId: "transfer-task",
         }),
         cycleTitle: "儿童是否应在小学开始学习外语",
+        cycleTitleEn: `${writingPrompt.question} ${writingPrompt.instruction}`,
         timeline: [
           {
             id: "v1",
@@ -1342,6 +1343,7 @@ export class MockLearningClient implements LearningClient {
       cycleTitle: practiceCompleted
         ? "小学外语启蒙 · Demo 练习记录已结束"
         : "儿童是否应在小学开始学习外语",
+      cycleTitleEn: `${writingPrompt.question} ${writingPrompt.instruction}`,
       timeline: [
         {
           id: "v1",

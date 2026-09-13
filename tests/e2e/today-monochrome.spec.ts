@@ -79,8 +79,8 @@ test.describe("monochrome Today course surface", () => {
       ),
     ).toHaveCount(0);
     await expect(primary.locator(".task-meta")).toHaveCount(0);
-    await expect(
-      primary.getByText("儿童是否应在小学开始学习外语", { exact: true }),
-    ).toBeVisible();
+    await expect(primary).toContainText(
+      "Some experts believe that it is better for children to begin learning a foreign language",
+    );
   });
 });

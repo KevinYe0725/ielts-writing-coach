@@ -2547,6 +2547,7 @@ export class HttpLearningClient implements LearningClient {
       blockedJobNotice,
       navigation,
       cycleTitle: wire.cycle?.question?.prompt ?? "IELTS Writing Task 2",
+      cycleTitleEn: wire.cycle?.question?.prompt ?? "IELTS Writing Task 2",
       timeline: mapTimeline(wire.cycle?.status ?? "QUESTION_READY"),
       week: {
         focusedMinutes: growth?.learningMinutes ?? null,
