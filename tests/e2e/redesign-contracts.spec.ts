@@ -1350,7 +1350,7 @@ test.describe("annotation desk redesign contracts", () => {
     { label: "desktop", width: 1440, height: 960 },
     { label: "390px mobile", width: 390, height: 844 },
   ]) {
-    test(`feedback badges and structural headings stay readable on ${viewport.label}`, async ({
+    test(`feedback structural headings stay readable on ${viewport.label}`, async ({
       page,
     }) => {
       await page.setViewportSize({
@@ -1368,9 +1368,8 @@ test.describe("annotation desk redesign contracts", () => {
         exact: true,
       });
 
-      for (const auxiliaryText of [trustBadge, modelLockBadge]) {
-        await expectFontSizeAtLeast(auxiliaryText, 12);
-      }
+      await expect(trustBadge).toHaveCount(0);
+      await expectFontSizeAtLeast(modelLockBadge, 12);
       for (const heading of [
         page.locator("#feedback-assessment-heading"),
         page.locator("[data-essay-pane] h2"),

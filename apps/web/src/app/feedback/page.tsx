@@ -17,13 +17,11 @@ import {
   BrainCircuit,
   CheckCircle2,
   ChevronDown,
-  Clock3,
   Info,
   Languages,
   LocateFixed,
   LockKeyhole,
   PenLine,
-  ShieldCheck,
   Sparkles,
   Target,
   TriangleAlert,
@@ -387,18 +385,6 @@ export default function FeedbackPage({
                 {text("进入专项教学", "Open focused teaching")}
               </ActionLink>
             ) : null}
-            <Badge tone="neutral">
-              <ShieldCheck aria-hidden="true" size={13} />
-              {data.languageScored
-                ? text(
-                    "学习用估分 · 非官方成绩",
-                    "Learning estimate · not an official score",
-                  )
-                : text(
-                    "示例报告 · 未评价语言",
-                    "Example report · language not scored",
-                  )}
-            </Badge>
           </div>
         }
         title={text(
@@ -591,14 +577,9 @@ export default function FeedbackPage({
         >
           <div className={styles.documentHeader}>
             <h2>{text("原文", "Original essay")}</h2>
-            <span>
-              <LockKeyhole aria-hidden="true" size={14} />
-              {text("原样保留", "Preserved")}
-            </span>
           </div>
 
           <div className={styles.taskBlock}>
-            <span>{text("原题", "Original task")}</span>
             <p lang="en">{data.prompt}</p>
           </div>
 
@@ -928,12 +909,11 @@ export default function FeedbackPage({
         </aside>
       </ResponsiveReport>
 
-      <Card className={styles.nextStepCard}>
+      <Card className={styles.nextStepCard} data-feedback-next-step>
         <span className={styles.nextStepIcon}>
           <BrainCircuit aria-hidden="true" size={23} />
         </span>
         <div>
-          <p className="eyebrow">{text("下一步", "Next step")}</p>
           <h2>
             {text(
               "先完成专项教学，再进入60分钟训练卷",
@@ -957,10 +937,6 @@ export default function FeedbackPage({
           {generationRetryError ? (
             <p role="alert">{generationRetryError}</p>
           ) : null}
-          <span className={styles.duration}>
-            <Clock3 aria-hidden="true" size={15} />
-            15–35 {messages.common.minutes}
-          </span>
         </div>
         <div className={styles.nextStepActions}>
           <ActionLink href="/today" size="lg" variant="secondary">
