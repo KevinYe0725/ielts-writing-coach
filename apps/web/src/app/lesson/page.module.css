@@ -136,6 +136,18 @@
   line-height: 1.7;
   text-underline-offset: 4px;
 }
+.primaryPracticeJump {
+  padding: var(--desk-space-3) var(--desk-space-4);
+  color: var(--desk-paper);
+  background: var(--desk-ink);
+  border-radius: var(--desk-radius-sm);
+  font-weight: var(--desk-body-weight-semibold);
+  text-decoration: none;
+}
+.primaryPracticeJump:hover {
+  color: var(--desk-paper);
+  background: var(--desk-ink-muted);
+}
 .contents .contentsPractice {
   display: flex;
   align-items: center;
@@ -190,29 +202,6 @@
   padding: var(--desk-space-6) 0 var(--desk-space-6);
   margin: 0;
   border-bottom: 1px solid var(--line);
-}
-
-.articleMeta {
-  display: flex;
-  margin-bottom: var(--desk-space-4);
-  color: var(--ink-faint);
-  font-size: var(--desk-type-meta);
-  font-weight: var(--desk-body-weight-bold);
-  align-items: center;
-  gap: var(--desk-space-3);
-}
-
-.articleMeta > span:first-child {
-  display: inline-flex;
-  color: var(--blue-dark);
-  align-items: center;
-  gap: var(--desk-space-2);
-}
-
-.articleMeta > span + span::before {
-  margin-right: var(--desk-space-3);
-  color: var(--line-strong);
-  content: "·";
 }
 
 .articleHeader h1 {
@@ -590,7 +579,7 @@
 .articleEntryActions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   flex-wrap: wrap;
   gap: var(--desk-space-3);
 }
@@ -1233,10 +1222,6 @@
 
   .articleHeader > p {
     margin-top: var(--desk-space-3);
-  }
-
-  .articleMeta {
-    margin-bottom: var(--desk-space-3);
   }
 
   .articleSection {

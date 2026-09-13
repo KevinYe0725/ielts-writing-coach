@@ -8,12 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import {
-  ArrowRight,
-  BookOpenCheck,
-  ChevronDown,
-  Lightbulb,
-} from "lucide-react";
+import { ArrowRight, ChevronDown, Lightbulb } from "lucide-react";
 import Markdown from "react-markdown";
 
 import { useLocale } from "@/components/locale-provider";
@@ -1128,41 +1123,32 @@ function TeachingArticleContent({
   return (
     <article className={styles.article} data-teaching-article>
       <header className={styles.articleHeader}>
-        <div className={styles.articleMeta}>
-          <span>
-            <BookOpenCheck aria-hidden="true" size={15} />
-            {text("专项能力教程", "Focused writing tutorial")}
-          </span>
-          <span>
-            {text(
-              `约 ${data.estimatedMinutes} 分钟`,
-              `About ${data.estimatedMinutes} min`,
-            )}
-          </span>
-        </div>
         <h1>{text(data.titleZh, data.titleEn)}</h1>
         {data.learningGoal ? (
-          <div className={styles.learningGoal}>
-            <span>
-              {text("学完这节，你能够", "After this tutorial, you can")}
-            </span>
+          <div
+            className={styles.learningGoal}
+            data-teaching-focus
+            data-teaching-focus-goal
+          >
+            <span>{text("本节只练一种能力", "One skill for this lesson")}</span>
             <p>{text(data.learningGoal.zh, data.learningGoal.en)}</p>
           </div>
         ) : null}
         <div className={styles.prose} data-teaching-prose>
           <Markdown>{data.introductionMarkdown}</Markdown>
         </div>
-        <div className={styles.articleEntryActions}>
-          <a className={styles.practiceJump} href="#teaching-practice-prompts">
+        <div className={styles.articleEntryActions} data-teaching-entry-actions>
+          <a
+            className={`${styles.practiceJump} ${styles.primaryPracticeJump}`}
+            data-teaching-primary-action
+            href="#teaching-practice-prompts"
+          >
             {text(
               `动笔试试 · ${practicePrompts.length} 道随堂练习`,
               `Try it yourself · ${practicePrompts.length} short exercises`,
             )}{" "}
             <ArrowRight size={15} aria-hidden="true" />
           </a>
-          <ActionLink href={paperHref} variant="ghost">
-            {text("直接进入训练卷", "Go to the practice paper")}
-          </ActionLink>
         </div>
       </header>
 

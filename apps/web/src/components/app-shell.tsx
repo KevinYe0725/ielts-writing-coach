@@ -247,6 +247,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const publicHome = pathname === "/signin";
   const courseHome = pathname === "/today";
   const writingPage = pathname === "/write" || pathname === "/rewrite";
+  const lessonPage = pathname === "/lesson";
   const feedbackPage =
     pathname === "/feedback" || pathname.startsWith("/feedback/");
   const feedbackComparePage =
@@ -272,7 +273,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       className={cn(
         setup ? "setup-shell" : "app-shell",
         setup ? styles.entryShell : styles.shell,
-        (courseHome || writingPage || feedbackPage) && styles.monochromeShell,
+        (courseHome || writingPage || lessonPage || feedbackPage) &&
+          styles.monochromeShell,
       )}
       data-app-shell={setup ? undefined : ""}
       data-course-home={courseHome ? "true" : undefined}

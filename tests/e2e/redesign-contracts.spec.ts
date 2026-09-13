@@ -843,8 +843,8 @@ test.describe("annotation desk redesign contracts", () => {
         proseMetrics.lineHeight / proseMetrics.fontSize,
       ).toBeGreaterThanOrEqual(1.8);
 
-      const articleMeta = page.getByText("专项能力教程", { exact: true });
-      await expectFontSizeAtLeast(articleMeta, 12);
+      const focusLabel = page.locator("[data-teaching-focus] > span");
+      await expectFontSizeAtLeast(focusLabel, 12);
 
       if (viewport.width < 720) {
         await expectFontSizeAtLeast(
@@ -1041,9 +1041,7 @@ test.describe("annotation desk redesign contracts", () => {
     await expect(page.locator("[data-teaching-article]")).toBeVisible();
     await switchToEnglish(page);
 
-    const articleMeta = page.getByText("Focused writing tutorial", {
-      exact: true,
-    });
+    const focusLabel = page.locator("[data-teaching-focus] > span");
     const articleHeading = page.getByRole("heading", {
       name: "Build the missing link in a causal argument",
     });
@@ -1055,7 +1053,7 @@ test.describe("annotation desk redesign contracts", () => {
       .locator('[data-teaching-practice] p[lang="en"]')
       .first();
 
-    for (const uiText of [articleMeta, articleHeading, uiButton]) {
+    for (const uiText of [focusLabel, articleHeading, uiButton]) {
       const font = await uiText.evaluate((element) => {
         const style = window.getComputedStyle(element);
         return { family: style.fontFamily, weight: style.fontWeight };
