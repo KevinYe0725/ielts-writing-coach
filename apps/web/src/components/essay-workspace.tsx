@@ -128,12 +128,14 @@ export function EssayWorkspaceContent({
                 <strong>
                   {text(essay.nextTask.titleZh, essay.nextTask.titleEn)}
                 </strong>
-                <p>
-                  {text(
-                    essay.nextTask.descriptionZh,
-                    essay.nextTask.descriptionEn,
-                  )}
-                </p>
+                {!compact ? (
+                  <p>
+                    {text(
+                      essay.nextTask.descriptionZh,
+                      essay.nextTask.descriptionEn,
+                    )}
+                  </p>
+                ) : null}
               </div>
             </div>
             <ActionLink

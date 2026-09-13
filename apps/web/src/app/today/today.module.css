@@ -769,3 +769,94 @@
     opacity: 1;
   }
 }
+
+/* The course home is a focused reading surface: one task, one compact list,
+   and one continuous progress summary. */
+.progressPanel {
+  display: grid;
+  overflow: hidden;
+  background: var(--desk-paper);
+  border: 1px solid color-mix(in srgb, var(--desk-ink) 14%, transparent);
+  border-radius: var(--desk-radius-lg);
+}
+
+.progressPanel .learningThread {
+  padding: var(--desk-space-6);
+  border-top: 0;
+}
+
+.progressPanel .learningThread :global(.section-header) {
+  margin-bottom: var(--desk-space-3);
+}
+
+.progressPanel .timelineCard {
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+
+.progressPanel .evidenceSummary {
+  padding: var(--desk-space-4) var(--desk-space-6);
+  border-top: 1px solid color-mix(in srgb, var(--desk-ink) 14%, transparent);
+}
+
+.desk :global([data-essay-workspace="compact"]) {
+  padding-top: var(--desk-space-4);
+}
+
+.desk :global([data-essay-workspace="compact"] .grid) {
+  gap: 0;
+}
+
+.desk :global([data-essay-workspace="compact"] .card) {
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto auto;
+  padding: var(--desk-space-4) 0;
+  border-right: 0;
+  border-bottom: 0;
+  border-left: 0;
+  border-top: 1px solid color-mix(in srgb, var(--desk-ink) 14%, transparent);
+  border-radius: 0;
+  background: transparent;
+  gap: var(--desk-space-3) var(--desk-space-4);
+}
+
+.desk :global([data-essay-workspace="compact"] .card:first-child) {
+  border-top: 0;
+}
+
+.desk :global([data-essay-workspace="compact"] .cardTopline),
+.desk :global([data-essay-workspace="compact"] .prompt) {
+  grid-column: 1 / -1;
+}
+
+.desk :global([data-essay-workspace="compact"] .prompt) {
+  min-height: 0;
+  -webkit-line-clamp: 2;
+}
+
+.desk :global([data-essay-workspace="compact"] .nextStep) {
+  grid-column: 1;
+  padding: 0;
+  border: 0;
+}
+
+.desk :global([data-essay-workspace="compact"] .card > .button) {
+  grid-column: 2;
+  grid-row: 3;
+  align-self: end;
+}
+
+@media (max-width: 760px) {
+  .progressPanel .learningThread {
+    padding: var(--desk-space-4);
+  }
+
+  .progressPanel .evidenceSummary {
+    padding: var(--desk-space-4);
+  }
+
+  .desk :global([data-essay-workspace="compact"] .card) {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+}

@@ -1148,91 +1148,95 @@ export default function TodayPage() {
 
         <EssayWorkspace compact />
 
-        <section className={styles.learningThread} data-today-learning-thread>
-          <SectionHeader
-            title={text("本篇进度", "Essay progress")}
-            description={data.cycleTitle}
-          />
-          <Card className={cn("cycle-timeline-card", styles.timelineCard)}>
-            <ol className="cycle-timeline">
-              {data.timeline.map((step, index) => (
-                <li
-                  className={cn("cycle-step", `cycle-step-${step.state}`)}
-                  key={step.id}
-                >
-                  <span className="cycle-node" aria-hidden="true">
-                    {step.state === "done" ? <Check size={15} /> : index + 1}
-                  </span>
-                  <div>
-                    <strong>{text(step.labelZh, step.labelEn)}</strong>
-                    <span>{step.dateLabel}</span>
-                  </div>
-                  {index < data.timeline.length - 1 ? (
-                    <span className="cycle-line" aria-hidden="true" />
-                  ) : null}
-                </li>
-              ))}
-            </ol>
-          </Card>
-        </section>
+        <div className={styles.progressPanel} data-today-progress-panel>
+          <section className={styles.learningThread} data-today-learning-thread>
+            <SectionHeader
+              title={text("本篇进度", "Essay progress")}
+              description={data.cycleTitle}
+            />
+            <Card className={cn("cycle-timeline-card", styles.timelineCard)}>
+              <ol className="cycle-timeline">
+                {data.timeline.map((step, index) => (
+                  <li
+                    className={cn("cycle-step", `cycle-step-${step.state}`)}
+                    key={step.id}
+                  >
+                    <span className="cycle-node" aria-hidden="true">
+                      {step.state === "done" ? <Check size={15} /> : index + 1}
+                    </span>
+                    <div>
+                      <strong>{text(step.labelZh, step.labelEn)}</strong>
+                      <span>{step.dateLabel}</span>
+                    </div>
+                    {index < data.timeline.length - 1 ? (
+                      <span className="cycle-line" aria-hidden="true" />
+                    ) : null}
+                  </li>
+                ))}
+              </ol>
+            </Card>
+          </section>
 
-        <section className={styles.evidenceSummary} data-today-evidence>
-          <div
-            aria-label={text("本周学习证据", "This week’s learning evidence")}
-            className={styles.evidenceList}
-            role="list"
-          >
-            <div className={styles.evidenceItem} role="listitem">
-              <span className="stat-icon blue">
-                <Clock3 aria-hidden="true" size={19} />
-              </span>
-              <div>
-                <span>{text("已记录学习时长", "Recorded learning time")}</span>
-                <strong>
-                  {data.week.focusedMinutes ?? "—"}
-                  {data.week.focusedMinutes === null ? null : (
-                    <small> min</small>
-                  )}
-                </strong>
-              </div>
-            </div>
-            <div className={styles.evidenceItem} role="listitem">
-              <span className="stat-icon blue">
-                <Gauge aria-hidden="true" size={19} />
-              </span>
-              <div>
-                <span>{text("已提交首稿", "First drafts submitted")}</span>
-                <strong>{data.week.completedActions ?? "—"}</strong>
-              </div>
-            </div>
-            <div className={styles.evidenceItem} role="listitem">
-              <span className="stat-icon blue">
-                <Target aria-hidden="true" size={19} />
-              </span>
-              <div>
-                <span>
-                  {text(
-                    "独立复测未复发",
-                    "No recurrence in independent checks",
-                  )}
+          <section className={styles.evidenceSummary} data-today-evidence>
+            <div
+              aria-label={text("本周学习证据", "This week’s learning evidence")}
+              className={styles.evidenceList}
+              role="list"
+            >
+              <div className={styles.evidenceItem} role="listitem">
+                <span className="stat-icon blue">
+                  <Clock3 aria-hidden="true" size={19} />
                 </span>
-                <strong>
-                  {data.week.repeatedErrorReduction ?? "—"}
-                  {data.week.repeatedErrorReduction === null ? null : (
-                    <small>%</small>
-                  )}
-                </strong>
+                <div>
+                  <span>
+                    {text("已记录学习时长", "Recorded learning time")}
+                  </span>
+                  <strong>
+                    {data.week.focusedMinutes ?? "—"}
+                    {data.week.focusedMinutes === null ? null : (
+                      <small> min</small>
+                    )}
+                  </strong>
+                </div>
+              </div>
+              <div className={styles.evidenceItem} role="listitem">
+                <span className="stat-icon blue">
+                  <Gauge aria-hidden="true" size={19} />
+                </span>
+                <div>
+                  <span>{text("已提交首稿", "First drafts submitted")}</span>
+                  <strong>{data.week.completedActions ?? "—"}</strong>
+                </div>
+              </div>
+              <div className={styles.evidenceItem} role="listitem">
+                <span className="stat-icon blue">
+                  <Target aria-hidden="true" size={19} />
+                </span>
+                <div>
+                  <span>
+                    {text(
+                      "独立复测未复发",
+                      "No recurrence in independent checks",
+                    )}
+                  </span>
+                  <strong>
+                    {data.week.repeatedErrorReduction ?? "—"}
+                    {data.week.repeatedErrorReduction === null ? null : (
+                      <small>%</small>
+                    )}
+                  </strong>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className={styles.refreshAction}>
-            <Button onClick={retry} size="sm" variant="secondary">
-              {text("刷新计划", "Refresh plan")}
-              <ArrowRight aria-hidden="true" size={15} />
-            </Button>
-          </div>
-        </section>
+            <div className={styles.refreshAction}>
+              <Button onClick={retry} size="sm" variant="secondary">
+                {text("刷新计划", "Refresh plan")}
+                <ArrowRight aria-hidden="true" size={15} />
+              </Button>
+            </div>
+          </section>
+        </div>
       </div>
     </PageLayout>
   );

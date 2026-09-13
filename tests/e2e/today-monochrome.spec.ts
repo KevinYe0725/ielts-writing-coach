@@ -45,4 +45,17 @@ test.describe("monochrome Today course surface", () => {
     ).toBeVisible();
     await expect(page.locator("[data-today-primary]")).toBeVisible();
   });
+
+  test("groups progress and evidence into one course summary", async ({
+    page,
+  }) => {
+    await page.goto("/today");
+    const summary = page.locator("[data-today-progress-panel]");
+    await expect(summary).toBeVisible();
+    await expect(summary.locator("[data-today-learning-thread]")).toBeVisible();
+    await expect(summary.locator("[data-today-evidence]")).toBeVisible();
+    await expect(
+      page.locator('[data-essay-workspace="compact"] .nextStep p'),
+    ).toHaveCount(0);
+  });
 });
