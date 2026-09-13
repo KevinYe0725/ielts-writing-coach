@@ -549,7 +549,7 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
   }) => {
     await page.goto(lessonUrl);
     await expect(
-      page.getByText("学完这节，你能够", { exact: true }),
+      page.getByText("本节只练一种能力", { exact: true }),
     ).toBeVisible();
     const toggle = page.locator("[data-teaching-toc-toggle]");
     if (await toggle.isVisible()) await toggle.click();
