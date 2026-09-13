@@ -661,6 +661,17 @@ function PracticePrompts({
           </p>
         </>
       ) : null}
+      {inline ? (
+        <div className={styles.practiceCue} data-teaching-practice-cue>
+          <span>{text("马上用一次", "Try it now")}</span>
+          <strong>
+            {text(
+              "把刚才的动作写进一个新句子",
+              "Use the same move in a new sentence",
+            )}
+          </strong>
+        </div>
+      ) : null}
       <div className={styles.practiceList}>
         {practicePrompts.map((prompt) => (
           <PracticePrompt

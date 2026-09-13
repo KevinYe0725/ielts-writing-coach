@@ -39,4 +39,25 @@ test.describe("focused teaching entry", () => {
       "compact",
     );
   });
+
+  test("puts a clear try-now cue directly before each inline practice", async ({
+    page,
+  }) => {
+    await page.goto(
+      "/lesson?cycle=cycle-demo&lesson=lesson-collocation-perspective",
+    );
+
+    const section = page.locator("[data-teaching-section]").first();
+    const cue = section.locator("[data-teaching-practice-cue]");
+    const practice = section.locator("[data-teaching-practice]").first();
+    await expect(cue).toBeVisible();
+    await expect(cue).toContainText("马上用一次");
+    const [cueBox, practiceBox] = await Promise.all([
+      cue.boundingBox(),
+      practice.boundingBox(),
+    ]);
+    expect(cueBox).not.toBeNull();
+    expect(practiceBox).not.toBeNull();
+    expect(cueBox!.y + cueBox!.height).toBeLessThanOrEqual(practiceBox!.y + 8);
+  });
 });

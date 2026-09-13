@@ -549,6 +549,30 @@
   color: var(--ink-soft);
 }
 
+.practiceCue {
+  display: flex;
+  padding: var(--desk-space-3) var(--desk-space-4);
+  margin-bottom: var(--desk-space-3);
+  color: var(--desk-ink);
+  background: var(--desk-blue-soft);
+  border-left: 3px solid var(--desk-blue);
+  align-items: baseline;
+  gap: var(--desk-space-3);
+}
+
+.practiceCue > span {
+  color: var(--desk-blue);
+  font-size: var(--desk-type-meta);
+  font-weight: var(--desk-body-weight-bold);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.practiceCue > strong {
+  font-size: var(--desk-type-body);
+  line-height: 1.6;
+}
+
 .practiceList {
   display: grid;
   margin-top: var(--desk-space-6);
@@ -596,6 +620,10 @@
 .practiceBlock[data-inline] .practiceList {
   margin-top: 0;
   border-top: 0;
+}
+
+.practiceBlock[data-inline] .practiceCue {
+  margin-bottom: var(--desk-space-2);
 }
 
 .practicePrompt[data-inline] {
@@ -1238,6 +1266,12 @@
   }
   .practiceJump {
     margin-top: var(--desk-space-2);
+  }
+
+  .practiceCue {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: var(--desk-space-1);
   }
 
   .articleHeader h1 {
