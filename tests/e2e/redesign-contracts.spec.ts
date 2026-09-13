@@ -728,28 +728,26 @@ test.describe("annotation desk redesign contracts", () => {
         "为保留闭卷证据，剩余 5 分钟时才会显示。",
       );
 
-      await expect(rule).toBeVisible();
+      await expect(rule).toHaveCount(0);
       await expect(shortcut).toBeVisible();
       await expect(finalFive).toBeVisible();
-      for (const auxiliaryText of [rule, save, shortcut, finalFive]) {
+      for (const auxiliaryText of [save, shortcut, finalFive]) {
         await expectFontSizeAtLeast(auxiliaryText, 12);
       }
     });
   }
 
-  test("writing states use annotation tokens instead of success or violet decoration", async ({
-    page,
-  }) => {
+  test("writing states use monochrome annotation tokens", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 960 });
     await page.goto("/rewrite?cycle=cycle-demo&task=rewrite-primary-language");
 
     await expect(page.getByText("已自动保存", { exact: true })).toHaveCSS(
       "color",
-      "rgb(18, 51, 48)",
+      "rgb(17, 17, 17)",
     );
     await expect(
       page.getByText("Version 2 · 闭卷重写", { exact: true }),
-    ).toHaveCSS("color", "rgb(7, 117, 129)");
+    ).toHaveCSS("color", "rgb(17, 17, 17)");
     await expect(page.locator(".writing-prompt")).toHaveCSS(
       "background-image",
       "none",
@@ -767,7 +765,7 @@ test.describe("annotation desk redesign contracts", () => {
       );
     await expect(page.getByText("250 词", { exact: true })).toHaveCSS(
       "color",
-      "rgb(7, 117, 129)",
+      "rgb(17, 17, 17)",
     );
   });
 

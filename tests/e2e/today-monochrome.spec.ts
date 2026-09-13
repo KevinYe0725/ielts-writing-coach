@@ -58,4 +58,25 @@ test.describe("monochrome Today course surface", () => {
       page.locator('[data-essay-workspace="compact"] .nextStep p'),
     ).toHaveCount(0);
   });
+
+  test("separates the next action from the essay context", async ({ page }) => {
+    await page.goto("/today");
+    const primary = page.locator("[data-today-primary]");
+    await expect(
+      primary.getByRole("heading", { name: "闭卷重写" }),
+    ).toBeVisible();
+    await expect(
+      primary.getByText("闭卷重写：小学外语启蒙", { exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      primary.getByText(
+        "只显示原题。最后 5 分钟才会出现你的三条抽象自检目标。",
+        { exact: true },
+      ),
+    ).toHaveCount(0);
+    await expect(primary.locator(".task-meta")).toHaveCount(0);
+    await expect(
+      primary.getByText("儿童是否应在小学开始学习外语", { exact: true }),
+    ).toBeVisible();
+  });
 });

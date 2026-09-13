@@ -81,6 +81,10 @@ function optionLabel<T extends string>(
   return locale === "zh-CN" ? (value?.zh ?? id) : (value?.en ?? id);
 }
 
+function taskActionTitle(value: string): string {
+  return value.split(/[:：]/u, 1)[0]?.trim() || value;
+}
+
 function subscribeToLocation(onStoreChange: () => void) {
   window.addEventListener("popstate", onStoreChange);
   return () => window.removeEventListener("popstate", onStoreChange);
@@ -555,6 +559,8 @@ export default function TodayPage() {
   }
 
   const task = data.nextTask;
+  const actionTitleZh = taskActionTitle(task.titleZh);
+  const actionTitleEn = taskActionTitle(task.titleEn);
   const aiService = data.aiService ?? {
     state:
       data.aiState === "connected"
@@ -888,16 +894,6 @@ export default function TodayPage() {
             className={cn("next-task-card", styles.primaryAction)}
             data-today-primary
           >
-            <div className="next-task-topline">
-              <Badge tone="blue">
-                <Sparkles aria-hidden="true" size={13} />
-                {text(task.eyebrowZh, task.eyebrowEn)}
-              </Badge>
-              <span className="due-label">
-                <CalendarClock aria-hidden="true" size={15} />
-                {text(task.dueLabelZh, task.dueLabelEn)}
-              </span>
-            </div>
             <div className="next-task-body">
               <div className="next-task-copy">
                 <div className={styles.currentEssay}>
@@ -909,24 +905,7 @@ export default function TodayPage() {
                     {data.cycleTitle}
                   </p>
                 </div>
-                <h2>{text(task.titleZh, task.titleEn)}</h2>
-                <p>{text(task.descriptionZh, task.descriptionEn)}</p>
-                {!processing ? (
-                  <div className="task-meta">
-                    <span>
-                      <Clock3 aria-hidden="true" size={16} />
-                      {task.durationMinutes} {messages.common.minutes}
-                    </span>
-                    <span>
-                      <Target aria-hidden="true" size={16} />
-                      {["first-attempt", "rewrite", "transfer"].includes(
-                        task.kind,
-                      )
-                        ? text("闭卷独立输出", "Closed-book production")
-                        : text("按自己的节奏继续", "Continue at your own pace")}
-                    </span>
-                  </div>
-                ) : null}
+                <h2>{text(actionTitleZh, actionTitleEn)}</h2>
               </div>
               {data.pendingJobAction === "retry" ? (
                 <Button

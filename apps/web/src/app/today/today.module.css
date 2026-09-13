@@ -562,6 +562,15 @@
   z-index: 1;
 }
 
+.primaryAction :global(.next-task-body) {
+  margin-top: 0;
+}
+
+.primaryAction .currentEssay > p {
+  font-size: var(--desk-type-subheading);
+  line-height: var(--desk-leading-body);
+}
+
 .learningThread {
   min-width: 0;
   padding-top: var(--desk-space-2);
