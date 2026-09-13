@@ -6,7 +6,6 @@ import {
   useCallback,
   useMemo,
   useState,
-  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import Link from "next/link";
@@ -78,8 +77,6 @@ type ComparisonPage = {
   issueIds: Set<string>;
 };
 
-const MOBILE_COMPARISON_QUERY = "(max-width: 939px)";
-
 function feedbackCompareHref(
   cycleId: string | null,
   issueId?: string | null,
@@ -93,16 +90,6 @@ function feedbackCompareHref(
 
 function usesSinglePaneReport() {
   return window.matchMedia(SINGLE_PANE_REPORT_QUERY).matches;
-}
-
-function subscribeToComparisonViewport(onStoreChange: () => void) {
-  const query = window.matchMedia(MOBILE_COMPARISON_QUERY);
-  query.addEventListener("change", onStoreChange);
-  return () => query.removeEventListener("change", onStoreChange);
-}
-
-function comparisonParagraphsPerPageSnapshot() {
-  return window.matchMedia(MOBILE_COMPARISON_QUERY).matches ? 1 : 2;
 }
 
 function annotationKind(issueType: string, severity: string) {
@@ -150,11 +137,6 @@ export function FeedbackPage({
   const [issueFilter, setIssueFilter] = useState<FeedbackGroup | "all">("all");
   const [mobilePane, setMobilePane] = useState<MobilePane>("suggestions");
   const reportMode: ReportMode = "full";
-  const paragraphsPerPage = useSyncExternalStore(
-    subscribeToComparisonViewport,
-    comparisonParagraphsPerPageSnapshot,
-    () => 2,
-  );
   const [locationMessage, setLocationMessage] = useState("");
   const [retryingGeneration, setRetryingGeneration] = useState(false);
   const [generationRetryError, setGenerationRetryError] = useState("");
@@ -261,8 +243,8 @@ export function FeedbackPage({
   const comparisonPages = useMemo<ComparisonPage[]>(() => {
     const chunks = paragraphLayout.chunks;
     const pages: ComparisonPage[] = [];
-    for (let offset = 0; offset < chunks.length; offset += paragraphsPerPage) {
-      const pageChunks = chunks.slice(offset, offset + paragraphsPerPage);
+    for (let offset = 0; offset < chunks.length; offset += 1) {
+      const pageChunks = chunks.slice(offset, offset + 1);
       const issueIds = pageChunks.flatMap((chunk) =>
         issuesInChunk(chunk).map((issue) => issue.id),
       );
@@ -290,7 +272,7 @@ export function FeedbackPage({
       page.pageNumber = index + 1;
     });
     return pages;
-  }, [issues, issuesInChunk, paragraphLayout.chunks, paragraphsPerPage]);
+  }, [issues, issuesInChunk, paragraphLayout.chunks]);
 
   const issuePageIndex = useMemo(() => {
     const map = new Map<string, number>();
@@ -761,8 +743,9 @@ export function FeedbackPage({
                         {paragraphFeedback ? (
                           <div
                             className={`${styles.paragraphReview} ${styles.inlineParagraphReview}`}
+                            data-feedback-paragraph-review
                           >
-                            <details>
+                            <details open>
                               <summary>
                                 <span>{paragraphFeedback.paragraphIndex}</span>
                                 <b>
@@ -779,7 +762,10 @@ export function FeedbackPage({
                                   <p className="eyebrow">
                                     {text("参考改写", "Polished revision")}
                                   </p>
-                                  <blockquote lang="en">
+                                  <blockquote
+                                    data-feedback-paragraph-revision
+                                    lang="en"
+                                  >
                                     {text(
                                       paragraphFeedback.revisionZh ??
                                         paragraphFeedback.excerpt,

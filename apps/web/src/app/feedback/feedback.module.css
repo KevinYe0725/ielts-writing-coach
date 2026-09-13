@@ -395,6 +395,12 @@
   overflow: hidden;
 }
 
+.focusWorkspace .sourcePane {
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 .focusWorkspace .suggestionPane {
   overflow-x: hidden;
   overflow-y: auto;
@@ -403,8 +409,23 @@
 
 .focusWorkspace .essay {
   min-height: 0;
-  overflow: hidden;
+  overflow: visible;
   flex: 1;
+}
+
+.focusWorkspace .paragraphReview summary {
+  font-size: var(--desk-type-body);
+}
+
+.focusWorkspace .paragraphReview details > p,
+.focusWorkspace .paragraphReview details > div {
+  font-size: var(--desk-type-body);
+  line-height: 1.7;
+}
+
+.focusWorkspace .paragraphReview .paragraphRevision blockquote {
+  font-size: var(--desk-type-subheading);
+  line-height: 1.8;
 }
 
 .focusWorkspace .issueList {

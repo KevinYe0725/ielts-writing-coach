@@ -11,7 +11,7 @@ test.describe("document-first workspace", () => {
   test("shows the original essay before the first desktop fold without shrinking reading text", async ({
     page,
   }) => {
-    await page.goto("/feedback?cycle=cycle-demo");
+    await page.goto("/feedback/compare?cycle=cycle-demo");
     const essay = page.locator("[data-feedback-essay]");
     await expect(essay).toBeVisible();
     const reading = await essay.evaluate((node) => ({
@@ -25,7 +25,7 @@ test.describe("document-first workspace", () => {
   test("resizes the report by keyboard without losing the original or selected correction", async ({
     page,
   }) => {
-    await page.goto("/feedback?cycle=cycle-demo");
+    await page.goto("/feedback/compare?cycle=cycle-demo");
     const essay = page.locator("[data-feedback-essay]");
     await expect(essay).toBeVisible();
     const original = await essay.textContent();
@@ -50,17 +50,15 @@ test.describe("document-first workspace", () => {
     await expect(separator).toBeFocused();
   });
 
-  test("keeps long-report suggestions below the header while the original remains alongside", async ({
+  test("keeps long feedback details inside the focused panes", async ({
     page,
   }) => {
-    await page.goto("/feedback?cycle=cycle-demo");
-    await page.locator('[data-feedback-mode="full"]').click();
-    await page.locator("[data-essay-pane] details summary").first().click();
+    await page.goto("/feedback/compare?cycle=cycle-demo");
+    await expect(
+      page.locator("[data-feedback-paragraph-review] details").first(),
+    ).toHaveAttribute("open", "");
 
     const geometry = await page.evaluate(() => {
-      const header = document.querySelector<HTMLElement>(
-        "[data-workspace-header]",
-      )!;
       const group = document.querySelector<HTMLElement>(
         "[data-feedback-workbench]",
       )!;
@@ -69,37 +67,24 @@ test.describe("document-first workspace", () => {
       )!;
       const groupRect = group.getBoundingClientRect();
       const suggestionRect = suggestions.getBoundingClientRect();
-      const stickyTop = header.getBoundingClientRect().bottom + 12;
-      const groupTop = groupRect.top + window.scrollY;
-      const groupBottom = groupRect.bottom + window.scrollY;
-      const start = groupTop - stickyTop + 24;
-      const end = groupBottom - suggestionRect.height - stickyTop - 24;
-      return { end, start };
+      return {
+        groupTop: groupRect.top,
+        groupBottom: groupRect.bottom,
+        suggestionTop: suggestionRect.top,
+        suggestionBottom: suggestionRect.bottom,
+        suggestionOverflow: getComputedStyle(suggestions).overflowY,
+      };
     });
-    expect(geometry.end).toBeGreaterThan(geometry.start);
-    await page.evaluate(
-      (scrollTop) => window.scrollTo({ top: scrollTop, behavior: "instant" }),
-      Math.min(geometry.start + 48, geometry.end),
-    );
-
-    await expect
-      .poll(async () => {
-        const [headerBox, suggestionBox] = await Promise.all([
-          page.locator("[data-workspace-header]").boundingBox(),
-          page.locator("[data-suggestion-panel]").boundingBox(),
-        ]);
-        if (!headerBox || !suggestionBox) return Number.NEGATIVE_INFINITY;
-        return suggestionBox.y - (headerBox.y + headerBox.height);
-      })
-      .toBeGreaterThanOrEqual(12);
-    await expect(page.locator("[data-feedback-essay]")).toBeInViewport();
+    expect(geometry.groupBottom).toBeGreaterThan(geometry.groupTop);
+    expect(geometry.suggestionBottom).toBeGreaterThan(geometry.suggestionTop);
+    expect(geometry.suggestionOverflow).toBe("auto");
   });
 
   test("uses one report document on mobile with a readable diagnosis", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto("/feedback?cycle=cycle-demo");
+    await page.goto("/feedback/compare?cycle=cycle-demo");
 
     await expect(page.locator("[data-essay-pane]")).toHaveCount(1);
     await expect(page.locator("[data-suggestion-panel]")).toHaveCount(1);
@@ -108,16 +93,16 @@ test.describe("document-first workspace", () => {
     await page.getByRole("tab", { name: "原文", exact: true }).click();
     await expect(page.locator("[data-essay-pane]")).toBeVisible();
     await expect(page.locator("[data-suggestion-panel]")).toBeHidden();
-    const summarySize = await page
-      .locator("#feedback-assessment-heading")
+    const revisionSize = await page
+      .locator("[data-feedback-paragraph-revision]")
       .evaluate((element) => parseFloat(getComputedStyle(element).fontSize));
-    expect(summarySize).toBeGreaterThanOrEqual(16);
+    expect(revisionSize).toBeGreaterThanOrEqual(18);
   });
 
   test("keeps the focused-target rationale available as optional guidance", async ({
     page,
   }) => {
-    await page.goto("/feedback?cycle=cycle-demo");
+    await page.goto("/feedback/compare?cycle=cycle-demo");
     const target = page.locator("[data-feedback-issue]", {
       hasText: "本次专项重点",
     });
@@ -133,7 +118,7 @@ test.describe("document-first workspace", () => {
   test("fills narrow report widths and preserves the selected issue across layout changes", async ({
     page,
   }) => {
-    await page.goto("/feedback?cycle=cycle-demo");
+    await page.goto("/feedback/compare?cycle=cycle-demo");
     const highlight = page.locator("[data-feedback-highlight]").first();
     const issue = await highlight.getAttribute("data-feedback-highlight");
     await highlight.click();
@@ -192,7 +177,7 @@ test.describe("document-first workspace", () => {
   }) => {
     for (const width of [768, 900]) {
       await page.setViewportSize({ width, height: 900 });
-      await page.goto("/feedback?cycle=cycle-demo");
+      await page.goto("/feedback/compare?cycle=cycle-demo");
       await page.getByRole("tab", { name: "原文", exact: true }).click();
       const source = page.locator("[data-essay-pane]");
       const suggestions = page.locator("[data-suggestion-panel]");

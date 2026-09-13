@@ -74,10 +74,21 @@ test.describe("feedback report views", () => {
 
     const workbench = page.locator("[data-feedback-focus-workbench]");
     await expect(workbench).toHaveAttribute("data-feedback-page", "1");
-    await expect(workbench).toHaveAttribute("data-feedback-page-count", "2");
+    await expect(workbench).toHaveAttribute("data-feedback-page-count", "3");
     await expect(page.locator("[data-feedback-page='1']")).toBeVisible();
     await expect(page.locator("[data-feedback-page='2']")).toHaveCount(0);
-    await expect(page.locator("[data-feedback-issue-card]")).toHaveCount(3);
+    await expect(page.locator("[data-feedback-issue-card]")).toHaveCount(2);
+    await expect(
+      page.locator("[data-feedback-paragraph-review] details"),
+    ).toHaveAttribute("open", "");
+    await expect(
+      page.locator("[data-feedback-paragraph-revision]"),
+    ).toBeVisible();
+    expect(
+      await page
+        .locator("[data-feedback-paragraph-revision]")
+        .evaluate((node) => parseFloat(getComputedStyle(node).fontSize)),
+    ).toBeGreaterThanOrEqual(18);
     await expect(page.locator("[data-feedback-page-prev]")).toBeDisabled();
     await expect(page.locator("[data-feedback-page-next]")).toBeEnabled();
     expect(
@@ -102,8 +113,15 @@ test.describe("feedback report views", () => {
     await expect(workbench).toHaveAttribute("data-feedback-page", "2");
     await expect(page.locator("[data-feedback-page='1']")).toHaveCount(0);
     await expect(page.locator("[data-feedback-page='2']")).toBeVisible();
-    await expect(page.locator("[data-feedback-issue-card]")).toHaveCount(0);
+    await expect(page.locator("[data-feedback-issue-card]")).toHaveCount(1);
     await expect(page.locator("[data-feedback-page-prev]")).toBeEnabled();
+    await expect(page.locator("[data-feedback-page-next]")).toBeEnabled();
+
+    await page.locator("[data-feedback-page-next]").click();
+    await expect(workbench).toHaveAttribute("data-feedback-page", "3");
+    await expect(page.locator("[data-feedback-page='2']")).toHaveCount(0);
+    await expect(page.locator("[data-feedback-page='3']")).toBeVisible();
+    await expect(page.locator("[data-feedback-issue-card]")).toHaveCount(0);
     await expect(page.locator("[data-feedback-page-next]")).toBeDisabled();
   });
 });
