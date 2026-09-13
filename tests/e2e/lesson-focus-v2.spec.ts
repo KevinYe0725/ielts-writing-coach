@@ -20,6 +20,9 @@ test.describe("focused teaching entry", () => {
     );
     await expect(page.getByText(/约 \d+ 分钟/, { exact: true })).toHaveCount(0);
     await expect(page.locator("[data-teaching-primary-action]")).toBeVisible();
+    await expect(page.locator("[data-teaching-entry-actions] a")).toHaveCount(
+      1,
+    );
     await expect(
       page.locator("[data-teaching-entry-actions] [data-teaching-paper-entry]"),
     ).toHaveCount(0);
@@ -30,6 +33,10 @@ test.describe("focused teaching entry", () => {
     await expect(page.locator("[data-app-shell]")).toHaveCSS(
       "background-color",
       "rgb(247, 247, 247)",
+    );
+    await expect(page.locator("[data-teaching-toc-column]")).toHaveAttribute(
+      "data-teaching-toc-density",
+      "compact",
     );
   });
 });

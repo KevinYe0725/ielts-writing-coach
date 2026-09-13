@@ -1252,7 +1252,11 @@ function TeachingArticleContent({
           </footer>
         </div>
 
-        <div className={styles.contentsColumn} data-teaching-toc-column>
+        <div
+          className={styles.contentsColumn}
+          data-teaching-toc-column
+          data-teaching-toc-density="compact"
+        >
           <button
             aria-controls="adaptive-teaching-contents"
             aria-expanded={contentsOpen}
