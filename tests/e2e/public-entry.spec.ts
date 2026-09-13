@@ -109,6 +109,29 @@ test("public page leads with the product and opens accessible account entry", as
   expect(scan.violations).toEqual([]);
 });
 
+test("public page keeps its presentation surface monochrome", async ({
+  page,
+}) => {
+  await page.goto("/signin");
+  const colors = await page.locator("[data-public-home]").evaluate((home) => {
+    const primary = home.querySelector("[data-public-primary-action]");
+    const homeStyle = getComputedStyle(home);
+    const primaryStyle = primary ? getComputedStyle(primary) : null;
+    return {
+      background: homeStyle.backgroundColor,
+      color: homeStyle.color,
+      primaryBackground: primaryStyle?.backgroundColor,
+      primaryColor: primaryStyle?.color,
+    };
+  });
+  expect(colors).toEqual({
+    background: "rgb(255, 255, 255)",
+    color: "rgb(17, 17, 17)",
+    primaryBackground: "rgb(17, 17, 17)",
+    primaryColor: "rgb(255, 255, 255)",
+  });
+});
+
 test("registration uses the existing account contract and preserves the return path", async ({
   page,
 }) => {

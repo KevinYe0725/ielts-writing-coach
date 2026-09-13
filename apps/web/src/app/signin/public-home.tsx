@@ -101,6 +101,7 @@ export function PublicHome() {
           <div className={styles.heroActions}>
             <button
               className={styles.pill}
+              data-public-primary-action
               disabled={!ready}
               onClick={(event) => enter("register", event)}
               type="button"

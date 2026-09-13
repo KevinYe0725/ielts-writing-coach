@@ -8,6 +8,17 @@
   --desk-amber: #7c531b;
   --desk-error: #b4474c;
   --desk-error-strong: #9f3840;
+  /* Public introduction surface: neutral black and white presentation roles. */
+  --desk-mono-ink: #111111;
+  --desk-mono-paper: #ffffff;
+  --desk-mono-canvas: #f7f7f7;
+  --desk-mono-muted: #5b5b5b;
+  --desk-mono-line: color-mix(in srgb, var(--desk-mono-ink) 14%, transparent);
+  --desk-mono-line-strong: color-mix(
+    in srgb,
+    var(--desk-mono-ink) 24%,
+    transparent
+  );
   --desk-evidence-muted: color-mix(
     in srgb,
     var(--desk-ink) 76%,

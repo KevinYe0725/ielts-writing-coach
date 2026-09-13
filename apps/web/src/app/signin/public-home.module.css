@@ -1,8 +1,12 @@
 .home {
-  --home-ink: var(--desk-ink);
-  --home-muted: var(--desk-ink-muted);
+  --home-ink: var(--desk-mono-ink);
+  --home-muted: var(--desk-mono-muted);
+  --home-paper: var(--desk-mono-paper);
+  --home-canvas: var(--desk-mono-canvas);
+  --home-line: var(--desk-mono-line);
+  --home-line-strong: var(--desk-mono-line-strong);
   color: var(--home-ink);
-  background: var(--desk-paper);
+  background: var(--home-paper);
   font-family: var(--desk-font-body);
 }
 .home h1,
@@ -20,8 +24,8 @@
   gap: 24px;
   min-height: 84px;
   padding: 16px clamp(16px, 4vw, 64px);
-  background: var(--desk-paper);
-  border-bottom: 1px solid var(--desk-line);
+  background: var(--home-paper);
+  border-bottom: 1px solid var(--home-line);
 }
 .brand {
   display: inline-flex;
@@ -34,7 +38,7 @@
   letter-spacing: -0.04em;
 }
 .brand svg {
-  color: var(--desk-blue);
+  color: var(--home-ink);
 }
 .navigation {
   display: flex;
@@ -72,7 +76,7 @@
 }
 .login:hover,
 .locale:hover {
-  background: var(--desk-canvas);
+  background: var(--home-canvas);
 }
 .pill {
   display: inline-flex;
@@ -81,7 +85,7 @@
   gap: 16px;
   min-height: 46px;
   padding: 12px 24px;
-  color: var(--desk-paper);
+  color: var(--home-paper);
   background: var(--home-ink);
   border: 1px solid var(--home-ink);
   border-radius: var(--desk-radius-pill);
@@ -91,8 +95,8 @@
     transform 160ms ease;
 }
 .pill:hover {
-  background: var(--desk-blue);
-  border-color: var(--desk-blue);
+  background: var(--home-muted);
+  border-color: var(--home-muted);
 }
 .pill:active {
   transform: translateY(1px);
@@ -148,7 +152,7 @@
   max-width: 1240px;
   margin: 0 auto;
   padding: 48px clamp(24px, 4vw, 64px) 64px;
-  background: var(--desk-canvas);
+  background: var(--home-canvas);
   border-radius: var(--desk-radius-lg);
   scroll-margin-top: 110px;
 }
@@ -179,8 +183,8 @@
 .manuscript {
   display: grid;
   grid-template-columns: 1fr 1.1fr;
-  background: var(--desk-paper);
-  border: 1px solid var(--desk-line);
+  background: var(--home-paper);
+  border: 1px solid var(--home-line);
   border-radius: var(--desk-radius-md);
   overflow: hidden;
 }
@@ -190,7 +194,7 @@
   padding: clamp(24px, 3.2vw, 48px);
 }
 .before {
-  border-right: 1px solid var(--desk-line);
+  border-right: 1px solid var(--home-line);
 }
 .before > span {
   color: var(--home-muted);
@@ -207,7 +211,7 @@
   color: inherit;
   background: transparent;
   text-decoration: underline;
-  text-decoration-color: var(--desk-amber);
+  text-decoration-color: var(--home-ink);
   text-underline-offset: 7px;
   text-decoration-thickness: 2px;
 }
@@ -222,7 +226,7 @@
   color: var(--home-muted);
 }
 .marginNote > span {
-  color: var(--desk-amber);
+  color: var(--home-ink);
   font-size: var(--desk-type-subheading);
 }
 .exampleTabs {
@@ -240,12 +244,12 @@
   background: transparent;
 }
 .exampleTabs button[aria-pressed="true"] {
-  color: var(--desk-blue);
-  background: var(--desk-blue-soft);
+  color: var(--home-ink);
+  background: var(--home-canvas);
 }
 .revision mark {
   color: var(--home-ink);
-  background: var(--desk-green-soft);
+  background: var(--home-canvas);
   border-radius: 0;
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
@@ -290,7 +294,7 @@
   grid-template-columns: 32px 1fr;
   gap: 24px;
   padding: 32px 0;
-  border-top: 1px solid var(--desk-line);
+  border-top: 1px solid var(--home-line);
 }
 .steps li:first-child {
   padding-top: 0;
@@ -317,7 +321,7 @@
 .closing {
   padding: 80px 24px;
   text-align: center;
-  background: var(--desk-canvas);
+  background: var(--home-canvas);
 }
 .closing h2 {
   font-size: var(--desk-type-public-closing);
@@ -346,14 +350,14 @@
 .home button:focus-visible,
 .dialog button:focus-visible,
 .dialog a:focus-visible {
-  outline: 3px solid var(--desk-blue);
+  outline: 3px solid var(--home-ink);
   outline-offset: 4px;
 }
 .overlay {
   position: fixed;
   inset: 0;
   z-index: 100;
-  background: color-mix(in srgb, var(--desk-ink) 35%, transparent);
+  background: color-mix(in srgb, var(--home-ink) 35%, transparent);
   backdrop-filter: blur(4px);
 }
 .dialog {
@@ -367,9 +371,9 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 48px 32px 32px;
-  background: var(--desk-paper);
-  color: var(--desk-ink);
-  border: 1px solid var(--desk-line);
+  background: var(--home-paper);
+  color: var(--home-ink);
+  border: 1px solid var(--home-line);
   border-radius: var(--desk-radius-lg);
   box-shadow: var(--desk-shadow-floating);
   font-family: var(--desk-font-body);
@@ -383,7 +387,7 @@
 }
 .authDescription {
   margin: 0 0 32px;
-  color: var(--desk-ink-muted);
+  color: var(--home-muted);
   font-size: var(--desk-type-body);
   line-height: 1.65;
 }
@@ -394,13 +398,13 @@
   margin-top: 24px;
   font-size: var(--desk-type-label);
   line-height: 1.75;
-  color: var(--desk-ink-muted);
+  color: var(--home-muted);
 }
 .authMeta p {
   margin: 0 0 12px;
 }
 .authMeta a {
-  color: var(--desk-blue);
+  color: var(--home-ink);
 }
 .close {
   position: absolute;
@@ -412,12 +416,12 @@
   height: 36px;
   background: transparent;
   border: 0;
-  color: var(--desk-ink-muted);
+  color: var(--home-muted);
   border-radius: var(--desk-radius-round);
   cursor: pointer;
 }
 .close:hover {
-  background: var(--desk-canvas);
+  background: var(--home-canvas);
 }
 .switchMode {
   width: 100%;
@@ -425,8 +429,8 @@
   padding: 16px 0 0;
   background: transparent;
   border: 0;
-  border-top: 1px solid var(--desk-line);
-  color: var(--desk-blue);
+  border-top: 1px solid var(--home-line);
+  color: var(--home-ink);
   font: inherit;
   font-size: var(--desk-type-label);
   cursor: pointer;
@@ -491,7 +495,7 @@
   }
   .before {
     border-right: 0;
-    border-bottom: 1px solid var(--desk-line);
+    border-bottom: 1px solid var(--home-line);
   }
   .before,
   .after {
