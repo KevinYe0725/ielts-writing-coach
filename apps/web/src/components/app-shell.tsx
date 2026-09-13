@@ -247,7 +247,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const publicHome = pathname === "/signin";
   const courseHome = pathname === "/today";
   const writingPage = pathname === "/write" || pathname === "/rewrite";
-  const feedbackPage = pathname === "/feedback";
+  const feedbackPage =
+    pathname === "/feedback" || pathname.startsWith("/feedback/");
   const setup = ["/setup", "/signin", "/join", "/recover"].some((path) =>
     pathname.startsWith(path),
   );

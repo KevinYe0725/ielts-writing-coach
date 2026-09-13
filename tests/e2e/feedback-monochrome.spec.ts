@@ -8,7 +8,7 @@ test.describe("monochrome feedback report", () => {
   test("uses the public monochrome palette and removes decorative microcopy", async ({
     page,
   }) => {
-    await page.goto("/feedback?cycle=cycle-demo");
+    await page.goto("/feedback/compare?cycle=cycle-demo");
     await expect(page.locator("[data-feedback-workbench]")).toBeVisible();
     const colors = await page.locator("[data-app-shell]").evaluate((shell) => {
       const source = shell.querySelector("[data-essay-pane]");
@@ -51,7 +51,7 @@ test.describe("monochrome feedback report", () => {
   test("starts in quick-fix mode and lets the learner open the full report", async ({
     page,
   }) => {
-    await page.goto("/feedback?cycle=cycle-demo");
+    await page.goto("/feedback/compare?cycle=cycle-demo");
     const report = page.locator("[data-feedback-report]");
     await expect(report).toHaveAttribute("data-feedback-report-mode", "quick");
     await expect(
@@ -77,7 +77,7 @@ test.describe("monochrome feedback report", () => {
   test("lets the active suggestion card collapse on a second click", async ({
     page,
   }) => {
-    await page.goto("/feedback?cycle=cycle-demo");
+    await page.goto("/feedback/compare?cycle=cycle-demo");
     const firstCard = page.locator("[data-feedback-issue-card]").first();
     const firstTrigger = firstCard.locator("[data-feedback-issue]").first();
     await expect(

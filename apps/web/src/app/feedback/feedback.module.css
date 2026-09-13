@@ -45,6 +45,34 @@
   margin-bottom: var(--desk-space-3);
 }
 
+.reportNav {
+  display: flex;
+  align-items: center;
+  margin-bottom: var(--desk-space-6);
+  border-bottom: 1px solid color-mix(in srgb, var(--desk-ink) 14%, transparent);
+  gap: var(--desk-space-1);
+}
+
+.reportNav a {
+  display: inline-flex;
+  min-height: 40px;
+  padding: var(--desk-space-2) var(--desk-space-3);
+  color: var(--desk-ink-muted);
+  border-bottom: 2px solid transparent;
+  font-size: var(--desk-type-label);
+  font-weight: var(--desk-body-weight-semibold);
+  align-items: center;
+}
+
+.reportNav a:hover {
+  color: var(--desk-ink);
+}
+
+.reportNav a[aria-current="page"] {
+  color: var(--desk-ink);
+  border-bottom-color: var(--desk-ink);
+}
+
 .page :global(.status-banner-warning) {
   color: var(--desk-amber);
   background: color-mix(in srgb, var(--desk-amber) 8%, var(--desk-paper));
