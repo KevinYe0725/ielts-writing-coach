@@ -62,6 +62,10 @@ test.describe("monochrome Today course surface", () => {
   test("separates the next action from the essay context", async ({ page }) => {
     await page.goto("/today");
     const primary = page.locator("[data-today-primary]");
+    await expect(primary.locator("[data-next-task-progress]")).toBeVisible();
+    await expect(primary.locator("[data-next-task-progress]")).toContainText(
+      "4/5",
+    );
     await expect(
       primary.getByRole("heading", { name: "闭卷重写" }),
     ).toBeVisible();

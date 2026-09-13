@@ -344,7 +344,7 @@ test.describe("deterministic setup and Today experience", () => {
     page,
   }) => {
     await page.goto("/today");
-    const taskPrompt = "Closed-book rewrite: early language learning";
+    const taskPrompt = "Closed-book rewrite";
 
     const header = page.locator("[data-workspace-header]");
     const localeSwitch = header.getByRole("button", {

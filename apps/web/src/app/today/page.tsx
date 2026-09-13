@@ -561,6 +561,17 @@ export default function TodayPage() {
   const task = data.nextTask;
   const actionTitleZh = taskActionTitle(task.titleZh);
   const actionTitleEn = taskActionTitle(task.titleEn);
+  const completedTimelineSteps = data.timeline.filter(
+    (step) => step.state === "done",
+  ).length;
+  const timelineTotal = Math.max(data.timeline.length, 1);
+  const currentTimelineStep = Math.min(
+    completedTimelineSteps + 1,
+    timelineTotal,
+  );
+  const timelineProgress = Math.round(
+    (currentTimelineStep / timelineTotal) * 100,
+  );
   const aiService = data.aiService ?? {
     state:
       data.aiState === "connected"
@@ -893,7 +904,17 @@ export default function TodayPage() {
           <section
             className={cn("next-task-card", styles.primaryAction)}
             data-today-primary
+            data-next-task-card
           >
+            <div className={styles.taskProgress} data-next-task-progress>
+              <span className={styles.taskProgressCount}>
+                {currentTimelineStep}
+                <span>/{timelineTotal}</span>
+              </span>
+              <span className={styles.taskProgressTrack} aria-hidden="true">
+                <span style={{ width: `${timelineProgress}%` }} />
+              </span>
+            </div>
             <div className="next-task-body">
               <div className="next-task-copy">
                 <div className={styles.currentEssay}>

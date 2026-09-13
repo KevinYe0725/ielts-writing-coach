@@ -291,6 +291,45 @@
   inset: var(--desk-space-6) auto var(--desk-space-6) 18px;
 }
 
+.taskProgress {
+  display: flex;
+  max-width: 360px;
+  align-items: center;
+  margin-bottom: var(--desk-space-6);
+  padding-left: var(--desk-space-4);
+  gap: var(--desk-space-3);
+}
+
+.taskProgressCount {
+  color: var(--desk-ink);
+  font-family: var(--desk-font-utility);
+  font-size: var(--desk-type-subheading);
+  font-weight: var(--desk-utility-weight-semibold);
+  line-height: var(--desk-leading-compact);
+}
+
+.taskProgressCount span {
+  color: var(--desk-ink-muted);
+  font-size: var(--desk-type-label);
+  font-weight: var(--desk-utility-weight-medium);
+}
+
+.taskProgressTrack {
+  display: block;
+  flex: 1;
+  height: var(--desk-space-1);
+  overflow: hidden;
+  background: color-mix(in srgb, var(--desk-ink) 12%, var(--desk-paper));
+  border-radius: var(--desk-radius-pill);
+}
+
+.taskProgressTrack > span {
+  display: block;
+  height: 100%;
+  background: var(--desk-ink);
+  border-radius: var(--desk-radius-pill);
+}
+
 /* The recommendation is a reading surface, not a second dashboard card. */
 .recommendationSheet {
   position: relative;
