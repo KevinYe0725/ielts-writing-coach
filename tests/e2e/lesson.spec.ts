@@ -2785,7 +2785,9 @@ test.describe("tutorial answer analysis over the public HTTP contract", () => {
         (element) => window.getComputedStyle(element).fontFamily,
       ),
     ]);
-    expect(headingFamily).toContain("Noto Sans SC");
+    expect(headingFamily).toContain("SF Pro Text");
+    expect(headingFamily).toContain("PingFang SC");
+    expect(headingFamily).not.toContain("Noto Sans SC");
     expect(headingFamily).not.toContain("Source Serif 4");
     for (const family of [answerFamily, evidenceFamily]) {
       expect(family).toContain("Source Serif 4");

@@ -46,6 +46,9 @@
 
   /* Typography roles. The 12px auxiliary role is the absolute visible floor. */
   --desk-font-body: "Noto Sans SC Variable", "PingFang SC", sans-serif;
+  --desk-font-lesson-ui:
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", system-ui,
+    sans-serif;
   --desk-font-reading: "Source Serif 4 Variable", Georgia, serif;
   --desk-font-utility: "IBM Plex Sans Variable", "Segoe UI", sans-serif;
   --desk-body-weight-regular: 400;

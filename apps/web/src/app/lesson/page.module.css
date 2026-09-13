@@ -100,7 +100,7 @@
   width: min(1040px, 100%);
   max-width: none;
   padding: 0;
-  font-family: var(--desk-font-body);
+  font-family: var(--desk-font-lesson-ui);
 }
 
 .article {
@@ -272,12 +272,23 @@
 
 .playerViewport {
   min-height: 0;
-  height: clamp(360px, 42dvh, 480px);
+  height: clamp(420px, 52dvh, 560px);
   padding-right: var(--desk-space-3);
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
+  scrollbar-color: var(--desk-line-strong) transparent;
+  scrollbar-width: thin;
+}
+
+.playerViewport::-webkit-scrollbar {
+  width: 6px;
+}
+
+.playerViewport::-webkit-scrollbar-thumb {
+  background: var(--desk-line-strong);
+  border-radius: var(--desk-radius-pill);
 }
 
 .playerViewport .articleSection {
@@ -347,10 +358,16 @@
 }
 
 .sectionHeading {
-  display: flex;
+  display: grid;
   margin-bottom: var(--desk-space-6);
-  align-items: baseline;
-  gap: var(--desk-space-3);
+  gap: var(--desk-space-2);
+}
+
+.knowledgeContext {
+  color: var(--desk-ink-muted);
+  font-family: var(--desk-font-utility);
+  font-size: var(--desk-type-meta);
+  font-weight: var(--desk-utility-weight-semibold);
 }
 
 .sectionHeading h2 {
@@ -683,11 +700,20 @@
   border-top: 1px solid var(--line);
 }
 
+.practiceBlock:not([data-inline]) .practiceList {
+  margin-top: var(--desk-space-4);
+}
+
 .practicePrompt {
   display: grid;
   padding: var(--desk-space-8) 0;
   border-bottom: 1px solid var(--line);
   gap: var(--desk-space-4);
+}
+
+.practiceBlock:not([data-inline]) .practicePrompt {
+  padding: var(--desk-space-4) 0;
+  gap: var(--desk-space-3);
 }
 
 .practiceInstruction strong {
@@ -1373,8 +1399,40 @@
     gap: var(--desk-space-2);
   }
   .playerViewport {
-    height: clamp(300px, 36dvh, 400px);
+    height: clamp(320px, 46dvh, 440px);
     padding-right: 0;
+  }
+  .practiceBlock:not([data-inline]) > h2 {
+    margin-bottom: var(--desk-space-2);
+    font-size: var(--desk-type-subheading);
+    line-height: 1.35;
+  }
+  .practiceBlock:not([data-inline]) .practiceLead {
+    font-size: var(--desk-type-label);
+    line-height: 1.55;
+  }
+  .practiceBlock:not([data-inline]) .practicePrompt {
+    padding: var(--desk-space-2) 0;
+    gap: var(--desk-space-2);
+  }
+  .practiceInstruction h3 {
+    font-size: var(--desk-type-label);
+    line-height: 1.45;
+  }
+  .practiceInstruction p {
+    font-size: var(--desk-type-label);
+    line-height: 1.55;
+  }
+  .practiceBlock:not([data-inline]) .practiceList {
+    margin-top: var(--desk-space-2);
+  }
+  .choiceList label {
+    padding: var(--desk-space-1) var(--desk-space-3);
+    font-size: var(--desk-type-label);
+    line-height: 1.45;
+  }
+  .practiceContinue {
+    min-height: 36px;
   }
   .playerNav button {
     padding-right: var(--desk-space-2);

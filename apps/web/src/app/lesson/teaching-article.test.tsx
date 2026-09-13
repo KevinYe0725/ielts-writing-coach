@@ -33,20 +33,25 @@ function render(
 }
 
 describe("teaching article flow", () => {
-  it("shows one teaching step and keeps its associated practice in the step", () => {
+  it("shows one knowledge step and keeps practice on its own step", () => {
     const html = render([1, 2, 3]);
     expect(html).toContain("data-teaching-player");
     expect(html).toContain('data-teaching-step="1"');
     expect(html).toContain("data-teaching-step-next");
-    expect(html.match(/id="teaching-practice-prompts"/g)).toHaveLength(1);
-    expect(html.match(/data-teaching-continue/g)).toHaveLength(1);
+    expect(html.match(/id="teaching-practice-prompts"/g)).toBeNull();
+    expect(html.match(/data-teaching-continue/g)).toBeNull();
     expect(html).not.toContain('id="build-the-mechanism-one-step-at-a-time"');
     expect(html).not.toContain("data-teaching-reference-answer");
+    const practiceHtml = render([1, 2, 3], 3);
+    expect(practiceHtml.match(/id="teaching-practice-prompts"/g)).toHaveLength(
+      1,
+    );
+    expect(practiceHtml.match(/data-teaching-continue/g)).toHaveLength(1);
     expect(render([1, 2, 3], 99)).toContain('href="/lesson/paper?cycle=test"');
   });
 
   it("keeps trailing exercises in their own step without duplicate anchors", () => {
-    const html = render([], 5);
+    const html = render([], 7);
     expect(html.match(/id="teaching-practice-prompts"/g)).toHaveLength(1);
     expect(html.match(/\bdata-teaching-practice=/g)).toHaveLength(3);
   });

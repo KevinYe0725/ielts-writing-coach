@@ -23,6 +23,7 @@ import type {
 } from "@/lib/client/types";
 
 import styles from "./page.module.css";
+import { buildTeachingPages, type TeachingPage } from "./teaching-pages";
 import { placeTeachingPractices } from "./teaching-practice-placement";
 
 const ANALYSIS_POLL_INTERVAL_MS = 350;
@@ -663,8 +664,8 @@ function PracticePrompts({
           </h2>
           <p className={styles.practiceLead}>
             {text(
-              "先独立作答。提交后，你会立即看到自己的首次答案、另一种可行路径，以及针对这次表达的进一步讲解。",
-              "Answer independently. After submitting, compare your saved first answer with another viable path and a closer explanation of this attempt.",
+              "先独立作答，提交后对照你的答案与可行写法。",
+              "Answer independently, then compare your response with a viable approach.",
             )}
           </p>
         </>
@@ -737,46 +738,6 @@ type TeachingArticleProps = {
   initialStep?: number | undefined;
 };
 
-type TeachingPage =
-  | {
-      kind: "section";
-      sectionIndex: number;
-      chunkIndex: number;
-      chunkCount: number;
-      markdown: string;
-      practicePrompts: readonly TeachingPracticePrompt[];
-    }
-  | {
-      kind: "practice";
-      practicePrompts: readonly TeachingPracticePrompt[];
-    }
-  | { kind: "finish" };
-
-function splitTeachingMarkdown(
-  markdown: string,
-  maxCharacters = 720,
-): string[] {
-  const blocks = markdown
-    .split(/\n{2,}/u)
-    .map((block) => block.trim())
-    .filter(Boolean);
-  if (blocks.length === 0) return [markdown];
-
-  const chunks: string[] = [];
-  let current = "";
-  for (const block of blocks) {
-    const candidate = current ? `${current}\n\n${block}` : block;
-    if (current && candidate.length > maxCharacters) {
-      chunks.push(current);
-      current = block;
-    } else {
-      current = candidate;
-    }
-  }
-  if (current) chunks.push(current);
-  return chunks;
-}
-
 function TeachingArticleContent({
   data,
   feedbackHref,
@@ -809,33 +770,10 @@ function TeachingArticleContent({
   const mounted = useRef(true);
   const [contentsOpen, setContentsOpen] = useState(false);
   const anchors = useMemo(() => sectionAnchors(data.sections), [data.sections]);
-  const pages = useMemo<TeachingPage[]>(() => {
-    const nextPages: TeachingPage[] = [];
-    data.sections.forEach((section, sectionIndex) => {
-      const chunks = splitTeachingMarkdown(section.markdown);
-      chunks.forEach((markdown, chunkIndex) => {
-        nextPages.push({
-          kind: "section",
-          sectionIndex,
-          chunkIndex,
-          chunkCount: chunks.length,
-          markdown,
-          practicePrompts:
-            chunkIndex === chunks.length - 1
-              ? (placement.bySection[sectionIndex] ?? [])
-              : [],
-        });
-      });
-    });
-    if (placement.trailing.length > 0) {
-      nextPages.push({
-        kind: "practice",
-        practicePrompts: placement.trailing,
-      });
-    }
-    nextPages.push({ kind: "finish" });
-    return nextPages;
-  }, [data.sections, placement]);
+  const pages = useMemo(
+    () => buildTeachingPages(data.sections, placement),
+    [data.sections, placement],
+  );
   const [activeStep, setActiveStep] = useState(() => {
     const requestedIndex = (initialStep ?? 1) - 1;
     return Math.min(Math.max(requestedIndex, 0), pages.length - 1);
@@ -1192,7 +1130,7 @@ function TeachingArticleContent({
   const progressMax = pages.length;
   const progressValue = activeStep + 1;
   const activeAnchor =
-    currentPage.kind === "section"
+    currentPage.kind === "knowledge"
       ? (anchors[currentPage.sectionIndex] ?? "section-1")
       : currentPage.kind === "practice"
         ? "teaching-practice-prompts"
@@ -1230,19 +1168,34 @@ function TeachingArticleContent({
 
   const stepForAnchor = (anchor: string) => {
     if (anchor === "teaching-practice-prompts") {
-      const practiceStep = pages.findIndex(
-        (page) =>
-          page.kind === "practice" ||
-          (page.kind === "section" && page.practicePrompts.length > 0),
-      );
+      const practiceStep = pages.findIndex((page) => page.kind === "practice");
       return practiceStep >= 0 ? practiceStep : pages.length - 1;
     }
     if (anchor === "teaching-paper-next") return pages.length - 1;
     const sectionIndex = anchors.indexOf(anchor);
     const step = pages.findIndex(
-      (page) => page.kind === "section" && page.sectionIndex === sectionIndex,
+      (page) => page.kind === "knowledge" && page.sectionIndex === sectionIndex,
     );
     return step >= 0 ? step : 0;
+  };
+  const nextPage = pages[activeStep + 1];
+  const practiceIsLastStep = nextPage?.kind === "finish";
+  const practiceContinuation = {
+    href: practiceIsLastStep
+      ? "#teaching-paper-next"
+      : nextPage?.kind === "knowledge"
+        ? `#${anchors[nextPage.sectionIndex] ?? "teaching-paper-next"}`
+        : "#teaching-practice-prompts",
+    zh: practiceIsLastStep
+      ? "去试试独立运用"
+      : nextPage?.kind === "practice"
+        ? "继续下一组练习"
+        : "继续下一个知识点",
+    en: practiceIsLastStep
+      ? "Try using it independently"
+      : nextPage?.kind === "practice"
+        ? "Continue to the next practice"
+        : "Continue to the next point",
   };
 
   return (
@@ -1264,15 +1217,15 @@ function TeachingArticleContent({
           ) : null
         ) : (
           <p className={styles.stepContext} data-teaching-step-context>
-            {currentPage.kind === "section"
-              ? text(
-                  data.sections[currentPage.sectionIndex]?.titleZh ??
-                    "继续这一项能力",
-                  data.sections[currentPage.sectionIndex]?.titleEn ??
-                    "Continue this skill",
-                )
+            {currentPage.kind === "knowledge"
+              ? text(currentPage.pointTitleZh, currentPage.pointTitleEn)
               : currentPage.kind === "practice"
-                ? text("把方法用到新题目", "Apply the method to a new prompt")
+                ? currentPage.sectionIndex !== undefined
+                  ? text(
+                      `练习：${data.sections[currentPage.sectionIndex]?.titleZh ?? "把方法用到新题目"}`,
+                      `Practice: ${data.sections[currentPage.sectionIndex]?.titleEn ?? "Apply the method to a new prompt"}`,
+                    )
+                  : text("把方法用到新题目", "Apply the method to a new prompt")
                 : text(
                     "完成迁移，进入训练卷",
                     "Complete the transfer and start the paper",
@@ -1337,7 +1290,7 @@ function TeachingArticleContent({
               className={styles.playerViewport}
               data-teaching-step={activeStep + 1}
             >
-              {currentPage.kind === "section" ? (
+              {currentPage.kind === "knowledge" ? (
                 <section
                   aria-labelledby={`teaching-step-${activeStep}-heading`}
                   className={styles.articleSection}
@@ -1346,14 +1299,17 @@ function TeachingArticleContent({
                   id={anchors[currentPage.sectionIndex]}
                 >
                   <header className={styles.sectionHeading}>
-                    <h2
-                      id={`teaching-step-${activeStep}-heading`}
-                      tabIndex={-1}
-                    >
+                    <span className={styles.knowledgeContext}>
                       {text(
                         data.sections[currentPage.sectionIndex]!.titleZh,
                         data.sections[currentPage.sectionIndex]!.titleEn,
                       )}
+                    </span>
+                    <h2
+                      id={`teaching-step-${activeStep}-heading`}
+                      tabIndex={-1}
+                    >
+                      {text(currentPage.pointTitleZh, currentPage.pointTitleEn)}
                     </h2>
                   </header>
                   <div className={styles.sectionBlocks}>
@@ -1362,43 +1318,11 @@ function TeachingArticleContent({
                       section={data.sections[currentPage.sectionIndex]!}
                     />
                   </div>
-                  {currentPage.practicePrompts.length > 0 ? (
-                    <PracticePrompts
-                      inline
-                      anchor="teaching-practice-prompts"
-                      continuation={{
-                        href:
-                          activeStep < pages.length - 2
-                            ? `#${anchors[currentPage.sectionIndex + 1] ?? "teaching-next-step"}`
-                            : "#teaching-paper-next",
-                        zh:
-                          activeStep < pages.length - 2
-                            ? "继续往下读"
-                            : "去试试独立运用",
-                        en:
-                          activeStep < pages.length - 2
-                            ? "Keep reading"
-                            : "Try using it independently",
-                      }}
-                      onContinue={() => moveToStep(activeStep + 1)}
-                      onPracticeDraft={updatePracticeDraft}
-                      onPracticeRetry={retryPractice}
-                      onPracticeSubmit={submitPractice}
-                      onRewriteDraft={updateRewriteDraft}
-                      onToggleRewrite={toggleRewrite}
-                      practicePrompts={currentPage.practicePrompts}
-                      practiceViews={practiceViews}
-                    />
-                  ) : null}
                 </section>
               ) : currentPage.kind === "practice" ? (
                 <PracticePrompts
                   anchor="teaching-practice-prompts"
-                  continuation={{
-                    href: "#teaching-paper-next",
-                    zh: "去试试独立运用",
-                    en: "Try using it independently",
-                  }}
+                  continuation={practiceContinuation}
                   onContinue={() => moveToStep(activeStep + 1)}
                   onPracticeDraft={updatePracticeDraft}
                   onPracticeRetry={retryPractice}

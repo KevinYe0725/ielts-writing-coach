@@ -393,6 +393,8 @@ describe("annotation desk token contract", () => {
       "--desk-type-section-title": "clamp(24px, 3vw, 28px)",
       "--desk-type-page-title": "clamp(30px, 4vw, 40px)",
       "--desk-font-body": '"Noto Sans SC Variable", "PingFang SC", sans-serif',
+      "--desk-font-lesson-ui":
+        '-apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", system-ui, sans-serif',
       "--desk-font-reading": '"Source Serif 4 Variable", Georgia, serif',
       "--desk-font-utility": '"IBM Plex Sans Variable", "Segoe UI", sans-serif',
       "--desk-body-weight-regular": "400",
@@ -489,6 +491,7 @@ describe("annotation desk token contract", () => {
     const approvedFamilies = new Set([
       "inherit",
       "var(--desk-font-body)",
+      "var(--desk-font-lesson-ui)",
       "var(--desk-font-reading)",
       "var(--desk-font-utility)",
     ]);
@@ -504,7 +507,7 @@ describe("annotation desk token contract", () => {
       "var(--desk-utility-weight-semibold)",
     ]);
     const typographyDefinition =
-      /^--(?:font-(?:sans|serif)|desk-(?:font-(?:body|reading|utility)|weight-[\w-]+|(?:body|reading|utility)-weight-[\w-]+))$/u;
+      /^--(?:font-(?:sans|serif)|desk-(?:font-(?:body|lesson-ui|reading|utility)|weight-[\w-]+|(?:body|lesson-ui|reading|utility)-weight-[\w-]+))$/u;
     const typographyDefinitionsOutsideTokens = cssDocuments.flatMap(
       ({ path, root }) => {
         if (path === tokensPath) return [];
@@ -587,6 +590,8 @@ describe("annotation desk token contract", () => {
       tokenTypography: {
         "--desk-font-body":
           '"Noto Sans SC Variable", "PingFang SC", sans-serif',
+        "--desk-font-lesson-ui":
+          '-apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", system-ui, sans-serif',
         "--desk-font-reading": '"Source Serif 4 Variable", Georgia, serif',
         "--desk-font-utility":
           '"IBM Plex Sans Variable", "Segoe UI", sans-serif',

@@ -984,7 +984,7 @@ test.describe("annotation desk redesign contracts", () => {
       .toBeGreaterThanOrEqual(12);
   });
 
-  test("teaching keeps Chinese UI in Noto Sans and reserves Source Serif for English evidence", async ({
+  test("teaching keeps Chinese UI in Apple system text and reserves Source Serif for English evidence", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1440, height: 960 });
@@ -992,43 +992,52 @@ test.describe("annotation desk redesign contracts", () => {
       "/lesson?cycle=cycle-demo&lesson=lesson-collocation-perspective",
     );
 
-    const chineseHeading = page.getByRole("heading", {
-      name: "别让论证从原因直接跳到结果",
-    });
+    const chineseHeading = page.locator("[data-teaching-article] h2").first();
     const chineseProse = page.locator("[data-teaching-prose] p").first();
     const chineseToc = page.locator("[data-teaching-toc] a").first();
-    const uiButton = page.locator("[data-teaching-practice-submit]").first();
-    const uiTextarea = page
-      .locator("[data-teaching-practice] textarea")
-      .first();
     const englishExample = page
       .locator('[data-teaching-block="MARKDOWN"] blockquote')
       .first();
-    const englishPrompt = page
-      .locator("[data-teaching-practice] [lang='en']")
-      .first();
 
     await expect(englishExample).toHaveAttribute("lang", "en");
-    for (const chineseText of [
-      chineseHeading,
-      chineseProse,
-      chineseToc,
-      uiButton,
-      uiTextarea,
-    ]) {
+    for (const chineseText of [chineseHeading, chineseProse, chineseToc]) {
       const family = await chineseText.evaluate(
         (element) => window.getComputedStyle(element).fontFamily,
       );
-      expect(family).toContain("Noto Sans SC");
+      expect(family).toContain("SF Pro Text");
+      expect(family).toContain("PingFang SC");
+      expect(family).not.toContain("Noto Sans SC");
       expect(family).not.toContain("Source Serif 4");
     }
-    for (const englishText of [englishExample, englishPrompt]) {
+    for (const englishText of [englishExample]) {
       const family = await englishText.evaluate(
         (element) => window.getComputedStyle(element).fontFamily,
       );
       expect(family).toContain("Source Serif 4");
       expect(family).not.toContain("Noto Sans SC");
     }
+
+    await page.locator("[data-teaching-primary-action]").click();
+    for (const chineseText of [
+      page.locator("[data-teaching-practice-submit]").first(),
+      page.locator("[data-teaching-step-nav] button").first(),
+    ]) {
+      const family = await chineseText.evaluate(
+        (element) => window.getComputedStyle(element).fontFamily,
+      );
+      expect(family).toContain("SF Pro Text");
+      expect(family).toContain("PingFang SC");
+      expect(family).not.toContain("Noto Sans SC");
+      expect(family).not.toContain("Source Serif 4");
+    }
+    const englishPrompt = page
+      .locator("[data-teaching-practice] [lang='en']")
+      .first();
+    const promptFamily = await englishPrompt.evaluate(
+      (element) => window.getComputedStyle(element).fontFamily,
+    );
+    expect(promptFamily).toContain("Source Serif 4");
+    expect(promptFamily).not.toContain("Noto Sans SC");
   });
 
   test("English locale typography keeps UI roles separate from explicit English evidence", async ({
@@ -1045,25 +1054,23 @@ test.describe("annotation desk redesign contracts", () => {
     const articleHeading = page.getByRole("heading", {
       name: "Build the missing link in a causal argument",
     });
-    const uiButton = page.locator("[data-teaching-practice-submit]").first();
     const englishQuote = page
       .locator('[data-teaching-block="MARKDOWN"] blockquote[lang="en"]')
       .first();
-    const englishPrompt = page
-      .locator('[data-teaching-practice] p[lang="en"]')
-      .first();
 
-    for (const uiText of [focusLabel, articleHeading, uiButton]) {
+    for (const uiText of [focusLabel, articleHeading]) {
       const font = await uiText.evaluate((element) => {
         const style = window.getComputedStyle(element);
         return { family: style.fontFamily, weight: style.fontWeight };
       });
-      expect(font.family).toContain("Noto Sans SC");
+      expect(font.family).toContain("SF Pro Text");
+      expect(font.family).toContain("PingFang SC");
+      expect(font.family).not.toContain("Noto Sans SC");
       expect(font.family).not.toContain("Source Serif 4");
       expect(["400", "500", "650", "700"]).toContain(font.weight);
     }
 
-    for (const englishText of [englishQuote, englishPrompt]) {
+    for (const englishText of [englishQuote]) {
       const font = await englishText.evaluate((element) => {
         const style = window.getComputedStyle(element);
         return { family: style.fontFamily, weight: style.fontWeight };
@@ -1072,6 +1079,29 @@ test.describe("annotation desk redesign contracts", () => {
       expect(font.family).not.toContain("Noto Sans SC");
       expect(["400", "600"]).toContain(font.weight);
     }
+
+    await page.locator("[data-teaching-primary-action]").click();
+    const uiButton = page.locator("[data-teaching-practice-submit]").first();
+    const uiFont = await uiButton.evaluate((element) => {
+      const style = window.getComputedStyle(element);
+      return { family: style.fontFamily, weight: style.fontWeight };
+    });
+    expect(uiFont.family).toContain("SF Pro Text");
+    expect(uiFont.family).toContain("PingFang SC");
+    expect(uiFont.family).not.toContain("Noto Sans SC");
+    expect(uiFont.family).not.toContain("Source Serif 4");
+    expect(["400", "500", "650", "700"]).toContain(uiFont.weight);
+
+    const englishPrompt = page
+      .locator('[data-teaching-practice] p[lang="en"]')
+      .first();
+    const promptFont = await englishPrompt.evaluate((element) => {
+      const style = window.getComputedStyle(element);
+      return { family: style.fontFamily, weight: style.fontWeight };
+    });
+    expect(promptFont.family).toContain("Source Serif 4");
+    expect(promptFont.family).not.toContain("Noto Sans SC");
+    expect(["400", "600"]).toContain(promptFont.weight);
   });
 
   test("Paper English option labels render in the semibold reading role", async ({
@@ -1124,7 +1154,9 @@ test.describe("annotation desk redesign contracts", () => {
       const style = window.getComputedStyle(element);
       return { family: style.fontFamily, weight: style.fontWeight };
     });
-    expect(chineseFont.family).toContain("Noto Sans SC");
+    expect(chineseFont.family).toContain("SF Pro Text");
+    expect(chineseFont.family).toContain("PingFang SC");
+    expect(chineseFont.family).not.toContain("Noto Sans SC");
     expect(chineseFont.family).not.toContain("Source Serif 4");
     expect(chineseFont.weight).toBe("700");
   });
