@@ -4,6 +4,64 @@
   color: var(--desk-ink);
   background: var(--desk-canvas);
 }
+
+/* Today is the focused course home. Keep the learning content monochrome so
+   the next action, rather than semantic color, carries the visual emphasis. */
+.courseHomeShell {
+  --desk-ink: var(--desk-mono-ink);
+  --desk-paper: var(--desk-mono-paper);
+  --desk-canvas: var(--desk-mono-canvas);
+  --desk-blue: var(--desk-mono-ink);
+  --desk-green: var(--desk-mono-ink);
+  --desk-amber: var(--desk-mono-muted);
+  --desk-error: var(--desk-mono-ink);
+  --desk-error-strong: var(--desk-mono-ink);
+  --desk-evidence-muted: color-mix(
+    in srgb,
+    var(--desk-ink) 76%,
+    var(--desk-canvas)
+  );
+  --desk-ink-muted: color-mix(in srgb, var(--desk-ink) 72%, var(--desk-canvas));
+  --desk-line: color-mix(in srgb, var(--desk-ink) 14%, transparent);
+  --desk-line-strong: color-mix(in srgb, var(--desk-ink) 24%, transparent);
+  --desk-blue-soft: color-mix(in srgb, var(--desk-blue) 11%, var(--desk-paper));
+  --desk-green-soft: color-mix(
+    in srgb,
+    var(--desk-green) 10%,
+    var(--desk-paper)
+  );
+  --desk-amber-soft: color-mix(
+    in srgb,
+    var(--desk-amber) 11%,
+    var(--desk-paper)
+  );
+  --desk-error-soft: color-mix(
+    in srgb,
+    var(--desk-error) 10%,
+    var(--desk-paper)
+  );
+  --bg: var(--desk-canvas);
+  --surface: var(--desk-paper);
+  --surface-muted: var(--desk-canvas);
+  --surface-blue: var(--desk-blue-soft);
+  --surface-warm: var(--desk-amber-soft);
+  --ink: var(--desk-ink);
+  --ink-soft: var(--desk-ink-muted);
+  --ink-faint: var(--desk-evidence-muted);
+  --line: var(--desk-line);
+  --line-strong: var(--desk-line-strong);
+  --blue: var(--desk-blue);
+  --blue-dark: var(--desk-blue);
+  --blue-soft: var(--desk-blue-soft);
+  --green: var(--desk-green);
+  --green-soft: var(--desk-green-soft);
+  --amber: var(--desk-amber);
+  --amber-soft: var(--desk-amber-soft);
+  --red: var(--desk-error);
+  --red-soft: var(--desk-error-soft);
+  --shadow-sm: none;
+  --shadow-lg: none;
+}
 .topbar {
   position: sticky;
   z-index: 50;

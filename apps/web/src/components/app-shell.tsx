@@ -245,6 +245,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { text } = useLocale();
   const layoutVariant = layoutVariantForPathname(pathname);
   const publicHome = pathname === "/signin";
+  const courseHome = pathname === "/today";
   const setup = ["/setup", "/signin", "/join", "/recover"].some((path) =>
     pathname.startsWith(path),
   );
@@ -265,8 +266,10 @@ export function AppShell({ children }: { children: ReactNode }) {
       className={cn(
         setup ? "setup-shell" : "app-shell",
         setup ? styles.entryShell : styles.shell,
+        courseHome && styles.courseHomeShell,
       )}
       data-app-shell={setup ? undefined : ""}
+      data-course-home={courseHome ? "true" : undefined}
       data-design-system={setup ? undefined : "annotation-desk-v1"}
       data-sidebar-state={setup ? undefined : "collapsed"}
     >

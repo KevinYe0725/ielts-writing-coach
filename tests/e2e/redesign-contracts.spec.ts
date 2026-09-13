@@ -176,7 +176,7 @@ async function expectExplicitEnglishEvidenceTypography(
 
 async function expectColorUsesToken(
   locator: Locator,
-  token: "--desk-blue",
+  token: string,
 ): Promise<void> {
   const colors = await locator.evaluate((element, cssToken) => {
     const probe = document.createElement("span");
@@ -664,7 +664,7 @@ test.describe("annotation desk redesign contracts", () => {
     await expect(desk.locator("[data-today-evidence]")).toBeVisible();
   });
 
-  test("Today keeps time and first-draft submission on neutral blue", async ({
+  test("Today keeps time and first-draft submission on monochrome ink", async ({
     page,
   }) => {
     await page.goto("/today");
@@ -675,7 +675,7 @@ test.describe("annotation desk redesign contracts", () => {
         .locator("..")
         .locator("..")
         .locator(".stat-icon");
-      await expectColorUsesToken(icon, "--desk-blue");
+      await expectColorUsesToken(icon, "--desk-mono-ink");
     }
   });
 
