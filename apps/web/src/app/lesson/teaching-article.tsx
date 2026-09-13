@@ -1131,6 +1131,12 @@ function TeachingArticleContent({
     return () => observer.disconnect();
   }, [anchors, data.sections, sectionSignature]);
 
+  const progressMax = anchors.length + 1;
+  const progressValue =
+    activeAnchor === "teaching-practice-prompts"
+      ? progressMax
+      : Math.max(anchors.indexOf(activeAnchor) + 1, 1);
+
   return (
     <article className={styles.article} data-teaching-article>
       <header className={styles.articleHeader}>
@@ -1145,6 +1151,25 @@ function TeachingArticleContent({
             <p>{text(data.learningGoal.zh, data.learningGoal.en)}</p>
           </div>
         ) : null}
+        <div
+          aria-label={text("专项教学进度", "Focused teaching progress")}
+          aria-valuemax={progressMax}
+          aria-valuemin={1}
+          aria-valuenow={progressValue}
+          className={styles.learningProgress}
+          data-teaching-progress
+          role="progressbar"
+        >
+          <span>{text("学习进度", "Progress")}</span>
+          <span className={styles.progressTrack} aria-hidden="true">
+            <span
+              style={{ width: `${(progressValue / progressMax) * 100}%` }}
+            />
+          </span>
+          <strong>
+            {progressValue} / {progressMax}
+          </strong>
+        </div>
         <div className={styles.prose} data-teaching-prose>
           <Markdown>{data.introductionMarkdown}</Markdown>
         </div>
@@ -1171,6 +1196,7 @@ function TeachingArticleContent({
               <section
                 aria-labelledby={`${slug}-heading`}
                 className={styles.articleSection}
+                data-active={activeAnchor === slug ? "true" : undefined}
                 data-teaching-section
                 id={slug}
                 key={slug}

@@ -126,6 +126,37 @@
   font-size: var(--desk-type-subheading);
   line-height: 1.7;
 }
+.learningProgress {
+  display: grid;
+  width: min(100%, var(--desk-layout-reading-copy));
+  margin: var(--desk-space-6) 0 0;
+  color: var(--desk-ink-muted);
+  font-family: var(--desk-font-utility);
+  font-size: var(--desk-type-meta);
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--desk-space-3);
+}
+.learningProgress > strong {
+  color: var(--desk-ink);
+  font-weight: var(--desk-utility-weight-semibold);
+  white-space: nowrap;
+}
+.progressTrack {
+  display: block;
+  height: 4px;
+  overflow: hidden;
+  background: var(--desk-line);
+  border-radius: var(--desk-radius-pill);
+}
+.progressTrack > span {
+  display: block;
+  width: 25%;
+  height: 100%;
+  background: var(--desk-ink);
+  border-radius: var(--desk-radius-pill);
+  transition: width 240ms ease;
+}
 .practiceJump {
   display: inline-flex;
   align-items: center;
@@ -259,6 +290,11 @@
   font-size: var(--desk-type-section-title);
   line-height: 1.35;
   letter-spacing: -0.025em;
+}
+.articleSection[data-active="true"] .sectionHeading h2 {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.24em;
 }
 
 .sectionBlocks {
@@ -1264,6 +1300,10 @@
   .learningGoal p {
     font-size: var(--desk-type-label);
   }
+  .learningProgress {
+    margin-top: var(--desk-space-4);
+    gap: var(--desk-space-2);
+  }
   .practiceJump {
     margin-top: var(--desk-space-2);
   }
@@ -1384,7 +1424,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .contentsToggle svg {
+  .contentsToggle svg,
+  .progressTrack > span {
     transition: none;
   }
 }

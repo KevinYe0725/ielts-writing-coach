@@ -60,4 +60,27 @@ test.describe("focused teaching entry", () => {
     expect(practiceBox).not.toBeNull();
     expect(cueBox!.y + cueBox!.height).toBeLessThanOrEqual(practiceBox!.y + 8);
   });
+
+  test("keeps a compact progress indicator synchronized with the active section", async ({
+    page,
+  }) => {
+    await page.goto(
+      "/lesson?cycle=cycle-demo&lesson=lesson-collocation-perspective",
+    );
+
+    const progress = page.locator("[data-teaching-progress]");
+    await expect(progress).toBeVisible();
+    await expect(progress).toHaveAttribute("role", "progressbar");
+    await expect(progress).toHaveAttribute("aria-valuemax", "4");
+    await expect(progress).toHaveAttribute("aria-valuenow", "1");
+
+    await page
+      .locator("[data-teaching-section]")
+      .nth(1)
+      .scrollIntoViewIfNeeded();
+    await expect(progress).toHaveAttribute("aria-valuenow", "2");
+    await expect(
+      page.locator('[data-teaching-section][data-active="true"]'),
+    ).toHaveCount(1);
+  });
 });
