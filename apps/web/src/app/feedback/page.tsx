@@ -504,25 +504,28 @@ export default function FeedbackPage({
               </p>
             </div>
           </div>
-          <div
-            className={styles.criteriaGrid}
-            aria-label={text("IELTS 四项估分", "IELTS criterion estimates")}
-          >
-            {data.scores.map((score) => (
-              <details className={styles.criterionCard} key={score.criterion}>
-                <summary>
-                  <span>
-                    <b>{score.criterion}</b>
-                    {text(score.labelZh, score.labelEn)}
-                  </span>
-                  <strong>
-                    {data.languageScored ? score.score.toFixed(1) : "—"}
-                  </strong>
-                </summary>
-                <p>{text(score.summaryZh, score.summaryEn)}</p>
-              </details>
-            ))}
-          </div>
+          {reportMode === "full" ? (
+            <div
+              aria-label={text("IELTS 四项估分", "IELTS criterion estimates")}
+              className={styles.criteriaGrid}
+              data-feedback-full-detail="criteria"
+            >
+              {data.scores.map((score) => (
+                <details className={styles.criterionCard} key={score.criterion}>
+                  <summary>
+                    <span>
+                      <b>{score.criterion}</b>
+                      {text(score.labelZh, score.labelEn)}
+                    </span>
+                    <strong>
+                      {data.languageScored ? score.score.toFixed(1) : "—"}
+                    </strong>
+                  </summary>
+                  <p>{text(score.summaryZh, score.summaryEn)}</p>
+                </details>
+              ))}
+            </div>
+          ) : null}
         </section>
 
         {priorities.length > 0 ? (
@@ -624,7 +627,7 @@ export default function FeedbackPage({
                     {chunkSegments.map((segment, index) =>
                       renderSourceSegment(segment, index),
                     )}
-                    {paragraphFeedback ? (
+                    {reportMode === "full" && paragraphFeedback ? (
                       <div
                         className={`${styles.paragraphReview} ${styles.inlineParagraphReview}`}
                       >
@@ -949,29 +952,34 @@ export default function FeedbackPage({
               )}
             </div>
 
-            <div className={styles.leakCheck}>
-              <h3>{text("基础漏洞速查", "Basic accuracy check")}</h3>
-              {grammarLeaks.length > 0 ? (
-                <ul>
-                  {grammarLeaks.map((issue) => (
-                    <li key={`leak-${issue.id}`}>
-                      <CheckCircle2 aria-hidden="true" size={14} />
-                      <span>
-                        <b lang="en">{issue.evidence}</b>
-                        {issue.knowledgePointZh}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p>
-                  {text(
-                    "本轮未识别出需要单独列出的基础语法或拼写问题。",
-                    "No foundational grammar or spelling issue needs a separate note this time.",
-                  )}
-                </p>
-              )}
-            </div>
+            {reportMode === "full" ? (
+              <div
+                className={styles.leakCheck}
+                data-feedback-full-detail="accuracy"
+              >
+                <h3>{text("基础漏洞速查", "Basic accuracy check")}</h3>
+                {grammarLeaks.length > 0 ? (
+                  <ul>
+                    {grammarLeaks.map((issue) => (
+                      <li key={`leak-${issue.id}`}>
+                        <CheckCircle2 aria-hidden="true" size={14} />
+                        <span>
+                          <b lang="en">{issue.evidence}</b>
+                          {issue.knowledgePointZh}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p>
+                    {text(
+                      "本轮未识别出需要单独列出的基础语法或拼写问题。",
+                      "No foundational grammar or spelling issue needs a separate note this time.",
+                    )}
+                  </p>
+                )}
+              </div>
+            ) : null}
           </aside>
         </ResponsiveReport>
 

@@ -54,6 +54,7 @@ test.describe("document-first workspace", () => {
     page,
   }) => {
     await page.goto("/feedback?cycle=cycle-demo");
+    await page.locator('[data-feedback-mode="full"]').click();
     await page.locator("[data-essay-pane] details summary").first().click();
 
     const geometry = await page.evaluate(() => {

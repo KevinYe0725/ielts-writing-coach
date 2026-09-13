@@ -60,12 +60,18 @@ test.describe("monochrome feedback report", () => {
     await expect(
       report.getByRole("tab", { name: "完整报告", exact: true }),
     ).toHaveAttribute("aria-selected", "false");
+    await expect(
+      report.locator('[data-feedback-full-detail="accuracy"]'),
+    ).toHaveCount(0);
 
     await report.getByRole("tab", { name: "完整报告", exact: true }).click();
     await expect(report).toHaveAttribute("data-feedback-report-mode", "full");
     await expect(
       report.getByRole("tab", { name: "完整报告", exact: true }),
     ).toHaveAttribute("aria-selected", "true");
+    await expect(
+      report.locator('[data-feedback-full-detail="accuracy"]'),
+    ).toBeVisible();
   });
 
   test("lets the active suggestion card collapse on a second click", async ({
