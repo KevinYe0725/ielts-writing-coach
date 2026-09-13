@@ -124,4 +124,24 @@ test.describe("feedback report views", () => {
     await expect(page.locator("[data-feedback-issue-card]")).toHaveCount(0);
     await expect(page.locator("[data-feedback-page-next]")).toBeDisabled();
   });
+
+  test("keeps an exit on the lower left and page controls on the lower right", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/feedback/compare?cycle=cycle-demo");
+
+    const exit = page.locator("[data-feedback-exit]");
+    const pager = page.locator("[data-feedback-pagination]");
+    await expect(exit).toHaveAttribute("href", "/feedback?cycle=cycle-demo");
+    const positions = await Promise.all([
+      exit.boundingBox(),
+      pager.boundingBox(),
+    ]);
+    expect(positions[0]).not.toBeNull();
+    expect(positions[1]).not.toBeNull();
+    expect(positions[0]!.x).toBeLessThan(positions[1]!.x);
+    await exit.click();
+    await expect(page).toHaveURL(/\/feedback\?cycle=cycle-demo$/);
+  });
 });

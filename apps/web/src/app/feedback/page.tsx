@@ -11,6 +11,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  ArrowLeft,
   ArrowRight,
   BookLock,
   BrainCircuit,
@@ -1088,36 +1089,55 @@ export function FeedbackPage({
               </aside>
             </ResponsiveReport>
 
-            <nav
-              aria-label={text("原文对照分页", "Original comparison pages")}
-              className={styles.comparisonPager}
-              data-feedback-pagination
-            >
-              <button
-                data-feedback-page-prev
-                disabled={currentPageIndex === 0}
-                onClick={() => changeComparisonPage(currentPageIndex - 1)}
-                type="button"
+            <div className={styles.focusFooter}>
+              <Link
+                className={styles.exitCompare}
+                data-feedback-exit
+                href={
+                  cycleId
+                    ? `/feedback?cycle=${encodeURIComponent(cycleId)}`
+                    : "/feedback"
+                }
               >
-                <ChevronLeft aria-hidden="true" size={16} />
-                {text("上一页", "Previous")}
-              </button>
-              <span aria-live="polite">
-                {text(
-                  `第 ${currentComparisonPage.pageNumber} / ${comparisonPages.length} 页`,
-                  `Page ${currentComparisonPage.pageNumber} of ${comparisonPages.length}`,
-                )}
-              </span>
-              <button
-                data-feedback-page-next
-                disabled={currentPageIndex >= comparisonPages.length - 1}
-                onClick={() => changeComparisonPage(currentPageIndex + 1)}
-                type="button"
+                <ArrowLeft aria-hidden="true" size={16} />
+                <span className={styles.exitLabelLong}>
+                  {text("退出原文对照", "Exit comparison")}
+                </span>
+                <span className={styles.exitLabelShort}>
+                  {text("退出", "Exit")}
+                </span>
+              </Link>
+              <nav
+                aria-label={text("原文对照分页", "Original comparison pages")}
+                className={styles.comparisonPager}
+                data-feedback-pagination
               >
-                {text("下一页", "Next")}
-                <ChevronRight aria-hidden="true" size={16} />
-              </button>
-            </nav>
+                <button
+                  data-feedback-page-prev
+                  disabled={currentPageIndex === 0}
+                  onClick={() => changeComparisonPage(currentPageIndex - 1)}
+                  type="button"
+                >
+                  <ChevronLeft aria-hidden="true" size={16} />
+                  {text("上一页", "Previous")}
+                </button>
+                <span aria-live="polite">
+                  {text(
+                    `第 ${currentComparisonPage.pageNumber} / ${comparisonPages.length} 页`,
+                    `Page ${currentComparisonPage.pageNumber} of ${comparisonPages.length}`,
+                  )}
+                </span>
+                <button
+                  data-feedback-page-next
+                  disabled={currentPageIndex >= comparisonPages.length - 1}
+                  onClick={() => changeComparisonPage(currentPageIndex + 1)}
+                  type="button"
+                >
+                  {text("下一页", "Next")}
+                  <ChevronRight aria-hidden="true" size={16} />
+                </button>
+              </nav>
+            </div>
           </div>
         ) : null}
 

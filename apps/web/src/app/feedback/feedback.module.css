@@ -434,6 +434,43 @@
   align-content: start;
 }
 
+.focusFooter {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--desk-space-4);
+}
+
+.exitCompare {
+  display: inline-flex;
+  min-height: 40px;
+  padding: var(--desk-space-2) var(--desk-space-3);
+  color: var(--desk-ink-muted);
+  border: 1px solid transparent;
+  border-radius: var(--desk-radius-sm);
+  font-size: var(--desk-type-meta);
+  font-weight: var(--desk-body-weight-semibold);
+  white-space: nowrap;
+  align-items: center;
+  gap: var(--desk-space-1);
+}
+
+.exitLabelShort {
+  display: none;
+}
+
+.exitCompare:hover {
+  color: var(--desk-ink);
+  background: var(--desk-canvas);
+  border-color: color-mix(in srgb, var(--desk-ink) 16%, transparent);
+}
+
+.exitCompare:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--desk-blue) 34%, transparent);
+  outline-offset: 2px;
+}
+
 .focusWorkspace .issueDetails {
   display: grid;
   padding-right: var(--desk-space-4);
@@ -473,8 +510,9 @@
 .comparisonPager {
   display: flex;
   min-height: 48px;
+  margin-left: auto;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-end;
   gap: var(--desk-space-4);
 }
 
@@ -1440,6 +1478,18 @@
 
   .focusWorkspace .comparisonPager {
     gap: var(--desk-space-2);
+  }
+
+  .focusWorkspace .exitCompare {
+    margin-left: var(--desk-space-12);
+  }
+
+  .focusWorkspace .exitLabelLong {
+    display: none;
+  }
+
+  .focusWorkspace .exitLabelShort {
+    display: inline;
   }
 
   .comparisonPager > span {
