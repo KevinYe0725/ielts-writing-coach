@@ -44,4 +44,24 @@ test.describe("monochrome feedback report", () => {
       page.locator("[data-feedback-next-step] .duration"),
     ).toHaveCount(0);
   });
+
+  test("starts in quick-fix mode and lets the learner open the full report", async ({
+    page,
+  }) => {
+    await page.goto("/feedback?cycle=cycle-demo");
+    const report = page.locator("[data-feedback-report]");
+    await expect(report).toHaveAttribute("data-feedback-report-mode", "quick");
+    await expect(
+      report.getByRole("tab", { name: "快速修改", exact: true }),
+    ).toHaveAttribute("aria-selected", "true");
+    await expect(
+      report.getByRole("tab", { name: "完整报告", exact: true }),
+    ).toHaveAttribute("aria-selected", "false");
+
+    await report.getByRole("tab", { name: "完整报告", exact: true }).click();
+    await expect(report).toHaveAttribute("data-feedback-report-mode", "full");
+    await expect(
+      report.getByRole("tab", { name: "完整报告", exact: true }),
+    ).toHaveAttribute("aria-selected", "true");
+  });
 });

@@ -424,6 +424,37 @@
   place-items: center;
 }
 
+.reportModeSwitch {
+  display: inline-flex;
+  padding: var(--desk-space-1);
+  margin: 0 var(--desk-space-3) var(--desk-space-3);
+  background: color-mix(in srgb, var(--desk-ink) 5%, var(--desk-paper));
+  border: 1px solid color-mix(in srgb, var(--desk-ink) 14%, transparent);
+  border-radius: var(--desk-radius-pill);
+  gap: var(--desk-space-1);
+}
+
+.reportModeSwitch button {
+  min-height: 36px;
+  padding: var(--desk-space-2) var(--desk-space-3);
+  color: var(--desk-ink-muted);
+  background: transparent;
+  border: 0;
+  border-radius: var(--desk-radius-pill);
+  font-size: var(--desk-type-label);
+  cursor: pointer;
+}
+
+.reportModeSwitch button[aria-selected="true"] {
+  color: var(--desk-paper);
+  background: var(--desk-ink);
+}
+
+.reportModeSwitch button:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--desk-ink) 34%, transparent);
+  outline-offset: 2px;
+}
+
 .taskBlock {
   padding: var(--desk-space-3) var(--desk-space-4);
   color: color-mix(in srgb, var(--desk-ink) 82%, transparent);
