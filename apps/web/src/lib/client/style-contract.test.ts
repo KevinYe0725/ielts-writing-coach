@@ -392,11 +392,14 @@ describe("annotation desk token contract", () => {
       "--desk-type-subheading": "20px",
       "--desk-type-section-title": "clamp(24px, 3vw, 28px)",
       "--desk-type-page-title": "clamp(30px, 4vw, 40px)",
-      "--desk-font-body": '"Noto Sans SC Variable", "PingFang SC", sans-serif',
+      "--desk-font-body":
+        '-apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", system-ui, sans-serif',
       "--desk-font-lesson-ui":
         '-apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", system-ui, sans-serif',
-      "--desk-font-reading": '"Source Serif 4 Variable", Georgia, serif',
-      "--desk-font-utility": '"IBM Plex Sans Variable", "Segoe UI", sans-serif',
+      "--desk-font-reading":
+        '"New York", "Iowan Old Style", "Palatino Linotype", Georgia, serif',
+      "--desk-font-utility":
+        '-apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", system-ui, sans-serif',
       "--desk-body-weight-regular": "400",
       "--desk-body-weight-medium": "500",
       "--desk-body-weight-semibold": "650",
@@ -589,12 +592,13 @@ describe("annotation desk token contract", () => {
       foundationTypographyDefinitions: [],
       tokenTypography: {
         "--desk-font-body":
-          '"Noto Sans SC Variable", "PingFang SC", sans-serif',
+          '-apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", system-ui, sans-serif',
         "--desk-font-lesson-ui":
           '-apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", system-ui, sans-serif',
-        "--desk-font-reading": '"Source Serif 4 Variable", Georgia, serif',
+        "--desk-font-reading":
+          '"New York", "Iowan Old Style", "Palatino Linotype", Georgia, serif',
         "--desk-font-utility":
-          '"IBM Plex Sans Variable", "Segoe UI", sans-serif',
+          '-apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", system-ui, sans-serif',
         "--desk-body-weight-regular": "400",
         "--desk-body-weight-medium": "500",
         "--desk-body-weight-semibold": "650",

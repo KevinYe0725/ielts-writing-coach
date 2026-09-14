@@ -108,10 +108,10 @@ test.describe("focused teaching entry", () => {
     for (const family of [headingFamily, proseFamily]) {
       expect(family).toContain("SF Pro Text");
       expect(family).toContain("PingFang SC");
-      expect(family).not.toContain("Noto Sans SC");
+      expect(family).not.toContain("New York");
     }
-    expect(evidenceFamily).toContain("Source Serif 4");
-    expect(evidenceFamily).not.toContain("Noto Sans SC");
+    expect(evidenceFamily).toContain("New York");
+    expect(evidenceFamily).not.toContain("SF Pro Text");
   });
 
   test("shows one teaching step at a time and resumes it from the URL", async ({

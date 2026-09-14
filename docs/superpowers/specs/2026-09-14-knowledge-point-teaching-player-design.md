@@ -29,7 +29,7 @@
 ## Visual direction
 
 - 保留全局顶部导航。
-- 主内容采用苹果系统字体栈：界面优先 SF Pro / PingFang，英文例句使用 `ui-serif` / New York / Source Serif 4 回退。
+- 主内容采用苹果字体体系：界面优先 SF Pro / PingFang，英文例句使用 Apple New York / Iowan Old Style 回退。
 - 黑白灰为主，仅用一个强调色表示当前进度和主操作。
 - 桌面端主内容保持 680–760px 阅读宽度，右侧仅保留轻量目录/进度。
 - 当前步骤使用固定视口区域；内容过长时只在步骤内部滚动。

@@ -657,7 +657,7 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
     await expect(mark).toHaveAttribute("data-annotation-kind", "development");
 
     // Compare activation geometry using the same loaded font. A fallback-to-
-    // Source Serif swap can change glyph boxes and wrapping without any hover
+    // Apple New York swap can change glyph boxes and wrapping without any hover
     // or selection layout change.
     await page.evaluate(() => document.fonts.ready);
 
@@ -2787,11 +2787,11 @@ test.describe("tutorial answer analysis over the public HTTP contract", () => {
     ]);
     expect(headingFamily).toContain("SF Pro Text");
     expect(headingFamily).toContain("PingFang SC");
-    expect(headingFamily).not.toContain("Noto Sans SC");
-    expect(headingFamily).not.toContain("Source Serif 4");
+    expect(headingFamily).not.toContain("New York");
+    expect(headingFamily).not.toContain("New York");
     for (const family of [answerFamily, evidenceFamily]) {
-      expect(family).toContain("Source Serif 4");
-      expect(family).not.toContain("Noto Sans SC");
+      expect(family).toContain("New York");
+      expect(family).not.toContain("SF Pro Text");
     }
     for (const evidence of await analysis
       .locator("[data-teaching-evidence]")
