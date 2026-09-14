@@ -860,7 +860,7 @@ test.describe("annotation desk redesign contracts", () => {
     });
   }
 
-  test("practice paper keeps its focused input above the fixed submit bar at 390px", async ({
+  test("practice paper keeps its focused input clear of the sticky submit bar at 390px", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 844 });
@@ -877,7 +877,7 @@ test.describe("annotation desk redesign contracts", () => {
     await focusedAnswer.focus();
     await expect(focusedAnswer).toBeFocused();
     await expect(focusedAnswer).toBeInViewport();
-    await expect(submitBar).toHaveCSS("position", "fixed");
+    await expect(submitBar).toHaveCSS("position", "sticky");
 
     await expect
       .poll(async () => {
