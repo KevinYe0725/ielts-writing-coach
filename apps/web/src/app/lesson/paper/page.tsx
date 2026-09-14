@@ -269,7 +269,7 @@ export default function PracticePaperPage({
       );
       setActiveQuestionIndex(safeIndex);
       updatePaperLocation("focus", safeIndex);
-      window.requestAnimationFrame(() => {
+      const focusTarget = () => {
         const target = document.getElementById(
           `paper-question-${data.questions[safeIndex]?.id}`,
         );
@@ -279,10 +279,13 @@ export default function PracticePaperPage({
           target &&
           (!activeElement ||
             activeElement === document.body ||
-            activeElement.closest("[data-paper-question-nav]"))
+            !activeElement.matches("input, textarea, select"))
         ) {
           target.focus({ preventScroll: true });
         }
+      };
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(focusTarget);
       });
     },
     [data, updatePaperLocation],

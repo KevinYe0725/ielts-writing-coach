@@ -19,6 +19,29 @@ test.describe("focused practice paper modes", () => {
     await expectNoHorizontalOverflow(page);
   });
 
+  test("uses the OpenAI monochrome palette for the paper workspace", async ({
+    page,
+  }) => {
+    await page.goto(paperUrl);
+
+    await expect(page.locator("[data-app-shell]")).toHaveCSS(
+      "background-color",
+      "rgb(247, 247, 247)",
+    );
+    await expect(page.locator(".topbar")).toHaveCSS(
+      "background-color",
+      "rgb(255, 255, 255)",
+    );
+    await expect(page.locator('[data-paper-view-toggle="focus"]')).toHaveCSS(
+      "background-color",
+      "rgb(17, 17, 17)",
+    );
+    await expect(page.locator("[data-paper-sheet]")).toHaveCSS(
+      "background-color",
+      "rgb(255, 255, 255)",
+    );
+  });
+
   test("keeps the focus question clear of the submit bar", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(paperUrl);
