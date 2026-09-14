@@ -113,8 +113,8 @@
   --desk-layout-sidebar: 232px;
   --desk-layout-mobile-header: 64px;
   --desk-layout-entry-max: 560px;
-  --desk-layout-focus-max: 1120px;
-  --desk-layout-reading-max: 1160px;
+  --desk-layout-focus-max: clamp(1120px, 82vw, 1440px);
+  --desk-layout-reading-max: clamp(1160px, 82vw, 1440px);
   --desk-layout-reading-copy: 760px;
   --desk-layout-reading-aside: 220px;
   --desk-layout-workspace-max: 1440px;
