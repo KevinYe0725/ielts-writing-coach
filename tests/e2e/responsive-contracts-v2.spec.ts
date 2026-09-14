@@ -11,7 +11,6 @@ const routes = [
   "/compare?cycle=cycle-demo",
   "/transfer?cycle=cycle-demo&task=transfer-task",
   "/growth",
-  "/account",
   "/settings",
   "/lesson?cycle=cycle-demo&lesson=lesson-collocation-perspective",
   "/lesson/paper?cycle=cycle-demo&lesson=lesson-collocation-perspective",
