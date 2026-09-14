@@ -1289,6 +1289,7 @@ function TeachingArticleContent({
             <div
               className={styles.playerViewport}
               data-teaching-step={activeStep + 1}
+              data-teaching-step-kind={currentPage.kind}
             >
               {currentPage.kind === "knowledge" ? (
                 <section

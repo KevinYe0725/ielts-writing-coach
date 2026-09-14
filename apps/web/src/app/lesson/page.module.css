@@ -291,6 +291,12 @@
   border-radius: var(--desk-radius-pill);
 }
 
+.playerViewport[data-teaching-step-kind="finish"] {
+  height: auto;
+  padding-right: 0;
+  overflow: visible;
+}
+
 .playerViewport .articleSection {
   padding-top: var(--desk-space-4);
 }

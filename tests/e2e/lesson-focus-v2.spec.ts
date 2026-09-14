@@ -144,6 +144,35 @@ test.describe("focused teaching entry", () => {
     await expect(player.locator("[data-teaching-step='2']")).toBeVisible();
   });
 
+  test("keeps the final training handoff inside the desktop viewport", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(
+      "/lesson?cycle=cycle-demo&lesson=lesson-collocation-perspective&step=10",
+    );
+    await expect(page.locator("#teaching-paper-next")).toBeVisible();
+
+    const bounds = await page.evaluate(() => {
+      const footer = document.querySelector<HTMLElement>(
+        "#teaching-paper-next",
+      );
+      const nav = document.querySelector<HTMLElement>(
+        "[data-teaching-step-nav]",
+      );
+      return {
+        bodyScrollHeight: document.documentElement.scrollHeight,
+        footerBottom: footer?.getBoundingClientRect().bottom ?? Infinity,
+        navBottom: nav?.getBoundingClientRect().bottom ?? Infinity,
+        viewportHeight: window.innerHeight,
+      };
+    });
+
+    expect(bounds.footerBottom).toBeLessThanOrEqual(bounds.viewportHeight);
+    expect(bounds.navBottom).toBeLessThanOrEqual(bounds.viewportHeight);
+    expect(bounds.bodyScrollHeight).toBeLessThanOrEqual(bounds.viewportHeight);
+  });
+
   test("lets the first action reveal the practice on the current step", async ({
     page,
   }) => {
