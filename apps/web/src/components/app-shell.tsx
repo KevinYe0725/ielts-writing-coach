@@ -252,12 +252,24 @@ export function AppShell({ children }: { children: ReactNode }) {
     pathname === "/lesson/paper" || pathname.startsWith("/lesson/paper/");
   const feedbackPage =
     pathname === "/feedback" || pathname.startsWith("/feedback/");
+  const comparePage =
+    pathname === "/compare" || pathname.startsWith("/compare/");
   const feedbackComparePage =
     pathname === "/feedback/compare" ||
     pathname.startsWith("/feedback/compare/");
   const setup = ["/setup", "/signin", "/join", "/recover"].some((path) =>
     pathname.startsWith(path),
   );
+  const monochromeWorkspace =
+    courseHome ||
+    writingPage ||
+    lessonPage ||
+    paperPage ||
+    feedbackPage ||
+    comparePage ||
+    ["/account", "/essays", "/growth", "/settings", "/transfer"].some(
+      (route) => pathname === route || pathname.startsWith(`${route}/`),
+    );
 
   if (publicHome) {
     return (
@@ -275,12 +287,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       className={cn(
         setup ? "setup-shell" : "app-shell",
         setup ? styles.entryShell : styles.shell,
-        (courseHome ||
-          writingPage ||
-          lessonPage ||
-          paperPage ||
-          feedbackPage) &&
-          styles.monochromeShell,
+        monochromeWorkspace && styles.monochromeShell,
       )}
       data-app-shell={setup ? undefined : ""}
       data-course-home={courseHome ? "true" : undefined}
