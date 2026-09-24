@@ -19,13 +19,13 @@
     "@iwc/config": "workspace:*",
     "@iwc/question-bank": "workspace:*",
     "drizzle-orm": "catalog:",
-    "graphile-worker": "0.17.3",
+    "graphile-worker": "0.18.0",
     "pg": "8.23.0",
-    "uuid": "14.0.1"
+    "uuid": "14.0.2"
   },
   "devDependencies": {
-    "@types/pg": "8.21.0",
-    "drizzle-kit": "0.31.10",
+    "@types/pg": "8.23.1",
+    "drizzle-kit": "0.31.11",
     "typescript": "catalog:"
   }
 }
