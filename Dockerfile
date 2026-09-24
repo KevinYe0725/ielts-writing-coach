@@ -18,6 +18,7 @@ COPY packages/exchange/package.json packages/exchange/package.json
 COPY packages/learning-contracts/package.json packages/learning-contracts/package.json
 COPY packages/learning-core/package.json packages/learning-core/package.json
 COPY packages/question-bank/package.json packages/question-bank/package.json
+COPY packages/search/package.json packages/search/package.json
 RUN pnpm install --frozen-lockfile
 
 FROM postgres:17.6-bookworm AS postgres-tools

@@ -22,3 +22,8 @@ tmp
 .env.*
 !.env.example
 .coach-ielts-writing
+.local-run
+**/.local-run
+**/.local-qa
+.superpowers
+.pnpm-store
