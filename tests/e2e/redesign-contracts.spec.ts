@@ -96,8 +96,8 @@ async function expectReadingTypography(
     return { family: style.fontFamily, weight: style.fontWeight };
   });
 
-  expect(font.family).toContain("Source Serif 4");
-  expect(font.family).not.toContain("Noto Sans SC");
+  expect(font.family).toContain("New York");
+  expect(font.family).not.toContain("SF Pro Text");
   expect(allowedWeights).toContain(font.weight);
 }
 
@@ -147,8 +147,8 @@ async function expectExplicitEnglishEvidenceTypography(
         count: records.length,
         violations: records.filter(
           ({ family, weight }) =>
-            !family.includes("Source Serif 4") ||
-            family.includes("Noto Sans SC") ||
+            !family.includes("New York") ||
+            family.includes("SF Pro Text") ||
             !["400", "600"].includes(weight),
         ),
       };
@@ -843,8 +843,8 @@ test.describe("annotation desk redesign contracts", () => {
         proseMetrics.lineHeight / proseMetrics.fontSize,
       ).toBeGreaterThanOrEqual(1.8);
 
-      const articleMeta = page.getByText("专项能力教程", { exact: true });
-      await expectFontSizeAtLeast(articleMeta, 12);
+      const focusLabel = page.locator("[data-teaching-focus] > span");
+      await expectFontSizeAtLeast(focusLabel, 12);
 
       if (viewport.width < 720) {
         await expectFontSizeAtLeast(
@@ -860,7 +860,7 @@ test.describe("annotation desk redesign contracts", () => {
     });
   }
 
-  test("practice paper keeps its focused input above the fixed submit bar at 390px", async ({
+  test("practice paper keeps its focused input clear of the sticky submit bar at 390px", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 844 });
@@ -877,7 +877,7 @@ test.describe("annotation desk redesign contracts", () => {
     await focusedAnswer.focus();
     await expect(focusedAnswer).toBeFocused();
     await expect(focusedAnswer).toBeInViewport();
-    await expect(submitBar).toHaveCSS("position", "fixed");
+    await expect(submitBar).toHaveCSS("position", "sticky");
 
     await expect
       .poll(async () => {
@@ -984,7 +984,7 @@ test.describe("annotation desk redesign contracts", () => {
       .toBeGreaterThanOrEqual(12);
   });
 
-  test("teaching keeps Chinese UI in Noto Sans and reserves Source Serif for English evidence", async ({
+  test("teaching keeps Chinese UI in SF Pro and uses Apple New York for English evidence", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1440, height: 960 });
@@ -992,43 +992,51 @@ test.describe("annotation desk redesign contracts", () => {
       "/lesson?cycle=cycle-demo&lesson=lesson-collocation-perspective",
     );
 
-    const chineseHeading = page.getByRole("heading", {
-      name: "别让论证从原因直接跳到结果",
-    });
+    const chineseHeading = page.locator("[data-teaching-article] h2").first();
     const chineseProse = page.locator("[data-teaching-prose] p").first();
     const chineseToc = page.locator("[data-teaching-toc] a").first();
-    const uiButton = page.locator("[data-teaching-practice-submit]").first();
-    const uiTextarea = page
-      .locator("[data-teaching-practice] textarea")
-      .first();
     const englishExample = page
       .locator('[data-teaching-block="MARKDOWN"] blockquote')
       .first();
-    const englishPrompt = page
-      .locator("[data-teaching-practice] [lang='en']")
-      .first();
 
     await expect(englishExample).toHaveAttribute("lang", "en");
+    await expect(englishExample).toBeVisible();
+    for (const chineseText of [chineseHeading, chineseProse, chineseToc]) {
+      const family = await chineseText.evaluate(
+        (element) => window.getComputedStyle(element).fontFamily,
+      );
+      expect(family).toContain("SF Pro Text");
+      expect(family).toContain("PingFang SC");
+      expect(family).not.toContain("New York");
+    }
+    for (const englishText of [englishExample]) {
+      const family = await englishText.evaluate(
+        (element) => window.getComputedStyle(element).fontFamily,
+      );
+      expect(family).toContain("New York");
+      expect(family).not.toContain("SF Pro Text");
+    }
+
+    await page.locator("[data-teaching-primary-action]").click();
     for (const chineseText of [
-      chineseHeading,
-      chineseProse,
-      chineseToc,
-      uiButton,
-      uiTextarea,
+      page.locator("[data-teaching-practice-submit]").first(),
+      page.locator("[data-teaching-step-nav] button").first(),
     ]) {
       const family = await chineseText.evaluate(
         (element) => window.getComputedStyle(element).fontFamily,
       );
-      expect(family).toContain("Noto Sans SC");
-      expect(family).not.toContain("Source Serif 4");
+      expect(family).toContain("SF Pro Text");
+      expect(family).toContain("PingFang SC");
+      expect(family).not.toContain("New York");
     }
-    for (const englishText of [englishExample, englishPrompt]) {
-      const family = await englishText.evaluate(
-        (element) => window.getComputedStyle(element).fontFamily,
-      );
-      expect(family).toContain("Source Serif 4");
-      expect(family).not.toContain("Noto Sans SC");
-    }
+    const englishPrompt = page
+      .locator("[data-teaching-practice] [lang='en']")
+      .first();
+    const promptFamily = await englishPrompt.evaluate(
+      (element) => window.getComputedStyle(element).fontFamily,
+    );
+    expect(promptFamily).toContain("New York");
+    expect(promptFamily).not.toContain("SF Pro Text");
   });
 
   test("English locale typography keeps UI roles separate from explicit English evidence", async ({
@@ -1041,39 +1049,56 @@ test.describe("annotation desk redesign contracts", () => {
     await expect(page.locator("[data-teaching-article]")).toBeVisible();
     await switchToEnglish(page);
 
-    const articleMeta = page.getByText("Focused writing tutorial", {
-      exact: true,
-    });
+    const focusLabel = page.locator("[data-teaching-focus] > span");
     const articleHeading = page.getByRole("heading", {
       name: "Build the missing link in a causal argument",
     });
-    const uiButton = page.locator("[data-teaching-practice-submit]").first();
     const englishQuote = page
       .locator('[data-teaching-block="MARKDOWN"] blockquote[lang="en"]')
       .first();
-    const englishPrompt = page
-      .locator('[data-teaching-practice] p[lang="en"]')
-      .first();
 
-    for (const uiText of [articleMeta, articleHeading, uiButton]) {
+    for (const uiText of [focusLabel, articleHeading]) {
       const font = await uiText.evaluate((element) => {
         const style = window.getComputedStyle(element);
         return { family: style.fontFamily, weight: style.fontWeight };
       });
-      expect(font.family).toContain("Noto Sans SC");
-      expect(font.family).not.toContain("Source Serif 4");
+      expect(font.family).toContain("SF Pro Text");
+      expect(font.family).toContain("PingFang SC");
+      expect(font.family).not.toContain("New York");
       expect(["400", "500", "650", "700"]).toContain(font.weight);
     }
 
-    for (const englishText of [englishQuote, englishPrompt]) {
+    for (const englishText of [englishQuote]) {
       const font = await englishText.evaluate((element) => {
         const style = window.getComputedStyle(element);
         return { family: style.fontFamily, weight: style.fontWeight };
       });
-      expect(font.family).toContain("Source Serif 4");
-      expect(font.family).not.toContain("Noto Sans SC");
+      expect(font.family).toContain("New York");
+      expect(font.family).not.toContain("SF Pro Text");
       expect(["400", "600"]).toContain(font.weight);
     }
+
+    await page.locator("[data-teaching-primary-action]").click();
+    const uiButton = page.locator("[data-teaching-practice-submit]").first();
+    const uiFont = await uiButton.evaluate((element) => {
+      const style = window.getComputedStyle(element);
+      return { family: style.fontFamily, weight: style.fontWeight };
+    });
+    expect(uiFont.family).toContain("SF Pro Text");
+    expect(uiFont.family).toContain("PingFang SC");
+    expect(uiFont.family).not.toContain("New York");
+    expect(["400", "500", "650", "700"]).toContain(uiFont.weight);
+
+    const englishPrompt = page
+      .locator('[data-teaching-practice] p[lang="en"]')
+      .first();
+    const promptFont = await englishPrompt.evaluate((element) => {
+      const style = window.getComputedStyle(element);
+      return { family: style.fontFamily, weight: style.fontWeight };
+    });
+    expect(promptFont.family).toContain("New York");
+    expect(promptFont.family).not.toContain("SF Pro Text");
+    expect(["400", "600"]).toContain(promptFont.weight);
   });
 
   test("Paper English option labels render in the semibold reading role", async ({
@@ -1113,8 +1138,8 @@ test.describe("annotation desk redesign contracts", () => {
       strong.remove();
       return font;
     });
-    expect(englishFont.family).toContain("Source Serif 4");
-    expect(englishFont.family).not.toContain("Noto Sans SC");
+    expect(englishFont.family).toContain("New York");
+    expect(englishFont.family).not.toContain("SF Pro Text");
     expect(englishFont.weight).toBe("600");
 
     const chineseStrong = page
@@ -1126,8 +1151,9 @@ test.describe("annotation desk redesign contracts", () => {
       const style = window.getComputedStyle(element);
       return { family: style.fontFamily, weight: style.fontWeight };
     });
-    expect(chineseFont.family).toContain("Noto Sans SC");
-    expect(chineseFont.family).not.toContain("Source Serif 4");
+    expect(chineseFont.family).toContain("SF Pro Text");
+    expect(chineseFont.family).toContain("PingFang SC");
+    expect(chineseFont.family).not.toContain("New York");
     expect(chineseFont.weight).toBe("700");
   });
 
@@ -1175,11 +1201,11 @@ test.describe("annotation desk redesign contracts", () => {
     const family = await main.evaluate(
       (element) => window.getComputedStyle(element).fontFamily,
     );
-    expect(family).toContain("Noto Sans SC");
-    expect(family).not.toContain("Source Serif 4");
+    expect(family).toContain("SF Pro Text");
+    expect(family).not.toContain("New York");
   });
 
-  test("typography authority keeps UI, reading, and utility families distinct", async ({
+  test("typography authority uses Apple system UI and Apple New York reading roles", async ({
     page,
   }) => {
     await page.route("**/api/v1/auth/get-session", async (route) => {
@@ -1195,8 +1221,8 @@ test.describe("annotation desk redesign contracts", () => {
     const accountHeadingFamily = await page
       .getByRole("heading", { name: "账户与安全" })
       .evaluate((element) => window.getComputedStyle(element).fontFamily);
-    expect(accountHeadingFamily).toContain("Noto Sans SC");
-    expect(accountHeadingFamily).not.toContain("Source Serif 4");
+    expect(accountHeadingFamily).toContain("SF Pro Text");
+    expect(accountHeadingFamily).not.toContain("New York");
 
     await page.goto(
       "/feedback?cycle=cycle-demo&lesson=lesson-collocation-perspective",
@@ -1204,8 +1230,8 @@ test.describe("annotation desk redesign contracts", () => {
     const manuscriptFamily = await page
       .locator("[data-feedback-essay]")
       .evaluate((element) => window.getComputedStyle(element).fontFamily);
-    expect(manuscriptFamily).toContain("Source Serif 4");
-    expect(manuscriptFamily).not.toContain("Noto Sans SC");
+    expect(manuscriptFamily).toContain("New York");
+    expect(manuscriptFamily).not.toContain("SF Pro Text");
 
     const evidenceLabelFamily = await page
       .locator("[data-feedback-evidence] [data-evidence-state]")
@@ -1213,7 +1239,7 @@ test.describe("annotation desk redesign contracts", () => {
       .locator(":scope > span")
       .last()
       .evaluate((element) => window.getComputedStyle(element).fontFamily);
-    expect(evidenceLabelFamily).toContain("IBM Plex Sans");
+    expect(evidenceLabelFamily).toContain("SF Pro Text");
   });
 
   test("growth displays every level without overstating evidence", async ({

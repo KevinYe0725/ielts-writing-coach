@@ -36,6 +36,23 @@
   container-type: inline-size;
 }
 
+.focusPage {
+  display: flex;
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  padding: var(--desk-space-4) var(--desk-space-6) var(--desk-space-3);
+  flex: 1;
+  flex-direction: column;
+}
+
+.focusPage > [data-feedback-report] {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
 .page :global(.eyebrow),
 .page :global(.badge) {
   font-size: var(--desk-type-meta);
@@ -43,6 +60,34 @@
 
 .page :global(.page-header) {
   margin-bottom: var(--desk-space-3);
+}
+
+.reportNav {
+  display: flex;
+  align-items: center;
+  margin-bottom: var(--desk-space-6);
+  border-bottom: 1px solid color-mix(in srgb, var(--desk-ink) 14%, transparent);
+  gap: var(--desk-space-1);
+}
+
+.reportNav a {
+  display: inline-flex;
+  min-height: 40px;
+  padding: var(--desk-space-2) var(--desk-space-3);
+  color: var(--desk-ink-muted);
+  border-bottom: 2px solid transparent;
+  font-size: var(--desk-type-label);
+  font-weight: var(--desk-body-weight-semibold);
+  align-items: center;
+}
+
+.reportNav a:hover {
+  color: var(--desk-ink);
+}
+
+.reportNav a[aria-current="page"] {
+  color: var(--desk-ink);
+  border-bottom-color: var(--desk-ink);
 }
 
 .page :global(.status-banner-warning) {
@@ -315,8 +360,199 @@
 
 .workbench {
   width: 100%;
+  min-height: 0;
   align-items: start;
   overflow: visible;
+}
+
+.focusWorkspace {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--desk-space-3);
+  overflow: hidden;
+}
+
+.focusWorkspace [data-feedback-workbench] {
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.focusWorkspace .resizablePanel {
+  min-height: 0;
+}
+
+.focusWorkspace .sourcePane,
+.focusWorkspace .suggestionPane {
+  position: static;
+  display: flex;
+  height: 100%;
+  max-height: none;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.focusWorkspace .sourcePane {
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.focusWorkspace .suggestionPane {
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.focusWorkspace .essay {
+  min-height: 0;
+  overflow: visible;
+  flex: 1;
+}
+
+.focusWorkspace .paragraphReview summary {
+  font-size: var(--desk-type-body);
+}
+
+.focusWorkspace .paragraphReview details > p,
+.focusWorkspace .paragraphReview details > div {
+  font-size: var(--desk-type-body);
+  line-height: 1.7;
+}
+
+.focusWorkspace .paragraphReview .paragraphRevision blockquote {
+  font-size: var(--desk-type-subheading);
+  line-height: 1.8;
+}
+
+.focusWorkspace .issueList {
+  flex: none;
+  overflow: visible;
+  align-content: start;
+}
+
+.focusFooter {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--desk-space-4);
+}
+
+.exitCompare {
+  display: inline-flex;
+  min-height: 40px;
+  padding: var(--desk-space-2) var(--desk-space-3);
+  color: var(--desk-ink-muted);
+  border: 1px solid transparent;
+  border-radius: var(--desk-radius-sm);
+  font-size: var(--desk-type-meta);
+  font-weight: var(--desk-body-weight-semibold);
+  white-space: nowrap;
+  align-items: center;
+  gap: var(--desk-space-1);
+}
+
+.exitLabelShort {
+  display: none;
+}
+
+.exitCompare:hover {
+  color: var(--desk-ink);
+  background: var(--desk-canvas);
+  border-color: color-mix(in srgb, var(--desk-ink) 16%, transparent);
+}
+
+.exitCompare:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--desk-blue) 34%, transparent);
+  outline-offset: 2px;
+}
+
+.focusWorkspace .issueDetails {
+  display: grid;
+  padding-right: var(--desk-space-4);
+  padding-left: var(--desk-space-4);
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  gap: var(--desk-space-2) var(--desk-space-3);
+}
+
+.focusWorkspace .issueDetails > .detailBlock,
+.focusWorkspace .issueDetails > .revisionBlock,
+.focusWorkspace .issueDetails > .transferBlock,
+.focusWorkspace .issueDetails > .focusReason,
+.focusWorkspace .issueDetails > .locateButton,
+.focusWorkspace .issueDetails > .unlocatedNote {
+  min-width: 0;
+}
+
+.focusWorkspace .issueDetails > .revisionBlock,
+.focusWorkspace .issueDetails > .transferBlock,
+.focusWorkspace .issueDetails > .focusReason,
+.focusWorkspace .issueDetails > .locateButton,
+.focusWorkspace .issueDetails > .unlocatedNote {
+  grid-column: 1 / -1;
+}
+
+.focusWorkspace .issueDetails > .detailBlock:nth-of-type(3) {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.focusWorkspace .issueDetails > .detailBlock + .revisionBlock,
+.focusWorkspace .issueDetails > .revisionBlock + .detailBlock,
+.focusWorkspace .issueDetails > .detailBlock + .transferBlock {
+  margin-top: 0;
+}
+
+.comparisonPager {
+  display: flex;
+  min-height: 48px;
+  margin-left: auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--desk-space-4);
+}
+
+.comparisonPager button {
+  display: inline-flex;
+  min-height: 40px;
+  padding: var(--desk-space-2) var(--desk-space-3);
+  color: var(--desk-ink);
+  background: var(--desk-paper);
+  border: 1px solid color-mix(in srgb, var(--desk-ink) 18%, transparent);
+  border-radius: var(--desk-radius-sm);
+  font: inherit;
+  font-size: var(--desk-type-meta);
+  font-weight: var(--desk-body-weight-semibold);
+  cursor: pointer;
+  align-items: center;
+  gap: var(--desk-space-1);
+}
+
+.comparisonPager button:hover:not(:disabled) {
+  background: var(--desk-canvas);
+}
+
+.comparisonPager button:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--desk-blue) 34%, transparent);
+  outline-offset: 2px;
+}
+
+.comparisonPager button:disabled {
+  color: var(--desk-evidence-muted);
+  background: color-mix(in srgb, var(--desk-ink) 4%, var(--desk-paper));
+  cursor: not-allowed;
+}
+
+.comparisonPager > span {
+  min-width: 110px;
+  color: var(--desk-ink-muted);
+  font-family: var(--desk-font-utility);
+  font-size: var(--desk-type-meta);
+  text-align: center;
 }
 
 .resizablePanel {
@@ -422,37 +658,6 @@
   font-size: var(--desk-type-meta);
   font-weight: var(--desk-utility-weight-semibold);
   place-items: center;
-}
-
-.reportModeSwitch {
-  display: inline-flex;
-  padding: var(--desk-space-1);
-  margin: 0 var(--desk-space-3) var(--desk-space-3);
-  background: color-mix(in srgb, var(--desk-ink) 5%, var(--desk-paper));
-  border: 1px solid color-mix(in srgb, var(--desk-ink) 14%, transparent);
-  border-radius: var(--desk-radius-pill);
-  gap: var(--desk-space-1);
-}
-
-.reportModeSwitch button {
-  min-height: 36px;
-  padding: var(--desk-space-2) var(--desk-space-3);
-  color: var(--desk-ink-muted);
-  background: transparent;
-  border: 0;
-  border-radius: var(--desk-radius-pill);
-  font-size: var(--desk-type-label);
-  cursor: pointer;
-}
-
-.reportModeSwitch button[aria-selected="true"] {
-  color: var(--desk-paper);
-  background: var(--desk-ink);
-}
-
-.reportModeSwitch button:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--desk-ink) 34%, transparent);
-  outline-offset: 2px;
 }
 
 .taskBlock {
@@ -1238,6 +1443,57 @@
 
   .lockedModelCard {
     align-items: flex-start;
+  }
+}
+
+@media (max-width: 939px) {
+  .focusPage {
+    padding: var(--desk-space-2) var(--desk-space-3) var(--desk-space-2);
+  }
+
+  .focusWorkspace .mobileSwitcher {
+    position: static;
+  }
+
+  .focusWorkspace .issueDetails {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .focusWorkspace .issueDetails > .detailBlock:nth-of-type(3) {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .focusWorkspace .sourcePane,
+  .focusWorkspace .suggestionPane {
+    display: none;
+  }
+
+  .focusWorkspace .sourcePane.mobileActive,
+  .focusWorkspace .suggestionPane.mobileActive {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+  }
+
+  .focusWorkspace .comparisonPager {
+    gap: var(--desk-space-2);
+  }
+
+  .focusWorkspace .exitCompare {
+    margin-left: var(--desk-space-12);
+  }
+
+  .focusWorkspace .exitLabelLong {
+    display: none;
+  }
+
+  .focusWorkspace .exitLabelShort {
+    display: inline;
+  }
+
+  .comparisonPager > span {
+    min-width: 88px;
   }
 }
 

@@ -100,7 +100,7 @@
   width: min(1040px, 100%);
   max-width: none;
   padding: 0;
-  font-family: var(--desk-font-body);
+  font-family: var(--desk-font-lesson-ui);
 }
 
 .article {
@@ -126,6 +126,37 @@
   font-size: var(--desk-type-subheading);
   line-height: 1.7;
 }
+.learningProgress {
+  display: grid;
+  width: min(100%, var(--desk-layout-reading-copy));
+  margin: var(--desk-space-6) 0 0;
+  color: var(--desk-ink-muted);
+  font-family: var(--desk-font-utility);
+  font-size: var(--desk-type-meta);
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--desk-space-3);
+}
+.learningProgress > strong {
+  color: var(--desk-ink);
+  font-weight: var(--desk-utility-weight-semibold);
+  white-space: nowrap;
+}
+.progressTrack {
+  display: block;
+  height: 4px;
+  overflow: hidden;
+  background: var(--desk-line);
+  border-radius: var(--desk-radius-pill);
+}
+.progressTrack > span {
+  display: block;
+  width: 25%;
+  height: 100%;
+  background: var(--desk-ink);
+  border-radius: var(--desk-radius-pill);
+  transition: width 240ms ease;
+}
 .practiceJump {
   display: inline-flex;
   align-items: center;
@@ -135,6 +166,18 @@
   font-size: var(--desk-type-meta);
   line-height: 1.7;
   text-underline-offset: 4px;
+}
+.primaryPracticeJump {
+  padding: var(--desk-space-3) var(--desk-space-4);
+  color: var(--desk-paper);
+  background: var(--desk-ink);
+  border-radius: var(--desk-radius-sm);
+  font-weight: var(--desk-body-weight-semibold);
+  text-decoration: none;
+}
+.primaryPracticeJump:hover {
+  color: var(--desk-paper);
+  background: var(--desk-ink-muted);
 }
 .contents .contentsPractice {
   display: flex;
@@ -192,29 +235,6 @@
   border-bottom: 1px solid var(--line);
 }
 
-.articleMeta {
-  display: flex;
-  margin-bottom: var(--desk-space-4);
-  color: var(--ink-faint);
-  font-size: var(--desk-type-meta);
-  font-weight: var(--desk-body-weight-bold);
-  align-items: center;
-  gap: var(--desk-space-3);
-}
-
-.articleMeta > span:first-child {
-  display: inline-flex;
-  color: var(--blue-dark);
-  align-items: center;
-  gap: var(--desk-space-2);
-}
-
-.articleMeta > span + span::before {
-  margin-right: var(--desk-space-3);
-  color: var(--line-strong);
-  content: "·";
-}
-
 .articleHeader h1 {
   max-width: 720px;
   margin: 0;
@@ -243,6 +263,91 @@
   gap: var(--desk-space-12);
 }
 
+.teachingPlayer {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--desk-space-3);
+}
+
+.playerViewport {
+  min-height: 0;
+  height: clamp(420px, 52dvh, 560px);
+  padding-right: var(--desk-space-3);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scrollbar-color: var(--desk-line-strong) transparent;
+  scrollbar-width: thin;
+}
+
+.playerViewport::-webkit-scrollbar {
+  width: 6px;
+}
+
+.playerViewport::-webkit-scrollbar-thumb {
+  background: var(--desk-line-strong);
+  border-radius: var(--desk-radius-pill);
+}
+
+.playerViewport[data-teaching-step-kind="finish"] {
+  height: auto;
+  padding-right: 0;
+  overflow: visible;
+}
+
+.playerViewport .articleSection {
+  padding-top: var(--desk-space-4);
+}
+
+.playerNav {
+  display: flex;
+  min-height: 48px;
+  padding-top: var(--desk-space-3);
+  border-top: 1px solid var(--line);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--desk-space-3);
+}
+
+.playerNav button {
+  display: inline-flex;
+  min-height: 40px;
+  padding: var(--desk-space-2) var(--desk-space-3);
+  color: var(--desk-ink);
+  background: var(--desk-paper);
+  border: 1px solid var(--desk-line-strong);
+  border-radius: var(--desk-radius-sm);
+  font: inherit;
+  font-size: var(--desk-type-meta);
+  font-weight: var(--desk-body-weight-semibold);
+  cursor: pointer;
+  align-items: center;
+  gap: var(--desk-space-2);
+}
+
+.playerNav button:hover:not(:disabled) {
+  background: var(--desk-canvas);
+}
+
+.playerNav button:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--desk-blue) 34%, transparent);
+  outline-offset: 2px;
+}
+
+.playerNav button:disabled {
+  color: var(--desk-evidence-muted);
+  background: var(--desk-canvas);
+  cursor: not-allowed;
+}
+
+.playerNav > span {
+  color: var(--desk-ink-muted);
+  font-family: var(--desk-font-utility);
+  font-size: var(--desk-type-meta);
+}
+
 .articleBody {
   min-width: 0;
 }
@@ -259,10 +364,16 @@
 }
 
 .sectionHeading {
-  display: flex;
+  display: grid;
   margin-bottom: var(--desk-space-6);
-  align-items: baseline;
-  gap: var(--desk-space-3);
+  gap: var(--desk-space-2);
+}
+
+.knowledgeContext {
+  color: var(--desk-ink-muted);
+  font-family: var(--desk-font-utility);
+  font-size: var(--desk-type-meta);
+  font-weight: var(--desk-utility-weight-semibold);
 }
 
 .sectionHeading h2 {
@@ -270,6 +381,11 @@
   font-size: var(--desk-type-section-title);
   line-height: 1.35;
   letter-spacing: -0.025em;
+}
+.articleSection[data-active="true"] .sectionHeading h2 {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.24em;
 }
 
 .sectionBlocks {
@@ -560,10 +676,38 @@
   color: var(--ink-soft);
 }
 
+.practiceCue {
+  display: flex;
+  padding: var(--desk-space-3) var(--desk-space-4);
+  margin-bottom: var(--desk-space-3);
+  color: var(--desk-ink);
+  background: var(--desk-blue-soft);
+  border-left: 3px solid var(--desk-blue);
+  align-items: baseline;
+  gap: var(--desk-space-3);
+}
+
+.practiceCue > span {
+  color: var(--desk-blue);
+  font-size: var(--desk-type-meta);
+  font-weight: var(--desk-body-weight-bold);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.practiceCue > strong {
+  font-size: var(--desk-type-body);
+  line-height: 1.6;
+}
+
 .practiceList {
   display: grid;
   margin-top: var(--desk-space-6);
   border-top: 1px solid var(--line);
+}
+
+.practiceBlock:not([data-inline]) .practiceList {
+  margin-top: var(--desk-space-4);
 }
 
 .practicePrompt {
@@ -571,6 +715,11 @@
   padding: var(--desk-space-8) 0;
   border-bottom: 1px solid var(--line);
   gap: var(--desk-space-4);
+}
+
+.practiceBlock:not([data-inline]) .practicePrompt {
+  padding: var(--desk-space-4) 0;
+  gap: var(--desk-space-3);
 }
 
 .practiceInstruction strong {
@@ -590,7 +739,7 @@
 .articleEntryActions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   flex-wrap: wrap;
   gap: var(--desk-space-3);
 }
@@ -607,6 +756,10 @@
 .practiceBlock[data-inline] .practiceList {
   margin-top: 0;
   border-top: 0;
+}
+
+.practiceBlock[data-inline] .practiceCue {
+  margin-bottom: var(--desk-space-2);
 }
 
 .practicePrompt[data-inline] {
@@ -1087,6 +1240,26 @@
   overflow-y: auto;
 }
 
+.contentsColumn[data-teaching-toc-density="compact"] {
+  max-width: 200px;
+}
+
+.contentsColumn[data-teaching-toc-density="compact"] .contents {
+  padding-top: var(--desk-space-4);
+  padding-bottom: var(--desk-space-4);
+}
+
+.contentsColumn[data-teaching-toc-density="compact"] .contents > p {
+  margin-bottom: var(--desk-space-2);
+  font-size: var(--desk-type-meta);
+}
+
+.contentsColumn[data-teaching-toc-density="compact"] .contents a {
+  min-height: 36px;
+  padding: var(--desk-space-2);
+  font-size: var(--desk-type-meta);
+}
+
 .contentsToggle {
   display: none;
 }
@@ -1162,11 +1335,15 @@
 
   .contentsColumn {
     position: static;
-    order: -1;
+    order: 1;
     width: 100%;
     max-height: none;
     margin-top: var(--desk-space-6);
     overflow: visible;
+  }
+
+  .contentsColumn[data-teaching-toc-density="compact"] {
+    max-width: none;
   }
 
   .contentsToggle {
@@ -1223,8 +1400,61 @@
   .learningGoal p {
     font-size: var(--desk-type-label);
   }
+  .learningProgress {
+    margin-top: var(--desk-space-4);
+    gap: var(--desk-space-2);
+  }
+  .playerViewport {
+    height: clamp(320px, 46dvh, 440px);
+    padding-right: 0;
+  }
+  .practiceBlock:not([data-inline]) > h2 {
+    margin-bottom: var(--desk-space-2);
+    font-size: var(--desk-type-subheading);
+    line-height: 1.35;
+  }
+  .practiceBlock:not([data-inline]) .practiceLead {
+    font-size: var(--desk-type-label);
+    line-height: 1.55;
+  }
+  .practiceBlock:not([data-inline]) .practicePrompt {
+    padding: var(--desk-space-2) 0;
+    gap: var(--desk-space-2);
+  }
+  .practiceInstruction h3 {
+    font-size: var(--desk-type-label);
+    line-height: 1.45;
+  }
+  .practiceInstruction p {
+    font-size: var(--desk-type-label);
+    line-height: 1.55;
+  }
+  .practiceBlock:not([data-inline]) .practiceList {
+    margin-top: var(--desk-space-2);
+  }
+  .choiceList label {
+    padding: var(--desk-space-1) var(--desk-space-3);
+    font-size: var(--desk-type-label);
+    line-height: 1.45;
+  }
+  .practiceContinue {
+    min-height: 36px;
+  }
+  .playerNav button {
+    padding-right: var(--desk-space-2);
+    padding-left: var(--desk-space-2);
+  }
+  .playerNav button:first-child {
+    margin-left: var(--desk-space-12);
+  }
   .practiceJump {
     margin-top: var(--desk-space-2);
+  }
+
+  .practiceCue {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: var(--desk-space-1);
   }
 
   .articleHeader h1 {
@@ -1233,10 +1463,6 @@
 
   .articleHeader > p {
     margin-top: var(--desk-space-3);
-  }
-
-  .articleMeta {
-    margin-bottom: var(--desk-space-3);
   }
 
   .articleSection {
@@ -1341,7 +1567,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .contentsToggle svg {
+  .contentsToggle svg,
+  .progressTrack > span {
     transition: none;
   }
 }

@@ -5,7 +5,10 @@ import { LocaleProvider } from "@/components/locale-provider";
 import { mechanismChainTeachingFixture } from "@/lib/client/mock-service";
 import { TeachingArticle } from "./teaching-article";
 
-function render(placements: readonly (number | undefined)[]) {
+function render(
+  placements: readonly (number | undefined)[],
+  initialStep?: number,
+) {
   return renderToStaticMarkup(
     createElement(LocaleProvider, {
       children: createElement(TeachingArticle, {
@@ -22,6 +25,7 @@ function render(placements: readonly (number | undefined)[]) {
           ),
         },
         feedbackHref: "/feedback?cycle=test",
+        initialStep,
         paperHref: "/lesson/paper?cycle=test",
       }),
     }),
@@ -29,23 +33,25 @@ function render(placements: readonly (number | undefined)[]) {
 }
 
 describe("teaching article flow", () => {
-  it("places associated practice before the next explanation, with one practice anchor", () => {
+  it("shows one knowledge step and keeps practice on its own step", () => {
     const html = render([1, 2, 3]);
-    expect(html.indexOf("data-teaching-practice")).toBeLessThan(
-      html.indexOf('id="build-the-mechanism-one-step-at-a-time"'),
-    );
-    expect(html.match(/id="teaching-practice-prompts"/g)).toHaveLength(1);
-    expect(html.match(/data-teaching-continue/g)).toHaveLength(3);
-    // No completion or answer is required to navigate to the paper.
-    expect(html).toContain('href="/lesson/paper?cycle=test"');
+    expect(html).toContain("data-teaching-player");
+    expect(html).toContain('data-teaching-step="1"');
+    expect(html).toContain("data-teaching-step-next");
+    expect(html.match(/id="teaching-practice-prompts"/g)).toBeNull();
+    expect(html.match(/data-teaching-continue/g)).toBeNull();
+    expect(html).not.toContain('id="build-the-mechanism-one-step-at-a-time"');
     expect(html).not.toContain("data-teaching-reference-answer");
+    const practiceHtml = render([1, 2, 3], 3);
+    expect(practiceHtml.match(/id="teaching-practice-prompts"/g)).toHaveLength(
+      1,
+    );
+    expect(practiceHtml.match(/data-teaching-continue/g)).toHaveLength(1);
+    expect(render([1, 2, 3], 99)).toContain('href="/lesson/paper?cycle=test"');
   });
 
-  it("keeps old exercises after all article sections without duplicate anchors", () => {
-    const html = render([]);
-    expect(html.indexOf('id="teaching-practice-prompts"')).toBeGreaterThan(
-      html.indexOf('id="transfer-the-method-to-a-new-topic"'),
-    );
+  it("keeps trailing exercises in their own step without duplicate anchors", () => {
+    const html = render([], 7);
     expect(html.match(/id="teaching-practice-prompts"/g)).toHaveLength(1);
     expect(html.match(/\bdata-teaching-practice=/g)).toHaveLength(3);
   });

@@ -392,9 +392,14 @@ describe("annotation desk token contract", () => {
       "--desk-type-subheading": "20px",
       "--desk-type-section-title": "clamp(24px, 3vw, 28px)",
       "--desk-type-page-title": "clamp(30px, 4vw, 40px)",
-      "--desk-font-body": '"Noto Sans SC Variable", "PingFang SC", sans-serif',
-      "--desk-font-reading": '"Source Serif 4 Variable", Georgia, serif',
-      "--desk-font-utility": '"IBM Plex Sans Variable", "Segoe UI", sans-serif',
+      "--desk-font-body":
+        '-apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", system-ui, sans-serif',
+      "--desk-font-lesson-ui":
+        '-apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", system-ui, sans-serif',
+      "--desk-font-reading":
+        '"New York", "Iowan Old Style", "Palatino Linotype", Georgia, serif',
+      "--desk-font-utility":
+        '-apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", system-ui, sans-serif',
       "--desk-body-weight-regular": "400",
       "--desk-body-weight-medium": "500",
       "--desk-body-weight-semibold": "650",
@@ -420,8 +425,8 @@ describe("annotation desk token contract", () => {
       "--desk-layout-sidebar": "232px",
       "--desk-layout-mobile-header": "64px",
       "--desk-layout-entry-max": "560px",
-      "--desk-layout-focus-max": "1120px",
-      "--desk-layout-reading-max": "1160px",
+      "--desk-layout-focus-max": "clamp(1120px, 82vw, 1440px)",
+      "--desk-layout-reading-max": "clamp(1160px, 82vw, 1440px)",
       "--desk-layout-reading-copy": "760px",
       "--desk-layout-reading-aside": "220px",
       "--desk-layout-workspace-max": "1440px",
@@ -489,6 +494,7 @@ describe("annotation desk token contract", () => {
     const approvedFamilies = new Set([
       "inherit",
       "var(--desk-font-body)",
+      "var(--desk-font-lesson-ui)",
       "var(--desk-font-reading)",
       "var(--desk-font-utility)",
     ]);
@@ -504,7 +510,7 @@ describe("annotation desk token contract", () => {
       "var(--desk-utility-weight-semibold)",
     ]);
     const typographyDefinition =
-      /^--(?:font-(?:sans|serif)|desk-(?:font-(?:body|reading|utility)|weight-[\w-]+|(?:body|reading|utility)-weight-[\w-]+))$/u;
+      /^--(?:font-(?:sans|serif)|desk-(?:font-(?:body|lesson-ui|reading|utility)|weight-[\w-]+|(?:body|lesson-ui|reading|utility)-weight-[\w-]+))$/u;
     const typographyDefinitionsOutsideTokens = cssDocuments.flatMap(
       ({ path, root }) => {
         if (path === tokensPath) return [];
@@ -586,10 +592,13 @@ describe("annotation desk token contract", () => {
       foundationTypographyDefinitions: [],
       tokenTypography: {
         "--desk-font-body":
-          '"Noto Sans SC Variable", "PingFang SC", sans-serif',
-        "--desk-font-reading": '"Source Serif 4 Variable", Georgia, serif',
+          '-apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", system-ui, sans-serif',
+        "--desk-font-lesson-ui":
+          '-apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", system-ui, sans-serif',
+        "--desk-font-reading":
+          '"New York", "Iowan Old Style", "Palatino Linotype", Georgia, serif',
         "--desk-font-utility":
-          '"IBM Plex Sans Variable", "Segoe UI", sans-serif',
+          '-apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", system-ui, sans-serif',
         "--desk-body-weight-regular": "400",
         "--desk-body-weight-medium": "500",
         "--desk-body-weight-semibold": "650",

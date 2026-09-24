@@ -19,12 +19,14 @@ const feedbackUrl =
   "/feedback?cycle=cycle-demo&lesson=lesson-collocation-perspective";
 const paperUrl =
   "/lesson/paper?cycle=cycle-demo&lesson=lesson-collocation-perspective";
+const paperOverviewUrl = `${paperUrl}&view=overview`;
 
 const backendVocabulary =
   /mechanism_chain|generated:\d|schema_version|prompt_version|rubric_version|route_version|model_id|provider_connection_id|job_id|attempt_id|lesson_id|deterministic demo|评分要点|置信度|模型版本|提示词版本|评分规则版本|后台字段|\bAI\b|\bAPI\b|\bMock\b|provider|model|job|queue|WAITING_FOR_CONSENT|ANALYSIS_PENDING|DEMO_ONLY|confidence|threshold|low-confidence|retry count|task kind|internal ID/i;
 
 const httpLessonUrl = "/lesson?cycle=cycle-http&lesson=lesson-http";
 const httpPaperUrl = "/lesson/paper?cycle=cycle-http&lesson=lesson-http";
+const httpPaperOverviewUrl = `${httpPaperUrl}&view=overview`;
 const httpPrompt = {
   id: "workplace-link",
   instructionZh: "用一句英文补出灵活工作与生产力之间的机制。",
@@ -549,7 +551,7 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
   }) => {
     await page.goto(lessonUrl);
     await expect(
-      page.getByText("学完这节，你能够", { exact: true }),
+      page.getByText("本节只练一种能力", { exact: true }),
     ).toBeVisible();
     const toggle = page.locator("[data-teaching-toc-toggle]");
     if (await toggle.isVisible()) await toggle.click();
@@ -657,7 +659,7 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
     await expect(mark).toHaveAttribute("data-annotation-kind", "development");
 
     // Compare activation geometry using the same loaded font. A fallback-to-
-    // Source Serif swap can change glyph boxes and wrapping without any hover
+    // Apple New York swap can change glyph boxes and wrapping without any hover
     // or selection layout change.
     await page.evaluate(() => document.fonts.ready);
 
@@ -1259,7 +1261,7 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
   test("shows all eight questions with concise, complete instructions", async ({
     page,
   }) => {
-    await page.goto(paperUrl);
+    await page.goto(paperOverviewUrl);
 
     await expect(page.getByText("本题评分点")).toHaveCount(0);
     await expect(page.getByText("基础判断", { exact: true })).toHaveCount(0);
@@ -1277,7 +1279,7 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
   test("practice paper keeps all utilities and exposes eight question anchors", async ({
     page,
   }) => {
-    await page.goto(paperUrl);
+    await page.goto(paperOverviewUrl);
 
     const navigation = page.locator("[data-paper-question-nav]");
     await expect(page.locator(".practice-paper-question")).toHaveCount(8);
@@ -1313,7 +1315,7 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
   test("practice paper question navigation only scrolls and preserves the draft", async ({
     page,
   }) => {
-    await page.goto(paperUrl);
+    await page.goto(paperOverviewUrl);
     const answer = page.getByRole("textbox", { name: "第 2 题 answer" });
     const draft =
       "Early practice makes recurring sentence patterns familiar before the learner faces a demanding writing task.";
@@ -1334,7 +1336,7 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
   test("keeps the source report available and preserves the paper draft", async ({
     page,
   }) => {
-    await page.goto(paperUrl);
+    await page.goto(paperOverviewUrl);
     const answer = page.getByRole("textbox", { name: "第 2 题 answer" });
     await answer.fill(
       "Regular exposure helps children recognise common language patterns early, so they face fewer difficulties when formal study becomes more demanding later.",
@@ -1348,11 +1350,15 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
       page.getByRole("heading", { name: "看懂问题，学会修改" }),
     ).toBeVisible();
     await page.getByRole("link", { name: "进入专项教学" }).click();
+    await page.goto(
+      "/lesson?cycle=cycle-demo&lesson=lesson-collocation-perspective&step=10",
+    );
     await page.getByRole("link", { name: "开始60分钟训练卷" }).click();
 
     await expect(page).toHaveURL(
       /\/lesson\/paper\?cycle=cycle-demo&lesson=lesson-collocation-perspective$/,
     );
+    await page.locator("[data-paper-view-toggle=overview]").click();
     await expect(answer).toHaveValue(
       "Regular exposure helps children recognise common language patterns early, so they face fewer difficulties when formal study becomes more demanding later.",
     );
@@ -1368,6 +1374,9 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
     await (await navigationLink(page, "专项提升")).click();
     await expect(page).toHaveURL(
       /\/lesson\?cycle=cycle-demo&lesson=lesson-collocation-perspective$/,
+    );
+    await page.goto(
+      "/lesson?cycle=cycle-demo&lesson=lesson-collocation-perspective&step=10",
     );
     await page.getByRole("link", { name: "开始60分钟训练卷" }).click();
     await expect(page).toHaveURL(
@@ -1410,7 +1419,7 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
   test("submits once and keeps the Demo paper explicitly unscored", async ({
     page,
   }) => {
-    await page.goto(paperUrl);
+    await page.goto(paperOverviewUrl);
     await page.getByText("A", { exact: true }).last().click();
     await page
       .getByRole("textbox", { name: "第 2 题 answer" })
@@ -1451,7 +1460,7 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
   test("final review semantics: Demo paper records the saved submission in both locales", async ({
     page,
   }) => {
-    await page.goto(paperUrl);
+    await page.goto(paperOverviewUrl);
     await page.getByText("A", { exact: true }).last().click();
     await page.getByRole("button", { name: "交卷" }).click();
 
@@ -1497,7 +1506,7 @@ test.describe("feedback, focused teaching and complete practice paper", () => {
         }),
       );
     });
-    await page.goto(paperUrl);
+    await page.goto(paperOverviewUrl);
 
     const retainedAnswer = page.getByRole("textbox", {
       name: "第 2 题 answer",
@@ -2142,7 +2151,7 @@ test.describe("tutorial answer analysis over the public HTTP contract", () => {
       paperState: "result",
     });
 
-    await page.goto(httpPaperUrl);
+    await page.goto(httpPaperOverviewUrl);
     await expect(page.getByText("已交卷", { exact: true })).toHaveClass(
       /badge-blue/,
     );
@@ -2785,11 +2794,13 @@ test.describe("tutorial answer analysis over the public HTTP contract", () => {
         (element) => window.getComputedStyle(element).fontFamily,
       ),
     ]);
-    expect(headingFamily).toContain("Noto Sans SC");
-    expect(headingFamily).not.toContain("Source Serif 4");
+    expect(headingFamily).toContain("SF Pro Text");
+    expect(headingFamily).toContain("PingFang SC");
+    expect(headingFamily).not.toContain("New York");
+    expect(headingFamily).not.toContain("New York");
     for (const family of [answerFamily, evidenceFamily]) {
-      expect(family).toContain("Source Serif 4");
-      expect(family).not.toContain("Noto Sans SC");
+      expect(family).toContain("New York");
+      expect(family).not.toContain("SF Pro Text");
     }
     for (const evidence of await analysis
       .locator("[data-teaching-evidence]")

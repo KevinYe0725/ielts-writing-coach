@@ -36,6 +36,13 @@ function wordCount(value: string): number {
   return value.trim().split(/\s+/).filter(Boolean).length;
 }
 
+type PaperView = "focus" | "overview";
+
+function parseQuestionIndex(value: string | null | undefined): number {
+  const parsed = value ? Number(value) : NaN;
+  return Number.isInteger(parsed) && parsed > 0 ? parsed - 1 : 0;
+}
+
 function keepFocusedControlAboveSubmitBar(control: HTMLElement): void {
   window.requestAnimationFrame(() => {
     const submitBar = document.querySelector<HTMLElement>(
@@ -125,6 +132,8 @@ export default function PracticePaperPage({
   const query = use(searchParams);
   const cycleId = singleRouteParam(query, "cycle");
   const lessonId = singleRouteParam(query, "lesson");
+  const requestedView = singleRouteParam(query, "view");
+  const requestedQuestion = singleRouteParam(query, "question");
   const router = useRouter();
   const { text, messages } = useLocale();
   const loader = useCallback(
@@ -146,6 +155,12 @@ export default function PracticePaperPage({
   const [submitting, setSubmitting] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [paperView, setPaperView] = useState<PaperView>(() =>
+    requestedView === "overview" ? "overview" : "focus",
+  );
+  const [activeQuestionIndex, setActiveQuestionIndex] = useState(() =>
+    parseQuestionIndex(requestedQuestion),
+  );
   const replace = useCallback(
     (targetLessonId: string) =>
       learningClient.replaceLegacyLesson(targetLessonId),
@@ -219,6 +234,72 @@ export default function PracticePaperPage({
         data?.result?.itemResults.map((item) => [item.itemId, item]) ?? [],
       ),
     [data],
+  );
+  const currentQuestionIndex = data
+    ? Math.min(
+        Math.max(activeQuestionIndex, 0),
+        Math.max(data.questions.length - 1, 0),
+      )
+    : activeQuestionIndex;
+
+  const updatePaperLocation = useCallback(
+    (nextView: PaperView, questionIndex: number) => {
+      const params = new URLSearchParams(window.location.search);
+      params.set("view", nextView);
+      if (nextView === "focus") {
+        params.set("question", String(questionIndex + 1));
+      } else {
+        params.delete("question");
+      }
+      window.history.replaceState(
+        window.history.state,
+        "",
+        `${window.location.pathname}?${params.toString()}`,
+      );
+    },
+    [],
+  );
+
+  const selectQuestion = useCallback(
+    (questionIndex: number) => {
+      if (!data) return;
+      const safeIndex = Math.min(
+        Math.max(questionIndex, 0),
+        Math.max(data.questions.length - 1, 0),
+      );
+      setActiveQuestionIndex(safeIndex);
+      updatePaperLocation("focus", safeIndex);
+      const focusTarget = () => {
+        const target = document.getElementById(
+          `paper-question-${data.questions[safeIndex]?.id}`,
+        );
+        target?.scrollIntoView({ behavior: "auto", block: "start" });
+        const activeElement = document.activeElement;
+        if (
+          target &&
+          (!activeElement ||
+            activeElement === document.body ||
+            !activeElement.matches("input, textarea, select"))
+        ) {
+          target.focus({ preventScroll: true });
+        }
+      };
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(focusTarget);
+      });
+    },
+    [data, updatePaperLocation],
+  );
+
+  const selectView = useCallback(
+    (nextView: PaperView) => {
+      setPaperView(nextView);
+      updatePaperLocation(nextView, currentQuestionIndex);
+      window.requestAnimationFrame(() => {
+        if (nextView === "focus") window.scrollTo({ top: 0, behavior: "auto" });
+      });
+    },
+    [currentQuestionIndex, updatePaperLocation],
   );
 
   if (!data) {
@@ -305,7 +386,10 @@ export default function PracticePaperPage({
   }
 
   return (
-    <div className={cn("practice-paper-page", styles.page)}>
+    <div
+      className={cn("practice-paper-page", styles.page)}
+      data-paper-view={paperView}
+    >
       <PageHeader
         actions={
           <div
@@ -348,6 +432,28 @@ export default function PracticePaperPage({
               <FileText aria-hidden="true" size={17} />
               {text("查看详细批改", "View detailed feedback")}
             </ActionLink>
+            <div
+              aria-label={text("试卷显示方式", "Paper display mode")}
+              className={styles.viewToggle}
+              role="group"
+            >
+              <button
+                aria-pressed={paperView === "focus"}
+                data-paper-view-toggle="focus"
+                onClick={() => selectView("focus")}
+                type="button"
+              >
+                {text("逐题", "Focus")}
+              </button>
+              <button
+                aria-pressed={paperView === "overview"}
+                data-paper-view-toggle="overview"
+                onClick={() => selectView("overview")}
+                type="button"
+              >
+                {text("总览", "Overview")}
+              </button>
+            </div>
             {data.submittedAt ? (
               <Badge tone={demoMode ? "neutral" : "blue"}>
                 <FileCheck2 aria-hidden="true" size={14} />
@@ -436,12 +542,25 @@ export default function PracticePaperPage({
                       `第 ${index + 1} 题${isAnswered ? "，已作答" : ""}`,
                       `Question ${index + 1}${isAnswered ? ", answered" : ""}`,
                     )}
+                    aria-current={
+                      paperView === "focus" && currentQuestionIndex === index
+                        ? "step"
+                        : undefined
+                    }
                     data-answered={isAnswered ? "true" : "false"}
                     href={`#paper-question-${question.id}`}
-                    onClick={() => {
-                      document
-                        .getElementById(`paper-question-${question.id}`)
-                        ?.focus({ preventScroll: true });
+                    onClick={(event) => {
+                      setActiveQuestionIndex(index);
+                      if (paperView === "focus") {
+                        event.preventDefault();
+                        selectQuestion(index);
+                        return;
+                      }
+                      window.requestAnimationFrame(() => {
+                        document
+                          .getElementById(`paper-question-${question.id}`)
+                          ?.focus({ preventScroll: true });
+                      });
                     }}
                   >
                     {index + 1}
@@ -456,7 +575,13 @@ export default function PracticePaperPage({
           className={cn("practice-paper-questions", styles.questions)}
           data-paper-sheet
         >
-          {data.questions.map((question) => {
+          {(paperView === "focus"
+            ? data.questions.slice(
+                currentQuestionIndex,
+                currentQuestionIndex + 1,
+              )
+            : data.questions
+          ).map((question) => {
             const result = resultById.get(question.id);
             const needsWork = result?.status !== "MEETS_STANDARD";
             const hasGenericTitle = /^第\s*\d+\s*题$/u.test(question.titleZh);
@@ -564,6 +689,39 @@ export default function PracticePaperPage({
           })}
         </div>
       </div>
+
+      {paperView === "focus" ? (
+        <nav
+          aria-label={text("题目分页", "Question pagination")}
+          className={styles.pageNavigation}
+          data-paper-page-nav
+        >
+          <button
+            data-paper-question-prev
+            disabled={currentQuestionIndex <= 0}
+            onClick={() => selectQuestion(currentQuestionIndex - 1)}
+            type="button"
+          >
+            <span aria-hidden="true">←</span>
+            {text("上一题", "Previous")}
+          </button>
+          <span aria-live="polite">
+            {text(
+              `第 ${currentQuestionIndex + 1} / ${data.questions.length} 题`,
+              `Question ${currentQuestionIndex + 1} of ${data.questions.length}`,
+            )}
+          </span>
+          <button
+            data-paper-question-next
+            disabled={currentQuestionIndex >= data.questions.length - 1}
+            onClick={() => selectQuestion(currentQuestionIndex + 1)}
+            type="button"
+          >
+            {text("下一题", "Next")}
+            <span aria-hidden="true">→</span>
+          </button>
+        </nav>
+      ) : null}
 
       {submitError ? (
         <p
