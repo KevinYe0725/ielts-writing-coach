@@ -19,11 +19,18 @@ export function PublicHome() {
   const [mode, setMode] = useState<EntryMode>("login");
   const [example, setExample] = useState<"revision" | "reason">("revision");
   const returnFocus = useRef<HTMLButtonElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
 
   function enter(next: EntryMode, event: MouseEvent<HTMLButtonElement>) {
     returnFocus.current = event.currentTarget;
+    if (dialogRef.current) dialogRef.current.scrollTop = 0;
     setMode(next);
     setOpen(true);
+  }
+
+  function switchMode() {
+    if (dialogRef.current) dialogRef.current.scrollTop = 0;
+    setMode((current) => (current === "login" ? "register" : "login"));
   }
 
   return (
@@ -300,6 +307,7 @@ export function PublicHome() {
         <Dialog.Portal>
           <Dialog.Overlay className={styles.overlay} />
           <Dialog.Content
+            ref={dialogRef}
             className={styles.dialog}
             onCloseAutoFocus={(event) => {
               event.preventDefault();
@@ -329,7 +337,7 @@ export function PublicHome() {
             <button
               className={styles.switchMode}
               type="button"
-              onClick={() => setMode(mode === "login" ? "register" : "login")}
+              onClick={switchMode}
             >
               {mode === "login"
                 ? text("第一次使用？创建账号", "First visit? Create an account")
