@@ -5,6 +5,7 @@
   --home-canvas: var(--desk-mono-canvas);
   --home-line: var(--desk-mono-line);
   --home-line-strong: var(--desk-mono-line-strong);
+  --desk-shadow-floating: 0 18px 52px rgb(0 0 0 / 16%);
   color: var(--home-ink);
   background: var(--home-paper);
   font-family: var(--desk-font-body);
@@ -357,26 +358,65 @@
   position: fixed;
   inset: 0;
   z-index: 100;
-  background: color-mix(in srgb, var(--home-ink) 35%, transparent);
+  background: color-mix(in srgb, var(--desk-mono-ink) 38%, transparent);
   backdrop-filter: blur(4px);
 }
 .dialog {
+  /* Radix portals this node under body, outside .home's theme scope. */
+  --home-ink: var(--desk-mono-ink);
+  --home-muted: var(--desk-mono-muted);
+  --home-paper: var(--desk-mono-paper);
+  --home-canvas: var(--desk-mono-canvas);
+  --home-line: var(--desk-mono-line);
+  --home-line-strong: var(--desk-mono-line-strong);
   position: fixed;
   z-index: 101;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: min(480px, calc(100vw - 32px));
-  max-height: calc(100dvh - 32px);
+  width: min(440px, calc(100vw - 32px));
+  max-height: min(720px, calc(100dvh - 32px));
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 48px 32px 32px;
+  -webkit-overflow-scrolling: touch;
+  padding: 40px 32px 32px;
   background: var(--home-paper);
   color: var(--home-ink);
   border: 1px solid var(--home-line);
   border-radius: var(--desk-radius-lg);
   box-shadow: var(--desk-shadow-floating);
   font-family: var(--desk-font-body);
+}
+.dialog :global([data-signin-form] .form-field label) {
+  color: var(--home-ink);
+}
+.dialog :global([data-signin-form] .text-input) {
+  color: var(--home-ink);
+  background: var(--home-paper);
+  border-color: var(--home-line-strong);
+}
+.dialog :global([data-signin-form] .text-input:focus-visible) {
+  border-color: var(--home-ink);
+  outline: 2px solid var(--home-ink);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+.dialog :global(#signin-password-hint) {
+  color: var(--home-muted);
+}
+.dialog :global([data-signin-form] button[type="submit"]) {
+  color: #ffffff;
+  background: var(--home-ink);
+  border-color: var(--home-ink);
+}
+.dialog :global([data-signin-form] button[type="submit"]:hover:not(:disabled)) {
+  background: #333333;
+  border-color: #333333;
+}
+.dialog :global([data-signin-form] button[type="submit"]:disabled) {
+  color: #5b5b5b;
+  background: #e6e6e6;
+  border-color: #e6e6e6;
 }
 .authTitle {
   font-family: var(--desk-font-body);
@@ -386,7 +426,7 @@
   letter-spacing: -0.04em;
 }
 .authDescription {
-  margin: 0 0 32px;
+  margin: 0 0 24px;
   color: var(--home-muted);
   font-size: var(--desk-type-body);
   line-height: 1.65;
@@ -519,6 +559,7 @@
     padding: 64px 24px;
   }
   .dialog {
+    max-height: min(720px, calc(100dvh - 24px));
     padding: 32px 24px 24px;
   }
 }
