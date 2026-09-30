@@ -21,7 +21,7 @@ COPY packages/question-bank/package.json packages/question-bank/package.json
 COPY packages/search/package.json packages/search/package.json
 RUN pnpm install --frozen-lockfile
 
-FROM postgres:17.6-bookworm AS postgres-tools
+FROM postgres:17.11-bookworm AS postgres-tools
 
 FROM dependencies AS builder
 COPY . .
