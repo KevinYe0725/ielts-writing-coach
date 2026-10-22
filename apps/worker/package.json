@@ -27,11 +27,11 @@
     "@iwc/search": "workspace:*",
     "ajv": "catalog:",
     "drizzle-orm": "catalog:",
-    "graphile-worker": "0.17.3",
-    "nodemailer": "9.0.5"
+    "graphile-worker": "0.18.0",
+    "nodemailer": "10.1.7"
   },
   "devDependencies": {
-    "tsup": "8.5.0",
+    "tsup": "9.0.0",
     "typescript": "catalog:"
   }
 }

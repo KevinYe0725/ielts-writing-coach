@@ -17,8 +17,8 @@
   "dependencies": {
     "@iwc/question-bank": "workspace:*",
     "ajv": "catalog:",
-    "openai": "7.4.0",
-    "zod": "4.4.3"
+    "openai": "7.39.0",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "typescript": "catalog:"
